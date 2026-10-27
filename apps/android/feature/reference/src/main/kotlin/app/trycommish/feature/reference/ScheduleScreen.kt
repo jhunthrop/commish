@@ -21,16 +21,21 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.trycommish.core.reference.ScheduleCell
@@ -52,6 +57,9 @@ private object GridSize {
     val strength = 48.dp
     val week = 64.dp
     val row = 52.dp
+
+    /** A row whose current week's cell carries the game's state on a third line. */
+    val statedRow = 62.dp
     val head = 34.dp
     val rank = 22.dp
     val face = 24.dp
@@ -64,6 +72,7 @@ fun weekHead(week: Int): String = "${Words.SchedulePage.week} $week"
  * player's name under it, then its strength. */
 @Composable
 private fun GridClubCell(
+    height: Dp,
     row: ScheduleGridRow,
     strength: Boolean,
     open: (String) -> Unit,
@@ -71,7 +80,7 @@ private fun GridClubCell(
     val c = CommishTheme.colors
     Column {
         Row(
-            Modifier.height(GridSize.row).padding(horizontal = Tokens.Space.s2.dp),
+            Modifier.height(height).padding(horizontal = Tokens.Space.s2.dp),
             horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s1.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -126,18 +135,21 @@ private fun GridClubCell(
  * played, opening the opponent's page; the bye's word. */
 @Composable
 private fun GridWeekCell(
+    height: Dp,
+    width: Dp,
     cell: ScheduleCell,
     open: (String) -> Unit,
+    onStateLaid: (TextLayoutResult) -> Unit,
 ) {
     val c = CommishTheme.colors
     val played = Tokens.Color.playedInk.resolve(c.dark)
     val ink = if (cell.played) played else c.ink
     val club = cell.club
-    Column(Modifier.width(GridSize.week)) {
+    Column(Modifier.width(width)) {
         Box(
             Modifier
-                .width(GridSize.week)
-                .height(GridSize.row)
+                .width(width)
+                .height(height)
                 .background(if (cell.hard) c.surface2 else c.bg)
                 .then(if (club != null) Modifier.clickable(role = Role.Button) { open(club) } else Modifier),
             contentAlignment = Alignment.Center,
@@ -160,6 +172,16 @@ private fun GridWeekCell(
                                 c.ink
                             },
                     )
+                    // The current week's game as the run read it, set back once final (Lane 223, B187).
+                    cell.state?.let {
+                        Text(
+                            it,
+                            style = STATE_STYLE,
+                            color = if (cell.played) played else c.ink3,
+                            maxLines = 1,
+                            onTextLayout = onStateLaid,
+                        )
+                    }
                 }
             }
         }
@@ -167,18 +189,28 @@ private fun GridWeekCell(
     }
 }
 
-/** The grid: the club and strength columns pinned, the weeks scrolling sideways beside them; `still` draws
- * the first weeks the frame holds, the rest cut at its edge (a snapshot's). */
+/** The grid: the club and strength columns pinned, the weeks scrolling sideways beside them, opened on the
+ * current week where the run says its games' states (ScheduleGrid.svelte openOnCurrent); `still` draws the
+ * weeks the frame holds from there, the rest cut at its edge (a snapshot's). */
 @Composable
 fun ScheduleGridView(
     grid: ScheduleGridModel,
     rows: List<ScheduleGridRow>,
     open: (String) -> Unit,
     still: Boolean,
+    onStateLaid: (TextLayoutResult) -> Unit = {},
 ) {
     val c = CommishTheme.colors
     val shape = RoundedCornerShape(Tokens.Radius.md.dp)
     val strength = grid.strengthLabel
+    val height = if (grid.current == null) GridSize.row else GridSize.statedRow
+    val currentWidth = currentWeekWidth(grid)
+    val weekWidth = { week: Int -> if (week == grid.current) currentWidth else GridSize.week }
+    // The weeks before the current one lie left of the frame's edge: week 1 sits at the start. A newer run
+    // read in place with another current week opens on that one (review L3).
+    val opening = with(LocalDensity.current) { (GridSize.week * ((grid.current ?: 1) - 1)).roundToPx() }
+    val weeks = rememberScrollState(opening)
+    LaunchedEffect(opening) { weeks.scrollTo(opening) }
     Row(
         Modifier
             .fillMaxWidth()
@@ -196,13 +228,13 @@ fun ScheduleGridView(
                 strength?.let { ColumnHead(it, Modifier.width(GridSize.strength)) }
             }
             HorizontalDivider(color = c.line)
-            rows.forEach { GridClubCell(it, strength != null, open) }
+            rows.forEach { GridClubCell(height, it, strength != null, open) }
         }
-        // At rest (a snapshot's) the weeks lie still at their start, the rest cut at the frame's edge.
-        Column(Modifier.weight(1f).horizontalScroll(rememberScrollState(), enabled = !still)) {
+        // At rest (a snapshot's) the weeks lie still where they open, the rest cut at the frame's edge.
+        Column(Modifier.weight(1f).horizontalScroll(weeks, enabled = !still)) {
             Row(Modifier.height(GridSize.head)) {
                 grid.weeks.forEach { week ->
-                    Box(Modifier.width(GridSize.week).height(GridSize.head), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(weekWidth(week)).height(GridSize.head), contentAlignment = Alignment.Center) {
                         Text(
                             weekHead(week).uppercase(),
                             style = Faces.label,
@@ -211,10 +243,24 @@ fun ScheduleGridView(
                     }
                 }
             }
-            HorizontalDivider(Modifier.width(GridSize.week * grid.weeks.size), color = c.line)
-            rows.forEach { row -> Row { row.cells.forEach { GridWeekCell(it, open) } } }
+            HorizontalDivider(Modifier.width(grid.weeks.fold(0.dp) { sum, week -> sum + weekWidth(week) }), color = c.line)
+            rows.forEach { row -> Row { row.cells.forEach { GridWeekCell(height, weekWidth(it.week), it, open, onStateLaid) } } }
         }
     }
+}
+
+/** The current week's line under a game: its state or its kickoff with its day and zone. */
+private val STATE_STYLE = Faces.label.copy(fontWeight = FontWeight.Normal)
+
+/** The current week's column, as the web widens its week at 390: wide enough for the longest state any
+ * club's cell says ("Sun 12:00 pm CT") with a margin each side, never narrower than a week. */
+@Composable
+private fun currentWeekWidth(grid: ScheduleGridModel): Dp {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val words = grid.rows.mapNotNull { row -> row.cells.firstOrNull { it.week == grid.current }?.state }.distinct()
+    val widest = words.maxOfOrNull { measurer.measure(it, STATE_STYLE, maxLines = 1).size.width } ?: 0
+    return maxOf(GridSize.week, with(density) { widest.toDp() } + Tokens.Space.s2.dp * 2)
 }
 
 /** The legend under the grid: a shaded cell's words and a played one's. */
@@ -248,13 +294,17 @@ fun ScheduleScreen(
     actions: ReferenceActions,
     rows: List<ScheduleGridRow> = model.grid.rows,
     still: Boolean = false,
+    /** Each current-week state line once laid out: the snapshot test checks none overflows (review H1). */
+    onStateLaid: (TextLayoutResult) -> Unit = {},
 ) {
     val c = CommishTheme.colors
     val scroll = if (still) Modifier else Modifier.fillMaxSize().verticalScroll(rememberScrollState())
     Column(scroll.background(c.bg).padding(vertical = Tokens.Space.s4.dp), verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp)) {
         ReferenceHead(model.heading, model.stamp, model.grid.lead, stale)
         Text(model.caption, style = Faces.small, color = c.ink3, modifier = Modifier.padding(horizontal = Tokens.Space.s3.dp))
-        Box(Modifier.padding(horizontal = Tokens.Space.s3.dp)) { ScheduleGridView(model.grid, rows, actions::club, still) }
+        Box(Modifier.padding(horizontal = Tokens.Space.s3.dp)) { ScheduleGridView(model.grid, rows, actions::club, still, onStateLaid) }
+        // One line under the games naming the run's read, so a state is never claimed live.
+        model.grid.asOf?.let { Text(it, style = Faces.small, color = c.ink3, modifier = Modifier.padding(horizontal = Tokens.Space.s3.dp)) }
         ScheduleLegend(model)
     }
 }

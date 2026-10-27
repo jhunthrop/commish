@@ -24,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
@@ -213,11 +215,21 @@ private fun ClubScheduleView(
                         color = color,
                         modifier = Modifier.weight(1f).clickable(role = Role.Button) { actions.club(game.club) },
                     )
+                    // The current week's game as the run read it follows the opponent (Lane 223, B187).
+                    game.state?.let {
+                        Text(
+                            it,
+                            style = Faces.label.copy(fontWeight = FontWeight.Normal),
+                            color = if (game.played) color else c.ink3,
+                        )
+                    }
                     Text(game.value, style = style, color = color, textAlign = TextAlign.End, modifier = Modifier.width(GAME_VALUE))
                 }
                 HorizontalDivider(color = c.line)
             }
         }
+        // One line under the games naming the run's read, so a state is never claimed live.
+        model.asOf?.let { Text(it, style = Faces.small, color = c.ink3, modifier = Modifier.padding(horizontal = Tokens.Space.s3.dp)) }
     }
 }
 
@@ -235,7 +247,8 @@ fun ClubScreen(
     Column(scroll.background(c.bg).padding(vertical = Tokens.Space.s4.dp), verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp)) {
         ClubHeroView(model, stale, actions)
         BasisLines(model.basis)
-        Column {
+        // The section's spoken label follows its head, as the web's table label does (Lane 223 review M3).
+        Column(Modifier.semantics { contentDescription = model.boardLabel }) {
             BoardSectionHead(model.boardHead)
             val nobody = model.nobody
             if (nobody != null) {

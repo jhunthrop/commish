@@ -208,17 +208,19 @@ internal object RecordLines {
         return if (order == OrderBasis.rest_of_season && asOf != null) "$named, refreshed ${RecordWords.day(asOf)}" else named
     }
 
-    /** records.ts weeklyOrderWords: "Our weekly rankings, set Oct 22". */
+    /** records.ts weeklyOrderWords: "Our rest-of-season order, set Oct 22", the date from the week's frozen
+     * stamp, never the clock (Lane 223, B188). */
     fun weeklyOrder(week: RunRecordWeek): String? {
         val frozenAt = week.frozenAt
-        return if (week.order == null || frozenAt == null) null else "Our weekly rankings, set ${RecordWords.day(frozenAt)}"
+        return if (week.order == null || frozenAt == null) null else "${Words.RecordOrder.rest_of_season}, set ${RecordWords.day(frozenAt)}"
     }
 
     /** records.ts beforeLine: the weeks before the weekly record with the set rule said once. */
     fun before(fromWeek: Int): Pair<String, String>? {
         if (fromWeek <= 1) return null
         return (if (fromWeek <= 2) "Week 1" else "Weeks 1 to ${fromWeek - 1}") to
-            "Weekly rankings start week $fromWeek. Each week's rankings are set before its first kickoff " +
+            "${Words.RecordOrder.rest_of_season} is graded week by week from week $fromWeek. " +
+            "Each week's order is set before its first kickoff " +
             "and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. " +
             "Before that the site shipped the draft board, graded under ${Words.Records.draft}."
     }

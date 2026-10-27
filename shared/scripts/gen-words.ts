@@ -30,12 +30,19 @@ export interface NamedTable {
  * functions rather than in a table. */
 export type Pick = string | readonly [key: string, exportName: string];
 
-/** One table the generator writes: its module, what it takes from it and the JSON it writes. */
-interface TableSource {
-  name: string;
+/** Where a table's words are taken from: a module and what it takes from it. */
+interface TableFrom {
   module: string;
   picks: readonly Pick[];
+}
+
+/** One table the generator writes: its module, what it takes from it and the JSON it writes; `ios`
+ * where iOS still draws the apps' older words from the pending seam (apps-pending-words.ts) while the
+ * JSON and Android draw the web's (Lane 231, B224; Lane 232 drops it). */
+interface TableSource extends TableFrom {
+  name: string;
   json: string;
+  ios?: TableFrom;
 }
 
 const SCRIPT = "shared/scripts/gen-words.ts";
@@ -53,6 +60,8 @@ const ACCOUNT_MODULE = "web/src/lib/account/words.ts";
 const REFERENCE_MODULE = "web/src/lib/site/reference-words.ts";
 const STRENGTH_MODULE = "web/src/lib/run/strength-words.ts";
 const COMPANION_MODULE = "web/src/lib/companion/words.ts";
+/** The words iOS still draws where the web has moved on (Lane 223), until Lane 232 follows. */
+const PENDING_MODULE = "shared/scripts/apps-pending-words.ts";
 const DELETE_MODULE = "web/src/lib/account/delete-words.ts";
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
@@ -291,10 +300,11 @@ export const TABLES: readonly TableSource[] = [
   },
   {
     name: "Bye",
-    // The apps' bye words until their lane follows the web's (Lane 223, apps-pending-words.ts).
-    module: "shared/scripts/apps-pending-words.ts",
+    module: "web/src/lib/format/bye.ts",
     picks: ["BYE_WORDS"],
     json: "shared/words/bye.json",
+    // iOS's bye words until its lane follows the web's (Lane 223, apps-pending-words.ts).
+    ios: { module: PENDING_MODULE, picks: ["BYE_WORDS"] },
   },
   {
     name: "Waivers",
@@ -449,10 +459,11 @@ export const TABLES: readonly TableSource[] = [
   },
   {
     name: "Records",
-    // The apps' record words until their lane follows the web's (Lane 223, apps-pending-words.ts).
-    module: "shared/scripts/apps-pending-words.ts",
+    module: "web/src/lib/run/records.ts",
     picks: ["RECORDS_WORDS"],
     json: "shared/words/records.json",
+    // iOS's record words until its lane follows the web's (Lane 223, apps-pending-words.ts).
+    ios: { module: PENDING_MODULE, picks: ["RECORDS_WORDS"] },
   },
   {
     name: "Pair",
@@ -813,20 +824,24 @@ export function gather(
   return Object.fromEntries(entries);
 }
 
-async function readTable(source: TableSource): Promise<NamedTable> {
-  const module = (await import(join(REPOSITORY, source.module))) as Record<
+async function readTable(name: string, from: TableFrom): Promise<NamedTable> {
+  const module = (await import(join(REPOSITORY, from.module))) as Record<
     string,
     unknown
   >;
-  return {
-    name: source.name,
-    table: gather(module, source.picks, source.module),
-  };
+  return { name, table: gather(module, from.picks, from.module) };
 }
 
 export async function generate(): Promise<Outputs> {
-  const tables = await Promise.all(TABLES.map(readTable));
-  const { swift, kotlin } = renderWords(tables);
+  const tables = await Promise.all(
+    TABLES.map((source) => readTable(source.name, source)),
+  );
+  // iOS's tables: the web's, but where it still draws the pending seam's words.
+  const iosTables = await Promise.all(
+    TABLES.map((source) => readTable(source.name, source.ios ?? source)),
+  );
+  const { kotlin } = renderWords(tables);
+  const { swift } = renderWords(iosTables);
   return new Map([
     ...TABLES.map((source, i): [string, string] => [
       source.json,

@@ -1,14 +1,16 @@
-/** The words the apps still draw where the web has moved on, so their generated words and their parity
- * stay what the apps draw until their own lane follows (Lane 223, B224). Each entry names the web's
- * change; the app lane deletes the entry (and this file with its last one), points gen-words.ts and
- * the parity scripts back at the web's tables and regenerates. apps-pending-words.test.ts fails when
- * an entry says what the web says again, so a stale entry is found, not kept.
+/** The words iOS still draws where the web has moved on, so its generated words (gen-words.ts, the
+ * tables' `ios` source) and the parity files' live values stay what iOS draws until its lane follows
+ * (Lane 223, B224). Android follows the web since Lane 231: its Words.kt is generated from the web's
+ * tables and its parity tests read the web's sentences from the files' `webPending` keys. Lane 232
+ * deletes this file, drops the tables' `ios` sources, moves each `webPending` value into its live key
+ * and points Android's parity reads back at the live keys. apps-pending-words.test.ts fails when an
+ * entry says what the web says again, so a stale entry is found, not kept.
  *
  * - The record's graded order (B188): the web names it "our rest-of-season order, graded week by
- *   week"; the apps' RecordLines still build "Our weekly rankings" by hand, so their words and the
- *   record parity keep the old sentences here.
- * - A played bye (B190): the web's Bye cell draws nothing; the apps' BoardCells still say "Bye Done",
- *   so their bye words and the board parity keep "Done" here. */
+ *   week"; iOS's RecordLines still build "Our weekly rankings" by hand, so its words and the record
+ *   parity's live values keep the old sentences here.
+ * - A played bye (B190): the web's Bye cell draws nothing; iOS's BoardCells still say "Bye Done", so
+ *   its bye words and the board parity's live values keep "Done" here. */
 import {
   BYE_WORDS as WEB_BYE_WORDS,
   byeAhead,

@@ -380,7 +380,7 @@ object Words {
     }
 
     object Bye {
-        const val done = "Done"
+        const val notSet = "Bye week not set"
     }
 
     object Waivers {
@@ -621,13 +621,13 @@ object Words {
     }
 
     object Records {
-        const val lead = "Two records, each graded against what it competes with: our weekly rankings against ESPN and the week's published projection, and our draft board against ADP."
+        const val lead = "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP."
         const val weekly = "Weekly record"
-        const val weeklyWhat = "Our weekly rankings against ESPN and the week's published projection"
+        const val weeklyWhat = "Our rest-of-season order, graded week by week against ESPN and the week's published projection"
         const val draft = "Draft record"
         const val draftWhat = "Our draft board against ADP, on the season's points so far"
         const val beforePhone = "Graded under Draft record"
-        const val setRulePhone = "Each week's rankings are graded as set, never as refreshed after."
+        const val setRulePhone = "Each week's order is graded as set, never as refreshed after."
         const val notPlayed = "not played yet"
         const val underway = "under way"
         const val gradesLater = "grades when the stats land"
