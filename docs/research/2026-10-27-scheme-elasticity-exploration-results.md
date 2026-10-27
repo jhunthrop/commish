@@ -178,8 +178,19 @@ after the fact. Per-cell values are in the JSON (`reproduction_2023`).
 
 ## 9. Caveats
 
-- Two seasons, 24 judged weeks. Small effects (a few thousandths of rho) are below what 24 weeks can
-  resolve, so the finding is "no effect of the size the bar asks for", not "no effect at all".
+- Two seasons, 24 judged weeks. The pooled difference's standard error is about 0.0009 (the method
+  review's figure), so the probe resolves pooled gains of about +/-0.002 and rules out pooled gains
+  above about +0.001 for this form of the terms. The bar's +0.030 is far beyond what this form could
+  deliver even if it were right: the review's oracle check found that a perfectly known 3 per cent
+  per-player-week multiplier gains only about +0.001 to +0.002 rho, and a +0.030 gain would need a true
+  per-player-week spread of about 10 to 15 per cent.
+- The RB box term measured points per carry, touchdowns included (8+ box carries +0.216 and +0.221 a
+  carry over lighter boxes), which is confounded by goal-line carries. It is not the yards per carry
+  by box count the brief intended, so the RB result does not test that idea.
+- The defence-rate prior (6 games toward the league, R4 2.4's construction) over-shrinks scheme rates
+  by about 1.3 to 1.6 times (the method review's estimate), because a defence's scheme rate varies
+  more between clubs than its points allowed. Undoing it would still leave the terms near +0.001 rho at
+  best, so it does not change the call.
 - The history window differs by season: 2023 rows see 2022 as well, 2022 rows see only 2022 before the
   week. 2022's pressure and man/zone columns miss about 11 per cent of dropbacks, and the man share of
   charted dropbacks rises from 29 to 42 per cent between the seasons, which looks like a charting change.
@@ -192,7 +203,19 @@ after the fact. Per-cell values are in the JSON (`reproduction_2023`).
   (G6 +0.0002), so this is the same matchup structure the hypothesis attacks, but it is not the system.
 - Calibration uses the rounds' residual range, not round 4's simulation (§5).
 
-## 10. Recommendation: drop
+## 10. What "drop" covers
+
+It covers only the form tested here: a multiplicative term of the player's own split times how often
+this week's opponent uses the scheme, on the spreadsheet, in fantasy points. It does not test:
+
+- the opponent's allowance split by scheme (what a defence gives up when it blitzes, pressures, or plays
+  man or zone, rather than how often it does);
+- per-dropback EPA or yards allowed in place of fantasy points (which keeps the cost of a sack);
+- interactions of a defence's weakness with a player's strength;
+- player sensitivities estimated from longer histories, or with a weighted or minimum-count moment fit;
+- scheme rates as plain inputs to a fitted model (round 5's trees).
+
+## 11. Recommendation: drop
 
 On 2022 and 2023, multiplying the spreadsheet by scheme-matchup terms (opponent blitz, pressure and
 play-action context for quarterbacks, man/zone for receivers, 8-man boxes for backs) left the weekly
