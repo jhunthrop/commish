@@ -3,12 +3,20 @@
 # job dispatches nightly-run with the id of a run that passed its gates
 # (client_payload.runId). A push builds the run runs/latest.json names.
 # The custom domain route is added at cutover (spec §10), not here.
+#
+# A pull request, or a dispatch on any branch but main, runs only the `checks` job: types, lint, unit
+# tests and the shared-sources check. It builds nothing and holds no secret, because a build reads the
+# run from R2 and R2's keys derive from the Cloudflare token. Only a run on main reaches
+# `build-measure-deploy`, the one job that names the token (Lane 251, B258).
 name: web
 
 on:
   push:
     branches: [main]
-    paths: ["web/**", "shared/**", "api/internal/figurewords/words.json", ".github/workflows/web.yml"]
+    paths: &paths ["web/**", "shared/**", "api/internal/figurewords/words.json", ".github/workflows/web.yml"]
+  # A branch is checked on its pull request, not on every push too (api.yml and shared.yml do the same).
+  pull_request:
+    paths: *paths
   repository_dispatch:
     types: [nightly-run]
   # The hourly backstop at any hour, the delivery path: `publish` moves runs/latest.json every hour
@@ -25,10 +33,12 @@ on:
         required: false
         default: latest
 
-# One deploy at a time. A newer run waits for the one in flight rather than racing it.
+# One deploy at a time. A newer run waits for the one in flight rather than racing it. A branch's
+# checks get their own group per ref, so they never queue behind or displace a deploy, and a newer
+# push to the branch supersedes its older check.
 concurrency:
-  group: web-deploy
-  cancel-in-progress: false
+  group: ${{ github.ref == 'refs/heads/main' && 'web-deploy' || format('web-checks-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -46,7 +56,43 @@ defaults:
     working-directory: web
 
 jobs:
+  # Everything a branch can prove without a run to build. No step here reads a secret or the R2
+  # bucket; the only repository values are the public account id and run id set above.
+  checks:
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # The committed fixture run: enough for the type and test gates, which read the run's schema.
+      PUBLIC_RUN_BASE_URL: ../shared/fixtures/run
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: svelte-check
+        run: npm run check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Shared sources match their generators
+        run: npm run check:shared
+
+  # Main only: the build reads the run from R2 with keys derived from the Cloudflare token, then
+  # deploys and purges with it. A branch never reaches this job.
   build-measure-deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
