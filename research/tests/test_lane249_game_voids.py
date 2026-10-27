@@ -275,6 +275,19 @@ def test_a_played_game_is_never_voided(engine: Engine) -> None:
     assert _void_rows(engine, 2040) == 0
 
 
+def test_a_final_stamped_after_the_void_still_means_played(engine: Engine) -> None:
+    # Re-review N1: the operator voids Monday morning a game whose final is dated Monday night.
+    with engine.begin() as conn:
+        _seed(conn, 2046)
+        conn.execute(
+            insert(TEAM_WEEK_OBSERVATIONS),
+            [{"season": 2046, "week": _WEEK, "team": club, "source": "nflverse_kickoff", "metric": "game_result",
+              "value": 1.0, "as_of": _VOIDED_AT + timedelta(days=1)} for club in _CANCELLED],
+        )  # fmt: skip
+    _refused(engine, _request(2046), "2046_17_BUF_CIN (BUF at CIN) was played")
+    assert _void_rows(engine, 2046) == 0
+
+
 def test_a_graded_week_takes_no_void_and_no_lift(engine: Engine) -> None:
     with engine.begin() as conn:
         _seed(conn, 2041)

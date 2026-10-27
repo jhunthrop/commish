@@ -51,7 +51,6 @@ where game_id = :g and season = :s and week = :w and game_type = :game_type
 _FINALS: Final = """
 select count(*) from research.team_week_observations
 where season = :s and week = :w and team in (:away, :home) and source = :source and metric = :metric
-  and as_of <= :now
 """
 
 _GRADED: Final = "select exists (select 1 from research.register_grade_rows where season = :s and week = :w)"
@@ -129,9 +128,10 @@ def _act(request: VoidRequest) -> str:
     return "lift" if request.lift else "void"
 
 
-def _played(conn: Connection, request: VoidRequest, game: Row[Any], now: datetime) -> bool:
+def _played(conn: Connection, request: VoidRequest, game: Row[Any]) -> bool:
     """Whether the game was played: nflverse_games holds a score, or either club holds its final for
-    the week as of `now` (the result the stats step writes, `ScheduleMetric.GAME_RESULT`)."""
+    the week (the result the stats step writes, `ScheduleMetric.GAME_RESULT`), whatever its stamp: a result
+    is dated a day past its game, so a row dated after the void still means the game was played."""
     if game.home_score is not None or game.away_score is not None:
         return True
     params = {
@@ -141,7 +141,6 @@ def _played(conn: Connection, request: VoidRequest, game: Row[Any], now: datetim
         "home": game.home_team,
         "source": ScheduleSource.KICKOFF,
         "metric": ScheduleMetric.GAME_RESULT,
-        "now": now,
     }
     return bool(conn.execute(text(_FINALS), params).scalar_one())
 
@@ -162,7 +161,7 @@ def record_void(conn: Connection, request: VoidRequest, now: datetime) -> str:
         raise VoidError(
             f"{where} is graded and a grade is final, so the {_act(asked)} would change nothing; nothing written."
         )
-    if not asked.lift and _played(conn, asked, game, now):
+    if not asked.lift and _played(conn, asked, game):
         raise VoidError(
             f"{label} was played (a score in nflverse_games or a club's final in the store): its late stat lines "
             "are an outage to wait out, not a cancellation; nothing written."
