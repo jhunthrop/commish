@@ -8,7 +8,9 @@ the overdue line. The operator voids it:
     uv run python -m research.inseason void-game --season S --week W --game ID --reason TEXT --by WHO [--lift]
 
 The command checks the game is the game table's for that season and week (regular season, the games
-the check reads), refuses a void of a voided game and a lift of one not voided, writes one row to
+the check reads), refuses any act on a week already graded (a grade is final), a void of a game that
+was played (a score, or a club's final: its late lines are an outage, not a cancellation), a void of a
+voided game and a lift of one not voided, writes one row to
 `research.game_voids` and prints what it did. Rows are never updated or deleted: a lift is a later row
 with `lifted` true, and a game's standing is its latest row at or before the pass. A void binds the
 game in the week it was voided in: a game moved to another week since is checked again.
@@ -20,14 +22,15 @@ reason). No schedule runs it.
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final
+from typing import Any, Final
 
-from sqlalchemy import Connection, insert, text
+from sqlalchemy import Connection, Row, insert, text
 
 from research.db.schema import GAME_VOIDS
 from research.errors import ResearchError
 from research.model.instants import js_iso, ms_instant
 from research.pipeline.nflverse.config import SEASON_TYPE
+from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
 
 VOID_COMMAND: Final = "void-game"
 REASON_LIMIT: Final = 200
@@ -41,9 +44,17 @@ order by game_id, voided_at desc
 """
 
 _GAME: Final = """
-select away_team, home_team from research.nflverse_games
+select away_team, home_team, home_score, away_score from research.nflverse_games
 where game_id = :g and season = :s and week = :w and game_type = :game_type
 """
+
+_FINALS: Final = """
+select count(*) from research.team_week_observations
+where season = :s and week = :w and team in (:away, :home) and source = :source and metric = :metric
+  and as_of <= :now
+"""
+
+_GRADED: Final = "select exists (select 1 from research.register_grade_rows where season = :s and week = :w)"
 
 
 class VoidError(ResearchError):
@@ -97,6 +108,14 @@ def void_command(season: int, week: int, game_id: str) -> str:
     )
 
 
+def void_ops_command(season: int, week: int, game_id: str) -> str:
+    """The same void through `ops.yml`, for when the laptop's gcloud login has lapsed."""
+    return (
+        f"gh workflow run ops.yml -f job=inseason -f args=research.inseason,{VOID_COMMAND},--season,{season},"
+        f"--week,{week},--game,{game_id},--reason,<why>,--by,<who>"
+    )
+
+
 def _checked(request: VoidRequest) -> VoidRequest:
     reason, by = request.reason.strip(), request.voided_by.strip()
     if not reason or len(reason) > REASON_LIMIT:
@@ -106,9 +125,32 @@ def _checked(request: VoidRequest) -> VoidRequest:
     return VoidRequest(request.season, request.week, request.game_id.strip(), reason, by, request.lift)
 
 
+def _act(request: VoidRequest) -> str:
+    return "lift" if request.lift else "void"
+
+
+def _played(conn: Connection, request: VoidRequest, game: Row[Any], now: datetime) -> bool:
+    """Whether the game was played: nflverse_games holds a score, or either club holds its final for
+    the week as of `now` (the result the stats step writes, `ScheduleMetric.GAME_RESULT`)."""
+    if game.home_score is not None or game.away_score is not None:
+        return True
+    params = {
+        "s": request.season,
+        "w": request.week,
+        "away": game.away_team,
+        "home": game.home_team,
+        "source": ScheduleSource.KICKOFF,
+        "metric": ScheduleMetric.GAME_RESULT,
+        "now": now,
+    }
+    return bool(conn.execute(text(_FINALS), params).scalar_one())
+
+
 def record_void(conn: Connection, request: VoidRequest, now: datetime) -> str:
     """One void or lift written at `now`, after the checks; the line saying what was done. Raises
-    `VoidError`, writing nothing, when the game is not the week's or its standing refuses the act."""
+    `VoidError`, writing nothing, when the game is not the week's regular season game, the week is
+    already graded (a grade is final), a void names a game that was played (late lines are an outage,
+    not a cancellation), or the game's standing refuses the act."""
     asked = _checked(request)
     params = {"g": asked.game_id, "s": asked.season, "w": asked.week, "game_type": SEASON_TYPE}
     game = conn.execute(text(_GAME), params).first()
@@ -116,6 +158,15 @@ def record_void(conn: Connection, request: VoidRequest, now: datetime) -> str:
     if game is None:
         raise VoidError(f"{asked.game_id} is not a regular season game of {where} in nflverse_games; nothing written.")
     label = f"{asked.game_id} ({game.away_team} at {game.home_team})"
+    if conn.execute(text(_GRADED), {"s": asked.season, "w": asked.week}).scalar_one():
+        raise VoidError(
+            f"{where} is graded and a grade is final, so the {_act(asked)} would change nothing; nothing written."
+        )
+    if not asked.lift and _played(conn, asked, game, now):
+        raise VoidError(
+            f"{label} was played (a score in nflverse_games or a club's final in the store): its late stat lines "
+            "are an outage to wait out, not a cancellation; nothing written."
+        )
     standing = _latest_rows(conn, asked.season, now).get(asked.game_id)
     if asked.lift and (standing is None or standing.week != asked.week):
         raise VoidError(f"{label} has no void standing in {where}; nothing written.")

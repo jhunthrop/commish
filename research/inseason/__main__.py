@@ -452,6 +452,10 @@ def void_game(argv: Sequence[str], now: datetime) -> int:
     except ResearchError as error:
         _line(f"{VOID_COMMAND}: REFUSED, {error}")
         return 1
+    except SQLAlchemyError as error:
+        # The transaction rolled back: one line naming the error's class, never a traceback.
+        _line(f"{VOID_COMMAND}: REFUSED, the database answered {type(error).__name__}; nothing written.")
+        return 1
     finally:
         engine.dispose()
     _line(line)

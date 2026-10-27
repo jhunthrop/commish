@@ -1,7 +1,10 @@
 """An operator voids one game so it never blocks its week (Lane 249, B255): a game cancelled but kept in
 the game table with no result holds its week until voided, then the week grades with the voided game
 named; a later lift holds it again; a void of a game not in the week is refused, writing nothing; and
-the overdue line names the game and the command that voids it. On fixed clocks, against Postgres."""
+the overdue line names the game and the command that voids it. Fix round 1 (the review's H1, M1, L1-L4): a
+played game is never voided, a graded week takes no void or lift, a voided game's stale kickoff moves no
+clock, a database error is one line, the hint quotes ops.yml, a moved game is checked again in its new week,
+and a postseason or preseason id is refused. On fixed clocks, against Postgres."""
 
 import os
 import re
@@ -10,7 +13,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Final, cast
 
 import pytest
-from sqlalchemy import Connection, Engine, func, insert, select
+from sqlalchemy import Connection, Engine, func, insert, select, update
+from sqlalchemy.exc import OperationalError
 
 from research.db.engine import make_engine
 from research.db.schema import (
@@ -26,9 +30,10 @@ from research.db.schema import (
 from research.db.url import sqlalchemy_url
 from research.inseason import __main__ as inseason_main
 from research.inseason import season_week
-from research.inseason.game_voids import VoidError, VoidRequest, record_void, void_command
+from research.inseason.game_voids import VoidError, VoidRequest, record_void, void_command, void_ops_command
 from research.inseason.season_week import GRADE_OVERDUE, SeasonWeekContext
 from research.inseason.step_result import StepResult
+from research.inseason.week_complete import week_state
 from research.model.register.freeze import SERVED_SOURCE
 from research.parity import databases
 from research.pipeline.http import Fetcher
@@ -205,7 +210,12 @@ def test_the_overdue_line_names_the_game_and_the_void_command(engine: Engine) ->
     assert step.status == "failed"
     assert step.detail == (
         "week 17: OVERDUE, waits on 1 game of 2, BUF at CIN (BUF no final, BUF no stat lines, CIN no final, "
-        f"CIN no stat lines); if 2034_17_BUF_CIN was cancelled or dropped from games.csv, void it: {command}",
+        f"CIN no stat lines); if 2034_17_BUF_CIN was cancelled or dropped from games.csv, void it: {command} "
+        f"(with gcloud lapsed: {void_ops_command(2034, _WEEK, '2034_17_BUF_CIN')})",
+    )
+    assert void_ops_command(2034, _WEEK, "2034_17_BUF_CIN") == (
+        "gh workflow run ops.yml -f job=inseason -f args=research.inseason,void-game,--season,2034,--week,17,"
+        "--game,2034_17_BUF_CIN,--reason,<why>,--by,<who>"
     )
 
 
@@ -224,3 +234,111 @@ def test_the_command_writes_the_void_and_refuses_with_its_own_line(
                                "2027-01-06T20:00:00.000Z by jh: called off")  # fmt: skip
     assert "void-game: REFUSED, 2035_17_BUF_CIN (BUF at CIN) is already voided" in printed[1]
     assert _void_rows(engine, 2035) == 1
+
+
+# Fix round 1.
+
+
+def _add_game(conn: Connection, season: int, game_id: str, *, week: int = _WEEK, game_type: str = "REG") -> None:
+    kickoff = _MONDAY + timedelta(hours=3)
+    conn.execute(
+        insert(NFLVERSE_GAMES),
+        {"season": season, "week": week, "game_id": game_id, "game_type": game_type, "gameday": kickoff.date(),
+         "kickoff_at": kickoff, "home_team": "NYJ", "away_team": "NE", "location": "Home", "stadium_id": "NYJ",
+         "stadium": "NYJ", "read_at": _FROZEN_AT},
+    )  # fmt: skip
+
+
+def _move(conn: Connection, game_id: str, **values: object) -> None:
+    """The game table's row as the next ingest's upsert leaves it."""
+    conn.execute(update(NFLVERSE_GAMES).where(NFLVERSE_GAMES.c.game_id == game_id).values(**values))
+
+
+def _refused(engine: Engine, request: VoidRequest, words: str, at: datetime = _VOIDED_AT) -> None:
+    with pytest.raises(VoidError, match=re.escape(words)), engine.begin() as conn:
+        record_void(conn, request, at)
+
+
+def test_a_played_game_is_never_voided(engine: Engine) -> None:
+    with engine.begin() as conn:
+        _seed(conn, 2040)
+    played = (
+        "2040_17_PIT_CLE (PIT at CLE) was played (a score in nflverse_games or a club's final in the store): its "
+        "late stat lines are an outage to wait out, not a cancellation; nothing written."
+    )
+    # PIT at CLE: both clubs hold their finals (no score on the table row).
+    _refused(engine, _request(2040, game=_game_id(2040, *_PLAYED)), played)
+    # BUF at CIN with a score on the table and no final in the store yet.
+    with engine.begin() as conn:
+        _move(conn, _game_id(2040, *_CANCELLED), home_score=20, away_score=17)
+    _refused(engine, _request(2040), "2040_17_BUF_CIN (BUF at CIN) was played")
+    assert _void_rows(engine, 2040) == 0
+
+
+def test_a_graded_week_takes_no_void_and_no_lift(engine: Engine) -> None:
+    with engine.begin() as conn:
+        _seed(conn, 2041)
+        record_void(conn, _request(2041), _VOIDED_AT)
+    graded, _ = _grade(engine, 2041, _WEDNESDAY_PASS)
+    with engine.begin() as conn:
+        _add_game(conn, 2041, "2041_17_NE_NYJ")
+    final = "season 2041 week 17 is graded and a grade is final, so the {} would change nothing; nothing written."
+    _refused(engine, _request(2041, lift=True), final.format("lift"), _LIFTED_AT)
+    _refused(engine, _request(2041, game="2041_17_NE_NYJ"), final.format("void"), _LIFTED_AT)
+    assert graded.status == "ok"
+    assert _void_rows(engine, 2041) == 1
+
+
+def test_a_voided_games_stale_kickoff_moves_no_clock(engine: Engine) -> None:
+    with engine.begin() as conn:
+        _seed(conn, 2042)
+        # The cancelled game's row keeps a placeholder kickoff weeks on.
+        _move(conn, _game_id(2042, *_CANCELLED), kickoff_at=_MONDAY + timedelta(days=30))
+        record_void(conn, _request(2042), _VOIDED_AT)
+    with engine.connect() as conn:
+        state = week_state(conn, 2042, _WEEK, _WEDNESDAY_PASS)
+    step, rows = _grade(engine, 2042, _WEDNESDAY_PASS)
+    assert state is not None
+    assert state.last_kickoff == _SUNDAY
+    assert (step.status, rows) == ("ok", 2)
+
+
+def test_a_game_moved_to_another_week_is_checked_again_there(engine: Engine) -> None:
+    game_id = _game_id(2043, *_CANCELLED)
+    with engine.begin() as conn:
+        _seed(conn, 2043)
+        record_void(conn, _request(2043), _VOIDED_AT)
+        _move(conn, game_id, week=_WEEK + 1)
+    with engine.connect() as conn:
+        moved = week_state(conn, 2043, _WEEK + 1, _WEDNESDAY_PASS)
+    assert moved is not None
+    assert (moved.incomplete[0].startswith("BUF at CIN ("), moved.voided, moved.unresulted) == (True, (), (game_id,))
+    _refused(engine, _request(2043, week=_WEEK + 1, lift=True), f"{game_id} (BUF at CIN) has no void standing in "
+             "season 2043 week 18; nothing written.", _LIFTED_AT)  # fmt: skip
+    assert _void_rows(engine, 2043) == 1
+
+
+def test_a_postseason_or_preseason_id_is_refused(engine: Engine) -> None:
+    with engine.begin() as conn:
+        _add_game(conn, 2044, "2044_19_NE_NYJ", week=19, game_type="POST")
+        _add_game(conn, 2044, "2044_02_NE_NYJ", week=2, game_type="PRE")
+    for game_id, week in (("2044_19_NE_NYJ", 19), ("2044_02_NE_NYJ", 2)):
+        words = f"{game_id} is not a regular season game of season 2044 week {week} in nflverse_games; nothing written."
+        _refused(engine, _request(2044, week=week, game=game_id), words)
+    assert _void_rows(engine, 2044) == 0
+
+
+def test_a_database_error_is_one_refused_line(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def lost(conn: Connection, request: VoidRequest, now: datetime) -> str:
+        raise OperationalError("insert into research.game_voids", {}, Exception("server closed the connection"))
+
+    monkeypatch.setenv("RESEARCH_DATABASE_URL", engine.url.render_as_string(hide_password=False))
+    monkeypatch.setattr(inseason_main, "now_ms", lambda: _VOIDED_AT)
+    monkeypatch.setattr(inseason_main, "record_void", lost)
+    args = ["void-game", "--season", "2045", "--week", "17", "--game", "x", "--reason", "r", "--by", "jh"]
+    assert inseason_main.main(args) == 1
+    out, err = capsys.readouterr()
+    assert out.splitlines()[-1].endswith("void-game: REFUSED, the database answered OperationalError; nothing written.")
+    assert "Traceback" not in out + err

@@ -63,7 +63,7 @@ from sqlalchemy import Connection, Engine, text
 
 from research.errors import ConfigurationError
 from research.inseason import usage_steps
-from research.inseason.game_voids import void_command
+from research.inseason.game_voids import void_command, void_ops_command
 from research.inseason.scoreboard import scoreboard_lines
 from research.inseason.step_result import Status, StepResult
 from research.inseason.week_complete import GRADE_FLOOR, WeekState, week_state
@@ -353,6 +353,7 @@ def _void_hint(season: int, week: int, state: WeekState) -> str:
     or dropped from games.csv (Lane 249, B255); a game with its finals but no lines is an outage, not this."""
     return "".join(
         f"; if {game_id} was cancelled or dropped from games.csv, void it: {void_command(season, week, game_id)}"
+        f" (with gcloud lapsed: {void_ops_command(season, week, game_id)})"
         for game_id in state.unresulted
     )
 

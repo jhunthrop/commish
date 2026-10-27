@@ -112,10 +112,14 @@ def week_state(conn: Connection, season: int, week: int, now: datetime) -> WeekS
     kickoffs = [ms_instant(game.kickoff_at) for game in games if game.kickoff_at is not None]
     if not kickoffs:
         return None
+    voids = voids_in_week(conn, season, week, now)
+    # A voided game's stale kickoff never moves the floor or the overdue clock (Lane 249 review L1); a
+    # week with no kickoff left outside its voids keeps the last of them all.
+    counted = [ms_instant(g.kickoff_at) for g in games if g.kickoff_at is not None and g.game_id not in voids]
+    last_kickoff = max(counted or kickoffs)
     result_params = {**params, "source": ScheduleSource.KICKOFF, "metric": ScheduleMetric.GAME_RESULT}
     results = {row.team: ms_instant(row.dated) for row in conn.execute(text(_RESULTS), result_params)}
     lined = _lined_clubs(conn, season, week, now)
-    voids = voids_in_week(conn, season, week, now)
     incomplete, unresulted, voided = [], [], []
     for game in games:
         label = f"{game.away_team} at {game.home_team}"
@@ -131,7 +135,7 @@ def week_state(conn: Connection, season: int, week: int, now: datetime) -> WeekS
             incomplete.append(f"{label} ({', '.join(lacks)})")
         if game.away_team not in results or game.home_team not in results:
             unresulted.append(game.game_id)
-    return WeekState(max(kickoffs), len(games), tuple(incomplete), tuple(unresulted), tuple(voided))
+    return WeekState(last_kickoff, len(games), tuple(incomplete), tuple(unresulted), tuple(voided))
 
 
 def earliest_grade(last_kickoff: datetime) -> datetime:
