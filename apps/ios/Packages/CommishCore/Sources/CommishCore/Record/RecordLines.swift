@@ -210,12 +210,13 @@ enum RecordLines {
         return "\(named), refreshed \(RecordWords.day(asOf))"
     }
 
-    /// records.ts weeklyOrderWords: "Our weekly rankings, set Oct 22".
+    /// records.ts weeklyOrderWords: "Our rest-of-season order, set Oct 22", the date from the week's
+    /// frozen stamp, never the clock (Lane 223, B188).
     static func weeklyOrder(_ week: RunRecordWeek) -> String? {
         guard week.order != nil, let frozen = week.frozenAt else {
             return nil
         }
-        return "Our weekly rankings, set \(RecordWords.day(frozen))"
+        return "\(Words.RecordOrder.rest_of_season), set \(RecordWords.day(frozen))"
     }
 
     /// records.ts beforeLine: the weeks before the weekly record with the set rule said once.
@@ -225,9 +226,10 @@ enum RecordLines {
         }
         return (
             fromWeek <= 2 ? "Week 1" : "Weeks 1 to \(fromWeek - 1)",
-            "Weekly rankings start week \(fromWeek). Each week's rankings are set before its first kickoff "
-                + "and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. "
-                + "Before that the site shipped the draft board, graded under \(Words.Records.draft)."
+            "\(Words.RecordOrder.rest_of_season) is graded week by week from week \(fromWeek). Each week's "
+                + "order is set before its first kickoff and graded as set, never as refreshed after, so a player "
+                + "put on IR later keeps the rank we set. Before that the site shipped the draft board, graded "
+                + "under \(Words.Records.draft)."
         )
     }
 }

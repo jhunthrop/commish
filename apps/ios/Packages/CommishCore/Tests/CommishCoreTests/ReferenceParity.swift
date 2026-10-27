@@ -19,10 +19,34 @@ extension ReferenceParityTests {
         let clubs: ClubsCase
         let clubPages: [ClubPageCase]
         let schedule: ScheduleCase
+        /// The current week's game states and the run's read (Lane 223, B187), nil out of season.
+        let current: CurrentCase?
+        let asOf: String?
+        let states: [StateCase]
+        let clubHead: ClubHeadCase
 
         var run: RunFixture {
             fixture.hasSuffix("standin-run") ? .standIn : .contract
         }
+    }
+
+    struct CurrentCase: Decodable {
+        let week: Int
+    }
+
+    /// A current week's game as the run read it, said in the fixtures' zone.
+    struct StateCase: Decodable {
+        let abbr: String
+        let week: Int
+        let word: String
+    }
+
+    /// The club section's heads: the run's board's, the order's once its rows stand.
+    struct ClubHeadCase: Decodable {
+        let board: String
+        let order: String
+        let nobodyBoard: String
+        let nobodyOrder: String
     }
 
     struct PlayedCase: Decodable {
@@ -136,6 +160,7 @@ extension ReferenceParityTests {
         }
 
         let abbr: String
+        let meta: String
         let hero: Hero?
         let scheduleCaption: String
         let games: [Game]

@@ -28,10 +28,8 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -104,20 +102,17 @@ class ReferenceParityTest {
 
     private fun index(fixture: RunFixture): List<RunIndexEntry> = decodeEnvelope<RunIndexAnswer>(fixture.indexAnswer()).pages
 
-    // The web's Lane 223 words (webPending), which Android draws since Lane 231 while the live values
-    // stay iOS's until Lane 232 moves them in.
-
     /** Each club's meta line as the web's clubMeta says it, by abbreviation. */
     private fun metaOf(run: JsonObject): Map<String, String> =
         run
-            .getValue("webPending")
+            .getValue("clubs")
             .jsonObject
-            .list("clubMeta")
+            .list("clubs")
             .associate { it.string("abbr") to it.string("meta") }
 
     /** The current week's game words by club and week, in the fixtures' zone. */
     private fun statesOf(run: JsonObject): Map<Pair<String, Int>, String> =
-        run.getValue("webPending").jsonObject.list("states").associate {
+        run.list("states").associate {
             (it.string("abbr") to it.getValue("week").jsonPrimitive.int) to it.string("word")
         }
 
@@ -202,23 +197,6 @@ class ReferenceParityTest {
             }
         }
 
-    /** A pair's rows as the page draws them: the live rows with the Bye row from webPending (the format's
-     * rest-of-season week, Lane 223), gone where both byes are played. */
-    private fun pageRows(want: JsonObject): List<JsonObject> {
-        val pending = want["webPending"] as? JsonObject ?: return want.list("rows")
-        val bye = pending["bye"]?.takeIf { it != JsonNull }?.jsonArray?.map { it.jsonPrimitive.content }
-        return want.list("rows").mapNotNull { row ->
-            when {
-                row.string("label") != Words.Board.bye -> row
-                bye == null -> null
-                else -> {
-                    val cells = row.list("cells").zip(bye) { cell, text -> JsonObject(cell + ("text" to JsonPrimitive(text))) }
-                    JsonObject(row + ("cells" to JsonArray(cells)))
-                }
-            }
-        }
-    }
-
     /** In season a screen on the run's figures ends its basis with the run's stamp while the order is
      * unread (Lane 226): the web's page says it after the basis the parity holds (basisAtClock). */
     private fun stampOf(
@@ -245,7 +223,7 @@ class ReferenceParityTest {
                 assertEquals(want.text("call"), table.call, label)
                 assertEquals(want.text("evidence"), table.evidence, label)
                 assertEquals(want.strings("basis") + stamp, table.basis, label)
-                val rows = pageRows(want)
+                val rows = want.list("rows")
                 assertEquals(rows.map { it.string("label") }, table.rows.map { it.label }, label)
                 table.rows.zip(rows).forEach { (row, wanted) ->
                     val cells = wanted.list("cells")
@@ -391,14 +369,9 @@ class ReferenceParityTest {
                     assertEquals(games.map { it.getValue("played").jsonPrimitive.boolean }, model.games.map { it.played }, abbr)
                     val states = statesOf(run)
                     assertEquals(model.games.map { states[abbr to it.week] }, model.games.map { it.state }, abbr)
-                    assertEquals(run.getValue("webPending").jsonObject.text("asOf"), model.asOf, abbr)
+                    assertEquals(run.text("asOf"), model.asOf, abbr)
                     assertEquals(metaOf(run).getValue(abbr), model.meta, abbr)
-                    val heads =
-                        run
-                            .getValue("webPending")
-                            .jsonObject
-                            .getValue("clubHead")
-                            .jsonObject
+                    val heads = run.getValue("clubHead").jsonObject
                     assertEquals(heads.string("board"), model.boardHead, abbr)
                     assertEquals("${model.name}, ${heads.string("board")}", model.boardLabel, abbr)
                     assertEquals(want.strings("rows"), model.rows.map { it.id }, abbr)
@@ -420,10 +393,9 @@ class ReferenceParityTest {
         runTest {
             runs.forEach { run ->
                 val model = scheduleModel(ClubFiles.read(reads(run), sources = false), zone)
-                val pending = run.getValue("webPending").jsonObject
                 val states = statesOf(run)
                 assertEquals(
-                    pending["current"]
+                    run["current"]
                         ?.takeIf { it != JsonNull }
                         ?.jsonObject
                         ?.getValue("week")
@@ -431,7 +403,7 @@ class ReferenceParityTest {
                         ?.int,
                     model.grid.current,
                 )
-                assertEquals(pending.text("asOf"), model.grid.asOf)
+                assertEquals(run.text("asOf"), model.grid.asOf)
                 model.grid.rows.forEach { row ->
                     assertEquals(row.cells.map { states[row.abbr to it.week] }, row.cells.map { it.state }, row.abbr)
                 }

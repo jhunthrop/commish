@@ -762,8 +762,6 @@ object Words {
 
     object ClubPage {
         const val clubs = "Clubs"
-        const val byeWeek = "bye week"
-        const val byeNotSet = "not set"
         const val ourRank = "Our rank"
         const val player = "player"
         const val onOurBoard = "on our board"

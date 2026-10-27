@@ -10,7 +10,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { captureShort } from "../../web/src/lib/format/designation.ts";
-import { appByeCell } from "./apps-pending-words.ts";
 import { byeLine } from "../../web/src/lib/format/bye.ts";
 import { carriesGap } from "../../web/src/lib/format/gap.ts";
 import { fixed, plural } from "../../web/src/lib/format/number.ts";
@@ -47,7 +46,6 @@ import { marketBasis } from "../../web/src/lib/site/market.ts";
 import { offlineLead } from "../../web/src/lib/site/offline-words.ts";
 import { boardWords } from "../../web/src/lib/site/season-words.ts";
 import { heatFor } from "../../web/src/lib/ui/heat.ts";
-import { BOARD } from "../../web/src/lib/ui/board-words.ts";
 import { TIER_WORDS } from "../../web/src/lib/ui/tier.ts";
 import type {
   MarketPosition,
@@ -249,31 +247,17 @@ async function runCase(run: BoardRun): Promise<unknown> {
     ),
     capture: statuses?.capture ?? null,
     statuses: statuses === null ? {} : statuses.rows,
+    // The phone's bye beside the club (Row.svelte byeLine): "Bye week 11", nothing once played.
     byes: Object.fromEntries(
-      listed.map((row) => {
-        const bye = byes.get(row.team) ?? null;
-        return [
-          row.id,
-          bye === null
-            ? null
-            : `${BOARD.bye} ${appByeCell(bye, format.rosFromWeek ?? null)}`,
-        ];
-      }),
+      listed.map((row) => [
+        row.id,
+        byeLine(byes.get(row.team) ?? null, format.rosFromWeek ?? null),
+      ]),
     ),
     heats: Object.fromEntries(
       board.rows.map((row) => [row.id, heatFor(row.vor, row.vorRound)]),
     ),
     views: await viewsOf(run, manifest, format),
-    // The web's phone bye beside the club (Row.svelte byeLine: "Bye week 11", nothing once played),
-    // which Android's parity holds it to since Lane 231 while `byes` stays iOS's until Lane 232.
-    webPending: {
-      byes: Object.fromEntries(
-        listed.map((row) => [
-          row.id,
-          byeLine(byes.get(row.team) ?? null, format.rosFromWeek ?? null),
-        ]),
-      ),
-    },
   };
 }
 

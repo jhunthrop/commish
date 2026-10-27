@@ -173,7 +173,10 @@ enum CompareRows {
         )
     }
 
-    static func rows(_ first: CompareSide, _ second: CompareSide, season: Int, underway: Bool) -> [CompareRow] {
+    /// `byesFrom` is the week a rest-of-season board ranks from, nil on a board of the full season.
+    static func rows(
+        _ first: CompareSide, _ second: CompareSide, season: Int, underway: Bool, byesFrom: Int? = nil
+    ) -> [CompareRow] {
         func pair<T>(_ read: (CompareSide) -> T) -> (T, T) {
             (read(first), read(second))
         }
@@ -199,7 +202,7 @@ enum CompareRows {
         rows += rangeRow
         rows.append(figures(Words.Board.adp, pair { $0.numbers.adp }, text: fixed, better: nil))
         rows += gapRow
-        rows.append(figures(Words.Board.bye, pair { $0.bye.map(Double.init) }, text: whole, better: nil))
+        rows += byeRow(pair(\.bye), from: byesFrom)
         if underway {
             rows.append(figures(
                 Words.Figure.avg, pair { $0.player.seasonSoFar?.pointsPerGame }, text: fixed, better: .higher
@@ -222,6 +225,17 @@ enum CompareRows {
         let cell = { (value: Double?) in CompareCell(text: BoardFigures.gap(value), wins: nil, tone: GapTone(value)) }
         return gaps.0 != nil || gaps.1 != nil
             ? [CompareRow(label: gapLabel, cells: [cell(gaps.0), cell(gaps.1)], range: false)] : []
+    }
+
+    /// The Bye row as the Board's Bye cell draws it (bye.ts byeCell): the week while ahead, blank once
+    /// played, the empty figure where the run names none; dropped only when both byes are played
+    /// (Lane 223).
+    static func byeRow(_ byes: (Int?, Int?), from week: Int?) -> [CompareRow] {
+        guard !(Byes.played(byes.0, fromWeek: week) && Byes.played(byes.1, fromWeek: week)) else {
+            return []
+        }
+        let cells = [byes.0, byes.1].map { CompareCell(text: Byes.cell($0, fromWeek: week), wins: nil, tone: nil) }
+        return [CompareRow(label: Words.Board.bye, cells: cells, range: false)]
     }
 
     /// The Floor to ceiling row, only when one of the pair carries a range: bars, or the empty mark.

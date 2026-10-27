@@ -161,7 +161,7 @@ struct BoardModelTests {
         #expect(puka.name == "Puka Nacua")
         #expect(puka.pill == "WR 1")
         #expect(puka.club == "LAR")
-        #expect(puka.bye == "Bye 11")
+        #expect(puka.bye == "Bye week 11")
         #expect(puka.projected == "344.1")
         #expect(puka.overReplacement == "+164.1")
         #expect(puka.heat == .round(1))

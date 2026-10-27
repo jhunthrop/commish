@@ -13,6 +13,9 @@ public struct ScheduleCell: Equatable, Sendable, Identifiable {
     public let value: String
     public let hard: Bool
     public let played: Bool
+    /// The run's state of the current week's game ("Final", "Kicked off", "Sun 12:00 pm CT"), nil on
+    /// any other week (Lane 223, B187).
+    public let state: String?
 
     public var id: Int {
         week
@@ -46,6 +49,8 @@ public struct ClubGame: Equatable, Sendable, Identifiable {
     public let club: String
     public let value: String
     public let played: Bool
+    /// The run's state of the current week's game, said after the opponent; nil on any other week.
+    public let state: String?
 
     public var id: Int {
         week
@@ -58,6 +63,8 @@ struct ClubSchedule {
     let hero: ClubHero?
     let games: [ClubGame]
     let caption: String
+    /// The line under the games naming the run's read, nil without a current week.
+    let asOf: String?
 }
 
 /// A club's hero figures (schedule-view.ts ClubHero): its strength headed and read, and its rank.
@@ -112,10 +119,9 @@ enum ScheduleViews {
     }
 
     /// clubSchedule: the hero's figures, every game and the table's caption.
-    static func club(
-        _ club: RunClub, schedule: RunSchedule, clubs: [RunClub], played: Reach, underway: Bool
-    ) -> ClubSchedule {
-        let views = Self.views(schedule, underway: underway)
+    static func club(_ club: RunClub, schedule: RunSchedule, clubs: [RunClub], at season: SeasonAt) -> ClubSchedule {
+        let played = season.played
+        let views = Self.views(schedule, underway: season.underway)
         let hero = views[club.abbr].map { view in
             let hardest = StrengthWords.hardestFigure(rank: view.rank, of: views.count)
             return ClubHero(
@@ -131,12 +137,14 @@ enum ScheduleViews {
                 opponent: "\(game.home ? Words.ClubPage.home : Words.ClubPage.away) \(names.full(game.opponent))",
                 club: game.opponent,
                 value: Formatting.fixed(value(schedule, game.opponent), 1),
-                played: Self.played(game, reach: played)
+                played: Self.played(game, reach: played),
+                state: season.word(game)
             )
         }
         let faded = StrengthWords.played(played)
         return ClubSchedule(
-            hero: hero, games: games, caption: "\(schedule.season) schedule\(faded.isEmpty ? "" : ", \(faded)")"
+            hero: hero, games: games, caption: "\(schedule.season) schedule\(faded.isEmpty ? "" : ", \(faded)")",
+            asOf: season.asOf
         )
     }
 
@@ -152,12 +160,13 @@ enum ScheduleViews {
     /// scheduleGrid: every club by week, hardest first, the strongest opponents shaded and the games in
     /// set back.
     static func grid(
-        _ schedule: RunSchedule, clubs: [RunClub], rows: [RunBoardRow], played: Reach, underway: Bool
+        _ schedule: RunSchedule, clubs: [RunClub], rows: [RunBoardRow], at season: SeasonAt
     ) -> ScheduleGridModel {
+        let played = season.played
         let lastWeek = schedule.slates.flatMap(\.games).map(\.week).max() ?? 0
         let weeks = Array(stride(from: 1, through: lastWeek, by: 1))
         let strong = strongFloor(Array(schedule.opponentValues.additionalProperties.values))
-        let views = Self.views(schedule, underway: underway)
+        let views = Self.views(schedule, underway: season.underway)
         let slates = order(schedule, views: views)
         let first = slates.lazy.compactMap { views[$0.abbr] }.first
         let names = ClubNames(clubs)
@@ -169,6 +178,8 @@ enum ScheduleViews {
             ),
             strengthLabel: first?.kind.column,
             played: played.complete,
+            current: season.current?.week,
+            asOf: season.asOf,
             rows: slates.map { slate in
                 let lead = rows.first { $0.team == slate.abbr }
                 let view = views[slate.abbr]
@@ -184,7 +195,7 @@ enum ScheduleViews {
                         week: week,
                         schedule: schedule,
                         strong: strong.floor,
-                        played: played
+                        at: season
                     ) }
                 )
             }
@@ -192,11 +203,13 @@ enum ScheduleViews {
     }
 
     private static func cell(
-        _ slate: Components.Schemas.RunSlate, week: Int, schedule: RunSchedule, strong: Double, played: Reach
+        _ slate: Components.Schemas.RunSlate, week: Int, schedule: RunSchedule, strong: Double, at season: SeasonAt
     ) -> ScheduleCell {
+        let played = season.played
         guard let game = slate.games.first(where: { $0.week == week }) else {
             return ScheduleCell(
-                week: week, opponent: nil, club: nil, value: "", hard: false, played: week <= played.complete
+                week: week, opponent: nil, club: nil, value: "", hard: false, played: week <= played.complete,
+                state: nil
             )
         }
         let value = Self.value(schedule, game.opponent)
@@ -206,7 +219,8 @@ enum ScheduleViews {
             club: game.opponent,
             value: Formatting.fixed(value, 1),
             hard: value >= strong,
-            played: Self.played(game, reach: played)
+            played: Self.played(game, reach: played),
+            state: season.word(game)
         )
     }
 }

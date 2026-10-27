@@ -251,7 +251,10 @@ extension CompareModel {
         case .same:
             return .same(title: Words.ComparePage.sameTitle, line: Words.Verdict.samePlayer)
         case let .call(leader, other, _, call, evidence):
-            let rows = CompareRows.rows(leader, other, season: input.manifest.season, underway: input.underway)
+            let rows = CompareRows.rows(
+                leader, other, season: input.manifest.season, underway: input.underway,
+                byesFrom: input.format.rosFromWeek
+            )
             let gapRow = rows.contains { $0.label == CompareRows.gapLabel }
             let ranges = [leader, other].compactMap(\.numbers.range)
             return .table(CompareTable(

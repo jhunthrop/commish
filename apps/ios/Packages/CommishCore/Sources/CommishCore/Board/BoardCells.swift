@@ -18,12 +18,10 @@ struct BoardCells {
         )
     }
 
-    /// Row.svelte's phone bye with format/bye.ts byeCell: "Bye 11", "Bye Done" for a bye before the
-    /// week the board ranks from.
+    /// Row.svelte's phone bye (bye.ts byeLine): "Bye week 11" while ahead of the week the board ranks
+    /// from, nothing once played (Lane 223, B190).
     func bye(_ club: String) -> String? {
-        byes[club].map { week in
-            "\(Words.Board.bye) \(fromWeek.map { week < $0 } == true ? Words.Bye.done : String(week))"
-        }
+        Byes.line(byes[club], fromWeek: fromWeek)
     }
 
     func ranked(_ row: RunBoardRow) -> BoardRow {

@@ -856,8 +856,7 @@
 					"what": "Our draft board against ADP, on the season's points so far"
 				},
 				"waiting": "This record is written by the next nightly run."
-			},
-			"webPending": null
+			}
 		},
 		"own": {
 			"now": "2026-10-22T17:00:00.000Z",
@@ -1711,8 +1710,7 @@
 					"what": "Our draft board against ADP, on the season's points so far"
 				},
 				"waiting": "This record is written by the next nightly run."
-			},
-			"webPending": null
+			}
 		},
 		"upcoming": {
 			"now": "2026-10-22T17:00:00.000Z",
@@ -1722,11 +1720,11 @@
 				"unplayed": [],
 				"underway": []
 			},
-			"lead": "Two records, each graded against what it competes with: our weekly rankings against ESPN and the week's published projection, and our draft board against ADP.",
+			"lead": "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP.",
 			"weekly": {
 				"head": {
 					"title": "Weekly record",
-					"what": "Our weekly rankings against ESPN and the week's published projection"
+					"what": "Our rest-of-season order, graded week by week against ESPN and the week's published projection"
 				},
 				"bug": {
 					"kind": "pending",
@@ -1746,7 +1744,7 @@
 				],
 				"before": {
 					"lead": "Weeks 1 to 6",
-					"text": "Weekly rankings start week 7. Each week's rankings are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
+					"text": "Our rest-of-season order is graded week by week from week 7. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
 				},
 				"rows": [
 					{
@@ -1974,17 +1972,6 @@
 					}
 				},
 				"basis": "Each position is graded on its own, All by players graded. Top named counts how many of the season's top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far the order also ranked that high."
-			},
-			"webPending": {
-				"lead": "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP.",
-				"weeklyWhat": "Our rest-of-season order, graded week by week against ESPN and the week's published projection",
-				"before": "Our rest-of-season order is graded week by week from week 7. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record.",
-				"setRulePhone": "Each week's order is graded as set, never as refreshed after.",
-				"orders": [],
-				"front": {
-					"caption": "Our draft board through week 5, 208 players.",
-					"note": "Our rest-of-season order is graded week by week from week 7, against ESPN and the week's published projection."
-				}
 			}
 		},
 		"graded": {
@@ -1995,11 +1982,11 @@
 				"unplayed": [],
 				"underway": []
 			},
-			"lead": "Two records, each graded against what it competes with: our weekly rankings against ESPN and the week's published projection, and our draft board against ADP.",
+			"lead": "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP.",
 			"weekly": {
 				"head": {
 					"title": "Weekly record",
-					"what": "Our weekly rankings against ESPN and the week's published projection"
+					"what": "Our rest-of-season order, graded week by week against ESPN and the week's published projection"
 				},
 				"bug": {
 					"kind": "tiles",
@@ -2070,14 +2057,14 @@
 				],
 				"before": {
 					"lead": "Weeks 1 to 6",
-					"text": "Weekly rankings start week 7. Each week's rankings are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
+					"text": "Our rest-of-season order is graded week by week from week 7. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
 				},
 				"rows": [
 					{
 						"lead": "Week 7",
 						"text": "Set Thu Oct 22, 1:00 pm Central, graded Wed Oct 28",
-						"order": "Our weekly rankings, set Oct 22",
-						"caption": "Our weekly rankings, set Oct 22, graded Wed Oct 28",
+						"order": "Our rest-of-season order, set Oct 22",
+						"caption": "Our rest-of-season order, set Oct 22, graded Wed Oct 28",
 						"graded": true,
 						"players": "188",
 						"cells": {
@@ -2784,23 +2771,6 @@
 					}
 				},
 				"basis": "Each position is graded on its own, All by players graded. Top named counts how many of the season's top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far the order also ranked that high."
-			},
-			"webPending": {
-				"lead": "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP.",
-				"weeklyWhat": "Our rest-of-season order, graded week by week against ESPN and the week's published projection",
-				"before": "Our rest-of-season order is graded week by week from week 7. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record.",
-				"setRulePhone": "Each week's order is graded as set, never as refreshed after.",
-				"orders": [
-					{
-						"week": 7,
-						"order": "Our rest-of-season order, set Oct 22",
-						"caption": "Our rest-of-season order, set Oct 22, graded Wed Oct 28"
-					}
-				],
-				"front": {
-					"caption": "Our rest-of-season order, graded over week 7, 188 players.",
-					"note": null
-				}
 			}
 		},
 		"published": {
@@ -2811,11 +2781,11 @@
 				"unplayed": [],
 				"underway": []
 			},
-			"lead": "Two records, each graded against what it competes with: our weekly rankings against ESPN and the week's published projection, and our draft board against ADP.",
+			"lead": "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP.",
 			"weekly": {
 				"head": {
 					"title": "Weekly record",
-					"what": "Our weekly rankings against ESPN and the week's published projection"
+					"what": "Our rest-of-season order, graded week by week against ESPN and the week's published projection"
 				},
 				"bug": {
 					"kind": "tiles",
@@ -2911,14 +2881,14 @@
 				],
 				"before": {
 					"lead": "Weeks 1 to 6",
-					"text": "Weekly rankings start week 7. Each week's rankings are set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
+					"text": "Our rest-of-season order is graded week by week from week 7. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
 				},
 				"rows": [
 					{
 						"lead": "Week 7",
 						"text": "Set Thu Oct 22, 1:00 pm Central, graded Wed Oct 28",
-						"order": "Our weekly rankings, set Oct 22",
-						"caption": "Our weekly rankings, set Oct 22, graded Wed Oct 28",
+						"order": "Our rest-of-season order, set Oct 22",
+						"caption": "Our rest-of-season order, set Oct 22, graded Wed Oct 28",
 						"graded": true,
 						"players": "188",
 						"cells": {
@@ -3775,23 +3745,6 @@
 					}
 				},
 				"basis": "Each position is graded on its own, All by players graded. Top named counts how many of the season's top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far the order also ranked that high."
-			},
-			"webPending": {
-				"lead": "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP.",
-				"weeklyWhat": "Our rest-of-season order, graded week by week against ESPN and the week's published projection",
-				"before": "Our rest-of-season order is graded week by week from week 7. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record.",
-				"setRulePhone": "Each week's order is graded as set, never as refreshed after.",
-				"orders": [
-					{
-						"week": 7,
-						"order": "Our rest-of-season order, set Oct 22",
-						"caption": "Our rest-of-season order, set Oct 22, graded Wed Oct 28"
-					}
-				],
-				"front": {
-					"caption": "Our rest-of-season order, graded over week 7, 188 players.",
-					"note": null
-				}
 			}
 		}
 	}

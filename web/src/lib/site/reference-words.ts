@@ -32,9 +32,6 @@ export const COMPARE_PAGE = {
 /** The clubs index and a club's page. */
 export const CLUB_PAGE = {
 	clubs: 'Clubs',
-	/** "ARI · bye week 14", or "not set" where the run names none. */
-	byeWeek: 'bye week',
-	byeNotSet: 'not set',
 	ourRank: 'Our rank',
 	/** "12 players on our board". */
 	player: 'player',
@@ -53,8 +50,7 @@ export const CLUB_PAGE = {
 } as const;
 
 /** A club page's section head and empty line while its rows are the rest-of-season order at the
- * order's clock (Lane 223, Lane 220's D2): the head names what the basis beside it names. The web's
- * alone until the apps' lane picks it into their words. */
+ * order's clock (Lane 223, Lane 220's D2): the head names what the basis beside it names. */
 export const CLUB_ORDER = {
 	onOrder: 'On our rest-of-season order',
 	nobody: 'Nobody from {city} is in this order'

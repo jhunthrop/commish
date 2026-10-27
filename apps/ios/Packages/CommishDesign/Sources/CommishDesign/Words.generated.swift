@@ -378,7 +378,7 @@ public enum Words {
     }
 
     public enum Bye {
-        public static let done = "Done"
+        public static let notSet = "Bye week not set"
     }
 
     public enum Waivers {
@@ -619,13 +619,13 @@ public enum Words {
     }
 
     public enum Records {
-        public static let lead = "Two records, each graded against what it competes with: our weekly rankings against ESPN and the week's published projection, and our draft board against ADP."
+        public static let lead = "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP."
         public static let weekly = "Weekly record"
-        public static let weeklyWhat = "Our weekly rankings against ESPN and the week's published projection"
+        public static let weeklyWhat = "Our rest-of-season order, graded week by week against ESPN and the week's published projection"
         public static let draft = "Draft record"
         public static let draftWhat = "Our draft board against ADP, on the season's points so far"
         public static let beforePhone = "Graded under Draft record"
-        public static let setRulePhone = "Each week's rankings are graded as set, never as refreshed after."
+        public static let setRulePhone = "Each week's order is graded as set, never as refreshed after."
         public static let notPlayed = "not played yet"
         public static let underway = "under way"
         public static let gradesLater = "grades when the stats land"
@@ -760,8 +760,6 @@ public enum Words {
 
     public enum ClubPage {
         public static let clubs = "Clubs"
-        public static let byeWeek = "bye week"
-        public static let byeNotSet = "not set"
         public static let ourRank = "Our rank"
         public static let player = "player"
         public static let onOurBoard = "on our board"

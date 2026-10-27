@@ -168,7 +168,20 @@ struct ClubScheduleView: View {
                     HStack(spacing: Tokens.Space.s2) {
                         Text(game.weekWords).frame(width: 64, alignment: .leading)
                         Button { actions.club(game.club) } label: {
-                            Text(game.opponent).frame(maxWidth: .infinity, alignment: .leading)
+                            HStack(spacing: Tokens.Space.s2) {
+                                Text(game.opponent)
+                                if let state = game.state {
+                                    // The run's state of the week's game, after its opponent.
+                                    Text(state)
+                                        .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .medium))
+                                        .monospacedDigit()
+                                        .lineLimit(1)
+                                        .fixedSize()
+                                        .foregroundStyle(theme
+                                            .color(game.played ? Tokens.Color.playedInk : Tokens.Color.ink2))
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .buttonStyle(.plain)
                         Text(game.value).monospacedDigit().frame(width: 72, alignment: .trailing)
@@ -181,6 +194,9 @@ struct ClubScheduleView: View {
                 }
             }
             .padding(.horizontal, Tokens.Space.s3)
+            if let asOf = model.asOf {
+                AsOfLine(words: asOf).padding(.horizontal, Tokens.Space.s3)
+            }
         }
     }
 }
@@ -212,6 +228,9 @@ public struct ClubScreen: View {
                         }
                     }
                 }
+                // The section's spoken label follows its head: "Kansas City Chiefs, On our PPR board".
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(model.boardLabel)
             }
             if parts.contains(.market), !model.market.isEmpty {
                 VStack(spacing: 0) {

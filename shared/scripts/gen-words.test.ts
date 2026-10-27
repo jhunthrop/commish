@@ -338,3 +338,55 @@ void test("the web's own words land in the JSON, the Swift and the Kotlin", asyn
   );
   assert.match(kotlin, /object Kickoff \{[^}]*const val decided = "Decided"/);
 });
+
+/** Each table's members as one language's file names them, by the table's name: its constants and its
+ * lists, a keyword's quotes dropped. A table opens on its own line inside Words and each member is a
+ * line of its own, so the lines are read, never the braces (a word may carry "{name}"). */
+function membersOf(
+  source: string,
+  table: RegExp,
+  member: RegExp,
+): Map<string, string[]> {
+  const found = new Map<string, string[]>();
+  let members: string[] | null = null;
+  for (const line of source.split("\n")) {
+    const opened = table.exec(line);
+    if (opened) {
+      members = [];
+      found.set(opened[1] ?? "", members);
+      continue;
+    }
+    const key = member.exec(line)?.[1];
+    if (members !== null && key !== undefined)
+      members.push(key.replaceAll("`", ""));
+  }
+  return found;
+}
+
+void test("every table renders the same members in the Swift and the Kotlin (Lane 231 review L1)", async () => {
+  const outputs = await generate();
+  const swift = membersOf(
+    outputs.get(OUTPUT.swift) ?? "",
+    /^ {4}public enum (\w+) \{/,
+    /^ {8}public static let (`?\w+`?)/,
+  );
+  const kotlin = membersOf(
+    outputs.get(OUTPUT.kotlin) ?? "",
+    /^ {4}object (\w+) \{/,
+    /^ {8}(?:const )?val (`?\w+`?)/,
+  );
+  assert.deepEqual(
+    [...swift.keys()],
+    TABLES.map((source) => source.name),
+  );
+  assert.deepEqual([...kotlin.keys()], [...swift.keys()]);
+  for (const [name, members] of swift)
+    assert.deepEqual(
+      kotlin.get(name),
+      members,
+      `${name} differs between the apps`,
+    );
+  // The two tables the apps once drew apart (Lane 223's seam): the web's words in both.
+  assert.deepEqual(swift.get("Bye"), ["notSet"]);
+  assert.ok(swift.get("Records")?.includes("setRulePhone"));
+});

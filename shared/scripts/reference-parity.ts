@@ -9,8 +9,10 @@
  * - `compare`: the first steps, every format's basis, and every pair of the run's pages in every
  *   format: the call and its evidence, the table's rows with their better side and the Gap's tone, and
  *   the basis the table prints (no Gap sentence without a Gap row); a held pair besides.
- * - `clubs`, `clubPages`, `schedule`: the index's lead and cards, each club's hero, games, caption,
- *   rows and basis, and the grid's lead, heads and cells.
+ * - `clubs`, `clubPages`, `schedule`: the index's lead and cards, each club's meta line, hero, games,
+ *   caption, rows and basis, and the grid's lead, heads and cells.
+ * - `current`, `asOf`, `states`, `clubHead`: the current week's game states and the run's read under
+ *   the grid and a club's schedule, and the club section's heads (Lane 223, B224).
  *
  * The run's reach (how far the season's figures go) is counted over the run's own pages, as the
  * site's reader counts it (server/run.ts seasonReach); the schedule's played games are its finals
@@ -278,20 +280,15 @@ function pairCase(
 	});
 	const call = verdict(contender(first), contender(second), format.label);
 	if (call.kind === 'same') return { a: a.id, b: b.id, format: format.id, kind: 'same' };
-	const rows = compareRows(call.leader.side, call.other.side, files.manifest.season, underway);
-	// The Bye row as the page draws it, from the format's rest-of-season week (Lane 223): a played bye
-	// blank, the row gone when both are played. Android's parity holds it since Lane 231; the live
-	// rows stay the full season's, as iOS draws them, until Lane 232.
-	const pageBye =
-		compareRows(
-			call.leader.side,
-			call.other.side,
-			files.manifest.season,
-			underway,
-			format.rosFromWeek ?? null
-		)
-			.find((row) => row.label === 'Bye')
-			?.cells.map((cell) => cell.text) ?? null;
+	// The rows as the page draws them, the Bye row from the format's rest-of-season week (Lane 223): a
+	// played bye blank, the row gone when both are played.
+	const rows = compareRows(
+		call.leader.side,
+		call.other.side,
+		files.manifest.season,
+		underway,
+		format.rosFromWeek ?? null
+	);
 	const basis = compareBasis(files, format, underway);
 	const showsGap = rows.some((row) => row.label === 'Gap');
 	return {
@@ -311,8 +308,7 @@ function pairCase(
 				tone: cell.tone ?? null
 			}))
 		})),
-		basis: basis.filter((part) => showsGap || !part.gap).map((part) => part.text),
-		webPending: { bye: pageBye }
+		basis: basis.filter((part) => showsGap || !part.gap).map((part) => part.text)
 	};
 }
 
@@ -374,7 +370,7 @@ async function clubCases(
 			clubs: cards.clubs.map((club) => ({
 				abbr: club.abbr,
 				name: `${club.city} ${club.nickname}`,
-				meta: `${club.abbr} · ${CLUB_PAGE.byeWeek} ${club.bye === null ? CLUB_PAGE.byeNotSet : String(club.bye)}`,
+				meta: clubMeta(club.abbr, club.bye, format.rosFromWeek ?? null),
 				strength: club.strength,
 				lead: club.lead?.id ?? null,
 				players: `${plural(club.players, CLUB_PAGE.player)} ${CLUB_PAGE.onOurBoard}`
@@ -392,6 +388,7 @@ async function clubCases(
 			const gap = showsGapOf(own);
 			return {
 				abbr: club.abbr,
+				meta: clubMeta(club.abbr, club.bye, format.rosFromWeek ?? null),
 				hero: scheduled.hero,
 				scheduleCaption: scheduled.scheduleCaption,
 				games: scheduled.games.map((game) => ({
@@ -432,32 +429,27 @@ async function clubCases(
 	};
 }
 
-/** The zone the pending sentences are said in, the fixtures' own (board-run-parity.ts ZONE). */
-const PENDING_ZONE = 'America/Chicago';
+/** The zone the current week's sentences are said in, the fixtures' own (board-run-parity.ts ZONE). */
+const STATE_ZONE = 'America/Chicago';
 
-/** The web's own reference sentences from Lane 223, which the apps do not check yet (review M4): the
- * current week's game states and the run's read on the schedule and a club, each club's meta line and
- * the club section's two heads. Android's parity holds it to them since Lane 231; iOS follows in Lane 232. */
-function webPending(files: RunFiles, underway: boolean, played: Reach) {
+/** Lane 223's reference sentences: the current week's game states and the run's read on the schedule
+ * and a club, and the club section's two heads, the run's board's before the order's rows stand and the
+ * order's after. */
+function gameDay(files: RunFiles, underway: boolean, played: Reach) {
 	const [format] = files.manifest.formats;
 	const games = files.schedule.slates.flatMap((slate) => slate.games);
 	const current = currentWeek(games, played, underway, files.manifest.runAt);
-	const fromWeek = format?.rosFromWeek ?? null;
 	return {
 		current,
-		asOf: current === null ? null : asOfLine(current, PENDING_ZONE),
+		asOf: current === null ? null : asOfLine(current, STATE_ZONE),
 		states: files.schedule.slates.flatMap((slate) =>
 			slate.games.flatMap((game) => {
 				const stated = statedGame(game, current);
 				return stated === null
 					? []
-					: [{ abbr: slate.abbr, week: game.week, word: stateWord(stated, PENDING_ZONE) }];
+					: [{ abbr: slate.abbr, week: game.week, word: stateWord(stated, STATE_ZONE) }];
 			})
 		),
-		clubMeta: files.clubs.map((club) => ({
-			abbr: club.abbr,
-			meta: clubMeta(club.abbr, club.bye, fromWeek)
-		})),
 		clubHead: {
 			board: filled(CLUB_PAGE.onBoard, format?.label ?? ''),
 			order: CLUB_ORDER.onOrder,
@@ -480,7 +472,7 @@ async function runCase(run: ReferenceRun) {
 		adp: await adpCases(run, files, underway),
 		compare: compareCases(files, underway),
 		...(await clubCases(run, files, underway, played)),
-		webPending: webPending(files, underway, played)
+		...gameDay(files, underway, played)
 	};
 }
 
