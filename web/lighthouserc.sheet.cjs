@@ -2,7 +2,7 @@
 // script writes them into localStorage before each run, and storage is kept between the seed and
 // the audit. Same profile, method and user-page budgets as lighthouserc.json.
 const { Launcher } = require('chrome-launcher');
-const { ORIGIN, PAINT_HOLDING_OFF } = require('./lighthouse-shared.cjs');
+const { ORIGIN, PAINT_HOLDING_OFF, SCRIPT_BUDGETS } = require('./lighthouse-shared.cjs');
 
 const RUNS = 7;
 const [chromePath] = Launcher.getInstallations();
@@ -33,7 +33,7 @@ module.exports = {
 		assert: {
 			assertions: {
 				'largest-contentful-paint': ['error', { maxNumericValue: 2000 }],
-				'resource-summary:script:size': ['error', { maxNumericValue: 184320 }],
+				'resource-summary:script:size': ['error', { maxNumericValue: SCRIPT_BUDGETS.tool }],
 				'cumulative-layout-shift': ['error', { maxNumericValue: 0.05 }]
 			},
 			aggregationMethod: 'median'
