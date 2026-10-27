@@ -78,6 +78,16 @@ def _curate(args: argparse.Namespace, deps: SyncDeps) -> None:
         raise SystemExit("curate: --missing, --refresh --player, or --player --url --by")
 
 
+def run_sync(deps: SyncDeps, season: int, limit: int | None) -> int:
+    """The sync's exit status: 1 only when every player died of a bucket or database error."""
+    counts = sync(deps, season, limit)
+    log_line(f"headshots: {season}, {counts.line()}")
+    if counts.systemic:
+        log_line("headshots: FAILED, every player died of a bucket or database error")
+        return 1
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     engine = make_engine(database_url_from_env())
@@ -92,11 +102,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 log=log_line,
             )
             if args.command == "sync":
-                counts = sync(deps, args.season, args.limit)
-                log_line(f"headshots: {args.season}, {counts.line()}")
-                if counts.systemic:
-                    log_line("headshots: FAILED, every player died of a bucket or database error")
-                    return 1
+                return run_sync(deps, args.season, args.limit)
             else:
                 _curate(args, deps)
     except ResearchError as error:

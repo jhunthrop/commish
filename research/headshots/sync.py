@@ -3,8 +3,8 @@
 A player is fetched when his season has no row, when his row is `refresh`, `failed`, or `missing`
 after a 404, or when his row is `copied` from a source that has since moved (a rookie's college photo
 replaced by his NFL one). A `copied` row from the same source is skipped without a request, and a
-`curated` row is never touched: the bucket write is skipped when his row has turned curated since the
-sync read it, and the ledger write is one statement that leaves a curated row alone. A player with no
+`curated` row is never touched: under his advisory lock the sync re-reads his row, skips the bucket
+write when it is curated, and writes the row with one statement that leaves a curated row alone. A player with no
 source image is written `missing` without a request, once, until his source changes. Each player's
 row is committed on its own, so a pass that dies keeps every copy it made. `SYNC_WORKERS` players are
 worked on at once; the one throttle, shared under a lock, still starts at most two fetches a second.
@@ -17,6 +17,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Final
+from urllib.parse import urlsplit
 
 import httpx
 from sqlalchemy import Engine
@@ -38,6 +39,7 @@ from research.headshots.table import (
     Candidate,
     Write,
     candidates,
+    lock_player,
     row_status,
     write_unless_curated,
 )
@@ -48,8 +50,7 @@ MISSING: Final = "missing"
 FAILED: Final = "failed"
 SKIPPED: Final = "skipped"
 
-_QUERY_STRING: Final = re.compile(r"\?[^\s'\"<>)]*")
-_REASON_MAX: Final = 500
+_URL: Final = re.compile(r"https?://[^\s'\"<>)]+")
 
 
 class Throttle:
@@ -97,6 +98,8 @@ class SyncCounts:
     def systemic(self) -> bool:
         """Whether every player the pass worked on died of an unmapped error: the bucket or the
         database is unreachable, not one player's source."""
+        # Mapped failures (a 500 from the source) count as worked, so one of them keeps a pass whose
+        # other players all died unmapped from being systemic.
         worked = sum(self.counts.get(outcome, 0) for outcome in (COPIED, MISSING, FAILED))
         return self.unmapped > 0 and self.unmapped == worked
 
@@ -129,8 +132,19 @@ def check_workers(workers: object) -> int:
 
 
 def error_reason(error: BaseException) -> str:
-    """A row's reason for an error nobody mapped: its class and message, with no URL query string."""
-    return f"{type(error).__name__}: {_QUERY_STRING.sub('', str(error))}"[:_REASON_MAX]
+    """A row's reason for an error nobody mapped: its class, and the scheme and host of each URL its
+    message names, never the message (a path, query, fragment or userinfo can carry a secret)."""
+    origins = [origin for origin in dict.fromkeys(_origin(url) for url in _URL.findall(str(error))) if origin]
+    named = f" ({', '.join(origins)})" if origins else ""
+    return f"{type(error).__name__}{named}"
+
+
+def _origin(url: str) -> str | None:
+    try:
+        parts = urlsplit(url)
+        return f"{parts.scheme}://{parts.hostname}" if parts.hostname else None
+    except ValueError:
+        return None
 
 
 def store_copies(bucket: ImageBucket, season: int, player_id: str, body: bytes) -> None:
@@ -146,14 +160,20 @@ def fetch_copy(deps: SyncDeps, source: Source) -> bytes:
     return fetch(deps.http, source)
 
 
-def copy_from(deps: SyncDeps, season: int, player_id: str, source: Source) -> None:
-    """One fetch, through the throttle, converted and written; raises NoImageError or FetchFailedError."""
-    store_copies(deps.bucket, season, player_id, fetch_copy(deps, source))
-
-
-def _curated_now(deps: SyncDeps, season: int, player_id: str) -> bool:
-    with deps.engine.connect() as conn:
-        return row_status(conn, season, player_id) == CURATED
+def _copy_under_lock(
+    deps: SyncDeps, season: int, candidate: Candidate, body: bytes, fetched_at: datetime | None
+) -> Write | None:
+    """His bucket write and ledger write under his lock, so a curation lands wholly before or after;
+    None when his row is curated. The fetch is outside the lock; a fetch a curation then makes
+    pointless is discarded, which is acceptable at this scale."""
+    row = Write(COPIED, candidate.source_url, None, fetched_at)
+    with deps.engine.begin() as conn:
+        lock_player(conn, season, candidate.player_id)
+        if row_status(conn, season, candidate.player_id) == CURATED:
+            return None
+        store_copies(deps.bucket, season, candidate.player_id, body)
+        write_unless_curated(conn, season, candidate.player_id, row, deps.now())
+    return row
 
 
 def _sync_one(deps: SyncDeps, season: int, candidate: Candidate) -> Write | None:
@@ -165,16 +185,11 @@ def _sync_one(deps: SyncDeps, season: int, candidate: Candidate) -> Write | None
             raise NoImageError("the source has no photo")
         check_player_id(candidate.player_id)
         fetched_at = deps.now()
-        body = fetch_copy(deps, source)
-        if _curated_now(deps, season, candidate.player_id):
-            return None
-        store_copies(deps.bucket, season, candidate.player_id, body)
+        return _copy_under_lock(deps, season, candidate, fetch_copy(deps, source), fetched_at)
     except NoImageError as error:
         row = Write(MISSING, candidate.source_url, str(error), fetched_at)
     except (FetchFailedError, ConfigurationError) as error:
         row = Write(FAILED, candidate.source_url, str(error), fetched_at)
-    else:
-        row = Write(COPIED, candidate.source_url, None, fetched_at)
     with deps.engine.begin() as conn:
         written = write_unless_curated(conn, season, candidate.player_id, row, deps.now())
     return row if written else None
@@ -215,6 +230,8 @@ def _collect(deps: SyncDeps, season: int, futures: dict[Future[Write | None], Ca
             if row is not None and row.status == FAILED:
                 deps.log(f"headshots: {candidate.player_id} failed, {row.reason}")
             continue
+        if not isinstance(error, Exception):
+            raise error  # SystemExit, KeyboardInterrupt: the process is being stopped, not a player failing
         counts.add(FAILED)
         counts.unmapped += 1
         deps.log(f"headshots: {candidate.player_id} failed, {_record_unmapped(deps, season, candidate, error)}")
@@ -226,14 +243,20 @@ def sync(deps: SyncDeps, season: int, limit: int | None = None) -> SyncCounts:
     The players are worked on `deps.workers` at a time and collected as they finish. An error a
     player raises that nobody mapped (a bucket or database error) fails only his row: it is logged,
     counted and kept in the ledger, and the other players carry on; `SyncCounts.systemic` says when
-    every player died so.
+    every player died so. Anything that is not an `Exception` (an interrupt, an exit), or any error
+    leaving the collection, cancels the players not started and propagates.
     """
     workers = check_workers(deps.workers)
     with deps.engine.connect() as conn:
         everyone = candidates(conn, season)
     counts = SyncCounts()
     taken = _take_due(everyone, limit, counts)
-    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="headshots") as pool:
+    pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="headshots")
+    try:
         futures = {pool.submit(_sync_one, deps, season, candidate): candidate for candidate in taken}
         _collect(deps, season, futures, counts)
+    except BaseException:
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
+    pool.shutdown(wait=True)
     return counts

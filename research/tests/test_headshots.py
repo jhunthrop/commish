@@ -19,12 +19,13 @@ from sqlalchemy import Engine, text
 from research.db.engine import make_engine
 from research.db.url import sqlalchemy_url
 from research.errors import ConfigurationError
+from research.headshots.__main__ import run_sync
 from research.headshots.bucket import ImageBucket, R2ImageBucket
 from research.headshots.config import APP_WIDTH, CACHE_CONTROL, SYNC_WORKERS, WIDTHS, copy_key, face_url
 from research.headshots.curate import CurationError, curate, curation_lines, refresh
 from research.headshots.faces import our_face
 from research.headshots.images import MAX_BYTES, FetchFailedError, NoImageError, Source, fetch, webp_widths
-from research.headshots.sync import SyncDeps, Throttle, due, sync
+from research.headshots.sync import SyncDeps, Throttle, due, error_reason, sync
 from research.headshots.table import Candidate, Write, curation_list, faced_ids, write, write_unless_curated
 from research.nightly.r2 import R2Credentials, R2RunStore
 from research.parity import databases
@@ -35,6 +36,8 @@ _ESPN = "https://a.espncdn.com/i/headshots/nfl/players/full/{}.png"
 _NO_PHOTO = "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=200&h=146"
 _INTERVAL = 0.5  # the sync's two fetches a second
 _MANY = 24
+_PAIR = 2
+_STARTED_AT_MOST = 4  # of twelve, after a cancel: the ones a worker had already taken
 
 
 def _png(width: int = 600, height: int = 436) -> bytes:
@@ -443,13 +446,13 @@ def test_one_worker_raising_an_unmapped_error_fails_only_his_row(engine: Engine)
         "3": "copied",
     }
     assert len(lines) == 1
-    assert lines[0].startswith("headshots: 2 failed, RuntimeError: R2 refused https://acct.example/x")
+    assert lines[0] == "headshots: 2 failed, RuntimeError (https://acct.example)"
     assert "abc123" not in lines[0]
     with engine.connect() as conn:
         reason = conn.execute(text("select reason from research.headshot_copies where player_id = '2'")).scalar()
     assert reason is not None
     assert "abc123" not in reason
-    assert reason.startswith("RuntimeError")
+    assert reason == "RuntimeError (https://acct.example)"
 
 
 def test_a_pass_where_every_player_dies_unmapped_is_systemic(engine: Engine) -> None:
@@ -506,3 +509,166 @@ def test_the_ledger_write_leaves_a_curated_row_alone(engine: Engine) -> None:
         write(conn, 2026, "1", Write("curated", "b", None, at, "coordinator", at), at)
         assert not write_unless_curated(conn, 2026, "1", Write("failed", "a", "x", at), at)
     assert _rows(engine)["1"] == ("curated", "b", "coordinator")
+
+
+# Fix round 1: exits, interrupts, secrets, and the curate race -----------------------------------------
+
+_LEAKS = [
+    ("boom https://cdn.example.com/sig/TOKEN123/x.png", "https://cdn.example.com", "TOKEN123"),
+    ("refused https://user:pw123@host.example/p", "https://host.example", "pw123"),
+    ("refused https://h.example/a?X-Amz-Signature=SECRET1 then", "https://h.example", "SECRET1"),
+    ("refused https://h.example/a#frag-SECRET2", "https://h.example", "SECRET2"),
+    ("Authorization: Bearer SECRET3 sent to https://h.example/a", "https://h.example", "SECRET3"),
+]
+
+
+@dataclass
+class LeakyBucket(StubBucket):
+    message: str = ""
+
+    def put(self, key: str, body: bytes, content_type: str) -> None:
+        raise RuntimeError(self.message)
+
+
+@pytest.mark.parametrize(("message", "origin", "secret"), _LEAKS)
+def test_an_unmapped_errors_message_never_reaches_the_row_or_the_log(
+    engine: Engine, message: str, origin: str, secret: str
+) -> None:
+    _players(engine, [("1", "RB", _ESPN.format(1))])
+    lines: list[str] = []
+    with StubSource().client() as http:
+        deps = replace(_deps(engine, http, LeakyBucket(message=message), FakeClock()), log=lines.append)
+        sync(deps, 2026)
+    with engine.connect() as conn:
+        reason = conn.execute(text("select reason from research.headshot_copies where player_id = '1'")).scalar()
+    assert reason == f"RuntimeError ({origin})"
+    assert lines == [f"headshots: 1 failed, {reason}"]
+    assert secret not in f"{reason}{lines}"
+
+
+def test_an_error_with_no_url_is_its_class_alone() -> None:
+    assert error_reason(KeyError("secret-key")) == "KeyError"
+
+
+@dataclass
+class ExitingBucket(StubBucket):
+    def put(self, key: str, body: bytes, content_type: str) -> None:
+        raise SystemExit(3)
+
+
+def _many(engine: Engine, count: int = 12) -> None:
+    _players(engine, [(str(n), "WR", _ESPN.format(n)) for n in range(1, count + 1)])
+
+
+def test_a_worker_raising_system_exit_propagates_and_later_players_never_start(engine: Engine) -> None:
+    _many(engine)
+    source = StubSource()
+    with source.client() as http:
+        deps = _deps(engine, http, ExitingBucket(), FakeClock(), workers=1)
+        with pytest.raises(SystemExit):
+            sync(deps, 2026)
+    assert len(source.requests) <= _STARTED_AT_MOST
+    assert _rows(engine).get("1") is None
+
+
+def test_an_interrupt_leaving_the_collection_cancels_the_players_not_started(engine: Engine) -> None:
+    _many(engine)
+    source = StubSource(broken=frozenset({"2"}))
+
+    def interrupt(line: str) -> None:
+        raise KeyboardInterrupt
+
+    with source.client() as http:
+        deps = replace(_deps(engine, http, StubBucket(), FakeClock(), workers=1), log=interrupt)
+        with pytest.raises(KeyboardInterrupt):
+            sync(deps, 2026)
+    assert len(source.requests) <= _STARTED_AT_MOST
+
+
+def test_a_mapped_and_an_unmapped_failure_in_one_run_each_keep_their_line(engine: Engine) -> None:
+    _players(engine, [("1", "RB", _ESPN.format(1)), ("2", "WR", _ESPN.format(2)), ("3", "TE", _ESPN.format(3))])
+    lines: list[str] = []
+    source = StubSource(gone=frozenset({"1"}), broken=frozenset({"2"}))
+    with source.client() as http:
+        deps = replace(_deps(engine, http, ExplodingBucket(bad=frozenset({"3"})), FakeClock()), log=lines.append)
+        counts = sync(deps, 2026)
+    assert counts.line() == "0 copied, 0 skipped, 1 missing, 2 failed"
+    assert sorted(lines) == [
+        "headshots: 2 failed, HTTP 500",
+        "headshots: 3 failed, RuntimeError (https://acct.example)",
+    ]
+    assert not counts.systemic
+
+
+def test_a_ledger_write_that_itself_fails_is_logged_and_does_not_stop_the_pass(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def down(*args: object, **kwargs: object) -> bool:
+        raise RuntimeError("ledger down postgres://u:pw@dbhost/x")
+
+    monkeypatch.setattr("research.headshots.sync.write_unless_curated", down)
+    _players(engine, [("1", "RB", _ESPN.format(1)), ("2", "WR", _ESPN.format(2))])
+    lines: list[str] = []
+    with StubSource().client() as http:
+        counts = sync(replace(_deps(engine, http, StubBucket(), FakeClock()), log=lines.append), 2026)
+    assert counts.line() == "0 copied, 0 skipped, 0 missing, 2 failed"
+    assert counts.systemic
+    assert len(lines) == _PAIR
+    assert all("his row was not written: RuntimeError" in line for line in lines)
+    assert all("pw" not in line for line in lines)
+    assert _rows(engine) == {}
+
+
+def _exit_code(engine: Engine, bad: frozenset[str], players: int, source: StubSource | None = None) -> int:
+    _many(engine, players)
+    with (source or StubSource()).client() as http:
+        return run_sync(_deps(engine, http, ExplodingBucket(bad=bad), FakeClock()), 2026, None)
+
+
+def test_the_exit_status_is_one_only_when_every_worked_player_died_unmapped(engine: Engine) -> None:
+    assert _exit_code(engine, frozenset(), 0) == 0  # no players
+    assert _exit_code(engine, frozenset({"1", "2"}), 2) == 1  # all unmapped
+    assert _exit_code(engine, frozenset({"2"}), 2) == 0  # one of two
+    assert _exit_code(engine, frozenset({"3", "4"}), 4) == 0  # an outage after successes
+    assert _exit_code(engine, frozenset({"2"}), 2, StubSource(broken=frozenset({"1"}))) == 0  # mapped plus unmapped
+    assert _exit_code(engine, frozenset(), 2, StubSource(broken=frozenset({"1", "2"}))) == 0  # only mapped failures
+
+
+def test_a_curation_landing_mid_sync_waits_for_his_lock_and_wins(engine: Engine) -> None:
+    _players(engine, [("1", "RB", _ESPN.format(1))])
+    chosen = io.BytesIO()
+    Image.new("RGBA", (600, 436), (20, 20, 220, 255)).save(chosen, "PNG")
+    chosen_widths = webp_widths(chosen.getvalue())
+    started: list[threading.Thread] = []
+    blocked: list[bool] = []
+
+    @dataclass
+    class CurateOnFirstPut(StubBucket):
+        deps: SyncDeps | None = None
+
+        def put(self, key: str, body: bytes, content_type: str) -> None:
+            if not started and self.deps is not None:
+                curator = threading.Thread(
+                    target=curate, args=(self.deps, 2026, "1", "https://chosen.example/1.png", "coordinator")
+                )
+                started.append(curator)
+                curator.start()
+                curator.join(timeout=0.5)
+                blocked.append(curator.is_alive())  # held at his lock while the sync writes
+            super().put(key, body, content_type)
+
+    bucket = CurateOnFirstPut()
+    other = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, content=chosen.getvalue(), headers={"content-type": "image/png"})
+        )
+    )
+    with other, StubSource().client() as http:
+        bucket.deps = _deps(engine, other, bucket, FakeClock())
+        sync(_deps(engine, http, bucket, FakeClock(), workers=1), 2026)
+        started[0].join(timeout=30)
+    assert blocked == [True]
+    assert not started[0].is_alive()
+    assert _rows(engine)["1"] == ("curated", "https://chosen.example/1.png", "coordinator")
+    for width, webp in chosen_widths.items():
+        assert bucket.objects[copy_key(2026, "1", width)][0] == webp

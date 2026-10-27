@@ -97,6 +97,15 @@ def write_unless_curated(conn: Connection, season: int, player_id: str, row: Wri
     return conn.execute(upsert.returning(HEADSHOT_COPIES.c.player_id)).first() is not None
 
 
+def lock_player(conn: Connection, season: int, player_id: str) -> None:
+    """Holds the player's season lock until the transaction ends. The sync and a curation each take
+    it around their bucket write and row write, so one runs wholly before the other."""
+    conn.execute(
+        text("select pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+        {"key": f"headshots:{season}:{player_id}"},
+    )
+
+
 def row_status(conn: Connection, season: int, player_id: str) -> str | None:
     """His row's status for the season, None when he has no row."""
     return conn.execute(
