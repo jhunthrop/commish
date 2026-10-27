@@ -1,7 +1,7 @@
 """`python -m research.transfer`: what a job reads from the store, per step and per statement.
 
     TRANSFER_DATABASE_URL=postgres://commish:commish@localhost:5432/commish \\
-        uv run python -m research.transfer nightly [--skip ingest,headshots] [--json OUT]
+        uv run python -m research.transfer nightly [--skip ingest,capsules] [--json OUT]
 
 Runs one scenario (`transfer.scenarios`) on an engine whose connections pass through a counting
 relay, with the meter (`db.meter`) on every statement. Prints the per-step table and the top

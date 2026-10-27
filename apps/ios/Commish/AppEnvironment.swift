@@ -19,6 +19,9 @@ struct AppEnvironment {
     /// development API). The site's `?replay=1` link asks the same in any build, as the web reads it;
     /// a production API refuses a replay with its own sentence.
     var companionReplay = false
+    /// The order the in-season screens share (Lane 224): one read at a time for the Board, the clubs and
+    /// Compare opened together.
+    let orderMemo = OrderMemo()
 
     /// The API's base URL from the bundle, failing fast on a build that does not carry one.
     static func baseURL(in info: [String: Any]) -> URL? {
@@ -45,6 +48,11 @@ struct AppEnvironment {
 
     var api: APIClient {
         APIClient(baseURL: baseURL, tokens: session)
+    }
+
+    /// The in-season screens' read of our order at their clock, the Rankings' own read.
+    var orders: OrderReader {
+        OrderReader(api: api, clock: clock, memo: orderMemo)
     }
 
     var pairing: PairingClient {

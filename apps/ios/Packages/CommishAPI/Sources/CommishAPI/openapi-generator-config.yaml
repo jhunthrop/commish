@@ -58,3 +58,10 @@ filter:
     - sharedMock
     - sharedMockReport
     - listLeagues
+    - listLobbies
+    - joinLobby
+    - getLobby
+    - leaveLobby
+    - lobbyCard
+    - lobbyReport
+    - updateMe

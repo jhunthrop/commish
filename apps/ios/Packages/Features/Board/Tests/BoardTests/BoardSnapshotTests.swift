@@ -14,15 +14,18 @@ import Testing
 /// kicker's view in the drafts' order, and the WR view's foot with the complete basis under its last
 /// rows. In season, the contract run (shared/fixtures/run): the rest of the season's head with its
 /// weeks and the verb to follow a league, and the same board saved and read with no signal, stale with
-/// its reason. A face draws its initials here (a snapshot loads no image). With SNAPSHOT_SHOTS set each
-/// is also written at its phone's own scale for the persona panel.
+/// its reason. At the order's clock (Lane 224), the one-value stand-in (shared/fixtures/one-value-run)
+/// at the fixture's Sunday: the top rows and the basis once the order the Rankings read has answered
+/// (its figures, its lead in the basis), and while it is unread (the run's rows, the run's stamp). A
+/// face draws its initials here (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also
+/// written at its phone's own scale for the persona panel.
 @MainActor
 struct BoardSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         .appendingPathComponent("__Snapshots__")
     static let zone = TimeZone(identifier: "America/Chicago")!
-    static let preDraft = APIDecoding.parseDate("2026-09-01T17:00:00Z")!
-    static let inSeason = APIDecoding.parseDate("2026-10-22T17:00:00Z")!
+    nonisolated static let preDraft = APIDecoding.parseDate("2026-09-01T17:00:00Z")!
+    nonisolated static let inSeason = APIDecoding.parseDate("2026-10-22T17:00:00Z")!
 
     enum Scene: String, CaseIterable, Sendable {
         case top
@@ -36,6 +39,10 @@ struct BoardSnapshotTests {
         case rest
         /// In season, saved and read with no signal.
         case stale
+        /// In season at the order's clock: the top rows and the basis with the order's lead.
+        case clock
+        /// In season with the order unread: the run's top rows and the basis with the run's stamp.
+        case clockUnread = "clock-unread"
 
         var position: BoardPosition? {
             switch self {
@@ -46,11 +53,31 @@ struct BoardSnapshotTests {
         }
 
         var inSeason: Bool {
-            self == .rest || self == .stale
+            [.rest, .stale, .clock, .clockUnread].contains(self)
+        }
+
+        /// The scenes at the order's clock, read or unread.
+        var atClock: Bool {
+            self == .clock || self == .clockUnread
         }
 
         var fixture: RunFixture {
-            inSeason ? .contract : .standIn
+            atClock ? .oneValue : inSeason ? .contract : .standIn
+        }
+
+        var now: Date {
+            atClock ? OneValueFixture.now : inSeason ? BoardSnapshotTests.inSeason : BoardSnapshotTests.preDraft
+        }
+
+        /// The order's read at the Sunday clock, failing with no signal while unread; none elsewhere.
+        var orders: OrderReader? {
+            guard atClock else {
+                return nil
+            }
+            return OrderReader(
+                api: StubOrderSearch(offline: self == .clockUnread),
+                clock: FixedClock(now), memo: OrderMemo()
+            )
         }
     }
 
@@ -69,7 +96,7 @@ struct BoardSnapshotTests {
     /// The view model at the scene's state: read fresh through the run's routes, or saved and then read
     /// with no signal.
     static func viewModel(_ scene: Scene) async throws -> BoardViewModel {
-        let now = scene.inSeason ? inSeason : preDraft
+        let now = scene.now
         let cache = FileCache(folder: FileManager.default.temporaryDirectory
             .appendingPathComponent("board-snapshots-\(UUID().uuidString)"))
         if scene == .stale {
@@ -82,7 +109,7 @@ struct BoardSnapshotTests {
         let viewModel = BoardViewModel(
             api: StubRun(scene.fixture, offline: scene == .stale), cache: cache,
             clock: FixedClock(now.addingTimeInterval(scene == .stale ? 1800 : 0)),
-            inSeason: scene.inSeason, following: false, zone: zone
+            inSeason: scene.inSeason, following: false, zone: zone, orders: scene.orders
         )
         await viewModel.load()
         viewModel.choose(position: scene.position)
@@ -119,6 +146,19 @@ struct BoardSnapshotTests {
         let shown = BoardMock.aroundCliff(model.sections)
         #expect(shown.count == 2)
         #expect(shown.first?.band?.drop != nil, "the tier above says its drop")
+    }
+
+    @Test func theClockScenesAreTheStatesTheyName() async throws {
+        for scene in [Scene.clock, .clockUnread] {
+            let viewModel = try await Self.viewModel(scene)
+            guard case let .loaded(model, _, _) = viewModel.state else {
+                throw SceneError.notLoaded(scene.rawValue)
+            }
+            #expect(model.atClock == (scene == .clock), "\(scene)")
+            let format = try #require(RunFixture.oneValue.manifest().formats.first)
+            let stamp = try #require(LiveOrderWords.runStamp(format, zone: Self.zone))
+            #expect(model.basis.contains(stamp) == (scene == .clockUnread), "\(scene)")
+        }
     }
 
     @Test func theStaleSceneSaysWhyItsBoardShows() async throws {
@@ -163,6 +203,9 @@ struct BoardMock: View {
                 BoardBasisView(lines: model.basis)
             }
             .padding(.vertical, Tokens.Space.s4)
+        case .clock, .clockUnread:
+            // The top of the board and its basis: the rows' clock and the words that name it, together.
+            BoardScreen(model: model, stamp: stamp, actions: .none, sections: topRows, live: false)
         default:
             VStack(spacing: 0) {
                 BoardScreen(model: model, stamp: stamp, actions: .none, sections: firstScreen, live: false)
@@ -193,6 +236,14 @@ struct BoardMock: View {
             left -= kept.count
             return section.with(rows: kept)
         }
+    }
+
+    /// The rows a clock scene draws over the basis.
+    static let clockRows = 4
+
+    /// The view's first rows, the basis under them.
+    private var topRows: [BoardSection] {
+        model.sections.prefix(1).map { $0.with(rows: Array($0.rows.prefix(Self.clockRows))) }
     }
 
     /// The last rows of the view, above its basis.

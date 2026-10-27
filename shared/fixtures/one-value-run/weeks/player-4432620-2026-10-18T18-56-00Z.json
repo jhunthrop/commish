@@ -1,0 +1,105 @@
+{
+	"ok": true,
+	"data": {
+		"week": 6,
+		"line": {
+			"player": {
+				"host_id": "9487",
+				"board_id": "4432620",
+				"name": "Parker Washington",
+				"position": "WR",
+				"team": "JAX",
+				"injured_reserve": false
+			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4432620.png",
+			"slug": "parker-washington",
+			"position_rank": 27,
+			"points_over_replacement": 2.3,
+			"rest_of_season_per_game": 11.8,
+			"held": false,
+			"facts": {
+				"week": 6,
+				"opponent": "HOU",
+				"home": true,
+				"kickoff": "2026-10-18T13:30:00.000Z",
+				"bye": false,
+				"designation": null,
+				"played": true,
+				"points_this_week": 10.1,
+				"last_games": [
+					{
+						"week": 5,
+						"points": 30.4
+					},
+					{
+						"week": 4,
+						"points": 2
+					},
+					{
+						"week": 3,
+						"points": 13
+					}
+				],
+				"allowed_to_position": {
+					"points_a_game": 11.4,
+					"rank": 31,
+					"of": 32,
+					"position": "WR"
+				},
+				"game_total": {
+					"points": 42.5,
+					"team_points": 23,
+					"read_at": "2026-10-16T21:01:26.774Z"
+				},
+				"spread": {
+					"side": "win",
+					"points": 3,
+					"read_at": "2026-10-16T21:01:26.774Z"
+				},
+				"roof": {
+					"kind": "outdoors",
+					"abroad": true
+				},
+				"weather": null,
+				"game_state": "final"
+			},
+			"week_projection": 11.9,
+			"projection_delta": 0.4,
+			"opp_rank": 31,
+			"season_avg": 15.1,
+			"last_points": 30.4,
+			"game_state": {
+				"state": "final",
+				"word": "Final"
+			}
+		},
+		"after_bye": null,
+		"projection_scoring": {
+			"format": "ppr",
+			"league_own": false
+		},
+		"projection_read_at": "2026-10-17T02:00:00.000Z",
+		"projection_previous_read_at": null,
+		"verb": null,
+		"rest_of_season": [
+			{
+				"format": "ppr",
+				"points": 118,
+				"points_over_replacement": 27.6
+			},
+			{
+				"format": "half_ppr",
+				"points": 108.9,
+				"points_over_replacement": 25.5
+			},
+			{
+				"format": "standard",
+				"points": 94.2,
+				"points_over_replacement": 22
+			}
+		],
+		"rest_from_week": 7
+	},
+	"error": null,
+	"request_id": "fixture"
+}

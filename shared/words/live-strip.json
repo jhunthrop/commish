@@ -1,0 +1,11 @@
+{
+	"yourLeague": "your league",
+	"leagueAvg": "Avg in your league's scoring.",
+	"functions": [
+		"updated",
+		"shapeLeague",
+		"untiered",
+		"head",
+		"nearestHead"
+	]
+}

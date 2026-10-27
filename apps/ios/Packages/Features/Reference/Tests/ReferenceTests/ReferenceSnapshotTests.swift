@@ -14,8 +14,11 @@ import Testing
 /// and the first rows of the strength of schedule. In season, the contract run (shared/fixtures/run): ADP
 /// with the run's three format chips and no Gap, Compare with one side a slug the run does not name, the
 /// schedule's rest of season grid with its played weeks set back, and ADP saved and read with no signal,
-/// stale with its reason. A face draws its initials (a snapshot loads no image). With SNAPSHOT_SHOTS set
-/// each is also written at its phone's own scale for the persona panel.
+/// stale with its reason. At the order's clock (Lane 224), the one-value stand-in
+/// (shared/fixtures/one-value-run) at the fixture's Sunday: a club's hero, basis and players (CHI) and
+/// Compare with Swift and Washington, each once the order the Rankings read has answered and while it is
+/// unread. A face draws its initials (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also
+/// written at its phone's own scale for the persona panel.
 @MainActor
 struct ReferenceSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -33,17 +36,39 @@ struct ReferenceSnapshotTests {
         case club
         case schedule
         case stale
+        /// A club's players at the order's clock, and with the order unread.
+        case clubClock = "club-clock"
+        case clubUnread = "club-clock-unread"
+        /// Compare's pair at the order's clock, and with the order unread.
+        case compareClock = "compare-clock"
+        case compareUnread = "compare-clock-unread"
 
         var inSeason: Bool {
             [.adpInSeason, .compareAbsent, .schedule, .stale].contains(self)
         }
 
+        /// The scenes over the one-value stand-in, read or unread.
+        var atClock: Bool {
+            [.clubClock, .clubUnread, .compareClock, .compareUnread].contains(self)
+        }
+
         var fixture: RunFixture {
-            inSeason ? .contract : .standIn
+            atClock ? .oneValue : inSeason ? .contract : .standIn
         }
 
         var now: Date {
-            inSeason ? ReferenceSnapshotTests.inSeason : ReferenceSnapshotTests.preDraft
+            atClock ? OneValueFixture.now : inSeason ? ReferenceSnapshotTests.inSeason : ReferenceSnapshotTests.preDraft
+        }
+
+        /// The order's read at the Sunday clock, failing with no signal while unread; none elsewhere.
+        var orders: OrderReader? {
+            guard atClock else {
+                return nil
+            }
+            return OrderReader(
+                api: StubOrderSearch(offline: self == .clubUnread || self == .compareUnread),
+                clock: FixedClock(now), memo: OrderMemo()
+            )
         }
     }
 
@@ -91,13 +116,22 @@ struct ReferenceSnapshotTests {
     }
 
     static func compare(_ scene: Scene) async throws -> CompareModel {
-        let slugs: (String?, String?) = scene == .compareTwo ? ("ja-marr-chase", "rome-odunze") : (
-            "jahmyr-gibbs",
-            "nobody"
-        )
+        let slugs: (String?, String?) = switch scene {
+        case .compareTwo: ("ja-marr-chase", "rome-odunze")
+        case .compareClock, .compareUnread: ("d-andre-swift", "parker-washington")
+        default: ("jahmyr-gibbs", "nobody")
+        }
         return try await loaded(RunScreenViewModel.compare(
             slugs: [slugs.0, slugs.1], run: StubRun(scene.fixture), pages: StubPages(scene.fixture),
-            cache: cache(), clock: FixedClock(scene.now), zone: zone
+            cache: cache(), clock: FixedClock(scene.now), zone: zone, orders: scene.orders
+        ))
+    }
+
+    /// The club the clock scenes draw: Chicago, Swift's.
+    static func clockClub(_ scene: Scene) async throws -> ClubPageModel {
+        try await loaded(RunScreenViewModel.club(
+            "chi", run: StubRun(scene.fixture), pages: StubPages(scene.fixture), cache: cache(),
+            clock: FixedClock(scene.now), zone: zone, orders: scene.orders
         ))
     }
 
@@ -113,8 +147,10 @@ struct ReferenceSnapshotTests {
                 model: model, stamp: stamp, actions: .none, format: { _ in }, rows: Array(model.rows.prefix(12)),
                 live: false
             )
-        case .compareTwo, .compareAbsent:
+        case .compareTwo, .compareAbsent, .compareClock, .compareUnread:
             try await CompareScreen(model: compare(scene), stamp: nil, actions: .none, live: false)
+        case .clubClock, .clubUnread:
+            try await ClubScreen(model: clockClub(scene), stamp: nil, actions: .none, parts: [.hero, .board])
         case .clubs:
             let model = try await loaded(RunScreenViewModel.clubs(
                 run: run, pages: pages, cache: cache(), clock: clock, zone: zone
@@ -162,6 +198,17 @@ struct ReferenceSnapshotTests {
     @Test func theStaleSceneSaysWhyItsScreenShows() async throws {
         let (_, stamp) = try await Self.adp(.stale)
         #expect(stamp == "You're offline, so this is the last board this device saved, updated Oct 21.")
+    }
+
+    @Test func theClockScenesAreTheStatesTheyName() async throws {
+        for scene in [Scene.clubClock, .clubUnread] {
+            let model = try await Self.clockClub(scene)
+            #expect(model.atClock == (scene == .clubClock), "\(scene)")
+        }
+        for scene in [Scene.compareClock, .compareUnread] {
+            let model = try await Self.compare(scene)
+            #expect(model.atClock == (scene == .compareClock), "\(scene)")
+        }
     }
 
     @Test func theAbsentSceneSaysTheWebsWordsOverItsSearch() async throws {

@@ -4,8 +4,10 @@ import { HEADSHOT_MAX_WIDTH, HEADSHOT_MIN_WIDTH, isHeadshotLeague } from '#lib/u
 import { upstreamHeadshotUrl } from '#lib/ui/headshot-provider.ts';
 import type { RequestHandler } from './$types';
 
-/** The headshot images of the nightly site: a headshot at a drawn width, fetched from the provider
- * once and kept at the edge (server/image-route.ts), so every face loads from our origin. */
+/** The previous web's headshot route: a headshot at a drawn width, fetched from the provider once and
+ * kept at the edge (server/image-route.ts). Kept one deploy after our own copies (Lane 241,
+ * lib/ui/headshot.ts), so a page the previous web built keeps its faces during the window; no page of
+ * this web asks it. Remove it with the next web change after that deploy. */
 export const prerender = false;
 
 const PLAYER_ID = /^\d{1,12}$/;

@@ -136,7 +136,11 @@ class R2RunStore:
         raise R2Error(f"{method} {key} failed after {_ATTEMPTS} attempts: {last}")
 
     def put(self, key: str, body: bytes, content_type: str) -> None:
-        response = self._send("PUT", key, body, {"content-type": content_type})
+        self.put_object(key, body, {"content-type": content_type})
+
+    def put_object(self, key: str, body: bytes, headers: Mapping[str, str]) -> None:
+        """A PUT with the object's own headers (its content type, and the cache rule an image keeps)."""
+        response = self._send("PUT", key, body, headers)
         if response.status_code != _OK:
             raise R2Error(f"PUT {key} answered {response.status_code}.")
 
