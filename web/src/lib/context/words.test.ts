@@ -275,7 +275,7 @@ void test('the account page goes on only to a path on this site', () => {
 	assert.equal(safeThen(null, origin), null);
 });
 
-void test('a set week says it is not played yet until its first kickoff, then grades when the stats land', () => {
+void test("a set week says it is not played yet until its first kickoff, then grades once every game's stats are in", () => {
 	const frozen: RecordWeek = {
 		week: 6,
 		status: 'frozen',
@@ -287,7 +287,10 @@ void test('a set week says it is not played yet until its first kickoff, then gr
 		lines: []
 	};
 	assert.equal(weekLines([frozen], [6])[0]?.text, 'set Tue Oct 13, not played yet');
-	assert.equal(weekLines([frozen])[0]?.text, 'set Tue Oct 13, grades when the stats land');
+	assert.equal(
+		weekLines([frozen])[0]?.text,
+		"set Tue Oct 13, grades once every game's stats are in"
+	);
 });
 
 void test("the switch names the page's league, the selected one marked in its list (Lane 115, B89)", () => {

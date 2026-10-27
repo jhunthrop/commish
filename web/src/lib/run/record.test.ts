@@ -165,7 +165,15 @@ const mondayNight = record({
 void test('the headline says how many played weeks are graded and why the rest are not (B03)', () => {
 	const missed = 'Weeks 3 to 5 were not set before kickoff, so they cannot be graded.';
 	assert.equal(standingWords(mondayNight), 'Graded 2 of 5 weeks played');
-	assert.equal(gapWords(mondayNight), `${missed} Week 6 grades Wednesday when the stats land.`);
+	assert.equal(
+		gapWords(mondayNight),
+		`${missed} Week 6 grades once every game's stats are in, usually Wednesday.`
+	);
+	const undated: RecordWeek = { ...waitingWeek, gradesFrom: undefined };
+	assert.equal(
+		gapWords(record({ weeks: [undated], toDate: [line(false)] })),
+		"Week 6 grades once every game's stats are in."
+	);
 	assert.equal(gapWords(mondayNight, [6]), missed);
 	const headline = recordHeadline(mondayNight);
 	assert.equal(headline.standing, 'Graded 2 of 5 weeks played');
@@ -180,7 +188,7 @@ void test('every week says set, then graded, in one order (B37)', () => {
 			'Week 1: set Tue Sep 8, graded Wed Oct 14',
 			'Week 2: set Tue Sep 8, graded Wed Oct 14',
 			'Weeks 3 to 5: our order was not set before kickoff, so they cannot be graded',
-			'Week 6: set Tue Oct 13, grades Wed Oct 21 when the stats land'
+			"Week 6: set Tue Oct 13, grades once every game's stats are in, usually Wed Oct 21"
 		]
 	);
 	assert.equal(weekLines([waitingWeek], [6])[0]?.text, 'set Tue Oct 13, not played yet');

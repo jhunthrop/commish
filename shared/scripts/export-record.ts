@@ -2,7 +2,8 @@
  * in its `record` field) in the shape the nightly writes since Lane 114, the weekly and draft records
  * beside the run's own, for the apps' Our record screen. Each is the record shots' run record
  * (web/scripts/record-fixture/record-live.json, the dev store's record on Monday night of week 6)
- * with its two records added by web/scripts/record-fixture/two.ts: `upcoming`, the state at the run
+ * as it is, `waiting` (week 6 set and played, waiting on its stats with the run's gradesFrom, Lane
+ * 250), and with its two records added by web/scripts/record-fixture/two.ts: `upcoming`, the state at the run
  * (week 7 not set yet, the draft record's real figures); `graded`, a STAND-IN week 7 graded against
  * ESPN; `published`, the same STAND-IN with the week's published projection beside ESPN. The
  * stand-ins' figures are not a grade of anything (two.ts says how they are made). The contract run's
@@ -23,8 +24,17 @@ const TWO = 'web/scripts/record-fixture/two.ts';
 /** The modes two.ts writes, each with what its file holds. */
 export const RECORD_MODES = [
 	{
+		mode: 'waiting',
+		about: "the run's own record alone, week 6 set and waiting on its stats with the day it usually grades"
+	},
+	{
 		mode: 'upcoming',
 		about: 'the weekly record before its first week is set, and the draft record'
+	},
+	{
+		mode: 'set',
+		about:
+			"the weekly record with week 7 set and played, waiting on its stats with the day it usually grades, and the draft record"
 	},
 	{
 		mode: 'graded',
@@ -47,8 +57,9 @@ export function recordFile(mode: RecordMode): string {
 /** The record with its two records in a mode, as the run writes it. */
 export async function recordIn(mode: RecordMode): Promise<unknown> {
 	const live = JSON.parse(await readFile(join(REPOSITORY, LIVE_RECORD), 'utf8')) as unknown;
+	if (mode === 'waiting') return live;
 	const two = (await import(join(REPOSITORY, TWO))) as {
-		withTwoRecords: (record: unknown, mode: RecordMode) => Promise<unknown>;
+		withTwoRecords: (record: unknown, mode: Exclude<RecordMode, 'waiting'>) => Promise<unknown>;
 	};
 	return two.withTwoRecords(live, mode);
 }

@@ -1,0 +1,3421 @@
+{
+	"season": 2026,
+	"format": "ppr-12",
+	"statistic": {
+		"agreement": "order matched",
+		"placesOff": "places off",
+		"starters": "starters right"
+	},
+	"scale": "Order matched is how closely an order ranked the players to the week's finish: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards.",
+	"startersBasis": "Starters right counts a standard 12-team lineup, the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs, and how many of them the order also put there.",
+	"method": "Each week we set our order before the first kickoff and graded it on its players' points, ADP on the same players.",
+	"publishedFromWeek": null,
+	"honest": "ADP had more of the week's starters right in the standard lineup, 104 of 168 against our 100.",
+	"weeks": [
+		{
+			"week": 1,
+			"status": "graded",
+			"frozenAt": "2026-09-08T12:00:16.244Z",
+			"frozenBy": "2026-10-19T12-live",
+			"order": "preseason",
+			"gradedAt": "2026-10-13T07:36:40.448Z",
+			"population": 341,
+			"lines": [
+				{
+					"position": "All",
+					"ours": {
+						"graded": 193,
+						"agreement": 0.5,
+						"placesOff": 43,
+						"starters": 50,
+						"startersOf": 84
+					},
+					"adp": {
+						"graded": 193,
+						"agreement": 0.41,
+						"placesOff": 47.9,
+						"starters": 52,
+						"startersOf": 84
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "QB",
+					"ours": {
+						"graded": 29,
+						"agreement": 0.2,
+						"placesOff": 9,
+						"starters": 5,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 29,
+						"agreement": 0.24,
+						"placesOff": 8.6,
+						"starters": 7,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "RB",
+					"ours": {
+						"graded": 54,
+						"agreement": 0.75,
+						"placesOff": 9.1,
+						"starters": 18,
+						"startersOf": 24
+					},
+					"adp": {
+						"graded": 54,
+						"agreement": 0.77,
+						"placesOff": 8.2,
+						"starters": 19,
+						"startersOf": 24
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "WR",
+					"ours": {
+						"graded": 84,
+						"agreement": 0.47,
+						"placesOff": 19.1,
+						"starters": 22,
+						"startersOf": 36
+					},
+					"adp": {
+						"graded": 84,
+						"agreement": 0.48,
+						"placesOff": 18.6,
+						"starters": 22,
+						"startersOf": 36
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "TE",
+					"ours": {
+						"graded": 26,
+						"agreement": -0.01,
+						"placesOff": 8.6,
+						"starters": 5,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 26,
+						"agreement": -0.09,
+						"placesOff": 9.3,
+						"starters": 4,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				}
+			],
+			"orderAsOf": "2026-09-07T21:57:33.121Z",
+			"players": [
+				{
+					"position": "QB",
+					"ours": 21,
+					"adp": 84,
+					"published": null,
+					"finish": 1
+				},
+				{
+					"position": "QB",
+					"ours": 4,
+					"adp": 33,
+					"published": null,
+					"finish": 2
+				},
+				{
+					"position": "RB",
+					"ours": 46,
+					"adp": 14,
+					"published": null,
+					"finish": 3
+				},
+				{
+					"position": "RB",
+					"ours": 47,
+					"adp": 22,
+					"published": null,
+					"finish": 4
+				},
+				{
+					"position": "WR",
+					"ours": 137,
+					"adp": 115,
+					"published": null,
+					"finish": 5
+				},
+				{
+					"position": "RB",
+					"ours": 9,
+					"adp": 1,
+					"published": null,
+					"finish": 6
+				},
+				{
+					"position": "WR",
+					"ours": 85,
+					"adp": 57,
+					"published": null,
+					"finish": 7
+				},
+				{
+					"position": "RB",
+					"ours": 45,
+					"adp": 20,
+					"published": null,
+					"finish": 8
+				},
+				{
+					"position": "RB",
+					"ours": 82,
+					"adp": 41,
+					"published": null,
+					"finish": 9
+				},
+				{
+					"position": "QB",
+					"ours": 87,
+					"adp": 176,
+					"published": null,
+					"finish": 10
+				},
+				{
+					"position": "RB",
+					"ours": 10,
+					"adp": 2,
+					"published": null,
+					"finish": 11
+				},
+				{
+					"position": "WR",
+					"ours": 8,
+					"adp": 12,
+					"published": null,
+					"finish": 12
+				},
+				{
+					"position": "RB",
+					"ours": 113,
+					"adp": 51,
+					"published": null,
+					"finish": 13
+				},
+				{
+					"position": "WR",
+					"ours": 5,
+					"adp": 7,
+					"published": null,
+					"finish": 14
+				},
+				{
+					"position": "WR",
+					"ours": 15,
+					"adp": 18,
+					"published": null,
+					"finish": 15
+				},
+				{
+					"position": "TE",
+					"ours": 104,
+					"adp": 128,
+					"published": null,
+					"finish": 16
+				},
+				{
+					"position": "QB",
+					"ours": 31,
+					"adp": 114,
+					"published": null,
+					"finish": 17
+				},
+				{
+					"position": "WR",
+					"ours": 3,
+					"adp": 5,
+					"published": null,
+					"finish": 18
+				},
+				{
+					"position": "QB",
+					"ours": 32,
+					"adp": 90,
+					"published": null,
+					"finish": 19
+				},
+				{
+					"position": "WR",
+					"ours": 27,
+					"adp": 24,
+					"published": null,
+					"finish": 20
+				},
+				{
+					"position": "RB",
+					"ours": 26,
+					"adp": 8,
+					"published": null,
+					"finish": 21
+				},
+				{
+					"position": "QB",
+					"ours": 7,
+					"adp": 56,
+					"published": null,
+					"finish": 22
+				},
+				{
+					"position": "QB",
+					"ours": 17,
+					"adp": 76,
+					"published": null,
+					"finish": 23
+				},
+				{
+					"position": "TE",
+					"ours": 44,
+					"adp": 29,
+					"published": null,
+					"finish": 24
+				},
+				{
+					"position": "RB",
+					"ours": 84,
+					"adp": 34,
+					"published": null,
+					"finish": 25
+				},
+				{
+					"position": "TE",
+					"ours": 128,
+					"adp": 111,
+					"published": null,
+					"finish": 26
+				},
+				{
+					"position": "RB",
+					"ours": 110,
+					"adp": 80,
+					"published": null,
+					"finish": 27
+				},
+				{
+					"position": "QB",
+					"ours": 61,
+					"adp": 130,
+					"published": null,
+					"finish": 28
+				},
+				{
+					"position": "QB",
+					"ours": 35,
+					"adp": 99,
+					"published": null,
+					"finish": 29
+				},
+				{
+					"position": "WR",
+					"ours": 25,
+					"adp": 21,
+					"published": null,
+					"finish": 30
+				},
+				{
+					"position": "QB",
+					"ours": 30,
+					"adp": 81,
+					"published": null,
+					"finish": 31
+				},
+				{
+					"position": "WR",
+					"ours": 51,
+					"adp": 45,
+					"published": null,
+					"finish": 32
+				},
+				{
+					"position": "RB",
+					"ours": 135,
+					"adp": 106,
+					"published": null,
+					"finish": 33
+				},
+				{
+					"position": "RB",
+					"ours": 95,
+					"adp": 44,
+					"published": null,
+					"finish": 34
+				},
+				{
+					"position": "WR",
+					"ours": 150,
+					"adp": 171,
+					"published": null,
+					"finish": 35
+				},
+				{
+					"position": "RB",
+					"ours": 56,
+					"adp": 32,
+					"published": null,
+					"finish": 36
+				},
+				{
+					"position": "QB",
+					"ours": 64,
+					"adp": 133,
+					"published": null,
+					"finish": 37
+				},
+				{
+					"position": "WR",
+					"ours": 62,
+					"adp": 61,
+					"published": null,
+					"finish": 38
+				},
+				{
+					"position": "WR",
+					"ours": 43,
+					"adp": 38,
+					"published": null,
+					"finish": 39
+				},
+				{
+					"position": "WR",
+					"ours": 112,
+					"adp": 109,
+					"published": null,
+					"finish": 40
+				},
+				{
+					"position": "TE",
+					"ours": 138,
+					"adp": 137,
+					"published": null,
+					"finish": 41
+				},
+				{
+					"position": "QB",
+					"ours": 28,
+					"adp": 71,
+					"published": null,
+					"finish": 42
+				},
+				{
+					"position": "WR",
+					"ours": 74,
+					"adp": 55,
+					"published": null,
+					"finish": 43
+				},
+				{
+					"position": "QB",
+					"ours": 80,
+					"adp": 162,
+					"published": null,
+					"finish": 44
+				},
+				{
+					"position": "QB",
+					"ours": 92,
+					"adp": 180,
+					"published": null,
+					"finish": 45
+				},
+				{
+					"position": "QB",
+					"ours": 65,
+					"adp": 153,
+					"published": null,
+					"finish": 46
+				},
+				{
+					"position": "QB",
+					"ours": 20,
+					"adp": 97,
+					"published": null,
+					"finish": 47
+				},
+				{
+					"position": "TE",
+					"ours": 169,
+					"adp": 179,
+					"published": null,
+					"finish": 48
+				},
+				{
+					"position": "WR",
+					"ours": 105,
+					"adp": 91,
+					"published": null,
+					"finish": 49
+				},
+				{
+					"position": "RB",
+					"ours": 76,
+					"adp": 30,
+					"published": null,
+					"finish": 50
+				},
+				{
+					"position": "WR",
+					"ours": 111,
+					"adp": 101,
+					"published": null,
+					"finish": 51
+				},
+				{
+					"position": "WR",
+					"ours": 6,
+					"adp": 10,
+					"published": null,
+					"finish": 52
+				},
+				{
+					"position": "WR",
+					"ours": 142,
+					"adp": 166,
+					"published": null,
+					"finish": 53
+				},
+				{
+					"position": "RB",
+					"ours": 63,
+					"adp": 37,
+					"published": null,
+					"finish": 54
+				},
+				{
+					"position": "RB",
+					"ours": 123,
+					"adp": 59,
+					"published": null,
+					"finish": 55
+				},
+				{
+					"position": "QB",
+					"ours": 16,
+					"adp": 63,
+					"published": null,
+					"finish": 56
+				},
+				{
+					"position": "TE",
+					"ours": 109,
+					"adp": 142,
+					"published": null,
+					"finish": 57
+				},
+				{
+					"position": "WR",
+					"ours": 156,
+					"adp": 174,
+					"published": null,
+					"finish": 58
+				},
+				{
+					"position": "QB",
+					"ours": 13,
+					"adp": 54,
+					"published": null,
+					"finish": 59
+				},
+				{
+					"position": "RB",
+					"ours": 132,
+					"adp": 39,
+					"published": null,
+					"finish": 60
+				},
+				{
+					"position": "WR",
+					"ours": 42,
+					"adp": 26,
+					"published": null,
+					"finish": 61
+				},
+				{
+					"position": "WR",
+					"ours": 140,
+					"adp": 129,
+					"published": null,
+					"finish": 62
+				},
+				{
+					"position": "RB",
+					"ours": 36,
+					"adp": 6,
+					"published": null,
+					"finish": 63
+				},
+				{
+					"position": "TE",
+					"ours": 174,
+					"adp": 181,
+					"published": null,
+					"finish": 64
+				},
+				{
+					"position": "QB",
+					"ours": 23,
+					"adp": 98,
+					"published": null,
+					"finish": 65
+				},
+				{
+					"position": "RB",
+					"ours": 58,
+					"adp": 27,
+					"published": null,
+					"finish": 66
+				},
+				{
+					"position": "WR",
+					"ours": 53,
+					"adp": 25,
+					"published": null,
+					"finish": 67
+				},
+				{
+					"position": "RB",
+					"ours": 155,
+					"adp": 110,
+					"published": null,
+					"finish": 68
+				},
+				{
+					"position": "QB",
+					"ours": 94,
+					"adp": 186,
+					"published": null,
+					"finish": 69
+				},
+				{
+					"position": "WR",
+					"ours": 1,
+					"adp": 3,
+					"published": null,
+					"finish": 70
+				},
+				{
+					"position": "WR",
+					"ours": 83,
+					"adp": 85,
+					"published": null,
+					"finish": 71
+				},
+				{
+					"position": "RB",
+					"ours": 144,
+					"adp": 108,
+					"published": null,
+					"finish": 72
+				},
+				{
+					"position": "QB",
+					"ours": 88,
+					"adp": 184,
+					"published": null,
+					"finish": 73
+				},
+				{
+					"position": "QB",
+					"ours": 22,
+					"adp": 119,
+					"published": null,
+					"finish": 74
+				},
+				{
+					"position": "TE",
+					"ours": 179,
+					"adp": 167,
+					"published": null,
+					"finish": 75
+				},
+				{
+					"position": "WR",
+					"ours": 39,
+					"adp": 35,
+					"published": null,
+					"finish": 76
+				},
+				{
+					"position": "TE",
+					"ours": 163,
+					"adp": 136,
+					"published": null,
+					"finish": 77
+				},
+				{
+					"position": "WR",
+					"ours": 71,
+					"adp": 73,
+					"published": null,
+					"finish": 78
+				},
+				{
+					"position": "RB",
+					"ours": 19,
+					"adp": 9,
+					"published": null,
+					"finish": 79
+				},
+				{
+					"position": "WR",
+					"ours": 33,
+					"adp": 31,
+					"published": null,
+					"finish": 80
+				},
+				{
+					"position": "RB",
+					"ours": 91,
+					"adp": 60,
+					"published": null,
+					"finish": 81
+				},
+				{
+					"position": "TE",
+					"ours": 168,
+					"adp": 169,
+					"published": null,
+					"finish": 82
+				},
+				{
+					"position": "TE",
+					"ours": 86,
+					"adp": 64,
+					"published": null,
+					"finish": 83
+				},
+				{
+					"position": "TE",
+					"ours": 103,
+					"adp": 103,
+					"published": null,
+					"finish": 84
+				},
+				{
+					"position": "WR",
+					"ours": 70,
+					"adp": 67,
+					"published": null,
+					"finish": 85
+				},
+				{
+					"position": "RB",
+					"ours": 141,
+					"adp": 102,
+					"published": null,
+					"finish": 86
+				},
+				{
+					"position": "RB",
+					"ours": 37,
+					"adp": 11,
+					"published": null,
+					"finish": 87
+				},
+				{
+					"position": "WR",
+					"ours": 40,
+					"adp": 16,
+					"published": null,
+					"finish": 88
+				},
+				{
+					"position": "QB",
+					"ours": 12,
+					"adp": 48,
+					"published": null,
+					"finish": 89
+				},
+				{
+					"position": "TE",
+					"ours": 119,
+					"adp": 105,
+					"published": null,
+					"finish": 90
+				},
+				{
+					"position": "RB",
+					"ours": 126,
+					"adp": 50,
+					"published": null,
+					"finish": 91
+				},
+				{
+					"position": "TE",
+					"ours": 117,
+					"adp": 96,
+					"published": null,
+					"finish": 92
+				},
+				{
+					"position": "WR",
+					"ours": 60,
+					"adp": 49,
+					"published": null,
+					"finish": 93
+				},
+				{
+					"position": "QB",
+					"ours": 81,
+					"adp": 182,
+					"published": null,
+					"finish": 94
+				},
+				{
+					"position": "WR",
+					"ours": 118,
+					"adp": 127,
+					"published": null,
+					"finish": 95
+				},
+				{
+					"position": "QB",
+					"ours": 72,
+					"adp": 151,
+					"published": null,
+					"finish": 96
+				},
+				{
+					"position": "RB",
+					"ours": 41,
+					"adp": 17,
+					"published": null,
+					"finish": 97
+				},
+				{
+					"position": "WR",
+					"ours": 77,
+					"adp": 95,
+					"published": null,
+					"finish": 98
+				},
+				{
+					"position": "RB",
+					"ours": 177,
+					"adp": 143,
+					"published": null,
+					"finish": 99
+				},
+				{
+					"position": "WR",
+					"ours": 145,
+					"adp": 163,
+					"published": null,
+					"finish": 100
+				},
+				{
+					"position": "TE",
+					"ours": 106,
+					"adp": 122,
+					"published": null,
+					"finish": 101
+				},
+				{
+					"position": "WR",
+					"ours": 50,
+					"adp": 36,
+					"published": null,
+					"finish": 102
+				},
+				{
+					"position": "WR",
+					"ours": 67,
+					"adp": 75,
+					"published": null,
+					"finish": 103
+				},
+				{
+					"position": "WR",
+					"ours": 69,
+					"adp": 82,
+					"published": null,
+					"finish": 104
+				},
+				{
+					"position": "RB",
+					"ours": 184,
+					"adp": 139,
+					"published": null,
+					"finish": 105
+				},
+				{
+					"position": "WR",
+					"ours": 49,
+					"adp": 43,
+					"published": null,
+					"finish": 106
+				},
+				{
+					"position": "WR",
+					"ours": 116,
+					"adp": 77,
+					"published": null,
+					"finish": 107
+				},
+				{
+					"position": "WR",
+					"ours": 29,
+					"adp": 28,
+					"published": null,
+					"finish": 108
+				},
+				{
+					"position": "RB",
+					"ours": 78,
+					"adp": 23,
+					"published": null,
+					"finish": 109
+				},
+				{
+					"position": "RB",
+					"ours": 122,
+					"adp": 93,
+					"published": null,
+					"finish": 110
+				},
+				{
+					"position": "WR",
+					"ours": 66,
+					"adp": 65,
+					"published": null,
+					"finish": 111
+				},
+				{
+					"position": "RB",
+					"ours": 188,
+					"adp": 168,
+					"published": null,
+					"finish": 112
+				},
+				{
+					"position": "WR",
+					"ours": 68,
+					"adp": 78,
+					"published": null,
+					"finish": 113
+				},
+				{
+					"position": "RB",
+					"ours": 133,
+					"adp": 68,
+					"published": null,
+					"finish": 114
+				},
+				{
+					"position": "WR",
+					"ours": 124,
+					"adp": 112,
+					"published": null,
+					"finish": 115
+				},
+				{
+					"position": "TE",
+					"ours": 152,
+					"adp": 178,
+					"published": null,
+					"finish": 116
+				},
+				{
+					"position": "WR",
+					"ours": 162,
+					"adp": 183,
+					"published": null,
+					"finish": 117
+				},
+				{
+					"position": "WR",
+					"ours": 59,
+					"adp": 52,
+					"published": null,
+					"finish": 118
+				},
+				{
+					"position": "WR",
+					"ours": 89,
+					"adp": 69,
+					"published": null,
+					"finish": 119
+				},
+				{
+					"position": "RB",
+					"ours": 101,
+					"adp": 47,
+					"published": null,
+					"finish": 120
+				},
+				{
+					"position": "WR",
+					"ours": 129,
+					"adp": 140,
+					"published": null,
+					"finish": 121
+				},
+				{
+					"position": "WR",
+					"ours": 146,
+					"adp": 193,
+					"published": null,
+					"finish": 122
+				},
+				{
+					"position": "WR",
+					"ours": 14,
+					"adp": 19,
+					"published": null,
+					"finish": 123
+				},
+				{
+					"position": "WR",
+					"ours": 136,
+					"adp": 150,
+					"published": null,
+					"finish": 124
+				},
+				{
+					"position": "WR",
+					"ours": 75,
+					"adp": 88,
+					"published": null,
+					"finish": 125
+				},
+				{
+					"position": "WR",
+					"ours": 52,
+					"adp": 40,
+					"published": null,
+					"finish": 126
+				},
+				{
+					"position": "TE",
+					"ours": 159,
+					"adp": 157,
+					"published": null,
+					"finish": 127
+				},
+				{
+					"position": "WR",
+					"ours": 18,
+					"adp": 15,
+					"published": null,
+					"finish": 128
+				},
+				{
+					"position": "WR",
+					"ours": 148,
+					"adp": 155,
+					"published": null,
+					"finish": 129
+				},
+				{
+					"position": "WR",
+					"ours": 11,
+					"adp": 13,
+					"published": null,
+					"finish": 130
+				},
+				{
+					"position": "QB",
+					"ours": 34,
+					"adp": 107,
+					"published": null,
+					"finish": 131
+				},
+				{
+					"position": "RB",
+					"ours": 149,
+					"adp": 116,
+					"published": null,
+					"finish": 132
+				},
+				{
+					"position": "WR",
+					"ours": 108,
+					"adp": 87,
+					"published": null,
+					"finish": 133
+				},
+				{
+					"position": "RB",
+					"ours": 160,
+					"adp": 131,
+					"published": null,
+					"finish": 134
+				},
+				{
+					"position": "WR",
+					"ours": 158,
+					"adp": 187,
+					"published": null,
+					"finish": 135
+				},
+				{
+					"position": "WR",
+					"ours": 97,
+					"adp": 100,
+					"published": null,
+					"finish": 136
+				},
+				{
+					"position": "RB",
+					"ours": 139,
+					"adp": 113,
+					"published": null,
+					"finish": 137
+				},
+				{
+					"position": "WR",
+					"ours": 96,
+					"adp": 121,
+					"published": null,
+					"finish": 138
+				},
+				{
+					"position": "WR",
+					"ours": 102,
+					"adp": 120,
+					"published": null,
+					"finish": 139
+				},
+				{
+					"position": "WR",
+					"ours": 157,
+					"adp": 146,
+					"published": null,
+					"finish": 140
+				},
+				{
+					"position": "RB",
+					"ours": 127,
+					"adp": 66,
+					"published": null,
+					"finish": 141
+				},
+				{
+					"position": "RB",
+					"ours": 165,
+					"adp": 118,
+					"published": null,
+					"finish": 142
+				},
+				{
+					"position": "WR",
+					"ours": 73,
+					"adp": 62,
+					"published": null,
+					"finish": 143
+				},
+				{
+					"position": "WR",
+					"ours": 147,
+					"adp": 177,
+					"published": null,
+					"finish": 144
+				},
+				{
+					"position": "QB",
+					"ours": 24,
+					"adp": 74,
+					"published": null,
+					"finish": 145
+				},
+				{
+					"position": "RB",
+					"ours": 114,
+					"adp": 70,
+					"published": null,
+					"finish": 146
+				},
+				{
+					"position": "TE",
+					"ours": 100,
+					"adp": 72,
+					"published": null,
+					"finish": 147
+				},
+				{
+					"position": "RB",
+					"ours": 183,
+					"adp": 138,
+					"published": null,
+					"finish": 148
+				},
+				{
+					"position": "RB",
+					"ours": 192,
+					"adp": 141,
+					"published": null,
+					"finish": 149
+				},
+				{
+					"position": "WR",
+					"ours": 151,
+					"adp": 160,
+					"published": null,
+					"finish": 150
+				},
+				{
+					"position": "RB",
+					"ours": 193,
+					"adp": 172,
+					"published": null,
+					"finish": 151
+				},
+				{
+					"position": "TE",
+					"ours": 187,
+					"adp": 170,
+					"published": null,
+					"finish": 152
+				},
+				{
+					"position": "WR",
+					"ours": 93,
+					"adp": 92,
+					"published": null,
+					"finish": 153
+				},
+				{
+					"position": "RB",
+					"ours": 164,
+					"adp": 83,
+					"published": null,
+					"finish": 154
+				},
+				{
+					"position": "TE",
+					"ours": 161,
+					"adp": 189,
+					"published": null,
+					"finish": 155
+				},
+				{
+					"position": "WR",
+					"ours": 170,
+					"adp": 175,
+					"published": null,
+					"finish": 156
+				},
+				{
+					"position": "WR",
+					"ours": 57,
+					"adp": 46,
+					"published": null,
+					"finish": 157
+				},
+				{
+					"position": "TE",
+					"ours": 130,
+					"adp": 152,
+					"published": null,
+					"finish": 158
+				},
+				{
+					"position": "TE",
+					"ours": 115,
+					"adp": 89,
+					"published": null,
+					"finish": 159
+				},
+				{
+					"position": "WR",
+					"ours": 2,
+					"adp": 4,
+					"published": null,
+					"finish": 160
+				},
+				{
+					"position": "WR",
+					"ours": 55,
+					"adp": 58,
+					"published": null,
+					"finish": 161
+				},
+				{
+					"position": "RB",
+					"ours": 191,
+					"adp": 165,
+					"published": null,
+					"finish": 162
+				},
+				{
+					"position": "WR",
+					"ours": 175,
+					"adp": 159,
+					"published": null,
+					"finish": 163
+				},
+				{
+					"position": "RB",
+					"ours": 107,
+					"adp": 86,
+					"published": null,
+					"finish": 164
+				},
+				{
+					"position": "TE",
+					"ours": 125,
+					"adp": 125,
+					"published": null,
+					"finish": 165
+				},
+				{
+					"position": "WR",
+					"ours": 121,
+					"adp": 123,
+					"published": null,
+					"finish": 166
+				},
+				{
+					"position": "RB",
+					"ours": 189,
+					"adp": 148,
+					"published": null,
+					"finish": 167
+				},
+				{
+					"position": "WR",
+					"ours": 178,
+					"adp": 161,
+					"published": null,
+					"finish": 168
+				},
+				{
+					"position": "WR",
+					"ours": 120,
+					"adp": 126,
+					"published": null,
+					"finish": 169
+				},
+				{
+					"position": "WR",
+					"ours": 134,
+					"adp": 117,
+					"published": null,
+					"finish": 170
+				},
+				{
+					"position": "WR",
+					"ours": 48,
+					"adp": 42,
+					"published": null,
+					"finish": 171
+				},
+				{
+					"position": "WR",
+					"ours": 176,
+					"adp": 185,
+					"published": null,
+					"finish": 172
+				},
+				{
+					"position": "RB",
+					"ours": 185,
+					"adp": 154,
+					"published": null,
+					"finish": 173
+				},
+				{
+					"position": "RB",
+					"ours": 171,
+					"adp": 132,
+					"published": null,
+					"finish": 174
+				},
+				{
+					"position": "QB",
+					"ours": 54,
+					"adp": 135,
+					"published": null,
+					"finish": 175
+				},
+				{
+					"position": "WR",
+					"ours": 154,
+					"adp": 192,
+					"published": null,
+					"finish": 176
+				},
+				{
+					"position": "RB",
+					"ours": 167,
+					"adp": 158,
+					"published": null,
+					"finish": 177
+				},
+				{
+					"position": "RB",
+					"ours": 190,
+					"adp": 173,
+					"published": null,
+					"finish": 178
+				},
+				{
+					"position": "WR",
+					"ours": 143,
+					"adp": 134,
+					"published": null,
+					"finish": 179
+				},
+				{
+					"position": "WR",
+					"ours": 131,
+					"adp": 147,
+					"published": null,
+					"finish": 180
+				},
+				{
+					"position": "TE",
+					"ours": 98,
+					"adp": 79,
+					"published": null,
+					"finish": 181
+				},
+				{
+					"position": "WR",
+					"ours": 99,
+					"adp": 104,
+					"published": null,
+					"finish": 182
+				},
+				{
+					"position": "WR",
+					"ours": 181,
+					"adp": 188,
+					"published": null,
+					"finish": 183
+				},
+				{
+					"position": "WR",
+					"ours": 90,
+					"adp": 94,
+					"published": null,
+					"finish": 184
+				},
+				{
+					"position": "WR",
+					"ours": 153,
+					"adp": 191,
+					"published": null,
+					"finish": 185
+				},
+				{
+					"position": "TE",
+					"ours": 79,
+					"adp": 53,
+					"published": null,
+					"finish": 186
+				},
+				{
+					"position": "RB",
+					"ours": 173,
+					"adp": 156,
+					"published": null,
+					"finish": 187
+				},
+				{
+					"position": "WR",
+					"ours": 172,
+					"adp": 190,
+					"published": null,
+					"finish": 188
+				},
+				{
+					"position": "TE",
+					"ours": 182,
+					"adp": 164,
+					"published": null,
+					"finish": 189
+				},
+				{
+					"position": "WR",
+					"ours": 186,
+					"adp": 144,
+					"published": null,
+					"finish": 190
+				},
+				{
+					"position": "RB",
+					"ours": 180,
+					"adp": 145,
+					"published": null,
+					"finish": 191
+				},
+				{
+					"position": "QB",
+					"ours": 38,
+					"adp": 124,
+					"published": null,
+					"finish": 192
+				},
+				{
+					"position": "RB",
+					"ours": 166,
+					"adp": 149,
+					"published": null,
+					"finish": 193
+				}
+			]
+		},
+		{
+			"week": 2,
+			"status": "graded",
+			"frozenAt": "2026-09-10T18:00:17.177Z",
+			"frozenBy": "2026-10-19T12-live",
+			"order": "preseason",
+			"gradedAt": "2026-10-13T07:36:40.448Z",
+			"population": 344,
+			"lines": [
+				{
+					"position": "All",
+					"ours": {
+						"graded": 188,
+						"agreement": 0.46,
+						"placesOff": 44.3,
+						"starters": 50,
+						"startersOf": 84
+					},
+					"adp": {
+						"graded": 188,
+						"agreement": 0.32,
+						"placesOff": 51.3,
+						"starters": 52,
+						"startersOf": 84
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "QB",
+					"ours": {
+						"graded": 27,
+						"agreement": 0.23,
+						"placesOff": 8.1,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 27,
+						"agreement": 0.28,
+						"placesOff": 7.4,
+						"starters": 7,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "RB",
+					"ours": {
+						"graded": 59,
+						"agreement": 0.64,
+						"placesOff": 11,
+						"starters": 16,
+						"startersOf": 24
+					},
+					"adp": {
+						"graded": 59,
+						"agreement": 0.65,
+						"placesOff": 10.9,
+						"starters": 17,
+						"startersOf": 24
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "WR",
+					"ours": {
+						"graded": 77,
+						"agreement": 0.33,
+						"placesOff": 21.3,
+						"starters": 20,
+						"startersOf": 36
+					},
+					"adp": {
+						"graded": 77,
+						"agreement": 0.33,
+						"placesOff": 20.9,
+						"starters": 20,
+						"startersOf": 36
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "TE",
+					"ours": {
+						"graded": 25,
+						"agreement": 0.11,
+						"placesOff": 7.6,
+						"starters": 8,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 25,
+						"agreement": 0.05,
+						"placesOff": 7.6,
+						"starters": 8,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				}
+			],
+			"orderAsOf": "2026-09-09T02:20:29.697Z",
+			"players": [
+				{
+					"position": "WR",
+					"ours": 2,
+					"adp": 4,
+					"published": null,
+					"finish": 1
+				},
+				{
+					"position": "QB",
+					"ours": 3,
+					"adp": 30,
+					"published": null,
+					"finish": 2
+				},
+				{
+					"position": "WR",
+					"ours": 47,
+					"adp": 37,
+					"published": null,
+					"finish": 3
+				},
+				{
+					"position": "WR",
+					"ours": 6,
+					"adp": 9,
+					"published": null,
+					"finish": 4
+				},
+				{
+					"position": "WR",
+					"ours": 5,
+					"adp": 6,
+					"published": null,
+					"finish": 5
+				},
+				{
+					"position": "QB",
+					"ours": 19,
+					"adp": 93,
+					"published": null,
+					"finish": 6
+				},
+				{
+					"position": "QB",
+					"ours": 9,
+					"adp": 61,
+					"published": null,
+					"finish": 7
+				},
+				{
+					"position": "RB",
+					"ours": 29,
+					"adp": 7,
+					"published": null,
+					"finish": 8
+				},
+				{
+					"position": "QB",
+					"ours": 24,
+					"adp": 95,
+					"published": null,
+					"finish": 9
+				},
+				{
+					"position": "QB",
+					"ours": 34,
+					"adp": 78,
+					"published": null,
+					"finish": 10
+				},
+				{
+					"position": "WR",
+					"ours": 25,
+					"adp": 25,
+					"published": null,
+					"finish": 11
+				},
+				{
+					"position": "QB",
+					"ours": 20,
+					"adp": 72,
+					"published": null,
+					"finish": 12
+				},
+				{
+					"position": "WR",
+					"ours": 1,
+					"adp": 3,
+					"published": null,
+					"finish": 13
+				},
+				{
+					"position": "TE",
+					"ours": 156,
+					"adp": 173,
+					"published": null,
+					"finish": 14
+				},
+				{
+					"position": "TE",
+					"ours": 103,
+					"adp": 99,
+					"published": null,
+					"finish": 15
+				},
+				{
+					"position": "QB",
+					"ours": 76,
+					"adp": 171,
+					"published": null,
+					"finish": 16
+				},
+				{
+					"position": "RB",
+					"ours": 43,
+					"adp": 20,
+					"published": null,
+					"finish": 17
+				},
+				{
+					"position": "RB",
+					"ours": 16,
+					"adp": 1,
+					"published": null,
+					"finish": 18
+				},
+				{
+					"position": "WR",
+					"ours": 90,
+					"adp": 116,
+					"published": null,
+					"finish": 19
+				},
+				{
+					"position": "RB",
+					"ours": 27,
+					"adp": 5,
+					"published": null,
+					"finish": 20
+				},
+				{
+					"position": "WR",
+					"ours": 10,
+					"adp": 17,
+					"published": null,
+					"finish": 21
+				},
+				{
+					"position": "TE",
+					"ours": 136,
+					"adp": 130,
+					"published": null,
+					"finish": 22
+				},
+				{
+					"position": "QB",
+					"ours": 63,
+					"adp": 124,
+					"published": null,
+					"finish": 23
+				},
+				{
+					"position": "WR",
+					"ours": 130,
+					"adp": 143,
+					"published": null,
+					"finish": 24
+				},
+				{
+					"position": "WR",
+					"ours": 42,
+					"adp": 39,
+					"published": null,
+					"finish": 25
+				},
+				{
+					"position": "WR",
+					"ours": 94,
+					"adp": 88,
+					"published": null,
+					"finish": 26
+				},
+				{
+					"position": "RB",
+					"ours": 41,
+					"adp": 10,
+					"published": null,
+					"finish": 27
+				},
+				{
+					"position": "WR",
+					"ours": 135,
+					"adp": 123,
+					"published": null,
+					"finish": 28
+				},
+				{
+					"position": "TE",
+					"ours": 121,
+					"adp": 119,
+					"published": null,
+					"finish": 29
+				},
+				{
+					"position": "QB",
+					"ours": 60,
+					"adp": 180,
+					"published": null,
+					"finish": 30
+				},
+				{
+					"position": "TE",
+					"ours": 44,
+					"adp": 26,
+					"published": null,
+					"finish": 31
+				},
+				{
+					"position": "TE",
+					"ours": 111,
+					"adp": 86,
+					"published": null,
+					"finish": 32
+				},
+				{
+					"position": "RB",
+					"ours": 46,
+					"adp": 14,
+					"published": null,
+					"finish": 33
+				},
+				{
+					"position": "RB",
+					"ours": 54,
+					"adp": 21,
+					"published": null,
+					"finish": 34
+				},
+				{
+					"position": "TE",
+					"ours": 175,
+					"adp": 158,
+					"published": null,
+					"finish": 35
+				},
+				{
+					"position": "TE",
+					"ours": 109,
+					"adp": 101,
+					"published": null,
+					"finish": 36
+				},
+				{
+					"position": "QB",
+					"ours": 50,
+					"adp": 150,
+					"published": null,
+					"finish": 37
+				},
+				{
+					"position": "WR",
+					"ours": 56,
+					"adp": 58,
+					"published": null,
+					"finish": 38
+				},
+				{
+					"position": "WR",
+					"ours": 37,
+					"adp": 23,
+					"published": null,
+					"finish": 39
+				},
+				{
+					"position": "QB",
+					"ours": 8,
+					"adp": 51,
+					"published": null,
+					"finish": 40
+				},
+				{
+					"position": "QB",
+					"ours": 13,
+					"adp": 73,
+					"published": null,
+					"finish": 41
+				},
+				{
+					"position": "RB",
+					"ours": 82,
+					"adp": 27,
+					"published": null,
+					"finish": 42
+				},
+				{
+					"position": "QB",
+					"ours": 71,
+					"adp": 177,
+					"published": null,
+					"finish": 43
+				},
+				{
+					"position": "WR",
+					"ours": 32,
+					"adp": 28,
+					"published": null,
+					"finish": 44
+				},
+				{
+					"position": "QB",
+					"ours": 4,
+					"adp": 53,
+					"published": null,
+					"finish": 45
+				},
+				{
+					"position": "RB",
+					"ours": 174,
+					"adp": 141,
+					"published": null,
+					"finish": 46
+				},
+				{
+					"position": "QB",
+					"ours": 31,
+					"adp": 69,
+					"published": null,
+					"finish": 47
+				},
+				{
+					"position": "WR",
+					"ours": 123,
+					"adp": 110,
+					"published": null,
+					"finish": 48
+				},
+				{
+					"position": "WR",
+					"ours": 36,
+					"adp": 33,
+					"published": null,
+					"finish": 49
+				},
+				{
+					"position": "RB",
+					"ours": 107,
+					"adp": 77,
+					"published": null,
+					"finish": 50
+				},
+				{
+					"position": "TE",
+					"ours": 84,
+					"adp": 62,
+					"published": null,
+					"finish": 51
+				},
+				{
+					"position": "RB",
+					"ours": 134,
+					"adp": 108,
+					"published": null,
+					"finish": 52
+				},
+				{
+					"position": "RB",
+					"ours": 55,
+					"adp": 29,
+					"published": null,
+					"finish": 53
+				},
+				{
+					"position": "WR",
+					"ours": 79,
+					"adp": 85,
+					"published": null,
+					"finish": 54
+				},
+				{
+					"position": "RB",
+					"ours": 125,
+					"adp": 47,
+					"published": null,
+					"finish": 55
+				},
+				{
+					"position": "QB",
+					"ours": 30,
+					"adp": 103,
+					"published": null,
+					"finish": 56
+				},
+				{
+					"position": "WR",
+					"ours": 66,
+					"adp": 54,
+					"published": null,
+					"finish": 57
+				},
+				{
+					"position": "QB",
+					"ours": 61,
+					"adp": 127,
+					"published": null,
+					"finish": 58
+				},
+				{
+					"position": "RB",
+					"ours": 132,
+					"adp": 60,
+					"published": null,
+					"finish": 59
+				},
+				{
+					"position": "WR",
+					"ours": 89,
+					"adp": 96,
+					"published": null,
+					"finish": 60
+				},
+				{
+					"position": "RB",
+					"ours": 85,
+					"adp": 41,
+					"published": null,
+					"finish": 61
+				},
+				{
+					"position": "RB",
+					"ours": 80,
+					"adp": 38,
+					"published": null,
+					"finish": 62
+				},
+				{
+					"position": "WR",
+					"ours": 88,
+					"adp": 100,
+					"published": null,
+					"finish": 63
+				},
+				{
+					"position": "WR",
+					"ours": 168,
+					"adp": 184,
+					"published": null,
+					"finish": 64
+				},
+				{
+					"position": "QB",
+					"ours": 78,
+					"adp": 156,
+					"published": null,
+					"finish": 65
+				},
+				{
+					"position": "WR",
+					"ours": 138,
+					"adp": 160,
+					"published": null,
+					"finish": 66
+				},
+				{
+					"position": "RB",
+					"ours": 26,
+					"adp": 8,
+					"published": null,
+					"finish": 67
+				},
+				{
+					"position": "WR",
+					"ours": 22,
+					"adp": 15,
+					"published": null,
+					"finish": 68
+				},
+				{
+					"position": "WR",
+					"ours": 139,
+					"adp": 157,
+					"published": null,
+					"finish": 69
+				},
+				{
+					"position": "WR",
+					"ours": 166,
+					"adp": 181,
+					"published": null,
+					"finish": 70
+				},
+				{
+					"position": "QB",
+					"ours": 21,
+					"adp": 114,
+					"published": null,
+					"finish": 71
+				},
+				{
+					"position": "RB",
+					"ours": 170,
+					"adp": 154,
+					"published": null,
+					"finish": 72
+				},
+				{
+					"position": "QB",
+					"ours": 57,
+					"adp": 148,
+					"published": null,
+					"finish": 73
+				},
+				{
+					"position": "WR",
+					"ours": 147,
+					"adp": 165,
+					"published": null,
+					"finish": 74
+				},
+				{
+					"position": "RB",
+					"ours": 28,
+					"adp": 12,
+					"published": null,
+					"finish": 75
+				},
+				{
+					"position": "RB",
+					"ours": 17,
+					"adp": 2,
+					"published": null,
+					"finish": 76
+				},
+				{
+					"position": "TE",
+					"ours": 106,
+					"adp": 117,
+					"published": null,
+					"finish": 77
+				},
+				{
+					"position": "TE",
+					"ours": 114,
+					"adp": 139,
+					"published": null,
+					"finish": 78
+				},
+				{
+					"position": "RB",
+					"ours": 124,
+					"adp": 98,
+					"published": null,
+					"finish": 79
+				},
+				{
+					"position": "TE",
+					"ours": 100,
+					"adp": 70,
+					"published": null,
+					"finish": 80
+				},
+				{
+					"position": "RB",
+					"ours": 45,
+					"adp": 19,
+					"published": null,
+					"finish": 81
+				},
+				{
+					"position": "WR",
+					"ours": 40,
+					"adp": 32,
+					"published": null,
+					"finish": 82
+				},
+				{
+					"position": "RB",
+					"ours": 146,
+					"adp": 111,
+					"published": null,
+					"finish": 83
+				},
+				{
+					"position": "WR",
+					"ours": 12,
+					"adp": 18,
+					"published": null,
+					"finish": 84
+				},
+				{
+					"position": "WR",
+					"ours": 116,
+					"adp": 97,
+					"published": null,
+					"finish": 85
+				},
+				{
+					"position": "RB",
+					"ours": 95,
+					"adp": 44,
+					"published": null,
+					"finish": 86
+				},
+				{
+					"position": "RB",
+					"ours": 91,
+					"adp": 57,
+					"published": null,
+					"finish": 87
+				},
+				{
+					"position": "RB",
+					"ours": 101,
+					"adp": 36,
+					"published": null,
+					"finish": 88
+				},
+				{
+					"position": "RB",
+					"ours": 140,
+					"adp": 113,
+					"published": null,
+					"finish": 89
+				},
+				{
+					"position": "WR",
+					"ours": 14,
+					"adp": 13,
+					"published": null,
+					"finish": 90
+				},
+				{
+					"position": "WR",
+					"ours": 99,
+					"adp": 74,
+					"published": null,
+					"finish": 91
+				},
+				{
+					"position": "RB",
+					"ours": 185,
+					"adp": 159,
+					"published": null,
+					"finish": 92
+				},
+				{
+					"position": "WR",
+					"ours": 128,
+					"adp": 135,
+					"published": null,
+					"finish": 93
+				},
+				{
+					"position": "WR",
+					"ours": 11,
+					"adp": 11,
+					"published": null,
+					"finish": 94
+				},
+				{
+					"position": "RB",
+					"ours": 183,
+					"adp": 138,
+					"published": null,
+					"finish": 95
+				},
+				{
+					"position": "RB",
+					"ours": 145,
+					"adp": 125,
+					"published": null,
+					"finish": 96
+				},
+				{
+					"position": "WR",
+					"ours": 62,
+					"adp": 52,
+					"published": null,
+					"finish": 97
+				},
+				{
+					"position": "WR",
+					"ours": 154,
+					"adp": 186,
+					"published": null,
+					"finish": 98
+				},
+				{
+					"position": "TE",
+					"ours": 104,
+					"adp": 122,
+					"published": null,
+					"finish": 99
+				},
+				{
+					"position": "WR",
+					"ours": 120,
+					"adp": 107,
+					"published": null,
+					"finish": 100
+				},
+				{
+					"position": "QB",
+					"ours": 7,
+					"adp": 45,
+					"published": null,
+					"finish": 101
+				},
+				{
+					"position": "RB",
+					"ours": 87,
+					"adp": 31,
+					"published": null,
+					"finish": 102
+				},
+				{
+					"position": "TE",
+					"ours": 126,
+					"adp": 149,
+					"published": null,
+					"finish": 103
+				},
+				{
+					"position": "QB",
+					"ours": 18,
+					"adp": 94,
+					"published": null,
+					"finish": 104
+				},
+				{
+					"position": "RB",
+					"ours": 133,
+					"adp": 102,
+					"published": null,
+					"finish": 105
+				},
+				{
+					"position": "QB",
+					"ours": 15,
+					"adp": 81,
+					"published": null,
+					"finish": 106
+				},
+				{
+					"position": "RB",
+					"ours": 113,
+					"adp": 64,
+					"published": null,
+					"finish": 107
+				},
+				{
+					"position": "RB",
+					"ours": 65,
+					"adp": 24,
+					"published": null,
+					"finish": 108
+				},
+				{
+					"position": "WR",
+					"ours": 155,
+					"adp": 179,
+					"published": null,
+					"finish": 109
+				},
+				{
+					"position": "TE",
+					"ours": 167,
+					"adp": 174,
+					"published": null,
+					"finish": 110
+				},
+				{
+					"position": "WR",
+					"ours": 143,
+					"adp": 172,
+					"published": null,
+					"finish": 111
+				},
+				{
+					"position": "WR",
+					"ours": 52,
+					"adp": 49,
+					"published": null,
+					"finish": 112
+				},
+				{
+					"position": "RB",
+					"ours": 158,
+					"adp": 137,
+					"published": null,
+					"finish": 113
+				},
+				{
+					"position": "TE",
+					"ours": 159,
+					"adp": 153,
+					"published": null,
+					"finish": 114
+				},
+				{
+					"position": "WR",
+					"ours": 53,
+					"adp": 43,
+					"published": null,
+					"finish": 115
+				},
+				{
+					"position": "WR",
+					"ours": 81,
+					"adp": 67,
+					"published": null,
+					"finish": 116
+				},
+				{
+					"position": "WR",
+					"ours": 117,
+					"adp": 112,
+					"published": null,
+					"finish": 117
+				},
+				{
+					"position": "WR",
+					"ours": 74,
+					"adp": 91,
+					"published": null,
+					"finish": 118
+				},
+				{
+					"position": "WR",
+					"ours": 58,
+					"adp": 63,
+					"published": null,
+					"finish": 119
+				},
+				{
+					"position": "WR",
+					"ours": 165,
+					"adp": 155,
+					"published": null,
+					"finish": 120
+				},
+				{
+					"position": "WR",
+					"ours": 150,
+					"adp": 188,
+					"published": null,
+					"finish": 121
+				},
+				{
+					"position": "QB",
+					"ours": 92,
+					"adp": 175,
+					"published": null,
+					"finish": 122
+				},
+				{
+					"position": "WR",
+					"ours": 119,
+					"adp": 104,
+					"published": null,
+					"finish": 123
+				},
+				{
+					"position": "WR",
+					"ours": 39,
+					"adp": 35,
+					"published": null,
+					"finish": 124
+				},
+				{
+					"position": "RB",
+					"ours": 102,
+					"adp": 68,
+					"published": null,
+					"finish": 125
+				},
+				{
+					"position": "WR",
+					"ours": 161,
+					"adp": 183,
+					"published": null,
+					"finish": 126
+				},
+				{
+					"position": "WR",
+					"ours": 59,
+					"adp": 46,
+					"published": null,
+					"finish": 127
+				},
+				{
+					"position": "QB",
+					"ours": 35,
+					"adp": 87,
+					"published": null,
+					"finish": 128
+				},
+				{
+					"position": "TE",
+					"ours": 164,
+					"adp": 176,
+					"published": null,
+					"finish": 129
+				},
+				{
+					"position": "RB",
+					"ours": 141,
+					"adp": 105,
+					"published": null,
+					"finish": 130
+				},
+				{
+					"position": "WR",
+					"ours": 70,
+					"adp": 75,
+					"published": null,
+					"finish": 131
+				},
+				{
+					"position": "WR",
+					"ours": 51,
+					"adp": 55,
+					"published": null,
+					"finish": 132
+				},
+				{
+					"position": "WR",
+					"ours": 142,
+					"adp": 136,
+					"published": null,
+					"finish": 133
+				},
+				{
+					"position": "RB",
+					"ours": 179,
+					"adp": 132,
+					"published": null,
+					"finish": 134
+				},
+				{
+					"position": "WR",
+					"ours": 162,
+					"adp": 178,
+					"published": null,
+					"finish": 135
+				},
+				{
+					"position": "WR",
+					"ours": 38,
+					"adp": 40,
+					"published": null,
+					"finish": 136
+				},
+				{
+					"position": "RB",
+					"ours": 67,
+					"adp": 34,
+					"published": null,
+					"finish": 137
+				},
+				{
+					"position": "WR",
+					"ours": 153,
+					"adp": 142,
+					"published": null,
+					"finish": 138
+				},
+				{
+					"position": "RB",
+					"ours": 131,
+					"adp": 66,
+					"published": null,
+					"finish": 139
+				},
+				{
+					"position": "RB",
+					"ours": 176,
+					"adp": 151,
+					"published": null,
+					"finish": 140
+				},
+				{
+					"position": "WR",
+					"ours": 169,
+					"adp": 185,
+					"published": null,
+					"finish": 141
+				},
+				{
+					"position": "RB",
+					"ours": 112,
+					"adp": 83,
+					"published": null,
+					"finish": 142
+				},
+				{
+					"position": "RB",
+					"ours": 97,
+					"adp": 48,
+					"published": null,
+					"finish": 143
+				},
+				{
+					"position": "WR",
+					"ours": 75,
+					"adp": 90,
+					"published": null,
+					"finish": 144
+				},
+				{
+					"position": "WR",
+					"ours": 137,
+					"adp": 152,
+					"published": null,
+					"finish": 145
+				},
+				{
+					"position": "QB",
+					"ours": 73,
+					"adp": 182,
+					"published": null,
+					"finish": 146
+				},
+				{
+					"position": "RB",
+					"ours": 171,
+					"adp": 140,
+					"published": null,
+					"finish": 147
+				},
+				{
+					"position": "WR",
+					"ours": 152,
+					"adp": 169,
+					"published": null,
+					"finish": 148
+				},
+				{
+					"position": "WR",
+					"ours": 86,
+					"adp": 82,
+					"published": null,
+					"finish": 149
+				},
+				{
+					"position": "RB",
+					"ours": 187,
+					"adp": 166,
+					"published": null,
+					"finish": 150
+				},
+				{
+					"position": "WR",
+					"ours": 69,
+					"adp": 71,
+					"published": null,
+					"finish": 151
+				},
+				{
+					"position": "TE",
+					"ours": 180,
+					"adp": 164,
+					"published": null,
+					"finish": 152
+				},
+				{
+					"position": "TE",
+					"ours": 160,
+					"adp": 163,
+					"published": null,
+					"finish": 153
+				},
+				{
+					"position": "WR",
+					"ours": 149,
+					"adp": 187,
+					"published": null,
+					"finish": 154
+				},
+				{
+					"position": "TE",
+					"ours": 172,
+					"adp": 161,
+					"published": null,
+					"finish": 155
+				},
+				{
+					"position": "RB",
+					"ours": 129,
+					"adp": 80,
+					"published": null,
+					"finish": 156
+				},
+				{
+					"position": "RB",
+					"ours": 93,
+					"adp": 56,
+					"published": null,
+					"finish": 157
+				},
+				{
+					"position": "TE",
+					"ours": 108,
+					"adp": 92,
+					"published": null,
+					"finish": 158
+				},
+				{
+					"position": "RB",
+					"ours": 148,
+					"adp": 129,
+					"published": null,
+					"finish": 159
+				},
+				{
+					"position": "RB",
+					"ours": 33,
+					"adp": 16,
+					"published": null,
+					"finish": 160
+				},
+				{
+					"position": "TE",
+					"ours": 98,
+					"adp": 76,
+					"published": null,
+					"finish": 161
+				},
+				{
+					"position": "RB",
+					"ours": 184,
+					"adp": 162,
+					"published": null,
+					"finish": 162
+				},
+				{
+					"position": "WR",
+					"ours": 83,
+					"adp": 89,
+					"published": null,
+					"finish": 163
+				},
+				{
+					"position": "WR",
+					"ours": 68,
+					"adp": 65,
+					"published": null,
+					"finish": 164
+				},
+				{
+					"position": "TE",
+					"ours": 144,
+					"adp": 128,
+					"published": null,
+					"finish": 165
+				},
+				{
+					"position": "WR",
+					"ours": 127,
+					"adp": 147,
+					"published": null,
+					"finish": 166
+				},
+				{
+					"position": "WR",
+					"ours": 64,
+					"adp": 79,
+					"published": null,
+					"finish": 167
+				},
+				{
+					"position": "WR",
+					"ours": 118,
+					"adp": 118,
+					"published": null,
+					"finish": 168
+				},
+				{
+					"position": "WR",
+					"ours": 110,
+					"adp": 121,
+					"published": null,
+					"finish": 169
+				},
+				{
+					"position": "RB",
+					"ours": 181,
+					"adp": 134,
+					"published": null,
+					"finish": 170
+				},
+				{
+					"position": "TE",
+					"ours": 115,
+					"adp": 106,
+					"published": null,
+					"finish": 171
+				},
+				{
+					"position": "WR",
+					"ours": 105,
+					"adp": 84,
+					"published": null,
+					"finish": 172
+				},
+				{
+					"position": "RB",
+					"ours": 182,
+					"adp": 145,
+					"published": null,
+					"finish": 173
+				},
+				{
+					"position": "TE",
+					"ours": 77,
+					"adp": 50,
+					"published": null,
+					"finish": 174
+				},
+				{
+					"position": "WR",
+					"ours": 49,
+					"adp": 22,
+					"published": null,
+					"finish": 175
+				},
+				{
+					"position": "RB",
+					"ours": 178,
+					"adp": 144,
+					"published": null,
+					"finish": 176
+				},
+				{
+					"position": "RB",
+					"ours": 157,
+					"adp": 126,
+					"published": null,
+					"finish": 177
+				},
+				{
+					"position": "QB",
+					"ours": 23,
+					"adp": 109,
+					"published": null,
+					"finish": 178
+				},
+				{
+					"position": "RB",
+					"ours": 177,
+					"adp": 131,
+					"published": null,
+					"finish": 179
+				},
+				{
+					"position": "RB",
+					"ours": 173,
+					"adp": 133,
+					"published": null,
+					"finish": 180
+				},
+				{
+					"position": "WR",
+					"ours": 96,
+					"adp": 115,
+					"published": null,
+					"finish": 181
+				},
+				{
+					"position": "RB",
+					"ours": 151,
+					"adp": 146,
+					"published": null,
+					"finish": 182
+				},
+				{
+					"position": "RB",
+					"ours": 188,
+					"adp": 167,
+					"published": null,
+					"finish": 183
+				},
+				{
+					"position": "WR",
+					"ours": 72,
+					"adp": 59,
+					"published": null,
+					"finish": 184
+				},
+				{
+					"position": "RB",
+					"ours": 186,
+					"adp": 168,
+					"published": null,
+					"finish": 185
+				},
+				{
+					"position": "WR",
+					"ours": 122,
+					"adp": 120,
+					"published": null,
+					"finish": 186
+				},
+				{
+					"position": "WR",
+					"ours": 163,
+					"adp": 170,
+					"published": null,
+					"finish": 187
+				},
+				{
+					"position": "WR",
+					"ours": 48,
+					"adp": 42,
+					"published": null,
+					"finish": 188
+				}
+			]
+		},
+		{
+			"week": 3,
+			"status": "missed",
+			"frozenAt": null,
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": [],
+			"note": "Our order was not set before kickoff that week."
+		},
+		{
+			"week": 4,
+			"status": "missed",
+			"frozenAt": null,
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": [],
+			"note": "Our order was not set before kickoff that week."
+		},
+		{
+			"week": 5,
+			"status": "missed",
+			"frozenAt": null,
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": [],
+			"note": "Our order was not set before kickoff that week."
+		},
+		{
+			"week": 6,
+			"status": "frozen",
+			"frozenAt": "2026-10-13T07:34:34.762Z",
+			"frozenBy": "2026-10-19T12-live",
+			"order": "preseason",
+			"gradedAt": null,
+			"population": 0,
+			"lines": [],
+			"orderAsOf": "2026-09-09T02:20:29.697Z",
+			"gradesFrom": "2026-10-21T00:30:00.000Z"
+		},
+		{
+			"week": 7,
+			"status": "upcoming",
+			"frozenAt": "2026-10-23T00:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 8,
+			"status": "upcoming",
+			"frozenAt": "2026-10-30T00:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 9,
+			"status": "upcoming",
+			"frozenAt": "2026-11-06T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 10,
+			"status": "upcoming",
+			"frozenAt": "2026-11-13T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 11,
+			"status": "upcoming",
+			"frozenAt": "2026-11-20T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 12,
+			"status": "upcoming",
+			"frozenAt": "2026-11-26T01:00:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 13,
+			"status": "upcoming",
+			"frozenAt": "2026-12-04T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 14,
+			"status": "upcoming",
+			"frozenAt": "2026-12-11T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 15,
+			"status": "upcoming",
+			"frozenAt": "2026-12-18T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 16,
+			"status": "upcoming",
+			"frozenAt": "2026-12-25T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 17,
+			"status": "upcoming",
+			"frozenAt": "2027-01-01T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 18,
+			"status": "upcoming",
+			"frozenAt": "2027-01-10T18:00:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		}
+	],
+	"toDate": [
+		{
+			"position": "All",
+			"ours": {
+				"graded": 203,
+				"agreement": 0.48,
+				"placesOff": 43.7,
+				"starters": 100,
+				"startersOf": 168
+			},
+			"adp": {
+				"graded": 203,
+				"agreement": 0.37,
+				"placesOff": 49.6,
+				"starters": 104,
+				"startersOf": 168
+			},
+			"published": null,
+			"oursOnPublished": null
+		},
+		{
+			"position": "QB",
+			"ours": {
+				"graded": 29,
+				"agreement": 0.22,
+				"placesOff": 8.6,
+				"starters": 11,
+				"startersOf": 24
+			},
+			"adp": {
+				"graded": 29,
+				"agreement": 0.26,
+				"placesOff": 8,
+				"starters": 14,
+				"startersOf": 24
+			},
+			"published": null,
+			"oursOnPublished": null
+		},
+		{
+			"position": "RB",
+			"ours": {
+				"graded": 62,
+				"agreement": 0.69,
+				"placesOff": 10,
+				"starters": 34,
+				"startersOf": 48
+			},
+			"adp": {
+				"graded": 62,
+				"agreement": 0.71,
+				"placesOff": 9.6,
+				"starters": 36,
+				"startersOf": 48
+			},
+			"published": null,
+			"oursOnPublished": null
+		},
+		{
+			"position": "WR",
+			"ours": {
+				"graded": 86,
+				"agreement": 0.4,
+				"placesOff": 20.2,
+				"starters": 42,
+				"startersOf": 72
+			},
+			"adp": {
+				"graded": 86,
+				"agreement": 0.41,
+				"placesOff": 19.8,
+				"starters": 42,
+				"startersOf": 72
+			},
+			"published": null,
+			"oursOnPublished": null
+		},
+		{
+			"position": "TE",
+			"ours": {
+				"graded": 26,
+				"agreement": 0.05,
+				"placesOff": 8.1,
+				"starters": 13,
+				"startersOf": 24
+			},
+			"adp": {
+				"graded": 26,
+				"agreement": -0.02,
+				"placesOff": 8.5,
+				"starters": 12,
+				"startersOf": 24
+			},
+			"published": null,
+			"oursOnPublished": null
+		}
+	],
+	"draft": {
+		"setAt": "2026-09-08T12:00:16.244Z",
+		"boardAsOf": "2026-09-07T21:57:33.121Z",
+		"throughWeek": 5,
+		"namedBasis": "Top named counts how many of the season's top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far the order also ranked that high.",
+		"honest": "ADP named more of the season's top players so far, 60 of 84 against our 56.",
+		"lines": [
+			{
+				"position": "All",
+				"ours": {
+					"graded": 208,
+					"agreement": 0.55,
+					"placesOff": 12.9,
+					"starters": 56,
+					"startersOf": 84
+				},
+				"adp": {
+					"graded": 208,
+					"agreement": 0.55,
+					"placesOff": 12.9,
+					"starters": 60,
+					"startersOf": 84
+				}
+			},
+			{
+				"position": "QB",
+				"ours": {
+					"graded": 31,
+					"agreement": 0.29,
+					"placesOff": 8.8,
+					"starters": 6,
+					"startersOf": 12
+				},
+				"adp": {
+					"graded": 31,
+					"agreement": 0.39,
+					"placesOff": 8.2,
+					"starters": 8,
+					"startersOf": 12
+				}
+			},
+			{
+				"position": "RB",
+				"ours": {
+					"graded": 63,
+					"agreement": 0.66,
+					"placesOff": 11.3,
+					"starters": 18,
+					"startersOf": 24
+				},
+				"adp": {
+					"graded": 63,
+					"agreement": 0.69,
+					"placesOff": 11,
+					"starters": 20,
+					"startersOf": 24
+				}
+			},
+			{
+				"position": "WR",
+				"ours": {
+					"graded": 87,
+					"agreement": 0.59,
+					"placesOff": 17.5,
+					"starters": 24,
+					"startersOf": 36
+				},
+				"adp": {
+					"graded": 87,
+					"agreement": 0.58,
+					"placesOff": 18,
+					"starters": 25,
+					"startersOf": 36
+				}
+			},
+			{
+				"position": "TE",
+				"ours": {
+					"graded": 27,
+					"agreement": 0.47,
+					"placesOff": 6.2,
+					"starters": 8,
+					"startersOf": 12
+				},
+				"adp": {
+					"graded": 27,
+					"agreement": 0.36,
+					"placesOff": 6.7,
+					"starters": 7,
+					"startersOf": 12
+				}
+			}
+		],
+		"progress": [
+			{
+				"week": 1,
+				"ours": 0.44,
+				"adp": 0.45
+			},
+			{
+				"week": 2,
+				"ours": 0.52,
+				"adp": 0.52
+			},
+			{
+				"week": 3,
+				"ours": 0.55,
+				"adp": 0.55
+			},
+			{
+				"week": 4,
+				"ours": 0.54,
+				"adp": 0.54
+			},
+			{
+				"week": 5,
+				"ours": 0.55,
+				"adp": 0.55
+			}
+		]
+	},
+	"weekly": {
+		"fromWeek": 7,
+		"statistic": {
+			"agreement": "order matched",
+			"placesOff": "places off",
+			"starters": "starters right"
+		},
+		"scale": "Order matched is how closely an order ranked the players to the week's finish: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards.",
+		"startersBasis": null,
+		"method": "From week 7 we set our rest-of-season order before each week's first kickoff and graded it on the week's points.",
+		"honest": null,
+		"weeks": [
+			{
+				"week": 7,
+				"status": "frozen",
+				"frozenAt": "2026-10-22T18:00:00.000Z",
+				"frozenBy": "2026-10-22T18-live",
+				"order": "rest_of_season",
+				"gradedAt": null,
+				"population": 0,
+				"lines": [],
+				"orderAsOf": "2026-10-22T09:00:00.000Z",
+				"gradesFrom": "2026-10-28T00:30:00.000Z"
+			},
+			{
+				"week": 8,
+				"status": "upcoming",
+				"frozenAt": "2026-10-30T00:15:00.000Z",
+				"frozenBy": null,
+				"order": null,
+				"gradedAt": null,
+				"population": 0,
+				"lines": []
+			},
+			{
+				"week": 9,
+				"status": "upcoming",
+				"frozenAt": "2026-11-06T01:15:00.000Z",
+				"frozenBy": null,
+				"order": null,
+				"gradedAt": null,
+				"population": 0,
+				"lines": []
+			},
+			{
+				"week": 10,
+				"status": "upcoming",
+				"frozenAt": "2026-11-13T01:15:00.000Z",
+				"frozenBy": null,
+				"order": null,
+				"gradedAt": null,
+				"population": 0,
+				"lines": []
+			},
+			{
+				"week": 11,
+				"status": "upcoming",
+				"frozenAt": "2026-11-20T01:15:00.000Z",
+				"frozenBy": null,
+				"order": null,
+				"gradedAt": null,
+				"population": 0,
+				"lines": []
+			},
+			{
+				"week": 12,
+				"status": "upcoming",
+				"frozenAt": "2026-11-26T01:00:00.000Z",
+				"frozenBy": null,
+				"order": null,
+				"gradedAt": null,
+				"population": 0,
+				"lines": []
+			},
+			{
+				"week": 13,
+				"status": "upcoming",
+				"frozenAt": "2026-12-04T01:15:00.000Z",
+				"frozenBy": null,
+				"order": null,
+				"gradedAt": null,
+				"population": 0,
+				"lines": []
+			},
+			{
+				"week": 14,
+				"status": "upcoming",
+				"frozenAt": "2026-12-11T01:15:00.000Z",
+				"frozenBy": null,
+				"order": null,
+				"gradedAt": null,
+				"population": 0,
+				"lines": []
+			},
+			{
+				"week": 15,
+				"status": "upcoming",
+				"frozenAt": "2026-12-18T01:15:00.000Z",
+				"frozenBy": null,
+				"order": null,
+				"gradedAt": null,
+				"population": 0,
+				"lines": []
+			},
+			{
+				"week": 16,
+				"status": "upcoming",
+				"frozenAt": "2026-12-25T01:15:00.000Z",
+				"frozenBy": null,
+				"order": null,
+				"gradedAt": null,
+				"population": 0,
+				"lines": []
+			},
+			{
+				"week": 17,
+				"status": "upcoming",
+				"frozenAt": "2027-01-01T01:15:00.000Z",
+				"frozenBy": null,
+				"order": null,
+				"gradedAt": null,
+				"population": 0,
+				"lines": []
+			},
+			{
+				"week": 18,
+				"status": "upcoming",
+				"frozenAt": "2027-01-10T18:00:00.000Z",
+				"frozenBy": null,
+				"order": null,
+				"gradedAt": null,
+				"population": 0,
+				"lines": []
+			}
+		],
+		"toDate": []
+	}
+}

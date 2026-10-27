@@ -18,6 +18,7 @@ import {
 	saidOnly,
 	weekLines,
 	capitalized,
+	gradesWhen,
 	type LeagueBasis,
 	type RecordFigure,
 	type RecordSource,
@@ -55,17 +56,16 @@ export const RECORDS_WORDS = {
 	notPlayed: RECORD_WORDS.notPlayed,
 	underway: RECORD_WORDS.underway,
 	gradedOn: (day: string) => `graded ${day}`,
-	/** The run's day is the earliest the grading pass may grade (review MEDIUM-1), so "from". */
-	gradesOn: (day: string) => `grades from ${day}, when the stats land`,
-	gradesLater: 'grades when the stats land',
+	/** The run's day is the first pass that can grade once every game's stats are in (B254), so
+	 * the rule first and the day as the usual one. */
+	gradesOn: (day: string) => gradesWhen(day),
+	gradesLater: RECORD_WORDS.gradesRule,
 	/** The weekly record's bug before a week of it is graded (C04): no figure, the week and when. */
 	pending: (week: number) => `Week ${String(week)} not graded yet`,
 	pendingWhen: (day: string | null, game: string | null) =>
-		game === null
-			? 'Grades when the stats land.'
-			: day === null
-				? `Grades after ${game}'s game.`
-				: `Grades from ${day}, after ${game}'s game.`,
+		day === null && game !== null
+			? `${capitalized(RECORD_WORDS.gradesRule)}, after ${game}'s game.`
+			: `${capitalized(gradesWhen(day))}.`,
 	/** A first week with no date on file yet. */
 	setUnknown: 'set before its first kickoff',
 	/** ESPN's projection in one line at a desk (Lane 163, D07): the season-long rule (C16) is said in
@@ -137,7 +137,7 @@ export interface NextGrade {
 }
 
 /** The weekly record's bug before any week of it is graded (Lane 140, C04): no figure, the week and
- * when it grades, "Week 7 not graded yet", "Grades Wed Oct 28 after Monday's game." The day is the
+ * when it grades, "Week 7 not graded yet", "Grades once every game's stats are in, usually Wed Oct 28." The day is the
  * run's own for a set week (its last kickoff and the grading pass's wait), and absent for a week not
  * set yet, which says only the game it waits on. Null once a week is graded. */
 export function weeklyPending(

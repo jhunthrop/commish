@@ -489,7 +489,7 @@ void test('before a week is graded the weekly record draws no figure: the week a
 	assert.ok(ahead);
 	assert.deepEqual(weeklyPending(ahead, { week: 7, lastKickoff: monday }), {
 		title: 'Week 7 not graded yet',
-		when: "Grades after Monday's game."
+		when: "Grades once every game's stats are in, after Monday's game."
 	});
 	// A set week grades on the run's own day: its last kickoff and the grading pass's wait.
 	const set: RecordWeek = {
@@ -505,18 +505,22 @@ void test('before a week is graded the weekly record draws no figure: the week a
 	const pending = weeklyPending(frozen, { week: 7, lastKickoff: monday });
 	assert.deepEqual(pending, {
 		title: 'Week 7 not graded yet',
-		when: "Grades from Wed Oct 28, after Monday's game."
+		when: "Grades once every game's stats are in, usually Wed Oct 28."
 	});
 	assert.ok(pending);
 	assert.doesNotMatch(pending.title.replace(/^Week \d+/u, ''), /\d/u);
 	assert.equal(
 		weeklyPending(frozen, { week: 7, lastKickoff: null })?.when,
-		'Grades when the stats land.'
+		"Grades once every game's stats are in, usually Wed Oct 28."
 	);
 	const graded = weeklyAsRecord(run({ weekly: weekly([gradedSeven]) }));
 	assert.ok(graded);
 	assert.equal(weeklyPending(graded, { week: 8, lastKickoff: monday }), null);
 	assert.equal(weeklyPending(ahead, null), null);
+	assert.equal(
+		weeklyPending(ahead, { week: 7, lastKickoff: null })?.when,
+		"Grades once every game's stats are in."
+	);
 });
 
 void test('the draft tiles say what top named counts and that places off is better lower (C17)', () => {

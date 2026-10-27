@@ -596,6 +596,8 @@ public enum Words {
         public static let placesOff = "Places off is how many places a player finished from his rank, lower is better."
         public static let notPlayed = "not played yet"
         public static let underway = "under way"
+        public static let gradesRule = "grades once every game's stats are in"
+        public static let usually = "usually"
         public static let noneSet = "weeks graded. Our first order is set before the first kickoff"
     }
 
@@ -628,7 +630,7 @@ public enum Words {
         public static let setRulePhone = "Each week's order is graded as set, never as refreshed after."
         public static let notPlayed = "not played yet"
         public static let underway = "under way"
-        public static let gradesLater = "grades when the stats land"
+        public static let gradesLater = "grades once every game's stats are in"
         public static let setUnknown = "set before its first kickoff"
         public static let espnBasis = "ESPN's is its own public PPR projection, read before the week's first kickoff."
         public static let espnReadAfter = "ESPN's projection this week was read after our rest-of-season order was set, still before the first kickoff."

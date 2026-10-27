@@ -61,7 +61,7 @@ async function record(who: Who, width: number): Promise<void> {
 	const main = (await page.locator('main').textContent()) ?? '';
 	has(main, 'Graded 2 of 5 weeks played', where);
 	has(main, 'Weeks 3 to 5 were not set before kickoff, so they cannot be graded.', where);
-	has(main, 'Week 6 grades Wednesday when the stats land.', where);
+	has(main, "Week 6 grades once every game's stats are in, usually Tuesday.", where);
 	has(main, RECORD_WORDS.placesOff, where);
 	// A run's own record leaves the published projection's start to the weekly record's desk and names
 	// Published in its lead once its column is drawn (Lane 131, record.ts recordBasis): never here.

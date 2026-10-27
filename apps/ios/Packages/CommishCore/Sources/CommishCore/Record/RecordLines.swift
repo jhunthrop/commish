@@ -39,10 +39,15 @@ enum RecordLines {
             .filter { RecordBook.status($0) == .frozen && !unplayed.contains($0.week) }
             .map { week in
                 let lead = RecordWords.lead([week])
-                return week.gradesFrom.map { "\(lead) grades \(RecordWords.weekdayWord($0)) when the stats land." }
-                    ?? "\(lead) grades when the stats land."
+                return "\(lead) \(gradesWhen(week.gradesFrom.map(RecordWords.weekdayWord)))."
             }
         return (missed + waiting).joined(separator: " ")
+    }
+
+    /// record.ts gradesWhen: the rule a set week waits on, with the day it usually holds when the run
+    /// names one: "grades once every game's stats are in, usually Wednesday".
+    static func gradesWhen(_ day: String?) -> String {
+        day.map { "\(Words.Record.gradesRule), \(Words.Record.usually) \($0)" } ?? Words.Record.gradesRule
     }
 
     /// record.ts recordHeadline: the one figure and its caption.
@@ -109,8 +114,7 @@ enum RecordLines {
         if underway.contains(week.week) {
             return "\(set), \(Words.Record.underway)"
         }
-        return week.gradesFrom.map { "\(set), grades \(RecordWords.weekdayDay($0)) when the stats land" }
-            ?? "\(set), grades when the stats land"
+        return "\(set), \(gradesWhen(week.gradesFrom.map(RecordWords.weekdayDay)))"
     }
 
     /// records.ts weeklyLines: each set week with its own set time, the missed weeks as the record says
@@ -153,28 +157,30 @@ enum RecordLines {
             Words.Records.notPlayed
         } else if underway.contains(week.week) {
             Words.Records.underway
-        } else if let from = week.gradesFrom {
-            "grades from \(RecordWords.weekdayDay(from)), when the stats land"
         } else {
-            Words.Records.gradesLater
+            gradesWhen(week.gradesFrom.map(RecordWords.weekdayDay))
         }
         return "\(set), \(then)"
     }
 
-    /// records.ts weeklyPending: "Week 7 not graded yet", "Grades after Monday's game."; nil once a
-    /// week is graded.
+    /// records.ts weeklyPending: "Week 7 not graded yet", "Grades once every game's stats are in,
+    /// usually Wed Oct 28."; nil once a week is graded.
     static func pending(_ book: RecordBook, next: NextGrade?) -> (title: String, when: String)? {
         guard let next, !book.weeks.contains(where: { RecordBook.status($0) == .graded }) else {
             return nil
         }
         let day = book.weeks.first { $0.week == next.week }?.gradesFrom.map(RecordWords.weekdayDay)
         let game = next.lastKickoff.map(RecordWords.weekdayWord)
-        let when = switch (day, game) {
-        case (_, nil): "Grades when the stats land."
-        case let (nil, game?): "Grades after \(game)'s game."
-        case let (day?, game?): "Grades from \(day), after \(game)'s game."
+        return ("Week \(next.week) not graded yet", pendingWhen(day: day, game: game))
+    }
+
+    /// records.ts pendingWhen: the grading day when the run names one, else the week's last game, else
+    /// the rule alone.
+    static func pendingWhen(day: String?, game: String?) -> String {
+        switch (day, game) {
+        case let (nil, game?): "\(RecordWords.capitalized(Words.Record.gradesRule)), after \(game)'s game."
+        default: "\(RecordWords.capitalized(gradesWhen(day)))."
         }
-        return ("Week \(next.week) not graded yet", when)
     }
 
     /// record.ts gradedOrders: "Our preseason order, then our rest-of-season order".

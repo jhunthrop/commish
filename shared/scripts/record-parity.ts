@@ -87,10 +87,22 @@ export const RECORD_CASES: readonly {
 		now: '2026-10-18T18:56:00.000Z'
 	},
 	{ name: 'own', file: `${RUN}/record.json`, now: '2026-10-22T17:00:00.000Z' },
+	// Week 6 played and waiting on its stats, with the day it usually grades (Lane 250, B254).
+	{
+		name: 'waiting',
+		file: 'shared/fixtures/record/waiting.json',
+		now: '2026-10-20T17:00:00.000Z'
+	},
 	{
 		name: 'upcoming',
 		file: 'shared/fixtures/record/upcoming.json',
 		now: '2026-10-22T17:00:00.000Z'
+	},
+	// Week 7 set and played, its stats not in: the weekly record's dated week line and pending bug.
+	{
+		name: 'set',
+		file: 'shared/fixtures/record/set.json',
+		now: '2026-10-27T17:00:00.000Z'
 	},
 	{
 		name: 'graded',
@@ -394,8 +406,22 @@ async function recordCase(file: string, now: string): Promise<unknown> {
 	};
 }
 
+/** The weekly bug's grading words at every reach (Lane 250 review L2): a grading day and the last
+ * game, the game alone, and neither, which no case's schedule reaches. */
+const PENDING_WHEN: readonly { day: string | null; game: string | null }[] = [
+	{ day: 'Tue Oct 27', game: 'Monday' },
+	{ day: 'Tue Oct 27', game: null },
+	{ day: null, game: 'Monday' },
+	{ day: null, game: null }
+];
+
 export async function renderRecord(about: string): Promise<string> {
 	const cases: Record<string, unknown> = {};
 	for (const c of RECORD_CASES) cases[c.name] = await recordCase(c.file, c.now);
-	return `${JSON.stringify({ about, schedule: `${RUN}/schedule.json`, cases }, null, '\t')}\n`;
+	const pendingWhen = PENDING_WHEN.map(({ day, game }) => ({
+		day,
+		game,
+		when: RECORDS_WORDS.pendingWhen(day, game)
+	}));
+	return `${JSON.stringify({ about, schedule: `${RUN}/schedule.json`, pendingWhen, cases }, null, '\t')}\n`;
 }
