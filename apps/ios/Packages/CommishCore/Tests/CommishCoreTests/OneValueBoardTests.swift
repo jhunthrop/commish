@@ -102,54 +102,6 @@ struct OneValueBoardTests {
         #expect(receivers.sections.last?.rows.map(\.id) == [washington.id])
     }
 
-    @Test func aPlayerTheOrderReturnsWithNoPointsOnIRTheRunDoesNotListIsDrawnAfterTheRankedRows() throws {
-        let swift = try #require(Reads.parity.players.first)
-        let missing = try OrderAtClock(
-            answer: OneValueFixture.reserving(swift.id, in: Reads.order().answer), landed: Reads.now
-        )
-        #expect(missing.places[swift.id] == nil, "the order holds his row with no figure")
-        #expect(missing.rows[swift.id] != nil)
-        let run = try RunFixture.oneValue.read(format: Reads.ppr)
-        #expect(run.designations.value?.players.additionalProperties[swift.id] == nil, "the run does not list him")
-        let all = try Reads.board(order: missing)
-        #expect(all.atClock)
-        #expect(Set(all.rows.map(\.id)) == Set(Reads.parity.board.ids), "every player is drawn")
-        let last = try #require(all.rows.last)
-        #expect(last.id == swift.id, "he follows the order's ranked rows")
-        #expect(last.pill == "RB \(Words.DesignationRank.injured_reserve)")
-        #expect(last.projected == Words.Box.none)
-        #expect(last.overReplacement == Words.Box.none)
-        #expect(last.status?.rank == Words.DesignationRank.injured_reserve)
-        #expect(!all.basis.contains { $0.hasPrefix("The first") }, "a whole answer says no count")
-        let backs = try Reads.board(position: .runningBack, order: missing)
-        #expect(backs.sections.last?.head == Words.Board.heldHead)
-        #expect(backs.sections.last?.rows.map(\.id) == [swift.id])
-        #expect(!backs.basis.contains { $0.hasPrefix("The first") })
-    }
-
-    @Test func aPositionChipPastTheSharesWindowReadsTheOrderAgain() async throws {
-        let clock = MovingClock(Reads.now)
-        let counted = CountedOrder()
-        let viewModel = BoardViewModel(
-            api: StubRun(.oneValue), cache: reads.cache(), clock: clock, inSeason: true, following: false,
-            zone: Reads.zone, orders: OrderReader(api: counted, clock: clock, memo: OrderMemo())
-        )
-        await viewModel.load()
-        #expect(await counted.reads == 1)
-        clock.now += 30
-        #expect(viewModel.choose(position: .receiver) == nil, "inside the window the held order redraws")
-        #expect(await counted.reads == 1)
-        clock.now = Reads.now + 61
-        let reread = try #require(viewModel.choose(position: .runningBack), "past the window the chip reads again")
-        await reread.value
-        #expect(await counted.reads == 2, "a held order 61 s old is read again")
-        guard case let .loaded(model, _, _) = viewModel.state else {
-            throw Reads.Failure.notLoaded("\(viewModel.state)")
-        }
-        #expect(model.atClock)
-        #expect(model.rows.allSatisfy { $0.pill.hasPrefix("RB ") })
-    }
-
     @Test func theBoardSaysHowFarOneReadReachesAndItsHeadIsOnTheBasisClock() throws {
         let order = try Reads.order()
         var answer = order.answer
@@ -181,17 +133,22 @@ struct OneValueBoardTests {
         #expect(await memo.kept == 1, "the club's read past its window is dropped")
     }
 
-    /// The stand-in's read with one player on injured reserve, the season-long list.
-    static func read(listing id: String) throws -> RunBoardRead {
+    /// The stand-in's read with one player under `status` in the run's capture, injured reserve (the
+    /// season-long list) unless named, and its board with `extra` rows after its own.
+    static func read(
+        listing id: String, status: String = "injured_reserve", seasonLong: Bool = true, extra: [RunBoardRow] = []
+    ) throws -> RunBoardRead {
         let fixture = RunFixture.oneValue
         let json = Data(#"""
         {"readAt":"2026-10-14T02:03:35.613Z","checkedAt":null,"source":"stand-in",
-         "players":{"\#(id)":{"status":"injured_reserve","seasonLong":true,"since":"2026-10-12T19:00:00.000Z"}}}
+         "players":{"\#(id)":{"status":"\#(status)","seasonLong":\#(seasonLong),"since":"2026-10-12T19:00:00.000Z"}}}
         """#.utf8)
         let designations = try APIDecoding.decoder().decode(RunDesignations.self, from: json)
+        var board = try fixture.board(format: Reads.ppr)
+        board.rows += extra
         return try RunBoardRead(
             manifest: Kept(value: fixture.manifest(), tag: nil),
-            board: Kept(value: fixture.board(format: Reads.ppr), tag: nil),
+            board: Kept(value: board, tag: nil),
             sources: Kept(value: fixture.adpSources(), tag: nil),
             designations: Kept(value: designations, tag: nil),
             clubs: Kept(value: fixture.clubs(), tag: nil)

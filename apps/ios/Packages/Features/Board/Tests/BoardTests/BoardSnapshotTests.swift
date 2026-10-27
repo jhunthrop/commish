@@ -49,9 +49,10 @@ struct BoardSnapshotTests {
         case clock
         /// In season with the order unread: the run's top rows and the basis with the run's stamp.
         case clockUnread = "clock-unread"
-        /// At the order's clock with a player the order returns with no points, put on IR after the
-        /// nightly the run's capture does not list (Lane 243, B251): the All view's foot, his row after
-        /// the order's ranked rows with IR and no figure, and no count line under them.
+        /// At the order's clock with a player put on IR after the nightly the run's capture does not
+        /// list, as the API answers him (Lane 243, B251, fix round 1): his points and value kept, his row
+        /// after every available player with the list's word in his pill, and no count line under the
+        /// All view's foot.
         case clockMissing = "clock-missing"
 
         var position: BoardPosition? {
@@ -87,7 +88,7 @@ struct BoardSnapshotTests {
             }
             return OrderReader(
                 api: StubOrderSearch(
-                    offline: self == .clockUnread, reserving: self == .clockMissing ? BoardSnapshotTests.missing : nil
+                    offline: self == .clockUnread, listing: self == .clockMissing ? BoardSnapshotTests.missing : nil
                 ),
                 clock: FixedClock(now), memo: OrderMemo()
             )
@@ -181,8 +182,9 @@ struct BoardSnapshotTests {
         }
         #expect(model.atClock)
         #expect(Self.missing != nil)
-        #expect(model.rows.last?.id == Self.missing)
-        #expect(model.rows.last?.pill == "RB \(Words.DesignationRank.injured_reserve)")
+        let row = try #require(model.rows.first { $0.id == Self.missing })
+        #expect(model.rows.suffix(BoardMock.around).contains(row), "the foot draws him")
+        #expect(row.pill == "RB \(Words.DesignationRank.injured_reserve)")
         #expect(!model.basis.contains { $0.hasPrefix("The first") })
     }
 

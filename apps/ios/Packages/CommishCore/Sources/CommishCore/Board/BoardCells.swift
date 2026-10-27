@@ -61,6 +61,31 @@ struct BoardCells {
         )
     }
 
+    /// A row the order places at its clock, with the order's figures: his status the order's own row's
+    /// first (`said`), else the run's (Lane 243 fix round 1, M2), and a season-long list's word in his
+    /// rank's place, as the web's Rankings say such a row (order.ts orderView's # cell,
+    /// `listed ? box.status.rank`).
+    func placed(_ row: RunBoardRow, figures: PlacedFigures, said: HeldStatus?) -> BoardRow {
+        let drawn = ranked(row, figures: figures)
+        guard let status = said?.status else {
+            return drawn
+        }
+        let label = BoardPosition(rawValue: row.positionName)?.label ?? row.positionName
+        let rank = status.rank ?? String(figures.positionRank)
+        let gap = status.onList ? nil : figures.gap
+        return BoardRow(
+            id: drawn.id, name: drawn.name, initials: drawn.initials, headshot: drawn.headshot,
+            pill: "\(label) \(rank)", club: drawn.club, bye: drawn.bye, status: status,
+            projected: drawn.projected, overReplacement: drawn.overReplacement, heat: drawn.heat,
+            gap: BoardFigures.gap(gap), gapTone: GapTone(gap), draftOrder: drawn.draftOrder, adp: drawn.adp,
+            sheetPlayer: SheetPlayer(
+                id: row.id, slug: row.slug, name: row.name, position: label, rank: rank, club: row.team,
+                boardID: row.id
+            ),
+            clubMark: drawn.clubMark
+        )
+    }
+
     /// A player drawn after the order's ranked rows at its clock: one on a season-long list, or one the
     /// order holds with no figure (Lane 243, B251). His status's word in his pill (`said`: the order's
     /// own row's, else the run's; "--" with neither) and no figure, as the Rankings draw him (the order
@@ -174,6 +199,11 @@ struct ClockPlaces {
     let rows: [String: OrderRow]
     let cut: Bool
     let zone: TimeZone
+
+    /// The status the order's own row carries for a board id, nil with none or no row.
+    func said(_ id: String) -> HeldStatus? {
+        rows[id].flatMap { HeldStatus.of($0.line, zone: zone) }
+    }
 
     /// The order's places for the board `format`, nil for an answer in another scoring.
     init?(_ order: OrderAtClock, format: RunFormat, zone: TimeZone) {

@@ -311,17 +311,18 @@ private struct ViewRows {
         let reached = clock.map { clock in drawn.filter { clock.places[$0.id] != nil } } ?? []
         if position?.draftOrder != true, let clock, !reached.isEmpty,
            let placed = LiveOrder.placed(reached, id: \.id, places: clock.places) {
-            let rows = placed.map { cells.ranked($0.row, figures: $0.row.figures.at($0.place, teams: clock.teams)) }
+            let rows = placed.map {
+                cells.placed(
+                    $0.row,
+                    figures: $0.row.figures.at($0.place, teams: clock.teams),
+                    said: clock.said($0.row.id)
+                )
+            }
             let listed = BoardOrder.withStatuses(drawn, statuses)
                 .filter { row in
                     clock.places[row.id] == nil && (BoardOrder.heldOut(row, statuses) || clock.rows[row.id] != nil)
                 }
-                .map { row in
-                    cells.listed(
-                        row, said: clock.rows[row.id].flatMap { HeldStatus.of($0.line, zone: clock.zone) }
-                            ?? cells.held(row.id)
-                    )
-                }
+                .map { row in cells.listed(row, said: clock.said(row.id) ?? cells.held(row.id)) }
             sections = Self.atClock(rows, listed: listed, position: position)
             carriesGap = false
             atClock = true
@@ -359,13 +360,20 @@ private struct ViewRows {
 
     /// A view at the order's clock: the order's rows, then its players on a season-long list, after
     /// them in All and under the list's head in a position's view, as the run's view draws them.
+    /// A position's held head sits over the rows on a season-long list alone; the other unplaced rows
+    /// follow with no head (Lane 243 fix round 1, M1: a row on no list never sits under it).
     static func atClock(_ rows: [BoardRow], listed: [BoardRow], position: BoardPosition?) -> [BoardSection] {
         guard let position else {
             return [BoardSection(id: "all", head: nil, band: nil, rows: rows + listed)]
         }
+        let held = listed.filter { $0.status?.onList == true }
+        let others = listed.filter { $0.status?.onList != true }
         return [BoardSection(id: position.rawValue, head: nil, band: nil, rows: rows)]
-            + (listed.isEmpty ? [] : [BoardSection(
-                id: "\(position.rawValue)-held", head: Words.Board.heldHead, band: nil, rows: listed
+            + (held.isEmpty ? [] : [BoardSection(
+                id: "\(position.rawValue)-held", head: Words.Board.heldHead, band: nil, rows: held
+            )])
+            + (others.isEmpty ? [] : [BoardSection(
+                id: "\(position.rawValue)-unplaced", head: nil, band: nil, rows: others
             )])
     }
 
