@@ -227,7 +227,7 @@ async function record(who: Who, width: number, theme: Theme): Promise<void> {
 		if (notes.length > 0) faults.push(`${where}: draws a week's note on a run without one`);
 		lacks(weekly, /ESPN's projection this week was read/u, where);
 		has(weekly, 'Week 7 not graded yet', where);
-		has(weekly, "Grades after Monday's game.", where);
+		has(weekly, "Grades once every game's stats are in, after Monday's game.", where);
 		has(weekly, 'Set before kickoff Thu Oct 22', where);
 		lacks(weekly, /ESPN 0\.|Order matched by week/u, where);
 	} else {

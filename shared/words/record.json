@@ -2,6 +2,8 @@
 	"placesOff": "Places off is how many places a player finished from his rank, lower is better.",
 	"notPlayed": "not played yet",
 	"underway": "under way",
+	"gradesRule": "grades once every game's stats are in",
+	"usually": "usually",
 	"noneSet": "weeks graded. Our first order is set before the first kickoff",
 	"functions": [
 		"missedOne",

@@ -53,6 +53,14 @@ export function rankAgreement(record: RunRecord): string {
 /** A rate (order matched) prints the run's two decimals, the one figure not to a tenth (ruling R2). */
 export const RATE_PLACES = 2;
 
+const GRADES_RULE = "grades once every game's stats are in";
+const USUALLY = 'usually';
+
+/** "grades once every game's stats are in, usually Wednesday", the rule alone with no day. */
+export function gradesWhen(day: string | null): string {
+	return day === null ? GRADES_RULE : `${GRADES_RULE}, ${USUALLY} ${day}`;
+}
+
 /** The record's words, in one place for the copy guard (Lane 93). */
 export const RECORD_WORDS = {
 	/** Places off in a player's words, its meaning whole, said once in the basis (B04, Lane 131). */
@@ -63,11 +71,12 @@ export const RECORD_WORDS = {
 	/** A set week's game state beside its set time (D08): the schedule's, never the run's. */
 	notPlayed: 'not played yet',
 	underway: 'under way',
+	/** The grading rule a set week waits on (B254): a week grades once every game's stats are in,
+	 * so a page says the rule and, beside it, the day it usually holds (the run's gradesFrom). */
+	gradesRule: GRADES_RULE,
+	usually: USUALLY,
 	/** A set week whose games are played and whose stats have not landed. */
-	waiting: (week: string, day: string | null) =>
-		day === null
-			? `${week} grades when the stats land.`
-			: `${week} grades ${day} when the stats land.`,
+	waiting: (week: string, day: string | null) => `${week} ${gradesWhen(day)}.`,
 	standing: (graded: number, played: number) =>
 		`Graded ${String(graded)} of ${plural(played, 'week')} played`,
 	noneSet: 'weeks graded. Our first order is set before the first kickoff',
@@ -102,7 +111,7 @@ function runsOf(weeks: readonly RecordWeek[]): RecordWeek[][] {
 }
 
 /** Why the played weeks not graded are not: "Weeks 3 to 5 were not set before kickoff, so they
- * cannot be graded. Week 6 grades Wednesday when the stats land." `unplayed` names the set weeks not
+ * cannot be graded. Week 6 grades once every game's stats are in, usually Wednesday." `unplayed` names the set weeks not
  * played yet, which wait on nothing. */
 export function gapWords(record: RunRecord, unplayed: readonly number[] = []): string {
 	const missed = runsOf(record.weeks)
@@ -202,7 +211,8 @@ function lead(weeks: readonly RecordWeek[]): string {
 }
 
 /** A set week as a person says it: "set Tue Sep 8, graded Wed Oct 14", "set Thu Oct 22, not played
- * yet" before its first kickoff, "set Tue Oct 13, grades Wed Oct 21 when the stats land" after it. */
+ * yet" before its first kickoff, "set Tue Oct 13, grades once every game's stats are in, usually Wed
+ * Oct 21" after it. */
 function frozenWords(
 	week: RecordWeek,
 	unplayed: readonly number[],
@@ -212,9 +222,7 @@ function frozenWords(
 	if (week.status === 'graded') return `${set}, graded ${stamp(week.gradedAt, week)}`;
 	if (unplayed.includes(week.week)) return `${set}, ${RECORD_WORDS.notPlayed}`;
 	if (underway.includes(week.week)) return `${set}, ${RECORD_WORDS.underway}`;
-	return week.gradesFrom === undefined
-		? `${set}, grades when the stats land`
-		: `${set}, grades ${weekdayLabel(week.gradesFrom)} when the stats land`;
+	return `${set}, ${gradesWhen(week.gradesFrom === undefined ? null : weekdayLabel(week.gradesFrom))}`;
 }
 
 /** A missed week's reason as a clause: the run's note ("Our order was not set before kickoff that

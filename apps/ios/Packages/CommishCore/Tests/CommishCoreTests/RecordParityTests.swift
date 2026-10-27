@@ -20,7 +20,7 @@ struct RecordParityTests {
         }
     }()
 
-    static let cases = ["own-sunday", "own", "upcoming", "graded", "published"]
+    static let cases = ["own-sunday", "own", "waiting", "upcoming", "graded", "published"]
 
     static func fixture(_ file: String) -> RecordFixture {
         file.hasPrefix("shared/fixtures/record/")

@@ -78,6 +78,7 @@ enum class RecordFixture(
 ) {
     /** The contract run's record, before the weekly and draft records. */
     Own("run/runs/2026-10-21T12-ros/record.json"),
+    Waiting("record/waiting.json"),
     Upcoming("record/upcoming.json"),
     Graded("record/graded.json"),
     Published("record/published.json"),

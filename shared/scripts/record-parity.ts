@@ -87,6 +87,12 @@ export const RECORD_CASES: readonly {
 		now: '2026-10-18T18:56:00.000Z'
 	},
 	{ name: 'own', file: `${RUN}/record.json`, now: '2026-10-22T17:00:00.000Z' },
+	// Week 6 played and waiting on its stats, with the day it usually grades (Lane 250, B254).
+	{
+		name: 'waiting',
+		file: 'shared/fixtures/record/waiting.json',
+		now: '2026-10-20T17:00:00.000Z'
+	},
 	{
 		name: 'upcoming',
 		file: 'shared/fixtures/record/upcoming.json',

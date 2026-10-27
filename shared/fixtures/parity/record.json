@@ -63,7 +63,7 @@
 							}
 						}
 					],
-					"gaps": "Weeks 3 to 5 were not set before kickoff, so they cannot be graded. Week 6 grades when the stats land.",
+					"gaps": "Weeks 3 to 5 were not set before kickoff, so they cannot be graded. Week 6 grades once every game's stats are in.",
 					"honest": "ADP had more of the week's starters right, 104 of 168 against our 100."
 				},
 				"positions": [
@@ -917,7 +917,7 @@
 							}
 						}
 					],
-					"gaps": "Weeks 3 to 5 were not set before kickoff, so they cannot be graded. Week 6 grades when the stats land.",
+					"gaps": "Weeks 3 to 5 were not set before kickoff, so they cannot be graded. Week 6 grades once every game's stats are in.",
 					"honest": "ADP had more of the week's starters right, 104 of 168 against our 100."
 				},
 				"positions": [
@@ -1442,7 +1442,7 @@
 					},
 					{
 						"lead": "Week 6",
-						"text": "Set Tue Oct 13, grades when the stats land",
+						"text": "Set Tue Oct 13, grades once every game's stats are in",
 						"order": "Our preseason order",
 						"caption": null,
 						"graded": false,
@@ -1712,6 +1712,860 @@
 				"waiting": "This record is written by the next nightly run."
 			}
 		},
+		"waiting": {
+			"now": "2026-10-20T17:00:00.000Z",
+			"file": "shared/fixtures/record/waiting.json",
+			"scoring": "PPR",
+			"states": {
+				"unplayed": [],
+				"underway": []
+			},
+			"lead": "How the order we set before each week's kickoff called its games, beside ADP, graded in PPR",
+			"weekly": {
+				"head": null,
+				"bug": {
+					"kind": "tiles",
+					"standing": "Graded 2 of 5 weeks played",
+					"head": "Our preseason order",
+					"tiles": [
+						{
+							"label": "order matched",
+							"pairs": null,
+							"values": {
+								"ours": "0.48",
+								"beside": [
+									{
+										"head": "ADP",
+										"value": "0.37",
+										"ours": null
+									}
+								]
+							}
+						},
+						{
+							"label": "places off",
+							"pairs": null,
+							"values": {
+								"ours": "43.7",
+								"beside": [
+									{
+										"head": "ADP",
+										"value": "49.6",
+										"ours": null
+									}
+								]
+							}
+						},
+						{
+							"label": "starters right",
+							"pairs": null,
+							"values": {
+								"ours": "100 of 168",
+								"beside": [
+									{
+										"head": "ADP",
+										"value": "104 of 168",
+										"ours": null
+									}
+								]
+							}
+						}
+					],
+					"gaps": "Weeks 3 to 5 were not set before kickoff, so they cannot be graded. Week 6 grades once every game's stats are in, usually Wednesday.",
+					"honest": "ADP had more of the week's starters right in the standard lineup, 104 of 168 against our 100."
+				},
+				"positions": [
+					"All",
+					"QB",
+					"RB",
+					"WR",
+					"TE"
+				],
+				"figures": [
+					"Order matched",
+					"Places off",
+					"Starters right"
+				],
+				"sourceHeads": [
+					"Ours",
+					"ADP"
+				],
+				"before": null,
+				"rows": [
+					{
+						"lead": "Week 1",
+						"text": "Set Tue Sep 8, graded Tue Oct 13",
+						"order": "Our preseason order",
+						"caption": "Our preseason order, set Tue Sep 8, graded Tue Oct 13",
+						"graded": true,
+						"players": "193",
+						"cells": {
+							"All": {
+								"agreement": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "0.50",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "0.41",
+											"same": null
+										}
+									]
+								},
+								"placesOff": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "43.0",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "47.9",
+											"same": null
+										}
+									]
+								},
+								"starters": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "50 of 84",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "52 of 84",
+											"same": null
+										}
+									]
+								}
+							},
+							"QB": {
+								"agreement": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "0.20",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "0.24",
+											"same": null
+										}
+									]
+								},
+								"placesOff": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "9.0",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "8.6",
+											"same": null
+										}
+									]
+								},
+								"starters": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "5 of 12",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "7 of 12",
+											"same": null
+										}
+									]
+								}
+							},
+							"RB": {
+								"agreement": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "0.75",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "0.77",
+											"same": null
+										}
+									]
+								},
+								"placesOff": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "9.1",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "8.2",
+											"same": null
+										}
+									]
+								},
+								"starters": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "18 of 24",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "19 of 24",
+											"same": null
+										}
+									]
+								}
+							},
+							"WR": {
+								"agreement": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "0.47",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "0.48",
+											"same": null
+										}
+									]
+								},
+								"placesOff": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "19.1",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "18.6",
+											"same": null
+										}
+									]
+								},
+								"starters": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "22 of 36",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "22 of 36",
+											"same": null
+										}
+									]
+								}
+							},
+							"TE": {
+								"agreement": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "-0.01",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "-0.09",
+											"same": null
+										}
+									]
+								},
+								"placesOff": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "8.6",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "9.3",
+											"same": null
+										}
+									]
+								},
+								"starters": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "5 of 12",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "4 of 12",
+											"same": null
+										}
+									]
+								}
+							}
+						},
+						"note": null
+					},
+					{
+						"lead": "Week 2",
+						"text": "Set Thu Sep 10, graded Tue Oct 13",
+						"order": "Our preseason order",
+						"caption": "Our preseason order, set Thu Sep 10, graded Tue Oct 13",
+						"graded": true,
+						"players": "188",
+						"cells": {
+							"All": {
+								"agreement": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "0.46",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "0.32",
+											"same": null
+										}
+									]
+								},
+								"placesOff": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "44.3",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "51.3",
+											"same": null
+										}
+									]
+								},
+								"starters": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "50 of 84",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "52 of 84",
+											"same": null
+										}
+									]
+								}
+							},
+							"QB": {
+								"agreement": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "0.23",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "0.28",
+											"same": null
+										}
+									]
+								},
+								"placesOff": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "8.1",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "7.4",
+											"same": null
+										}
+									]
+								},
+								"starters": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "6 of 12",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "7 of 12",
+											"same": null
+										}
+									]
+								}
+							},
+							"RB": {
+								"agreement": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "0.64",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "0.65",
+											"same": null
+										}
+									]
+								},
+								"placesOff": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "11.0",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "10.9",
+											"same": null
+										}
+									]
+								},
+								"starters": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "16 of 24",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "17 of 24",
+											"same": null
+										}
+									]
+								}
+							},
+							"WR": {
+								"agreement": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "0.33",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "0.33",
+											"same": null
+										}
+									]
+								},
+								"placesOff": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "21.3",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "20.9",
+											"same": null
+										}
+									]
+								},
+								"starters": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "20 of 36",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "20 of 36",
+											"same": null
+										}
+									]
+								}
+							},
+							"TE": {
+								"agreement": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "0.11",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "0.05",
+											"same": null
+										}
+									]
+								},
+								"placesOff": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "7.6",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "7.6",
+											"same": null
+										}
+									]
+								},
+								"starters": {
+									"trails": false,
+									"cells": [
+										{
+											"source": "ours",
+											"value": "8 of 12",
+											"same": null
+										},
+										{
+											"source": "adp",
+											"value": "8 of 12",
+											"same": null
+										}
+									]
+								}
+							}
+						},
+						"note": null
+					},
+					{
+						"lead": "Weeks 3 to 5",
+						"text": "Our order was not set before kickoff, so they cannot be graded",
+						"order": null,
+						"caption": null,
+						"graded": false,
+						"players": null,
+						"cells": null,
+						"note": null
+					},
+					{
+						"lead": "Week 6",
+						"text": "Set Tue Oct 13, grades once every game's stats are in, usually Wed Oct 21",
+						"order": "Our preseason order",
+						"caption": null,
+						"graded": false,
+						"players": null,
+						"cells": null,
+						"note": null
+					},
+					{
+						"lead": "Weeks 7 to 18",
+						"text": "Set before kickoff Thu Oct 22",
+						"order": null,
+						"caption": null,
+						"graded": false,
+						"players": null,
+						"cells": null,
+						"note": null
+					}
+				],
+				"toDate": {
+					"lead": "To date",
+					"players": "203 distinct",
+					"cells": {
+						"All": {
+							"agreement": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "0.48",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "0.37",
+										"same": null
+									}
+								]
+							},
+							"placesOff": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "43.7",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "49.6",
+										"same": null
+									}
+								]
+							},
+							"starters": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "100 of 168",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "104 of 168",
+										"same": null
+									}
+								]
+							}
+						},
+						"QB": {
+							"agreement": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "0.22",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "0.26",
+										"same": null
+									}
+								]
+							},
+							"placesOff": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "8.6",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "8.0",
+										"same": null
+									}
+								]
+							},
+							"starters": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "11 of 24",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "14 of 24",
+										"same": null
+									}
+								]
+							}
+						},
+						"RB": {
+							"agreement": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "0.69",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "0.71",
+										"same": null
+									}
+								]
+							},
+							"placesOff": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "10.0",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "9.6",
+										"same": null
+									}
+								]
+							},
+							"starters": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "34 of 48",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "36 of 48",
+										"same": null
+									}
+								]
+							}
+						},
+						"WR": {
+							"agreement": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "0.40",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "0.41",
+										"same": null
+									}
+								]
+							},
+							"placesOff": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "20.2",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "19.8",
+										"same": null
+									}
+								]
+							},
+							"starters": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "42 of 72",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "42 of 72",
+										"same": null
+									}
+								]
+							}
+						},
+						"TE": {
+							"agreement": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "0.05",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "-0.02",
+										"same": null
+									}
+								]
+							},
+							"placesOff": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "8.1",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "8.5",
+										"same": null
+									}
+								]
+							},
+							"starters": {
+								"trails": false,
+								"cells": [
+									{
+										"source": "ours",
+										"value": "13 of 24",
+										"same": null
+									},
+									{
+										"source": "adp",
+										"value": "12 of 24",
+										"same": null
+									}
+								]
+							}
+						}
+					}
+				},
+				"basis": "Each week we set our order before the first kickoff and graded it on its players' points, ADP on the same players. Order matched is how closely an order ranked the players to the week's finish: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards. Places off is how many places a player finished from his rank, lower is better. Starters right counts a standard 12-team lineup, the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs, and how many of them the order also put there."
+			},
+			"draft": {
+				"head": {
+					"title": "Draft record",
+					"what": "Our draft board against ADP, on the season's points so far"
+				},
+				"waiting": "This record is written by the next nightly run."
+			}
+		},
 		"upcoming": {
 			"now": "2026-10-22T17:00:00.000Z",
 			"file": "shared/fixtures/record/upcoming.json",
@@ -1729,7 +2583,7 @@
 				"bug": {
 					"kind": "pending",
 					"title": "Week 7 not graded yet",
-					"when": "Grades after Monday's game.",
+					"when": "Grades once every game's stats are in, after Monday's game.",
 					"gaps": ""
 				},
 				"positions": [],
