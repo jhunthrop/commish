@@ -276,3 +276,40 @@ export function leagueToDate(rows: readonly LeagueRankingRow[]): string | null {
 		return `Following ESPN instead of us would have scored ${fixed(-tenth)} more points over ${over}.`;
 	return `Following us or ESPN would have scored the same over ${over}.`;
 }
+
+/** Everything the record page draws from a selected league, in the page's one lineup: the record as
+ * shown, the honest sentence, the league's basis, its weekly rows and sentences and the season so far.
+ * The page loads this module with the league's reads (Lane 253), so the record at rest never carries
+ * the league's code. Where the league's lineup cannot be counted, these say the run's own record. */
+export interface LeagueView {
+	host: LeagueRecord['host'];
+	record: RunRecord;
+	honest: string | null;
+	basis: LeagueBasis;
+	rows: LeagueRankingRow[];
+	/** One sentence a week the page draws no row for (weekSentence), with its week. */
+	sentences: { week: number; text: string }[];
+	said: string | null;
+}
+
+export function leagueView(
+	run: RunRecord,
+	league: LeagueRecord,
+	players: PlayersByWeek
+): LeagueView {
+	const lineup = pageLineup(run, league, players);
+	const record = shownRecord(run, players, lineup);
+	const rows = leagueRankingRows(league);
+	return {
+		host: league.host,
+		record,
+		honest: honestWords(run, record, lineup),
+		basis: leagueBasis(league, lineup),
+		rows,
+		sentences: leagueSentenceWeeks(league).map((week) => ({
+			week: week.week,
+			text: weekSentence(week)
+		})),
+		said: leagueToDate(rows)
+	};
+}
