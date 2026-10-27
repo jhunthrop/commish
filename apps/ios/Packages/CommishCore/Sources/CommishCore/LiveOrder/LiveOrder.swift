@@ -77,6 +77,21 @@ public enum LiveOrder {
         return places
     }
 
+    /// Every row the answer returns, by board id, with figures or without: a row with none (a player
+    /// put on a list after the nightly) is still the order's, drawn with its status's word (Lane 243,
+    /// B251).
+    public static func rows(_ answer: OrderAdvice) -> [String: OrderRow] {
+        Dictionary(
+            answer.rows.compactMap { row in row.line.player.boardId.map { ($0, row) } },
+            uniquingKeysWith: { first, _ in first }
+        )
+    }
+
+    /// Whether the answer is cut: the view holds more players than the rows it returned (its limit).
+    public static func cut(_ answer: OrderAdvice) -> Bool {
+        answer.total > answer.rows.count
+    }
+
     /// Every row with its place, in the order's order, or nil when the answer does not place one of
     /// them: the screen then keeps the run's rows, never a table half one board and half the other
     /// (placedRows).

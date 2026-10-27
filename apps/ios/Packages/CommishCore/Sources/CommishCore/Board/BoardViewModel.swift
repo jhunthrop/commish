@@ -66,6 +66,8 @@ public final class BoardViewModel {
     private var shown: Shown?
     /// The order as last read at the screen's clock, so a chip redraws on it.
     private var order: OrderAtClock?
+    /// A chip's read of the order, past the share's window.
+    private var reread: Task<Void, Never>?
 
     private struct Shown {
         let format: String?
@@ -173,12 +175,28 @@ public final class BoardViewModel {
         await load()
     }
 
-    /// A position chip: the same board in another view, with no read.
-    public func choose(position: BoardPosition?) {
+    /// A position chip: the same board in another view, with no read of the run. The order held redraws
+    /// it only inside the share's window by the screen's clock (Lane 243, B251); one older is dropped,
+    /// the run's view drawn, and the order read again through the share, so a board left open never
+    /// draws an order of any age. The re-read's task, nil where none is made.
+    @discardableResult
+    public func choose(position: BoardPosition?) -> Task<Void, Never>? {
         filter = filter.with(position: position)
+        let stale = order.map { clock.now.timeIntervalSince($0.landed) >= OrderReader.window } == true
+        if stale {
+            order = nil
+        }
         if let shown {
             show(shown.read, stamp: shown.stamp, stale: shown.stale)
         }
+        guard stale else {
+            return nil
+        }
+        reread?.cancel()
+        let format = filter.format
+        let task = Task { await self.readOrder(format: format) }
+        reread = task
+        return task
     }
 
     private func show(_ read: RunBoardRead, stamp: Date, stale: BoardStale?) {

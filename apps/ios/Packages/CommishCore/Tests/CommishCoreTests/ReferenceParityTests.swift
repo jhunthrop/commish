@@ -279,6 +279,13 @@ struct ReferenceParityTests {
                 #expect(model.meta == want.meta, "\(want.abbr)")
                 #expect(model.boardHead == run.clubHead.board, "\(want.abbr)")
                 #expect(model.boardLabel == "\(model.name), \(run.clubHead.board)", "\(want.abbr)")
+                // Both halves of the head against the web's words (the Lane 232 review's L3).
+                let board = ClubFiles.head(files.format, atClock: false)
+                let order = ClubFiles.head(files.format, atClock: true)
+                #expect(board.title == run.clubHead.board)
+                #expect(board.nobody == run.clubHead.nobodyBoard)
+                #expect(order.title == run.clubHead.order)
+                #expect(order.nobody == run.clubHead.nobodyOrder)
                 #expect(model.rows.map(\.id) == want.rows, "\(want.abbr)")
                 #expect(model.market.map(\.id) == want.market, "\(want.abbr)")
                 #expect(model.columns == .ranked(gap: want.gap))

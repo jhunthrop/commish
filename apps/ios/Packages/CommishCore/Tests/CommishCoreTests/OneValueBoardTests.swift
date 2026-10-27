@@ -102,10 +102,59 @@ struct OneValueBoardTests {
         #expect(receivers.sections.last?.rows.map(\.id) == [washington.id])
     }
 
+    @Test func aPlayerTheOrderReturnsWithNoPointsOnIRTheRunDoesNotListIsDrawnAfterTheRankedRows() throws {
+        let swift = try #require(Reads.parity.players.first)
+        let missing = try OrderAtClock(
+            answer: OneValueFixture.reserving(swift.id, in: Reads.order().answer), landed: Reads.now
+        )
+        #expect(missing.places[swift.id] == nil, "the order holds his row with no figure")
+        #expect(missing.rows[swift.id] != nil)
+        let run = try RunFixture.oneValue.read(format: Reads.ppr)
+        #expect(run.designations.value?.players.additionalProperties[swift.id] == nil, "the run does not list him")
+        let all = try Reads.board(order: missing)
+        #expect(all.atClock)
+        #expect(Set(all.rows.map(\.id)) == Set(Reads.parity.board.ids), "every player is drawn")
+        let last = try #require(all.rows.last)
+        #expect(last.id == swift.id, "he follows the order's ranked rows")
+        #expect(last.pill == "RB \(Words.DesignationRank.injured_reserve)")
+        #expect(last.projected == Words.Box.none)
+        #expect(last.overReplacement == Words.Box.none)
+        #expect(last.status?.rank == Words.DesignationRank.injured_reserve)
+        #expect(!all.basis.contains { $0.hasPrefix("The first") }, "a whole answer says no count")
+        let backs = try Reads.board(position: .runningBack, order: missing)
+        #expect(backs.sections.last?.head == Words.Board.heldHead)
+        #expect(backs.sections.last?.rows.map(\.id) == [swift.id])
+        #expect(!backs.basis.contains { $0.hasPrefix("The first") })
+    }
+
+    @Test func aPositionChipPastTheSharesWindowReadsTheOrderAgain() async throws {
+        let clock = MovingClock(Reads.now)
+        let counted = CountedOrder()
+        let viewModel = BoardViewModel(
+            api: StubRun(.oneValue), cache: reads.cache(), clock: clock, inSeason: true, following: false,
+            zone: Reads.zone, orders: OrderReader(api: counted, clock: clock, memo: OrderMemo())
+        )
+        await viewModel.load()
+        #expect(await counted.reads == 1)
+        clock.now += 30
+        #expect(viewModel.choose(position: .receiver) == nil, "inside the window the held order redraws")
+        #expect(await counted.reads == 1)
+        clock.now = Reads.now + 61
+        let reread = try #require(viewModel.choose(position: .runningBack), "past the window the chip reads again")
+        await reread.value
+        #expect(await counted.reads == 2, "a held order 61 s old is read again")
+        guard case let .loaded(model, _, _) = viewModel.state else {
+            throw Reads.Failure.notLoaded("\(viewModel.state)")
+        }
+        #expect(model.atClock)
+        #expect(model.rows.allSatisfy { $0.pill.hasPrefix("RB ") })
+    }
+
     @Test func theBoardSaysHowFarOneReadReachesAndItsHeadIsOnTheBasisClock() throws {
         let order = try Reads.order()
         var answer = order.answer
         answer.rows = Array(answer.rows.prefix(40))
+        #expect(LiveOrder.cut(answer), "the view holds more players than the rows it returned")
         let short = try Reads.board(order: OrderAtClock(answer: answer, landed: Reads.now))
         let total = try RunFixture.oneValue.board(format: Reads.ppr).rows.count
         #expect(short.basis.last == LiveOrderWords.reach(shown: short.rows.count, total: total))
@@ -147,6 +196,20 @@ struct OneValueBoardTests {
             designations: Kept(value: designations, tag: nil),
             clubs: Kept(value: fixture.clubs(), tag: nil)
         )
+    }
+}
+
+/// The order's route answering the fixture, counting each read it is asked.
+actor CountedOrder: RankingsAPI {
+    private(set) var reads = 0
+
+    func order(_ query: OrderQuery) async throws -> OrderAdvice {
+        reads += 1
+        return try await StubOrderSearch().order(query)
+    }
+
+    func weekOrder(position: WeekOrderPosition) async throws -> WeekOrderAdvice {
+        try await StubOrderSearch().weekOrder(position: position)
     }
 }
 

@@ -27,6 +27,9 @@ struct BoardSnapshotTests {
     static let zone = TimeZone(identifier: "America/Chicago")!
     nonisolated static let preDraft = APIDecoding.parseDate("2026-09-01T17:00:00Z")!
     nonisolated static let inSeason = APIDecoding.parseDate("2026-10-22T17:00:00Z")!
+    /// The player the missing scene puts on IR: the one-value stand-in's D'Andre Swift.
+    nonisolated static let missing = (try? RankingsFixture.order("-all", at: OneValueFixture.clock))?.rows
+        .first { $0.line.player.name == "D'Andre Swift" }?.line.player.boardId
 
     enum Scene: String, CaseIterable, Sendable {
         case top
@@ -46,6 +49,10 @@ struct BoardSnapshotTests {
         case clock
         /// In season with the order unread: the run's top rows and the basis with the run's stamp.
         case clockUnread = "clock-unread"
+        /// At the order's clock with a player the order returns with no points, put on IR after the
+        /// nightly the run's capture does not list (Lane 243, B251): the All view's foot, his row after
+        /// the order's ranked rows with IR and no figure, and no count line under them.
+        case clockMissing = "clock-missing"
 
         var position: BoardPosition? {
             switch self {
@@ -57,12 +64,12 @@ struct BoardSnapshotTests {
         }
 
         var inSeason: Bool {
-            [.rest, .stale, .clock, .clockUnread].contains(self)
+            [.rest, .stale, .clock, .clockUnread, .clockMissing].contains(self)
         }
 
         /// The scenes at the order's clock, read or unread.
         var atClock: Bool {
-            self == .clock || self == .clockUnread
+            [.clock, .clockUnread, .clockMissing].contains(self)
         }
 
         var fixture: RunFixture {
@@ -79,7 +86,9 @@ struct BoardSnapshotTests {
                 return nil
             }
             return OrderReader(
-                api: StubOrderSearch(offline: self == .clockUnread),
+                api: StubOrderSearch(
+                    offline: self == .clockUnread, reserving: self == .clockMissing ? BoardSnapshotTests.missing : nil
+                ),
                 clock: FixedClock(now), memo: OrderMemo()
             )
         }
@@ -165,6 +174,18 @@ struct BoardSnapshotTests {
         }
     }
 
+    @Test func theMissingSceneDrawsHimAfterTheRankedRowsWithNoCount() async throws {
+        let viewModel = try await Self.viewModel(.clockMissing)
+        guard case let .loaded(model, _, _) = viewModel.state else {
+            throw SceneError.notLoaded("clock-missing")
+        }
+        #expect(model.atClock)
+        #expect(Self.missing != nil)
+        #expect(model.rows.last?.id == Self.missing)
+        #expect(model.rows.last?.pill == "RB \(Words.DesignationRank.injured_reserve)")
+        #expect(!model.basis.contains { $0.hasPrefix("The first") })
+    }
+
     @Test func theStaleSceneSaysWhyItsBoardShows() async throws {
         let viewModel = try await Self.viewModel(.stale)
         #expect(viewModel.stampWords == "You're offline, so this is the last board this device saved, updated Oct 21.")
@@ -201,7 +222,7 @@ struct BoardMock: View {
                 columns: model.columns, sections: Self.aroundCliff(model.sections), open: { _ in }, live: false
             )
             .padding(.vertical, Tokens.Space.s4)
-        case .foot:
+        case .foot, .clockMissing:
             VStack(alignment: .leading, spacing: Tokens.Space.s4) {
                 BoardTableView(columns: model.columns, sections: lastRows, open: { _ in }, live: false)
                 BoardBasisView(lines: model.basis)

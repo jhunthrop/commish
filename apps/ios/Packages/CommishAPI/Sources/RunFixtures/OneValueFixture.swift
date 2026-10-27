@@ -24,6 +24,30 @@ public enum OneValueFixture {
         return try APIDecoding.envelopeData(PlayerWeek.self, from: Data(contentsOf: file))
     }
 
+    /// The moment the list's status is read, after the nightly and before the Sunday clock.
+    static let reserveRead = APIDecoding.parseDate("2026-10-18T18:00:00Z") ?? .distantPast
+
+    /// The answer with one player put on injured reserve after the nightly (Lane 243, B251): the order
+    /// returns his row with no points, no value and no rank, and the list's status, which the run's
+    /// capture does not hold.
+    public static func reserving(_ id: String, in answer: OrderAdvice) -> OrderAdvice {
+        var answer = answer
+        answer.rows = answer.rows.map { row in
+            guard row.line.player.boardId == id else {
+                return row
+            }
+            var row = row
+            row.restOfSeasonPoints = nil
+            row.pointsOverReplacement = nil
+            row.line.positionRank = nil
+            row.line.facts.designation = .init(value1: .init(
+                status: .init(value1: .injuredReserve), asOf: reserveRead, seasonLong: true
+            ))
+            return row
+        }
+        return answer
+    }
+
     /// The parity file's bytes.
     public static func parity() throws -> Data {
         try Data(contentsOf: RunFixture.fixtures.appendingPathComponent("parity/one-value.json"))
@@ -56,13 +80,17 @@ public struct StubOneValueWeeks: PlayerWeekAPI {
 /// rows), else the whole read with the byes in their places (order-all-<clock>.json); a search keeps the
 /// rows whose name or club holds the letters, any case, accents aside, each keeping his place; then the
 /// read's limit, `total` counting the rows before it; every read failing with no signal while `offline`.
+/// `reserving` names a player the whole read answers put on injured reserve after the nightly
+/// (OneValueFixture.reserved).
 public struct StubOrderSearch: RankingsAPI {
     public let clock: String
     public let offline: Bool
+    public let reserving: String?
 
-    public init(clock: String = OneValueFixture.clock, offline: Bool = false) {
+    public init(clock: String = OneValueFixture.clock, offline: Bool = false, reserving: String? = nil) {
         self.clock = clock
         self.offline = offline
+        self.reserving = reserving
     }
 
     public func order(_ query: OrderQuery) async throws -> OrderAdvice {
@@ -70,6 +98,9 @@ public struct StubOrderSearch: RankingsAPI {
             throw URLError(.notConnectedToInternet)
         }
         var answer = try RankingsFixture.order(query.byesLast ? "" : "-all", at: clock)
+        if let reserving, !query.byesLast {
+            answer = OneValueFixture.reserving(reserving, in: answer)
+        }
         if let search = query.search.map(Self.folded) {
             answer.rows = answer.rows.filter { row in
                 Self.folded(row.line.player.name).contains(search) || Self.folded(row.line.player.team).contains(search)
