@@ -64,7 +64,8 @@ fun MockSetupScreen(
 ) {
     val c = CommishTheme.colors
     val state = rememberScrollState()
-    LaunchedEffect(lobby?.asking) { if (lobby?.asking == true) state.animateScrollTo(0) }
+    // Keyed on the format asked for, so a second card tapped while the question shows scrolls to it again.
+    LaunchedEffect(lobby?.askingFor) { if (lobby?.asking == true) state.animateScrollTo(0) }
     Column(modifier.background(c.bg)) {
         val scroll = if (still) Modifier else Modifier.weight(1f).verticalScroll(state)
         Column(

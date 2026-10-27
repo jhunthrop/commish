@@ -169,7 +169,10 @@ fun LobbyRoomView(
     var asking by rememberSaveable { mutableStateOf(false) }
     var shown by rememberSaveable { mutableIntStateOf(PoolModel.FIRST_ROWS) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(vm) { vm.run() }
+    // A run again (Try again after a read that did not go) is a new key; a configuration change runs the same
+    // key again, which the view model resumes from the last seq.
+    var attempt by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(vm, attempt) { vm.run() }
     BackHandler(onBack = exits.close)
     val notices = listOfNotNull(stopped, LobbyViewModel.notice(status, refusal, problem, dismissed))
     val open = state == LobbyScreenState.Room && stopped == null && lobby?.let { !it.complete && !it.abandoned } == true
@@ -211,7 +214,7 @@ fun LobbyRoomView(
                             roomNow = vm::roomNow,
                         )
                     }
-                is LobbyScreenState.Failed -> Failed(now.sentence, exits.close)
+                is LobbyScreenState.Failed -> Failed(now.sentence, exits.close, retry = if (now.final) null else ({ attempt++ }))
             }
         }
     }
@@ -235,6 +238,7 @@ fun LobbyRoomView(
 private fun Failed(
     sentence: String,
     back: () -> Unit,
+    retry: (() -> Unit)? = null,
 ) {
     Column(
         Modifier.fillMaxSize().padding(Tokens.Space.s5.dp),
@@ -242,6 +246,8 @@ private fun Failed(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         BasisText(sentence)
+        // A read that did not go (no signal, the API's own fault) can be tried again; a refusal for good cannot.
+        retry?.let { QuietButton(AppWords.tryAgain, onClick = it) }
         QuietButton(Words.Lobby.joinLobby, onClick = back)
     }
 }

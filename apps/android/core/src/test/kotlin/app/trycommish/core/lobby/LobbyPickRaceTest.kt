@@ -11,6 +11,7 @@ import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /** The recorded rows through the frame that puts the drafter (seat 9) on the clock at 1.09, or through `pick`. */
@@ -43,15 +44,19 @@ class LobbyPickRaceTest {
             val connector = ScriptedConnector(listOf(listOf(LobbySocketTest.welcome(opening), LobbySocketTest.pickStep(8), Scripted.End)))
             val vm = LobbySocketTest.viewModel(StubLobby(), connector)
             val card = requireNotNull(LobbyFixtures.card(LobbyFixtures.YOU))
+            var drove = false
             connector.drive = { command ->
                 if (command is RoomCommand.Pick) {
                     assertFalse(vm.drawn.value?.yourTurn == true)
                     vm.draft(card.call)
+                    drove = true
                 } else {
                     vm.close()
                 }
             }
             vm.run()
+            // The Draft was tapped off the clock, and only the hello went out.
+            assertTrue(drove)
             assertEquals(listOf(LobbySocketTest.hello(0)), connector.sent.first())
         }
 

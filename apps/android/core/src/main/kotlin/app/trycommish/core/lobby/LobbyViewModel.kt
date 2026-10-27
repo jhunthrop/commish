@@ -81,8 +81,10 @@ sealed interface LobbyScreenState {
  * 403, 404) stops here (B208): nothing polls a refused draft. Rows that skip a seq read the room again and replay
  * the whole log from the welcome (B219).
  *
- * [run] is the room for the screen's life, from the screen's own scope: each run reads the room afresh and
- * replays its log from the welcome, and the socket closes with 1000 when that scope goes.
+ * [run] is the room for the screen's life, from the screen's own scope, and the socket closes with 1000 when that
+ * scope goes. The first run reads the room and replays its log from the welcome; a run again with the room held (a
+ * configuration change) reads nothing and says hello from the last seq applied; after a read that did not go, a run
+ * again (Try again) reads it afresh.
  */
 @Suppress("TooManyFunctions") // One verb per control of the room, as the web's page has them.
 class LobbyViewModel(
@@ -143,7 +145,9 @@ class LobbyViewModel(
     /** The room for the screen's whole life: read it, then hold its socket until the calling coroutine is
      * cancelled (the socket closes with 1000) or the room stops it for good. */
     suspend fun run() {
-        val socket = load() ?: return
+        // Stopped for good (a 1008 close, a refused upgrade) or refused for good (B208): nothing is tried again.
+        if (mutableStopped.value != null || (mutableState.value as? LobbyScreenState.Failed)?.final == true) return
+        val socket = resumed() ?: load() ?: return
         coroutineScope {
             running = this
             try {
@@ -155,9 +159,36 @@ class LobbyViewModel(
         }
     }
 
+    /** The room already held (a run again after a configuration change, Lane 230 review M1): no read and no
+     * reset, a socket that says hello from the last seq applied, the protocol's own reconnect. Null when this view
+     * model holds no room yet. */
+    private fun resumed(): RoomSocket? {
+        val room = room ?: return null
+        val lobby = mutableLobby.value ?: return null
+        if (mutableState.value != LobbyScreenState.Room) return null
+        return socket(room.socketUrl, lobby.seq)
+    }
+
+    private fun socket(
+        url: String,
+        lastSeq: Long,
+    ): RoomSocket =
+        RoomSocket(
+            url,
+            connector,
+            token,
+            clock,
+            wait,
+            lastSeq = lastSeq,
+            onRows = ::apply,
+            onSignedOut = sessionEnd::signedOut,
+            onGap = ::resync,
+        ).also { mutableSocket.value = it }
+
     /** The room's read and its socket; null when the read failed. */
     private suspend fun load(): RoomSocket? {
         mutableStopped.value = null
+        mutableState.value = LobbyScreenState.Loading
         cardFor = -1
         rebuilding = null
         return try {
@@ -168,16 +199,7 @@ class LobbyViewModel(
             mutableLobby.value = LobbyState.of(read)
             mutableState.value = LobbyScreenState.Room
             redraw()
-            RoomSocket(
-                read.socketUrl,
-                connector,
-                token,
-                clock,
-                wait,
-                onRows = ::apply,
-                onSignedOut = sessionEnd::signedOut,
-                onGap = ::resync,
-            ).also { mutableSocket.value = it }
+            socket(read.socketUrl, 0)
         } catch (e: CancellationException) {
             throw e
         } catch (

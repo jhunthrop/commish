@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import app.trycommish.api.models.LobbyFormat
 import app.trycommish.core.lobby.LobbyCard
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
@@ -48,8 +49,8 @@ class LobbySetup(
     val cards: List<LobbyCard>,
     val problem: String?,
     val enabled: Boolean,
-    /** A join waits on a handle: the question shows, with the API's word on the last one tried. */
-    val asking: Boolean = false,
+    /** The format a join waits on a handle for: the question shows, with the API's word on the last one tried. */
+    val askingFor: LobbyFormat? = null,
     val handleProblem: String? = null,
     val join: (LobbyCard) -> Unit = {},
     /** The quiet "Join a lobby with people" beside the setup's verb: the format nearest the setup's. */
@@ -57,7 +58,9 @@ class LobbySetup(
     val saveHandle: (String) -> Unit = {},
     /** The list has been read: before then only the quiet verb shows. */
     val listed: Boolean = true,
-)
+) {
+    val asking: Boolean get() = askingFor != null
+}
 
 /** The list (LobbyList.svelte at 390), the iOS LobbyListView's: a card a format with its title and clock, how
  * many are in, and its one verb; a draft the member holds a seat in reads "Your seat" on the accent. */
