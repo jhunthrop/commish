@@ -26,6 +26,9 @@ android {
     buildFeatures { compose = true }
     testOptions.unitTests.all {
         it.systemProperty("fixtures", rootDir.resolve("../../shared/fixtures").canonicalPath)
+        // Each snapshot class in a JVM of its own: layoutlib keeps the interface face's variations as the first
+        // class to draw resolved them (B191), so the lobby's scenes drawn first redrew every mock reference.
+        it.forkEvery = 1
     }
 }
 

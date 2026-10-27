@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.Paparazzi
@@ -156,8 +157,23 @@ private fun LobbyFramed(
 ) {
     val inRoom = scene == LobbyScene.Filling || scene == LobbyScene.YourTurn || scene == LobbyScene.Between
     Column(Modifier.background(CommishTheme.colors.bg).fillMaxWidth().height(room)) {
-        Box(Modifier.size(0.dp)) { Text("0", style = Faces.cell) }
+        FaceWarmUp()
         RoomTop({}, AppWords.lobbyClose, leave = if (inRoom) ({}) else null)
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) { SceneBody(SceneScreen(body)) }
+    }
+}
+
+/**
+ * The number face's semibold cut, then the interface face at each of its weights, resolved before anything else
+ * and unseen (B191): layoutlib keeps the variations the first drawing of this JVM resolves, so a class drawn first
+ * otherwise draws every interface weight at one cut. A device resolves each cut on its own.
+ */
+@Composable
+private fun FaceWarmUp() {
+    Box(Modifier.size(0.dp)) {
+        Text("0", style = Faces.cell)
+        listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold).forEach {
+            Text("0", style = Faces.body.copy(fontWeight = it))
+        }
     }
 }
