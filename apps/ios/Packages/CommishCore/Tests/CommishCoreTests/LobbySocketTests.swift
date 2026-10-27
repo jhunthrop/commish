@@ -73,7 +73,7 @@ struct LobbySocketTests {
     }
 
     static func viewModel(
-        _ api: StubLobby, _ connector: ScriptedConnector, timer: RecordingTimer,
+        _ api: StubLobby, _ connector: ScriptedConnector, timer: any PollTimer,
         signedOut: @escaping @MainActor () -> Void = {}
     ) -> LobbyViewModel {
         LobbyViewModel(
@@ -298,6 +298,22 @@ struct LobbySocketTests {
         #expect(await api.reads == 2)
         // The socket opened only after the second read, from the start of the log.
         #expect(await connector.sent.first?.first == .object(["type": .string("hello"), "last_seq": .number(0)]))
+    }
+
+    @Test func aCancelledReadLeavesNoFailureScreen() async {
+        let api = StubLobby()
+        await api.setHangs(true)
+        let connector = ScriptedConnector([])
+        let viewModel = Self.viewModel(api, connector, timer: RecordingTimer())
+        let run = Task { await viewModel.run() }
+        while await api.reads == 0 {
+            await Task.yield()
+        }
+        run.cancel()
+        await run.value
+        // The screen went (or Try again started another run) mid-read: no failure, no Try again, no socket.
+        #expect(viewModel.state == .loading)
+        #expect(await connector.tokens.isEmpty)
     }
 
     @Test func aRoomRefusedForGoodIsNeverReadAgain() async {

@@ -102,7 +102,6 @@ class LobbyViewModel(
     private val mutableSocket = MutableStateFlow<RoomSocket?>(null)
     private val mutableStopped = MutableStateFlow<String?>(null)
     private val mutableProblem = MutableStateFlow<String?>(null)
-    private val mutableDismissed = MutableStateFlow<String?>(null)
     private val mutableLeaving = MutableStateFlow(false)
 
     val state: StateFlow<LobbyScreenState> = mutableState.asStateFlow()
@@ -124,8 +123,6 @@ class LobbyViewModel(
     /** A leave or a join the API refused, in its words, over the room. */
     val problem: StateFlow<String?> = mutableProblem.asStateFlow()
 
-    /** The room's refusal the member's last pick put away, so the notice stops showing it. */
-    val dismissed: StateFlow<String?> = mutableDismissed.asStateFlow()
     val leaving: StateFlow<Boolean> = mutableLeaving.asStateFlow()
 
     var room: LobbyRoom? = null
@@ -283,7 +280,7 @@ class LobbyViewModel(
     /** The room's notice line: reconnecting, a refused leave, or the last command the room refused in its words. */
     fun notice(): String? {
         val socket = mutableSocket.value
-        return notice(socket?.status?.value, socket?.refusal?.value, mutableProblem.value, mutableDismissed.value)
+        return notice(socket?.status?.value, socket?.refusal?.value, mutableProblem.value)
     }
 
     /** The room's clock: the phone's plus the latest welcome's offset. */
@@ -307,14 +304,13 @@ class LobbyViewModel(
         val socket = mutableSocket.value
         val lobby = mutableLobby.value ?: return
         val room = room ?: return
-        // Off the clock nothing is sent, so the refusal stays: a dismissal never outlives the pick it answered
-        // (B252; the page clears `refused` only in onpick).
+        // Off the clock nothing is sent, so the refusal stays (B252; the page clears `refused` only in onpick).
         if (player == null || !open || !lobby.drafting || RoomDraft.seatAt(lobby.pickNumber, room.teams) != room.you) return
-        // The room's last refusal goes with the member's pick (the page's `refused = null`).
-        mutableDismissed.value = socket?.refusal?.value
         marked = null
         redraw()
-        if (socket?.send(RoomCommand.Pick(player, lobby.pickNumber)) == true) mutableDismissed.value = null
+        // A pick that goes out puts the room's last refusal away (the socket's send clears it, the page's
+        // `refused = null`); one that cannot go (reconnecting) leaves it for the welcome.
+        socket?.send(RoomCommand.Pick(player, lobby.pickNumber))
     }
 
     /** Queue or unqueue a player: the whole queue as a command. */
@@ -390,18 +386,17 @@ class LobbyViewModel(
     }
 
     companion object {
-        /** The notice from what it reads: the socket's status and last refusal, a refused leave or join, and the
-         * refusal the member's last pick put away. */
+        /** The notice from what it reads: the socket's status and last refusal, and a refused leave or join. The
+         * refusal is the socket's own: a pick that goes out puts it away, every new error frame shows it again, and
+         * a welcome clears it, so no dismissal can outlive the action it answered (B252). */
         fun notice(
             status: RoomStatus?,
             refusal: String?,
             problem: String?,
-            dismissed: String?,
         ): String? =
             when {
                 status == RoomStatus.Reconnecting -> Words.Lobby.reconnecting
-                problem != null -> problem
-                else -> refusal?.takeIf { it != dismissed }
+                else -> problem ?: refusal
             }
     }
 

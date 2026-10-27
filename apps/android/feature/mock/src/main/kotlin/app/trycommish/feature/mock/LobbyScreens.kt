@@ -162,7 +162,6 @@ fun LobbyRoomView(
     val lobby by vm.lobby.collectAsStateWithLifecycle()
     val stopped by vm.stopped.collectAsStateWithLifecycle()
     val problem by vm.problem.collectAsStateWithLifecycle()
-    val dismissed by vm.dismissed.collectAsStateWithLifecycle()
     val socket by vm.socket.collectAsStateWithLifecycle()
     val status = socket?.status?.collectAsState()?.value
     val refusal = socket?.refusal?.collectAsState()?.value
@@ -174,7 +173,7 @@ fun LobbyRoomView(
     var attempt by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(vm, attempt) { vm.run() }
     BackHandler(onBack = exits.close)
-    val notices = listOfNotNull(stopped, LobbyViewModel.notice(status, refusal, problem, dismissed))
+    val notices = listOfNotNull(stopped, LobbyViewModel.notice(status, refusal, problem))
     val open = state == LobbyScreenState.Room && stopped == null && lobby?.let { !it.complete && !it.abandoned } == true
     Column(
         Modifier

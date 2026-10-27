@@ -1,9 +1,11 @@
 package app.trycommish.core.lobby
 
+import app.trycommish.core.room.RoomClosed
 import app.trycommish.core.room.RoomCommand
 import app.trycommish.core.room.RoomRow
 import app.trycommish.core.room.Scripted
 import app.trycommish.core.room.ScriptedConnector
+import app.trycommish.design.Words
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -60,12 +62,69 @@ class LobbyPickRaceTest {
             assertEquals(listOf(LobbySocketTest.hello(0)), connector.sent.first())
         }
 
+    /** B252 review M2: a Draft on the clock whose pick goes out puts the room's refusal away. */
+    @Test
+    fun `a pick that goes out puts the refusal away`() =
+        runTest {
+            val (opening, _) = PickRace.opening()
+            val connector =
+                ScriptedConnector(
+                    listOf(listOf(LobbySocketTest.welcome(opening), refused(), LobbySocketTest.pickStep(LobbyFixtures.YOU), Scripted.End)),
+                )
+            val vm = LobbySocketTest.viewModel(StubLobby(), connector)
+            val card = requireNotNull(LobbyFixtures.card(LobbyFixtures.YOU))
+            val notices = mutableListOf<String?>()
+            connector.drive = { command ->
+                if (command is RoomCommand.Pick) {
+                    notices += vm.notice()
+                    vm.draft(card.call)
+                    notices += vm.notice()
+                }
+            }
+            vm.run()
+            assertEquals(listOf(QUEUED, null), notices)
+            assertEquals(1, connector.sent.first().count { (it.jsonObject["type"] as? JsonPrimitive)?.content == "pick" })
+        }
+
+    /**
+     * B252 review M1: a Draft on the clock while the socket reconnects cannot go; the same refusal after the
+     * reconnect still shows, never hidden behind a dismissal it did not answer.
+     */
+    @Test
+    fun `a Draft while reconnecting hides no later refusal`() =
+        runTest {
+            val (opening, _) = PickRace.opening()
+            val queueStep = Scripted.Client(Json.parseToJsonElement(RoomCommand.Queue(emptyList()).text).jsonObject)
+            val connector =
+                ScriptedConnector(
+                    listOf(
+                        listOf(LobbySocketTest.welcome(opening), refused(), Scripted.Close(RoomClosed(ABNORMAL))),
+                        listOf(LobbySocketTest.welcome(opening), refused(), queueStep, Scripted.End),
+                    ),
+                )
+            val card = requireNotNull(LobbyFixtures.card(LobbyFixtures.YOU))
+            var whileReconnecting: String? = null
+            lateinit var vm: LobbyViewModel
+            vm =
+                LobbySocketTest.viewModel(StubLobby(), connector, onWait = {
+                    // On the clock with the socket down: the Draft is tapped and its pick cannot go.
+                    vm.draft(card.call)
+                    whileReconnecting = vm.notice()
+                })
+            var afterReconnect: String? = null
+            connector.drive = { command -> if (command is RoomCommand.Queue) afterReconnect = vm.notice() }
+            vm.run()
+            assertEquals(Words.Lobby.reconnecting, whileReconnecting)
+            assertEquals(QUEUED, afterReconnect)
+            assertFalse(connector.sent.flatten().any { (it.jsonObject["type"] as? JsonPrimitive)?.content == "pick" })
+        }
+
     /** B252: an off-clock Draft sends nothing, so it puts no refusal away; the same refusal again shows. */
     @Test
     fun `an off-clock Draft leaves the refusal and the same refusal again shows`() =
         runTest {
             val (opening, _) = PickRace.opening(before = 8)
-            val refused = Scripted.Server("""{"type":"error","code":"conflict","message":"$QUEUED"}""")
+            val refused = refused()
             val queueStep = Scripted.Client(Json.parseToJsonElement(RoomCommand.Queue(emptyList()).text).jsonObject)
             val connector =
                 ScriptedConnector(
@@ -154,6 +213,11 @@ class LobbyPickRaceTest {
         }
 
     private companion object {
+        const val ABNORMAL = 1006
+
+        /** The room refusing a queue of a drafted player, in its words. */
+        fun refused(): Scripted = Scripted.Server("""{"type":"error","code":"conflict","message":"$QUEUED"}""")
+
         const val REFUSAL = "You are not on the clock."
         const val QUEUED = "That player is drafted."
     }
