@@ -118,8 +118,16 @@ public final class LobbyViewModel {
     }
 
     /// The room for the screen's whole life: read it, then hold its socket until the screen goes (the
-    /// calling task's cancellation closes the socket with 1000).
+    /// calling task's cancellation closes the socket with 1000). Run again after a read that did not go
+    /// (Try again) it reads the room afresh; a room refused for good or a socket stopped for good is
+    /// never tried again (B208, B252).
     public func run() async {
+        if stopped != nil {
+            return
+        }
+        if case .failed(_, final: true) = state {
+            return
+        }
         guard await load(), let socket else {
             return
         }
@@ -130,6 +138,7 @@ public final class LobbyViewModel {
     /// The room's read; false when it failed.
     @discardableResult
     func load() async -> Bool {
+        state = .loading
         do {
             let read = try await api.lobby(id: id)
             guard let url = URL(string: read.socketUrl) else {
