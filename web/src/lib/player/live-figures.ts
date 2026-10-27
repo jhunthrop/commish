@@ -1,6 +1,7 @@
 /** The player page's rest-of-season figures on one clock (Lane 86, re-review N1): the run's until the
  * read answers, then the read's alone, a figure it lacks null (the page prints the empty figure), so no
- * box or column mixes the run's clock with the read's. Imports nothing: the page carries it. */
+ * box or column mixes the run's clock with the read's. Imports nothing; the page loads it with the read
+ * (Lane 234: the player page's script budget). */
 import type { BoardFormat } from '#lib/sheet/model.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
 import type { LiveFormats, LiveTier } from './week-words.ts';
