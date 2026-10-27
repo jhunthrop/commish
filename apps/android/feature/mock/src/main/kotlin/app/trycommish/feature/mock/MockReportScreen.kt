@@ -22,6 +22,8 @@ class MockReportVerbs(
     val lead: String,
     val run: () -> Unit = {},
     val another: (() -> Unit)? = null,
+    /** The quiet verb's words: Try another slot, or the lobby's "Run it against bots from slot 5". */
+    val anotherLabel: String = Words.Mock.tryAnother,
     val copied: Boolean = false,
     val copy: (() -> Unit)? = null,
     /** A verb the API refused (Run it again), in its words, under the verbs. */
@@ -42,7 +44,7 @@ fun MockReportScreen(
     DraftReportScreen(report, CompanionActions(open = open), modifier, parts) {
         Verb(verbs.lead, onClick = verbs.run)
         Row(horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp)) {
-            verbs.another?.let { QuietButton(Words.Mock.tryAnother, onClick = it) }
+            verbs.another?.let { QuietButton(verbs.anotherLabel, onClick = it) }
             verbs.copy?.let { QuietButton(if (verbs.copied) Words.Mock.copied else Words.Mock.copyLink, onClick = it) }
         }
         verbs.refusal?.let { NoteText(it) }

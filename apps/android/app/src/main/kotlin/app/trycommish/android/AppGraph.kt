@@ -36,6 +36,13 @@ import app.trycommish.core.companion.NewCompanionViewModel
 import app.trycommish.core.leaguehome.ApiLeagueReads
 import app.trycommish.core.leaguehome.LeagueHomeViewModel
 import app.trycommish.core.leaguehome.LeagueReads
+import app.trycommish.core.lobby.ApiLobbyReads
+import app.trycommish.core.lobby.LobbyLandingViewModel
+import app.trycommish.core.lobby.LobbyReads
+import app.trycommish.core.lobby.LobbyReportViewModel
+import app.trycommish.core.lobby.LobbySeatMemory
+import app.trycommish.core.lobby.LobbyViewModel
+import app.trycommish.core.lobby.PrefsLobbySeats
 import app.trycommish.core.matchup.ApiMatchupReads
 import app.trycommish.core.matchup.MatchupReads
 import app.trycommish.core.matchup.MatchupViewModel
@@ -64,6 +71,7 @@ import app.trycommish.core.reference.CompareReader
 import app.trycommish.core.reference.ReferenceReads
 import app.trycommish.core.reference.RunScreenViewModel
 import app.trycommish.core.reference.ScheduleModel
+import app.trycommish.core.room.phoneRoomConnector
 import app.trycommish.core.shell.AccountReads
 import app.trycommish.core.shell.ApiAccountReads
 import app.trycommish.core.shell.FollowedLeague
@@ -95,6 +103,7 @@ import java.time.ZoneId
 
 private const val TAG = "Commish"
 private const val CLIP_LABEL = "Lineup"
+private const val LOBBY_PREFS = "commish_lobby"
 
 /**
  * The app's graph, built by hand (no DI framework, spec §6.2): one session, one transport, one cache,
@@ -255,6 +264,23 @@ class AppGraph(
 
     /** A shared mock by its link's code. */
     fun sharedMockViewModel(code: String): SharedMockViewModel = SharedMockViewModel(code, mocks, sessionEnd)
+
+    private val lobbies: LobbyReads by lazy { ApiLobbyReads(transport) }
+
+    /** The rooms the member joined, kept across a relaunch for the paired device. */
+    private val lobbySeats: LobbySeatMemory by lazy { PrefsLobbySeats(appContext.getSharedPreferences(LOBBY_PREFS, Context.MODE_PRIVATE)) }
+
+    /** One socket client for the app's life, so the room's affinity cookie carries across reconnects. */
+    private val roomConnector by lazy { phoneRoomConnector() }
+
+    /** The open house drafts under the setup, with the seats the paired device holds. */
+    fun lobbyLandingViewModel(): LobbyLandingViewModel = LobbyLandingViewModel(lobbies, lobbySeats, { session.deviceId }, sessionEnd)
+
+    /** A lobby room by its id: its read, then the room's socket. */
+    fun lobbyViewModel(id: String): LobbyViewModel = LobbyViewModel(id, lobbies, roomConnector, { session.token }, clock, sessionEnd)
+
+    /** A finished lobby's report. */
+    fun lobbyReportViewModel(id: String): LobbyReportViewModel = LobbyReportViewModel(id, lobbies, mocks, sessionEnd)
 
     /** Our record from the run, with the schedule its weeks are read by. */
     fun recordViewModel(): RecordViewModel = RecordViewModel(records, cache, clock, zone, sessionEnd)

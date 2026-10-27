@@ -6,12 +6,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -26,6 +29,7 @@ import app.trycommish.core.board.BoardChip
 import app.trycommish.core.mock.MockSetupForm
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
+import app.trycommish.design.QuietButton
 import app.trycommish.design.Tokens
 import app.trycommish.design.Verb
 import app.trycommish.design.Words
@@ -46,7 +50,9 @@ class MockSetupActions(
 /**
  * The setup (web/src/routes/mock/new at 390) for a mock against bots, the approved iOS screen's: the title,
  * the clocks, the scoring, the teams, your slot, the lineup, and the one verb pinned at the foot. `still` lays
- * the chip rows at rest (a snapshot's).
+ * the chip rows at rest (a snapshot's). `lobby` draws the open house drafts under the form and the quiet "Join a
+ * lobby with people" beside the verb, as the web's setup does; a join that asks for a handle draws its question
+ * at the top and scrolls to it.
  */
 @Composable
 fun MockSetupScreen(
@@ -54,14 +60,18 @@ fun MockSetupScreen(
     actions: MockSetupActions,
     modifier: Modifier = Modifier,
     still: Boolean = false,
+    lobby: LobbySetup? = null,
 ) {
     val c = CommishTheme.colors
+    val state = rememberScrollState()
+    LaunchedEffect(lobby?.asking) { if (lobby?.asking == true) state.animateScrollTo(0) }
     Column(modifier.background(c.bg)) {
-        val scroll = if (still) Modifier else Modifier.weight(1f).verticalScroll(rememberScrollState())
+        val scroll = if (still) Modifier else Modifier.weight(1f).verticalScroll(state)
         Column(
             scroll.fillMaxWidth().padding(vertical = Tokens.Space.s4.dp),
             verticalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp),
         ) {
+            if (lobby?.asking == true) LobbyHandleView(lobby)
             Text(
                 Words.Mock.setupTitle.uppercase(),
                 style = Faces.head.copy(fontSize = Faces.head.fontSize * DISPLAY_SCALE),
@@ -78,8 +88,9 @@ fun MockSetupScreen(
             ChipLine(Words.Mock.teams, form.teamChips, form.settings.teams, actions.teams, still)
             Slots(form, actions.slot)
             ChipLine(Words.Mock.lineup, form.lineupChips, form.settings.lineup, actions.lineup, still)
+            lobby?.takeIf { it.listed }?.let { LobbyListView(it) }
         }
-        Pin(form, actions.start)
+        Pin(form, actions.start, lobby)
     }
 }
 
@@ -127,6 +138,7 @@ private fun Slots(
 private fun Pin(
     form: MockSetupForm,
     start: () -> Unit,
+    lobby: LobbySetup?,
 ) {
     val c = CommishTheme.colors
     Column(
@@ -138,6 +150,9 @@ private fun Pin(
         verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp),
     ) {
         form.problem?.let { NoteText(it) }
-        Verb(Words.Mock.start, enabled = !form.busy, onClick = start)
+        Row(horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp), verticalAlignment = Alignment.CenterVertically) {
+            Verb(Words.Mock.start, Modifier.weight(1f), enabled = !form.busy, onClick = start)
+            lobby?.let { QuietButton(Words.Lobby.joinWithPeople, enabled = it.enabled && !form.busy, onClick = it.joinNearest) }
+        }
     }
 }

@@ -1,15 +1,22 @@
 package app.trycommish.android
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.trycommish.api.CommishJson
 import app.trycommish.api.models.Feature
 import app.trycommish.api.models.LeagueSettings
+import app.trycommish.api.models.LobbyFormat
 import app.trycommish.core.mock.MockRoomViewModel
 import app.trycommish.core.mock.MockSetupSeed
 import app.trycommish.core.mock.MockSetupViewModel
@@ -22,6 +29,7 @@ import app.trycommish.feature.mock.MockSetupActions
 import app.trycommish.feature.mock.MockSetupScreen
 import app.trycommish.feature.mock.SharedMockScreen
 import app.trycommish.feature.shell.LocalPlayerSheet
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
 
 /** The bar's Mock draft page (nav.ts MOCK_SETUP): the setup. */
@@ -58,35 +66,60 @@ fun settingsOf(arg: String?): LeagueSettings? =
         }
     }
 
-/** The setup in the bar's tab or pushed: its own view model per route; starting opens the room full screen. */
+/** The setup in the bar's tab or pushed: its own view model per route; starting opens the room full screen. Under
+ * its form the open house drafts (the web's /lobby is this page), read on appear and on a pull; a join opens the
+ * lobby full screen. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MockSetupTab(
     graph: AppGraph,
     route: ShellRoute.MockSetup,
     shell: ShellState,
     start: (String) -> Unit,
+    lobby: LobbyEntry,
 ) {
     val key = "mock-setup-${route.league}-${route.from?.hashCode()}"
     val vm: MockSetupViewModel = viewModel(key = key) { graph.mockSetupViewModel(route.from, mockSeed(shell, route.league)) }
     val form by vm.form.collectAsStateWithLifecycle()
+    val landing = lobby.landing
+    val scope = rememberCoroutineScope()
+    var pulling by remember { mutableStateOf(false) }
     LaunchedEffect(vm) { vm.load() }
+    LaunchedEffect(landing) { landing.load() }
     LaunchedEffect(form.started) {
         form.started?.let {
             vm.opened()
             start(it)
         }
     }
-    MockSetupScreen(
-        form,
-        MockSetupActions(
-            scoring = vm::choose,
-            teams = vm::chooseTeams,
-            slot = vm::chooseSlot,
-            lineup = vm::choose,
-            start = { vm.start() },
-        ),
-        Modifier.fillMaxSize(),
-    )
+    val join = { format: LobbyFormat -> scope.launch { landing.join(format)?.let(lobby.open) } }
+    PullToRefreshBox(
+        isRefreshing = pulling,
+        onRefresh = {
+            pulling = true
+            scope.launch {
+                landing.load()
+                pulling = false
+            }
+        },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        MockSetupScreen(
+            form,
+            MockSetupActions(
+                scoring = vm::choose,
+                teams = vm::chooseTeams,
+                slot = vm::chooseSlot,
+                lineup = vm::choose,
+                start = { vm.start() },
+            ),
+            Modifier.fillMaxSize(),
+            lobby =
+                lobbySetup(landing, form.settings, { join(it) }) { handle ->
+                    scope.launch { landing.saveHandle(handle)?.let(lobby.open) }
+                },
+        )
+    }
 }
 
 /** A shared draft pushed where its link was opened; running it opens the reader's own room. */

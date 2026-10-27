@@ -18,6 +18,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +37,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import app.trycommish.core.lobby.LobbyLandingViewModel
 import app.trycommish.core.phoneBar
 import app.trycommish.core.shell.FollowedLeague
 import app.trycommish.core.shell.LEAGUE_PAGE
@@ -64,6 +66,7 @@ import app.trycommish.feature.shell.NamedScreen
 import app.trycommish.feature.shell.PhoneTabBar
 import app.trycommish.feature.shell.TopBar
 import app.trycommish.feature.shell.TopBarActions
+import kotlinx.coroutines.launch
 
 /** Every page any bar opens (Rail.generated.kt), each its own route. */
 private val PAGES: List<RailItem> =
@@ -144,6 +147,10 @@ fun Shell(
     var switchOpen by chrome::switchOpen
     var query by chrome::query
     var mockRoom by chrome::mockRoom
+    var lobby by chrome::lobby
+    // The open house drafts, one list per account, shared by the setup that draws it and the lobby over it.
+    val lobbies: LobbyLandingViewModel = viewModel(key = "lobby-landing-$generation") { graph.lobbyLandingViewModel() }
+    val scope = rememberCoroutineScope()
     // Read from the collected state, so the bar follows every answer and choice.
     val bar = if (signedIn && state != ShellState.SignedOut) shell.bar() else phoneBar(null, null)
 
@@ -220,7 +227,7 @@ fun Shell(
         Scaffold(
             // Under the room full screen the shell is out of reach, to touch (the room takes it) and to a
             // screen reader.
-            modifier = if (mockRoom != null) Modifier.clearAndSetSemantics {} else Modifier,
+            modifier = if (chrome.covered) Modifier.clearAndSetSemantics {} else Modifier,
             containerColor = CommishTheme.colors.bg,
             topBar = {
                 if (signedIn) {
@@ -260,7 +267,21 @@ fun Shell(
                         nav,
                         state,
                         bar,
-                        PageVerbs(shell::open, openLineup, ::openTab, choose, link, openGame, ::push) { mockRoom = it },
+                        PageVerbs(
+                            shell::open,
+                            openLineup,
+                            ::openTab,
+                            choose,
+                            link,
+                            openGame,
+                            ::push,
+                            LobbyEntry(lobbies) {
+                                lobby =
+                                    OpenLobby(it)
+                            },
+                        ) {
+                            mockRoom = it
+                        },
                     )
                 }
                 if (switchOpen) {
@@ -292,13 +313,32 @@ fun Shell(
                 ),
             )
         }
+        lobby?.let { open ->
+            LobbyCover(
+                graph,
+                open,
+                lobbies,
+                LobbyCoverExits(
+                    show = { lobby = it },
+                    close = {
+                        lobby = null
+                        scope.launch { lobbies.load() }
+                    },
+                    solo = { id ->
+                        lobby = null
+                        mockRoom = id
+                    },
+                    open = { sheet.open(it) },
+                ),
+            )
+        }
         // Over a draft in progress the sheet has no Full page: one verb per screen, and the room has no page
         // stack to push it on; his page is reachable after the draft (Lane 214 review M3).
         PlayerSheetOver(
             graph,
             sheet,
             (state as? ShellState.Ready)?.selected,
-            openPlayer = if (mockRoom == null) ({ push(it) }) else null,
+            openPlayer = if (chrome.covered) null else ({ push(it) }),
         )
     }
 }
@@ -315,6 +355,8 @@ private class PageVerbs(
     val openGame: (leagueId: String, roster: Int?) -> Unit,
     /** A screen pushed on the tab in view. */
     val push: (ShellRoute) -> Unit,
+    /** The open house drafts under the setup, and a lobby opened full screen by its id. */
+    val lobby: LobbyEntry,
     /** A mock room opened full screen by its id. */
     val openRoom: (String) -> Unit,
 )
@@ -403,7 +445,7 @@ private fun Pages(
         composable(PLAYERS_PAGE) { RankingsTab(graph, state, query = "") }
         composable(RECORD_PAGE) { RecordTab(graph) }
         companion(graph, verbs.push)
-        mock(graph, state, verbs.openRoom)
+        mock(graph, state, verbs.openRoom, verbs.lobby)
         PAGES.filter { it.page !in LIVE_PAGES }.forEach { item ->
             composable(item.page) { NamedScreen(item.label) }
         }
@@ -471,8 +513,9 @@ private fun NavGraphBuilder.mock(
     graph: AppGraph,
     state: ShellState,
     openRoom: (String) -> Unit,
+    lobby: LobbyEntry,
 ) {
-    composable(MOCK_PAGE) { MockSetupTab(graph, ShellRoute.MockSetup(), state, openRoom) }
+    composable(MOCK_PAGE) { MockSetupTab(graph, ShellRoute.MockSetup(), state, openRoom, lobby) }
     val optional = { name: String ->
         navArgument(name) {
             type = NavType.StringType
@@ -485,7 +528,7 @@ private fun NavGraphBuilder.mock(
                 entry.arguments?.getString("league")?.takeIf { it.isNotEmpty() },
                 settingsOf(entry.arguments?.getString("from")),
             )
-        MockSetupTab(graph, route, state, openRoom)
+        MockSetupTab(graph, route, state, openRoom, lobby)
     }
     composable(Routes.SHARED_MOCK, listOf(navArgument("code") { type = NavType.StringType })) { entry ->
         entry.arguments?.getString("code")?.let { SharedMockTab(graph, it, openRoom) }

@@ -23,6 +23,7 @@ internal class ShellChrome(
     switchOpen: MutableState<Boolean>,
     query: MutableState<String>,
     mockRoom: MutableState<String?>,
+    lobby: MutableState<String?>,
     val sheet: PlayerSheetHost,
 ) {
     var tab by tab
@@ -32,13 +33,42 @@ internal class ShellChrome(
     /** The mock room open full screen over the shell (its id), its bars hidden while drafting. */
     var mockRoom by mockRoom
 
-    /** Nothing of the last member's: the League tab, the switch shut, no letters, no room, no sheet. */
+    /** The lobby open full screen over the shell: its room, or its report once the member reads it
+     * ([OpenLobby.key]). */
+    private var lobbyKey by lobby
+
+    var lobby: OpenLobby?
+        get() = lobbyKey?.let(OpenLobby::of)
+        set(value) {
+            lobbyKey = value?.key
+        }
+
+    /** A room or a lobby is full screen over the shell: its bars out of reach. */
+    val covered: Boolean get() = mockRoom != null || lobbyKey != null
+
+    /** Nothing of the last member's: the League tab, the switch shut, no letters, no room or lobby, no sheet. */
     fun reset() {
         tab = LEAGUE_PAGE
         switchOpen = false
         query = ""
         mockRoom = null
+        lobbyKey = null
         sheet.close()
+    }
+}
+
+/** A lobby the app opens full screen, by its id; `report` once the member reads its report. Kept for a
+ * rotation as its key, "id" or "id/report". */
+internal data class OpenLobby(
+    val id: String,
+    val report: Boolean = false,
+) {
+    val key: String get() = if (report) "$id$REPORT" else id
+
+    companion object {
+        private const val REPORT = "/report"
+
+        fun of(key: String): OpenLobby = OpenLobby(key.removeSuffix(REPORT), key.endsWith(REPORT))
     }
 }
 
@@ -49,6 +79,7 @@ internal fun rememberShellChrome(): ShellChrome =
         rememberSaveable { mutableStateOf(LEAGUE_PAGE) },
         rememberSaveable { mutableStateOf(false) },
         rememberSaveable { mutableStateOf("") },
+        rememberSaveable { mutableStateOf<String?>(null) },
         rememberSaveable { mutableStateOf<String?>(null) },
         remember { PlayerSheetHost() },
     )

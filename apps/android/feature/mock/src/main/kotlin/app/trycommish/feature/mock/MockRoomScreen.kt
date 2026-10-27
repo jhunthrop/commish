@@ -191,9 +191,14 @@ private fun MoreMenu(
 private val MORE_HEIGHT = 44.dp
 private val MORE_PAD = 11.dp
 
-/** The room's top bar full screen: the close that asks first, and the page's name. */
+/** The room's top bar full screen: the close (the mock's asks first; the lobby's keeps the seat, so it does not),
+ * the page's name, and the lobby's quiet Leave while its room still takes people. */
 @Composable
-internal fun RoomTop(close: () -> Unit) {
+internal fun RoomTop(
+    close: () -> Unit,
+    closeLabel: String = AppWords.mockClose,
+    leave: (() -> Unit)? = null,
+) {
     val c = CommishTheme.colors
     Row(
         Modifier
@@ -204,11 +209,15 @@ internal fun RoomTop(close: () -> Unit) {
     ) {
         Icon(
             painterResource(R.drawable.icon_close),
-            contentDescription = AppWords.mockClose,
+            contentDescription = closeLabel,
             tint = c.ink,
             modifier = Modifier.clickable(role = Role.Button, onClick = close).padding(Tokens.Space.s3.dp).size(CLOSE_SIDE),
         )
         Text(AppWords.mock, style = Faces.body.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+        leave?.let {
+            Spacer(Modifier.weight(1f))
+            QuietButton(Words.Lobby.leave, onClick = it)
+        }
     }
 }
 
