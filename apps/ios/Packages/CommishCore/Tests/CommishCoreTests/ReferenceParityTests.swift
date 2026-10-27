@@ -39,6 +39,27 @@ struct ReferenceParityTests {
         case notLoaded(String)
     }
 
+    /// A game by its club and week.
+    static func at(_ abbr: String, _ week: Int) -> String {
+        "\(abbr) \(week)"
+    }
+
+    /// The current week's game words by club and week, in the fixtures' zone.
+    static func states(_ run: Run) -> [String: String] {
+        Dictionary(uniqueKeysWithValues: run.states.map { (at($0.abbr, $0.week), $0.word) })
+    }
+
+    @Test func theContractRunSaysItsCurrentWeeksStatesTheStandInNone() throws {
+        let runs = try Self.parity().runs
+        #expect(runs.filter { $0.fixture.hasSuffix("standin-run") }
+            .allSatisfy { $0.states.isEmpty && $0.current == nil })
+        let contract = try #require(runs.first { !$0.fixture.hasSuffix("standin-run") })
+        #expect(contract.current?.week == 6)
+        #expect(Set(contract.states.map(\.word)) == [Words.Kickoff.final, Words.Kickoff.kickedOff])
+        // A played bye's club says its code alone (KC's week 5 before the week 7 board).
+        #expect(contract.clubs.clubs.first { $0.abbr == "KC" }?.meta == "KC")
+    }
+
     @Test func adpDrawsTheWebsRowsInTheDraftersOrderWithItsBasis() async throws {
         for run in try Self.parity().runs {
             for want in run.adp {
@@ -252,6 +273,12 @@ struct ReferenceParityTests {
                 #expect(model.games.map(\.opponent) == want.games.map(\.opponent))
                 #expect(model.games.map(\.value) == want.games.map(\.value))
                 #expect(model.games.map(\.played) == want.games.map(\.played), "\(want.abbr)")
+                let states = Self.states(run)
+                #expect(model.games.map(\.state) == model.games.map { states[Self.at(want.abbr, $0.week)] })
+                #expect(model.asOf == run.asOf, "\(want.abbr)")
+                #expect(model.meta == want.meta, "\(want.abbr)")
+                #expect(model.boardHead == run.clubHead.board, "\(want.abbr)")
+                #expect(model.boardLabel == "\(model.name), \(run.clubHead.board)", "\(want.abbr)")
                 #expect(model.rows.map(\.id) == want.rows, "\(want.abbr)")
                 #expect(model.market.map(\.id) == want.market, "\(want.abbr)")
                 #expect(model.columns == .ranked(gap: want.gap))
@@ -267,8 +294,11 @@ struct ReferenceParityTests {
         for run in try Self.parity().runs {
             let (reads, _) = Self.reads(run)
             let files = try await ClubFiles.read(reads, sources: false)
-            let model = ScheduleModel(files)
+            let model = ScheduleModel(files, zone: Fixtures.zone)
             let want = run.schedule
+            let states = Self.states(run)
+            #expect(model.grid.current == run.current?.week)
+            #expect(model.grid.asOf == run.asOf)
             #expect(model.grid.lead == want.lead)
             #expect(model.grid.strengthLabel == want.strengthLabel)
             #expect(model.grid.played == want.played)
@@ -284,6 +314,7 @@ struct ReferenceParityTests {
                 #expect(row.cells.map(\.value) == wanted.cells.map(\.value))
                 #expect(row.cells.map(\.hard) == wanted.cells.map(\.hard))
                 #expect(row.cells.map(\.played) == wanted.cells.map(\.played), "\(wanted.abbr)")
+                #expect(row.cells.map(\.state) == row.cells.map { states[Self.at(row.abbr, $0.week)] }, "\(row.abbr)")
                 let opponents = wanted.cells.map { cell in
                     cell.opponent.map { "\(cell.home ? Words.ClubPage.home : Words.ClubPage.away) \($0)" }
                 }

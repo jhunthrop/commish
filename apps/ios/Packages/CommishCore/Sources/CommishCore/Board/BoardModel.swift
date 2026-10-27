@@ -99,8 +99,8 @@ public struct BoardRow: Equatable, Sendable, Identifiable {
     /// "WR 4", "RB IR", "DST".
     public let pill: String
     public let club: String
-    /// "Bye 11", "Bye Done" once it is before the week a rest-of-season board ranks from; nil when the
-    /// run names no bye for his club.
+    /// "Bye week 11" while it is ahead of the week a rest-of-season board ranks from; nil once played or
+    /// when the run names no bye for his club.
     public let bye: String?
     public let status: RowStatus?
     /// His projected points, the row's one big number; the empty figure for a kicker or a defense.

@@ -154,16 +154,32 @@ public struct BoardRowView: View {
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(theme.color(Tokens.Color.ink))
-            HStack(spacing: 6) {
-                PositionPill(row.pill)
-                clubChip(theme)
-                if let bye = row.bye {
-                    Text(bye).modifier(Small(theme: theme))
+            // "Bye week 11" beside his club where the line holds it whole, else on its own line under
+            // them, never broken in two (the web's phone line wraps the same way).
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    PositionPill(row.pill)
+                    clubChip(theme)
+                    bye(theme)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        PositionPill(row.pill)
+                        clubChip(theme)
+                    }
+                    bye(theme)
                 }
             }
             if let status = row.status {
                 Pill(status.mark, tone: status.sits ? .loss : .quiet)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func bye(_ theme: Theme) -> some View {
+        if let bye = row.bye {
+            Text(bye).modifier(Small(theme: theme)).lineLimit(1).fixedSize()
         }
     }
 

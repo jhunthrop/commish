@@ -19,7 +19,7 @@ public struct ClubLead: Equatable, Sendable {
 public struct ClubCard: Equatable, Sendable, Identifiable {
     public let abbr: String
     public let name: String
-    /// "ARI · bye week 14".
+    /// "ARI · Bye week 14", "KC" once the bye is played.
     public let meta: String
     public let strength: StrengthFigure?
     public let lead: ClubLead?
@@ -62,9 +62,12 @@ public struct ClubPageModel: Equatable, Sendable {
     public let stamp: String
     public let hero: ClubHero?
     public let basis: [String]
-    /// "On our PPR board".
+    /// "On our PPR board" on the run's rows, "On our rest-of-season order" once the order's stand
+    /// (Lane 223, Lane 220's D2): the head names what the basis beside it names.
     public let boardHead: String
-    /// "Nobody from Arizona is on this board", nil where the board has some.
+    /// The section's spoken label, "Detroit Lions, On our PPR board", following the head.
+    public let boardLabel: String
+    /// "Nobody from Arizona is on this board" (or "in this order"), nil where the rows have some.
     public let nobody: String?
     public let columns: BoardColumns
     public let rows: [BoardRow]
@@ -73,6 +76,8 @@ public struct ClubPageModel: Equatable, Sendable {
     public let scheduleCaption: String
     public let scheduleHeads: [String]
     public let games: [ClubGame]
+    /// The line under the games naming the run's read, nil without a current week.
+    public let asOf: String?
     /// The verb that sets its two best available players side by side, nil with fewer than two.
     public let compare: ClubCompare?
     public let clubsLink: String
@@ -96,6 +101,11 @@ public struct ScheduleGridModel: Equatable, Sendable {
     public let strengthLabel: String?
     /// The last complete week: its heads are set back.
     public let played: Int
+    /// The week whose cells say the run's game state, the grid opening on it; nil out of season or
+    /// where the run carries no states (Lane 223, B187).
+    public let current: Int?
+    /// "Week 6's games as of Wed Oct 21, 7:00 am Central.": the run's read, said once under the grid.
+    public let asOf: String?
     public let rows: [ScheduleGridRow]
 }
 
@@ -167,10 +177,6 @@ struct ClubFiles: Sendable {
         BoardCells(statuses: statuses, byes: [:], fromWeek: format.rosFromWeek, zone: zone)
     }
 
-    func meta(_ club: RunClub) -> String {
-        "\(club.abbr) · \(Words.ClubPage.byeWeek) \(club.bye.map(String.init) ?? Words.ClubPage.byeNotSet)"
-    }
-
     func captureWords(now: Date, zone: TimeZone) -> String? {
         capture?.value.map { BoardWords.capture(asOf: $0.readAt, checkedAt: $0.checkedAt, now: now, zone: zone) }
     }
@@ -240,8 +246,7 @@ extension ClubPageModel {
         }
         let gap = format.rosFromWeek == nil && shown.contains { $0.1.gap != nil }
         let scheduled = ScheduleViews.club(
-            club, schedule: files.schedule.value, clubs: files.clubs.value, played: files.played,
-            underway: files.underway
+            club, schedule: files.schedule.value, clubs: files.clubs.value, at: files.season(zone: zone)
         )
         self.abbr = club.abbr
         name = "\(club.city) \(club.nickname)"
@@ -258,8 +263,10 @@ extension ClubPageModel {
                 + (files.captureWords(now: now, zone: zone).map { [$0] } ?? []),
             order: order, atClock: placed != nil, zone: zone
         )
-        boardHead = filled(Words.ClubPage.onBoard, format.label)
-        nobody = own.isEmpty ? filled(Words.ClubPage.nobody, club.city) : nil
+        let head = ClubFiles.head(format, atClock: placed != nil)
+        boardHead = head.title
+        boardLabel = "\(name), \(head.title)"
+        nobody = own.isEmpty ? filled(head.nobody, club.city) : nil
         columns = .ranked(gap: gap)
         rows = shown.map { cells.ranked($0.0, figures: $0.1) }
         marketHead = Words.ClubPage.kickers
@@ -267,6 +274,7 @@ extension ClubPageModel {
         scheduleCaption = scheduled.caption
         scheduleHeads = [Words.ClubPage.week, Words.ClubPage.opponent, Words.ClubPage.expectedWins]
         games = scheduled.games
+        asOf = scheduled.asOf
         let pair = Array(own.filter { !BoardOrder.heldOut($0, files.statuses) }.prefix(2))
         compare = pair.count == 2
             ? ClubCompare(label: Words.ClubPage.comparePair, ids: pair.map(\.id), slugs: pair.map(\.slug)) : nil
@@ -275,11 +283,10 @@ extension ClubPageModel {
 }
 
 extension ScheduleModel {
-    init(_ files: ClubFiles) {
+    init(_ files: ClubFiles, zone: TimeZone) {
         let schedule = files.schedule.value
         grid = ScheduleViews.grid(
-            schedule, clubs: files.clubs.value, rows: files.board.value.rows, played: files.played,
-            underway: files.underway
+            schedule, clubs: files.clubs.value, rows: files.board.value.rows, at: files.season(zone: zone)
         )
         heading = "\(schedule.season) \(Words.SchedulePage.heading)"
         stamp = RunWords.stamp(files.manifest.value)
@@ -362,7 +369,11 @@ public extension RunScreenViewModel where Model == ScheduleModel {
             reads: RunReads(run: run, pages: pages, cache: cache, clock: clock), zone: zone, onSignedOut: onSignedOut
         ) { reads in
             let files = try await ClubFiles.read(reads, sources: false)
-            return BuiltScreen(model: ScheduleModel(files), manifest: files.manifest.value, reads: files.marks)
+            return BuiltScreen(
+                model: ScheduleModel(files, zone: zone),
+                manifest: files.manifest.value,
+                reads: files.marks
+            )
         }
     }
 }

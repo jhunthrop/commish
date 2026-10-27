@@ -1,6 +1,8 @@
 import Board
 import CommishCore
 import CommishDesign
+import CoreText
+import Foundation
 import SwiftUI
 
 /// The grid's phone sizes (ScheduleGrid.svelte at 390): the club's column with its rank leading and
@@ -10,7 +12,44 @@ enum GridSize {
     static let strength: Double = 48
     static let week: Double = 64
     static let row: Double = 52
+    /// A row whose current week's cell says its game's state on a third line (Lane 223, B187).
+    static let stateRow: Double = 62
     static let head: Double = 34
+    /// The state line's size and weight, which the current week's column is measured in.
+    static let stateSize = Tokens.TypeScale.xs
+    static let stateWeight = FaceWeight.medium
+
+    /// The row's height: taller where the grid says the current week's states.
+    static func row(_ grid: ScheduleGridModel) -> Double {
+        grid.current == nil ? row : stateRow
+    }
+
+    /// A week's column: the current one as wide as the longest state its cells say (a kickoff,
+    /// "Sun 12:00 pm CT", whole with its zone), with a margin each side, never narrower than a week's.
+    static func width(_ week: Int, in grid: ScheduleGridModel, rows: [ScheduleGridRow]) -> Double {
+        guard week == grid.current else {
+            return Self.week
+        }
+        let words = rows.flatMap(\.cells).filter { $0.week == week }.compactMap(\.state)
+        let widest = words.map(measured).max() ?? 0
+        return max(Self.week, (widest + 2 * Tokens.Space.s2).rounded(.up))
+    }
+
+    /// The words' width in the state line's face, as CoreText lays them out.
+    static func measured(_ words: String) -> Double {
+        guard let font = Faces.ctFont(.ui, size: stateSize, weight: stateWeight) else {
+            // The system face where ours did not register: a generous character width.
+            return Double(words.count) * stateSize * 0.6
+        }
+        let text = NSAttributedString(string: words, attributes: [kCTFontAttributeName as NSAttributedString.Key: font])
+        let line = CTLineCreateWithAttributedString(text)
+        return CTLineGetTypographicBounds(line, nil, nil, nil)
+    }
+
+    /// Where the weeks open: the current week at the leading edge, the weeks before it scrolled past.
+    static func opening(_ grid: ScheduleGridModel) -> Double {
+        grid.current.map { Double(max(0, $0 - 1)) * week } ?? 0
+    }
 }
 
 /// The pinned columns of a club's row: its rank, its lead player's face, its name opening its page with
@@ -19,6 +58,7 @@ struct GridClubCell: View {
     @Environment(\.colorScheme) private var colorScheme
     let row: ScheduleGridRow
     let strength: Bool
+    let height: Double
     let open: (String) -> Void
 
     var body: some View {
@@ -60,17 +100,20 @@ struct GridClubCell: View {
             }
         }
         .padding(.horizontal, Tokens.Space.s2)
-        .frame(height: GridSize.row)
+        .frame(height: height)
         .background(theme.color(Tokens.Color.bg))
         .overlay(alignment: .bottom) { Hairline() }
     }
 }
 
 /// A week's cell: the opponent at or against and his value, shaded among the strongest, set back once
-/// played, opening the opponent's page; the bye's word.
+/// played, opening the opponent's page, and in the current week the run's state of the game under
+/// them; the bye's word.
 struct GridWeekCell: View {
     @Environment(\.colorScheme) private var colorScheme
     let cell: ScheduleCell
+    let width: Double
+    let height: Double
     let open: (String) -> Void
 
     var body: some View {
@@ -88,6 +131,14 @@ struct GridWeekCell: View {
                             .monospacedDigit()
                             .foregroundStyle(cell.played ? ink : theme
                                 .color(cell.hard ? Tokens.Color.ink2 : Tokens.Color.ink))
+                        if let state = cell.state {
+                            Text(state)
+                                .font(Faces.font(.ui, size: GridSize.stateSize, weight: GridSize.stateWeight))
+                                .monospacedDigit()
+                                .lineLimit(1)
+                                .fixedSize()
+                                .foregroundStyle(theme.color(cell.played ? Tokens.Color.playedInk : Tokens.Color.ink2))
+                        }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
@@ -99,7 +150,7 @@ struct GridWeekCell: View {
                     .foregroundStyle(theme.color(cell.played ? Tokens.Color.playedInk : Tokens.Color.ink3))
             }
         }
-        .frame(width: GridSize.week, height: GridSize.row)
+        .frame(width: width, height: height)
         .background(cell.hard ? theme.color(Tokens.Color.surface2) : theme.color(Tokens.Color.bg))
         .overlay(alignment: .bottom) { Hairline() }
     }
@@ -128,17 +179,21 @@ struct ScheduleGridView: View {
                 .frame(height: GridSize.head)
                 .overlay(alignment: .bottom) { Hairline() }
                 ForEach(rows) { row in
-                    GridClubCell(row: row, strength: grid.strengthLabel != nil, open: open)
+                    GridClubCell(row: row, strength: grid.strengthLabel != nil, height: GridSize.row(grid), open: open)
                 }
             }
             .overlay(alignment: .trailing) { theme.color(Tokens.Color.line).frame(width: 1) }
             if live {
-                ScrollView(.horizontal, showsIndicators: true) { weeks(theme) }
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: true) { weeks(theme) }
+                        .onAppear { scrollToCurrent(proxy) }
+                        .onChange(of: grid.current) { scrollToCurrent(proxy) }
+                }
             } else {
-                // Still: the first weeks the frame holds, the rest cut at its edge.
+                // Still: the weeks the frame holds from the one it opens on, the rest cut at its edge.
                 Color.clear
-                    .frame(height: GridSize.head + GridSize.row * Double(rows.count))
-                    .overlay(alignment: .topLeading) { weeks(theme) }
+                    .frame(height: GridSize.head + GridSize.row(grid) * Double(rows.count))
+                    .overlay(alignment: .topLeading) { weeks(theme).offset(x: -GridSize.opening(grid)) }
                     .clipped()
             }
         }
@@ -152,27 +207,51 @@ struct ScheduleGridView: View {
         "\(Words.SchedulePage.week) \(week)"
     }
 
+    /// The grid opens on the current week, and on a newer run's week once it is read in place.
+    private func scrollToCurrent(_ proxy: ScrollViewProxy) {
+        if let current = grid.current {
+            proxy.scrollTo(current, anchor: .leading)
+        }
+    }
+
     private func weeks(_ theme: Theme) -> some View {
-        VStack(spacing: 0) {
+        let height = GridSize.row(grid)
+        let widths = Dictionary(uniqueKeysWithValues: grid.weeks.map { ($0, GridSize.width($0, in: grid, rows: rows)) })
+        return VStack(spacing: 0) {
             HStack(spacing: 0) {
                 ForEach(grid.weeks, id: \.self) { week in
                     Text(Self.head(week))
                         .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
                         .textCase(.uppercase)
                         .foregroundStyle(theme.color(week <= grid.played ? Tokens.Color.playedInk : Tokens.Color.ink3))
-                        .frame(width: GridSize.week, height: GridSize.head)
+                        .frame(width: widths[week] ?? GridSize.week, height: GridSize.head)
+                        .id(week)
                 }
             }
             .overlay(alignment: .bottom) { Hairline() }
             ForEach(rows) { row in
                 HStack(spacing: 0) {
                     ForEach(row.cells) { cell in
-                        GridWeekCell(cell: cell, open: open)
+                        GridWeekCell(cell: cell, width: widths[cell.week] ?? GridSize.week, height: height, open: open)
                     }
                 }
             }
         }
         .fixedSize()
+    }
+}
+
+/// The line under the current week's games naming the run's read, so a state is never claimed live.
+struct AsOfLine: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let words: String
+
+    var body: some View {
+        Text(words)
+            .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
+            .foregroundStyle(Theme(colorScheme).color(Tokens.Color.ink3))
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -219,6 +298,9 @@ public struct ScheduleScreen: View {
             BasisText(model.caption).padding(.horizontal, Tokens.Space.s3)
             ScheduleGridView(grid: model.grid, rows: rows ?? model.grid.rows, open: actions.club, live: live)
                 .padding(.horizontal, Tokens.Space.s3)
+            if let asOf = model.grid.asOf {
+                AsOfLine(words: asOf).padding(.horizontal, Tokens.Space.s3)
+            }
             ScheduleLegend(model: model)
         }
         .padding(.vertical, Tokens.Space.s4)

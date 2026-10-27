@@ -17,8 +17,13 @@ import Testing
 /// stale with its reason. At the order's clock (Lane 224), the one-value stand-in
 /// (shared/fixtures/one-value-run) at the fixture's Sunday: a club's hero, basis and players (CHI) and
 /// Compare with Swift and Washington, each once the order the Rankings read has answered and while it is
-/// unread. A face draws its initials (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also
-/// written at its phone's own scale for the persona panel.
+/// unread. Game day (Lane 232, B224, the web's Lane 223): a club in season whose bye is played (KC,
+/// its code alone, week 6's states after the opponents and the run's read under them), Compare's Bye row
+/// with both byes ahead, one played, and both played (the row gone, the run's clubs read with both
+/// byes before week 7), and the grid opening on week 6 as read on its Sunday morning (the Thursday game
+/// Final, every other game still to come, each saying its kickoff). A face draws its initials (a
+/// snapshot loads no image). With SNAPSHOT_SHOTS set each is also written at its phone's own scale for
+/// the persona panel.
 @MainActor
 struct ReferenceSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -42,9 +47,18 @@ struct ReferenceSnapshotTests {
         /// Compare's pair at the order's clock, and with the order unread.
         case compareClock = "compare-clock"
         case compareUnread = "compare-clock-unread"
+        /// Game day: a club whose bye is played, Compare's Bye row in its three states, upcoming games.
+        case clubInSeason = "club-inseason"
+        case compareByeAhead = "compare-bye-ahead"
+        case compareByePlayed = "compare-bye-played"
+        case compareByeGone = "compare-bye-gone"
+        case scheduleUpcoming = "schedule-upcoming"
 
         var inSeason: Bool {
-            [.adpInSeason, .compareAbsent, .schedule, .stale].contains(self)
+            [
+                .adpInSeason, .compareAbsent, .schedule, .stale, .clubInSeason, .compareByeAhead, .compareByePlayed,
+                .compareByeGone, .scheduleUpcoming,
+            ].contains(self)
         }
 
         /// The scenes over the one-value stand-in, read or unread.
@@ -119,10 +133,14 @@ struct ReferenceSnapshotTests {
         let slugs: (String?, String?) = switch scene {
         case .compareTwo: ("ja-marr-chase", "rome-odunze")
         case .compareClock, .compareUnread: ("d-andre-swift", "parker-washington")
+        case .compareByeAhead, .compareByeGone: ("josh-allen", "josh-jacobs")
+        case .compareByePlayed: ("josh-allen", "jahmyr-gibbs")
         default: ("jahmyr-gibbs", "nobody")
         }
+        let run: any RunAPI = scene == .compareByeGone
+            ? PlayedByes(base: StubRun(scene.fixture), clubs: ["BUF": 5, "GB": 6]) : StubRun(scene.fixture)
         return try await loaded(RunScreenViewModel.compare(
-            slugs: [slugs.0, slugs.1], run: StubRun(scene.fixture), pages: StubPages(scene.fixture),
+            slugs: [slugs.0, slugs.1], run: run, pages: StubPages(scene.fixture),
             cache: cache(), clock: FixedClock(scene.now), zone: zone, orders: scene.orders
         ))
     }
@@ -147,8 +165,14 @@ struct ReferenceSnapshotTests {
                 model: model, stamp: stamp, actions: .none, format: { _ in }, rows: Array(model.rows.prefix(12)),
                 live: false
             )
-        case .compareTwo, .compareAbsent, .compareClock, .compareUnread:
+        case .compareTwo, .compareAbsent, .compareClock, .compareUnread, .compareByeAhead, .compareByePlayed,
+             .compareByeGone:
             try await CompareScreen(model: compare(scene), stamp: nil, actions: .none, live: false)
+        case .clubInSeason:
+            let model = try await loaded(RunScreenViewModel.club(
+                "kc", run: run, pages: pages, cache: cache(), clock: clock, zone: zone
+            ))
+            ClubScreen(model: model, stamp: nil, actions: .none, parts: [.hero, .board, .schedule])
         case .clubClock, .clubUnread:
             try await ClubScreen(model: clockClub(scene), stamp: nil, actions: .none, parts: [.hero, .board])
         case .clubs:
@@ -161,9 +185,10 @@ struct ReferenceSnapshotTests {
                 "cin", run: run, pages: pages, cache: cache(), clock: clock, zone: zone
             ))
             ClubScreen(model: model, stamp: nil, actions: .none)
-        case .schedule:
+        case .schedule, .scheduleUpcoming:
             let model = try await loaded(RunScreenViewModel.schedule(
-                run: run, pages: pages, cache: cache(), clock: clock, zone: zone
+                run: run, pages: scene == .scheduleUpcoming ? UpcomingWeek(base: pages) : pages, cache: cache(),
+                clock: clock, zone: zone
             ))
             ScheduleScreen(
                 model: model,
@@ -204,11 +229,46 @@ struct ReferenceSnapshotTests {
         for scene in [Scene.clubClock, .clubUnread] {
             let model = try await Self.clockClub(scene)
             #expect(model.atClock == (scene == .clubClock), "\(scene)")
+            // The head names the rows' basis: the order's once its rows stand, the run's board before.
+            let head = scene == .clubClock ? Words.ClubOrder.onOrder : "On our PPR board"
+            #expect(model.boardHead == head, "\(scene)")
+            #expect(model.boardLabel == "\(model.name), \(head)", "\(scene)")
         }
         for scene in [Scene.compareClock, .compareUnread] {
             let model = try await Self.compare(scene)
             #expect(model.atClock == (scene == .compareClock), "\(scene)")
         }
+    }
+
+    @Test func theGameDayScenesAreTheStatesTheyName() async throws {
+        let byeRow = { (scene: Scene) async throws -> [String]? in
+            guard case let .table(table) = try await Self.compare(scene).outcome else {
+                return nil
+            }
+            return table.rows.first { $0.label == Words.Board.bye }?.cells.map(\.text)
+        }
+        #expect(try await byeRow(.compareByeAhead) == ["7", "11"])
+        #expect(try await byeRow(.compareByePlayed)?.contains("") == true)
+        #expect(try await byeRow(.compareByeGone) == nil)
+        let club = try await Self.loaded(RunScreenViewModel.club(
+            "kc", run: StubRun(.contract), pages: StubPages(.contract), cache: Self.cache(),
+            clock: FixedClock(Self.inSeason), zone: Self.zone
+        ))
+        #expect(club.meta == "KC")
+        #expect(club.asOf == "Week 6's games as of Wed Oct 21, 7:00 am Central.")
+        #expect(club.games.contains { $0.state == Words.Kickoff.kickedOff })
+        let upcoming = try await Self.loaded(RunScreenViewModel.schedule(
+            run: StubRun(.contract), pages: UpcomingWeek(base: StubPages(.contract)), cache: Self.cache(),
+            clock: FixedClock(Self.inSeason), zone: Self.zone
+        ))
+        let words = Set(upcoming.grid.rows.flatMap(\.cells).compactMap(\.state))
+        #expect(upcoming.grid.current == 6)
+        #expect(words.contains(Words.Kickoff.final))
+        #expect(words.contains { $0.hasSuffix(" CT") })
+        // The current week's column holds its longest kickoff whole with its zone.
+        let widest = words.map(GridSize.measured).max() ?? 0
+        #expect(GridSize.width(6, in: upcoming.grid, rows: upcoming.grid.rows) >= widest + 2 * Tokens.Space.s2)
+        #expect(GridSize.width(5, in: upcoming.grid, rows: upcoming.grid.rows) == GridSize.week)
     }
 
     @Test func theAbsentSceneSaysTheWebsWordsOverItsSearch() async throws {
@@ -219,5 +279,92 @@ struct ReferenceSnapshotTests {
 
     enum SceneError: Error {
         case notLoaded(String)
+    }
+}
+
+extension RunRead {
+    /// A fresh read's value changed, an unchanged read as it is.
+    func mapped(_ change: (Value) -> Value) -> RunRead<Value> {
+        switch self {
+        case let .fresh(value, tag): .fresh(change(value), tag: tag)
+        case .unchanged: self
+        }
+    }
+}
+
+/// The run's clubs with some byes set (a club's abbreviation to its week), every other route the run's:
+/// Compare's Bye row with both byes played, which the fixture's four players cannot draw.
+struct PlayedByes: RunAPI {
+    let base: StubRun
+    let clubs: [String: Int]
+
+    func manifest(tag: String?) async throws -> RunRead<RunManifest> {
+        try await base.manifest(tag: tag)
+    }
+
+    func board(format: String, tag: String?) async throws -> RunRead<RunBoardAnswer> {
+        try await base.board(format: format, tag: tag)
+    }
+
+    func adpSources(tag: String?) async throws -> RunRead<[RunAdpSource]> {
+        try await base.adpSources(tag: tag)
+    }
+
+    func designations(tag: String?) async throws -> RunRead<RunDesignations?> {
+        try await base.designations(tag: tag)
+    }
+
+    func clubs(tag: String?) async throws -> RunRead<[RunClub]> {
+        let byes = clubs
+        return try await base.clubs(tag: tag).mapped { clubs in
+            clubs.map { club in
+                var club = club
+                club.bye = byes[club.abbr] ?? club.bye
+                return club
+            }
+        }
+    }
+}
+
+/// The run's pages with its schedule's current week read as on its Sunday morning: the Thursday game
+/// Final, every game that had kicked off still to come, so each cell says its kickoff (Lane 231's
+/// schedule-upcoming scene).
+struct UpcomingWeek: RunPagesAPI {
+    let base: StubPages
+    static let week = 6
+
+    func index(tag: String?) async throws -> RunRead<[RunIndexEntry]> {
+        try await base.index(tag: tag)
+    }
+
+    func page(id: String, tag: String?) async throws -> RunRead<RunPlayerAnswer> {
+        try await base.page(id: id, tag: tag)
+    }
+
+    func held(tag: String?) async throws -> RunRead<[RunHeldPage]?> {
+        try await base.held(tag: tag)
+    }
+
+    func heldCopy(id: String, tag: String?) async throws -> RunRead<RunPlayer> {
+        try await base.heldCopy(id: id, tag: tag)
+    }
+
+    func schedule(tag: String?) async throws -> RunRead<RunSchedule> {
+        try await base.schedule(tag: tag).mapped { schedule in
+            var schedule = schedule
+            schedule.slates = schedule.slates.map { slate in
+                var slate = slate
+                slate.games = slate.games.map { game in
+                    guard game.week == Self.week, game.state?.value1 == .kickedOff else {
+                        return game
+                    }
+                    var game = game
+                    game.state = .init(value1: .upcoming, value2: "upcoming")
+                    return game
+                }
+                return slate
+            }
+            return schedule
+        }
     }
 }
