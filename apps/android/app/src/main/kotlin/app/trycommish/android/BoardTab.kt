@@ -65,7 +65,7 @@ fun BoardTab(
                 // The sheet's verb here is Compare, with him on one side (shelf-state.ts compareOffer).
                 open = { sheet.open(it, SheetOffer.compare(it, link)) },
                 format = { vm.choose(it) },
-                position = vm::choose,
+                position = { vm.choose(it) },
                 refresh = { vm.load() },
                 openPage = link,
             ),

@@ -68,11 +68,11 @@ public struct RecordRow: Equatable, Sendable, Identifiable {
     public let lead: String
     /// The status words, capitalized: "Set Thu Oct 22, 1:00 pm Central, graded Wed Oct 28".
     public let text: String
-    /// The order the week graded: "Our weekly rankings, set Oct 22", "Our preseason order".
+    /// The order the week graded: "Our rest-of-season order, set Oct 22", "Our preseason order".
     public let order: String?
     public let graded: Bool
     /// A graded week's line under its lead on a phone, its order and when it was graded with the set
-    /// date said once: "Our weekly rankings, set Oct 22, graded Wed Oct 28"; nil off a graded week.
+    /// date said once: "Our rest-of-season order, set Oct 22, graded Wed Oct 28"; nil off a graded week.
     public let caption: String?
     /// The players graded at All, nil off a graded week.
     public let players: String?

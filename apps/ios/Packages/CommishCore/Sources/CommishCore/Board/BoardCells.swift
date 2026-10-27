@@ -61,17 +61,61 @@ struct BoardCells {
         )
     }
 
-    /// A player on a season-long list at the order's clock: the list's word in his pill and no figure,
-    /// as the Rankings draw him (the order values none for him, and the run's are another clock's).
-    func listed(_ row: RunBoardRow) -> BoardRow {
-        let drawn = ranked(row)
+    /// A row the order places at its clock, with the order's figures: his status the order's own row's
+    /// first (`said`), else the run's (Lane 243 fix round 1, M2), and a season-long list's word in his
+    /// rank's place, as the web's Rankings say such a row (order.ts orderView's # cell,
+    /// `listed ? box.status.rank`).
+    func placed(_ row: RunBoardRow, figures: PlacedFigures, said: HeldStatus?) -> BoardRow {
+        let drawn = ranked(row, figures: figures)
+        guard let status = said?.status else {
+            return drawn
+        }
+        let label = BoardPosition(rawValue: row.positionName)?.label ?? row.positionName
+        let rank = status.rank ?? String(figures.positionRank)
+        let gap = status.onList ? nil : figures.gap
         return BoardRow(
-            id: drawn.id, name: drawn.name, initials: drawn.initials, headshot: drawn.headshot, pill: drawn.pill,
-            club: drawn.club, bye: drawn.bye, status: drawn.status, projected: Words.Box.none,
-            overReplacement: Words.Box.none, heat: .none, gap: Words.Box.none, gapTone: nil,
-            draftOrder: drawn.draftOrder, adp: drawn.adp, sheetPlayer: drawn.sheetPlayer,
+            id: drawn.id, name: drawn.name, initials: drawn.initials, headshot: drawn.headshot,
+            pill: "\(label) \(rank)", club: drawn.club, bye: drawn.bye, status: status,
+            projected: drawn.projected, overReplacement: drawn.overReplacement, heat: drawn.heat,
+            gap: BoardFigures.gap(gap), gapTone: GapTone(gap), draftOrder: drawn.draftOrder, adp: drawn.adp,
+            sheetPlayer: SheetPlayer(
+                id: row.id, slug: row.slug, name: row.name, position: label, rank: rank, club: row.team,
+                boardID: row.id
+            ),
             clubMark: drawn.clubMark
         )
+    }
+
+    /// A player drawn after the order's ranked rows at its clock: one on a season-long list, or one the
+    /// order holds with no figure (Lane 243, B251). His status's word in his pill (`said`: the order's
+    /// own row's, else the run's; "--" with neither) and no figure, as the Rankings draw him (the order
+    /// values none for him, and the run's are another clock's).
+    func listed(_ row: RunBoardRow, said: HeldStatus?) -> BoardRow {
+        let drawn = ranked(row)
+        let label = BoardPosition(rawValue: row.positionName)?.label ?? row.positionName
+        let word = said?.word ?? Words.Box.none
+        return BoardRow(
+            id: drawn.id, name: drawn.name, initials: drawn.initials, headshot: drawn.headshot,
+            pill: "\(label) \(word)", club: drawn.club, bye: drawn.bye, status: said?.status,
+            projected: Words.Box.none, overReplacement: Words.Box.none, heat: .none, gap: Words.Box.none,
+            gapTone: nil, draftOrder: drawn.draftOrder, adp: drawn.adp,
+            sheetPlayer: SheetPlayer(
+                id: row.id, slug: row.slug, name: row.name, position: label, rank: word, club: row.team,
+                boardID: row.id
+            ),
+            clubMark: drawn.clubMark
+        )
+    }
+
+    /// The run's status for a row drawn after the order's, with its short word; nil where the run lists
+    /// none.
+    func held(_ id: String) -> HeldStatus? {
+        guard let status = statuses[id], let view = BoardStatus.view(status, zone: zone),
+              let known = status.status.value1
+        else {
+            return nil
+        }
+        return HeldStatus(status: view, word: view.rank ?? RowStatuses.rankWord(known))
     }
 
     /// A kicker or a defense: on the board his place is his Draft order column, so his pill is his
@@ -108,6 +152,25 @@ struct BoardCells {
     }
 }
 
+/// What a row drawn after the order's ranked rows says of his status: the chip, and the short word his
+/// pill carries in his rank's place ("IR", "O").
+struct HeldStatus: Equatable, Sendable {
+    let status: RowStatus
+    let word: String
+
+    /// The status the order's own row carries (box.ts statusOf), nil with none.
+    static func of(_ line: PlayerLine, zone: TimeZone) -> HeldStatus? {
+        let designation = line.facts.designation?.value1
+        let hostIR = line.player.injuredReserve
+        guard let status = RowStatuses.of(designation, hostIR: hostIR, zone: zone),
+              let word = status.rank ?? RowStatuses.rankWord(of: designation, hostIR: hostIR)
+        else {
+            return nil
+        }
+        return HeldStatus(status: status, word: word)
+    }
+}
+
 /// His status as the board row's chip says it (status-view.ts statusView): a season-long list's word in
 /// place of his rank and its start, a week's designation, or due back this week.
 enum BoardStatus {
@@ -125,5 +188,32 @@ enum BoardStatus {
         let mark = status.returning.map { "Due back \(RowStatuses.calendarDay($0, weekday: true))" }
             ?? RowStatuses.word(known)
         return RowStatus(rank: nil, mark: mark, sits: RowStatuses.sits(known), question: known == .questionable)
+    }
+}
+
+/// The order's places for a board of `teams`, every row it returned by board id, placed or not, and
+/// whether its answer is cut (it holds more players than it returned).
+struct ClockPlaces {
+    let places: [String: LivePlace]
+    let teams: Int
+    let rows: [String: OrderRow]
+    let cut: Bool
+    let zone: TimeZone
+
+    /// The status the order's own row carries for a board id, nil with none or no row.
+    func said(_ id: String) -> HeldStatus? {
+        rows[id].flatMap { HeldStatus.of($0.line, zone: zone) }
+    }
+
+    /// The order's places for the board `format`, nil for an answer in another scoring.
+    init?(_ order: OrderAtClock, format: RunFormat, zone: TimeZone) {
+        guard LiveOrder.inScoring(order.answer, format: format) else {
+            return nil
+        }
+        places = order.places
+        teams = format.teams
+        rows = order.rows
+        cut = LiveOrder.cut(order.answer)
+        self.zone = zone
     }
 }

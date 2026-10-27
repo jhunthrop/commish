@@ -1,6 +1,7 @@
 package app.trycommish.core.liveorder
 
 import app.trycommish.api.decodeEnvelope
+import app.trycommish.api.models.DesignationStatus
 import app.trycommish.api.models.RunDesignationsAnswer
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
@@ -29,6 +30,11 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
@@ -152,7 +158,12 @@ class OneValueTest {
                     .filter { it != swift },
                 model.rows.map { it.id },
             )
-            val short = reads.board(reads.order(StubOrderSearch(rows = { it.take(SHORT_READ) })))
+            assertFalse(model.basis.any { it.startsWith("The first") }, "an answer the order did not cut says no count")
+            // A cut answer: the view holds more players than the rows it returned.
+            val whole = reads.order()
+            val cut = whole.answer.copy(rows = whole.answer.rows.take(SHORT_READ))
+            assertTrue(cut.total > cut.rows.size)
+            val short = reads.board(OrderAtClock(whole.body, cut, whole.landed))
             val total =
                 reads
                     .run()
@@ -216,6 +227,167 @@ class OneValueTest {
                     .rows
                     .map { it.id },
             )
+        }
+
+    @Test
+    fun `a player put on IR after the nightly is drawn placed with the list's word, as the API answers him`() =
+        runTest {
+            val swift = reads.players.first().text("id")
+            assertFalse(
+                reads
+                    .run()
+                    .designations
+                    ?.players
+                    .orEmpty()
+                    .containsKey(swift),
+                "the run's capture does not list him",
+            )
+            val listing = OneValueFixture.listing(swift)
+            val place = requireNotNull(listing.places[swift]) { "the order places him" }
+            assertNull(place.positionRank, "the API keeps his figures and drops his place at his position")
+            val all = reads.board(listing)
+            assertTrue(all.atClock)
+            assertEquals(ids().sorted(), all.rows.map { it.id }.sorted(), "every player is drawn, once")
+            val row = all.rows.single { it.id == swift }
+            assertEquals("RB ${Words.DesignationRank.injured_reserve}", row.pill, "the list's word, as the Rankings' # cell says it")
+            assertEquals(Words.DesignationRank.injured_reserve, row.status?.rank)
+            assertEquals(BoardFigures.projected(place.projected), row.projected, "placed, so the order's figures")
+            val at = all.rows.indexOf(row)
+            assertTrue(
+                all.rows
+                    .withIndex()
+                    .filter { it.value.status == null }
+                    .all { it.index < at },
+                "after every available player",
+            )
+            assertFalse(all.basis.any { it.startsWith("The first") }, "a whole answer says no count")
+        }
+
+    @Test
+    fun `a player the order returns with no figure is drawn after the ranked rows with the order's word`() =
+        runTest {
+            val swift = reads.players.first().text("id")
+            val unvalued = OneValueFixture.unvalued(swift, DesignationStatus.injured_reserve)
+            assertNull(unvalued.places[swift], "the order holds his row with no figure")
+            assertNotNull(unvalued.rows[swift])
+            val all = reads.board(unvalued)
+            assertEquals(ids().sorted(), all.rows.map { it.id }.sorted(), "every player is drawn, once")
+            val last = all.rows.last()
+            assertEquals(swift, last.id, "he follows the order's ranked rows")
+            assertEquals("RB ${Words.DesignationRank.injured_reserve}", last.pill)
+            assertEquals(Words.Box.none, last.projected)
+            assertEquals(Words.Box.none, last.overReplacement)
+            assertFalse(all.basis.any { it.startsWith("The first") }, "a whole answer says no count")
+            val backs = reads.board(unvalued, BoardPosition.RunningBack)
+            assertEquals(Words.Board.heldHead, backs.sections.last().head)
+            assertEquals(
+                listOf(swift),
+                backs.sections
+                    .last()
+                    .rows
+                    .map { it.id },
+            )
+        }
+
+    @Test
+    fun `a row the order returns with no status falls back to the run's word, else to the dash, never under the list's head`() =
+        runTest {
+            val swift = reads.players.first().text("id")
+            val unvalued = OneValueFixture.unvalued(swift, null)
+            val out = listing(swift, "out", seasonLong = false)
+            assertEquals(
+                "RB ${Words.DesignationRank.out}",
+                reads
+                    .board(unvalued, read = out)
+                    .rows
+                    .single { it.id == swift }
+                    .pill,
+            )
+            assertEquals(
+                "RB ${Words.Box.none}",
+                reads
+                    .board(unvalued)
+                    .rows
+                    .single { it.id == swift }
+                    .pill,
+            )
+            val backs = reads.board(unvalued, BoardPosition.RunningBack, out)
+            assertTrue(backs.sections.none { section -> section.head == Words.Board.heldHead && section.rows.any { it.id == swift } })
+            val tail = backs.sections.last()
+            assertNull(tail.head, "a row on no list sits after the order's rows with no head")
+            assertEquals(listOf(swift), tail.rows.map { it.id })
+        }
+
+    @Test
+    fun `the fixture's players with no figure and no status never sit under the list's head`() =
+        runTest {
+            // James Cook: the shared Sunday order returns him with no figure and no status.
+            val order = reads.order()
+            val cook = order.answer.rows.single { it.line.player.name == COOK }
+            assertNull(cook.restOfSeasonPoints)
+            assertNull(cook.line.facts.designation)
+            val id = requireNotNull(cook.line.player.boardId)
+            val read = withRunRow(id, COOK, cook.line.player.team)
+            val backs = reads.board(order, BoardPosition.RunningBack, read)
+            assertTrue(backs.sections.none { section -> section.head == Words.Board.heldHead && section.rows.any { it.id == id } })
+            val tail = backs.sections.last()
+            assertNull(tail.head)
+            assertEquals(listOf(id), tail.rows.map { it.id })
+            assertEquals("RB ${Words.Box.none}", tail.rows.single().pill)
+            val all = reads.board(order, read = read)
+            assertEquals(id, all.rows.last().id)
+            assertEquals(
+                all.rows.size,
+                all.rows
+                    .map { it.id }
+                    .distinct()
+                    .size,
+                "no player drawn twice",
+            )
+        }
+
+    @Test
+    fun `a board id the order repeats keeps its first row`() =
+        runTest {
+            val order = reads.order()
+            val first = order.answer.rows.first()
+            val twin = first.copy(rank = order.answer.rows.size + 1, restOfSeasonPoints = null)
+            val rows = LiveOrder.rows(order.answer.copy(rows = order.answer.rows + twin))
+            assertEquals(first, rows[first.line.player.boardId])
+        }
+
+    @Test
+    fun `a position chip reads the order again from the share's window on`() =
+        runTest {
+            val clock = MovingClock(reads.now)
+            val search = StubOrderSearch()
+            val vm =
+                BoardViewModel(
+                    StubRunReads(RunFixture.OneValue),
+                    MemoryCache(),
+                    clock,
+                    reads.zone,
+                    inSeason = true,
+                    following = false,
+                    sessionEnd = SessionEnd {},
+                    orders = OrderReader(OrderShare(search, clock)),
+                )
+            vm.load().join()
+            assertEquals(1, search.routes.size)
+            clock.at = clock.at.plusSeconds(WITHIN_WINDOW)
+            assertNull(vm.choose(BoardPosition.Receiver), "inside the window the held order redraws")
+            assertEquals(1, search.routes.size)
+            clock.at = reads.now.plus(OrderShare.WINDOW)
+            val atWindow = requireNotNull(vm.choose(BoardPosition.Receiver)) { "at exactly the window the chip reads again" }
+            atWindow.join()
+            assertEquals(2, search.routes.size, "a held order 60 s old is read again")
+            clock.at = clock.at.plusSeconds(PAST_WINDOW)
+            val reread = requireNotNull(vm.choose(BoardPosition.RunningBack)) { "past the window the chip reads again" }
+            reread.join()
+            assertEquals(3, search.routes.size, "a held order 61 s old is read again")
+            val model = (vm.state.value as BoardState.Loaded).model
+            assertTrue(model.atClock)
+            assertTrue(model.rows.all { it.pill.startsWith("RB ") })
         }
 
     @Test
@@ -315,17 +487,47 @@ class OneValueTest {
             assertNotNull(orders.readOrNull())
         }
 
-    /** The stand-in's read with one player on injured reserve, the season-long list. */
-    private fun listing(id: String): RunBoardRead {
+    /** The stand-in's read with one player under `status` in the run's capture, injured reserve (the
+     * season-long list) unless named. */
+    private fun listing(
+        id: String,
+        status: String = "injured_reserve",
+        seasonLong: Boolean = true,
+    ): RunBoardRead {
         val fixture = RunFixture.OneValue
         val designations =
             """{"ok":true,"data":{"run_id":"${fixture.runId}","designations":{"readAt":"2026-10-14T02:03:35.613Z","checkedAt":null,""" +
-                """"source":"stand-in","players":{"$id":{"status":"injured_reserve","seasonLong":true,""" +
+                """"source":"stand-in","players":{"$id":{"status":"$status","seasonLong":$seasonLong,""" +
                 """"since":"2026-10-12T19:00:00.000Z"}}}},"error":null,"request_id":"fixture"}"""
         decodeEnvelope<RunDesignationsAnswer>(designations)
         val bodies = fixture.bodies(reads.PPR)
         return RunBoardRead.of(bodies.copy(designations = KeptBody(designations, null)))
     }
+
+    /** The stand-in's read with one more RB on its board: D'Andre Swift's run row under another id. */
+    private fun withRunRow(
+        id: String,
+        name: String,
+        team: String,
+    ): RunBoardRead {
+        val bodies = RunFixture.OneValue.bodies(reads.PPR)
+        val envelope = Json.parseToJsonElement(bodies.board.body).jsonObject
+        val data = envelope.getValue("data").jsonObject
+        val rows = data.getValue("rows").jsonArray
+        val swift =
+            rows
+                .first {
+                    it.jsonObject
+                        .getValue("id")
+                        .jsonPrimitive.content == reads.players.first().text("id")
+                }.jsonObject
+        val added = JsonObject(swift + mapOf("id" to JsonPrimitive(id), "name" to JsonPrimitive(name), "team" to JsonPrimitive(team)))
+        val board = JsonObject(envelope + ("data" to JsonObject(data + ("rows" to JsonArray(rows + added)))))
+        return RunBoardRead.of(bodies.copy(board = KeptBody(board.toString(), null)))
+    }
+
+    /** The parity's Board ids: every run row the order places. */
+    private fun ids(): List<String> = reads.parity.obj("board").strings("ids")
 
     private fun kotlinx.serialization.json.JsonElement.boardId(): String? =
         jsonObject
@@ -338,5 +540,8 @@ class OneValueTest {
 
     private companion object {
         const val SHORT_READ = 40
+        const val WITHIN_WINDOW = 30L
+        const val PAST_WINDOW = 61L
+        const val COOK = "James Cook"
     }
 }

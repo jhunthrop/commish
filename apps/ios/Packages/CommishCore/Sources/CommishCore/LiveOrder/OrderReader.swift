@@ -16,6 +16,11 @@ public struct OrderAtClock: Equatable, Sendable {
         LiveOrder.places(answer)
     }
 
+    /// Every row it returns by board id, placed or not.
+    public var rows: [String: OrderRow] {
+        LiveOrder.rows(answer)
+    }
+
     /// When it was read (live-board.ts answerReadAt): the league's read when it says one, else the
     /// screen's clock as it landed.
     public var readAt: Date {
@@ -81,7 +86,11 @@ public actor OrderMemo {
 /// Our order read at a screen's clock (Lane 224), shared through the memo: the in-season pages' read with
 /// no league (GET /order, the API's most rows, the byes in their places as the web's
 /// live-order-read.ts reads it, so a bye club's players are within the rows and the number is the
-/// web's), and the Rankings' own reads (`read(_:)`, the byes last as their page asks). The order ranks
+/// web's), and the Rankings' own reads (`read(_:)`, the byes last as their page asks). The two never
+/// share one answer: the Rankings number the byes last (`byes=last`, the week's byes section, Lane 163
+/// D06) and read a hundred rows at a time, while the screens read the byes in their places and the
+/// API's most rows, so neither query is a superset of the other and each keeps its own clock within the
+/// window (Lane 243, B251, the Lane 226 review's L1). The order ranks
 /// more players than one read gives, so a screen that draws a club's or a pair's players reads them by
 /// their club or name (`search`), as the web's club page and Compare do; the API numbers every row
 /// before the search, so a match keeps his place. The route answers with no ETag, so an answer is
