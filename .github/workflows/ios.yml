@@ -27,8 +27,23 @@ on:
         type: boolean
         default: false
 
+# One run per commit. A push or a dispatch on a branch is keyed on the branch (ref_name), a pull
+# request on its number; on either a newer run cancels the older one. Main is never cancelled: each
+# main run has a group of its own (main-<run id>), so a later push to main can neither cancel it nor
+# replace it while it waits. A shared main group would not do: with cancel-in-progress off a newer
+# run still cancels the pending one (run 40311055577 on b98d92a77 was cancelled that way on
+# 2026-10-26), and the queue key that would hold them in order (queue: max) is not yet known to
+# actionlint (1.7.12). Main runs therefore run side by side, each one whole; iOS uploads nothing that
+# could overlap until the TestFlight key exists. Pull request runs sit in their own groups, so a
+# skipped duplicate (the changes job's if) never cancels the push run it duplicates. A record run
+# (the record_snapshots dispatch) sits in its own group, so a verify push and a record run on one
+# branch never cancel each other. A dispatched verify run shares the branch's verify group with the
+# pushes: the newer of the two cancels the older, so the newest head of the branch wins.
 concurrency:
-  group: ios-${{ github.ref }}
+  group: >-
+    ios-${{ github.ref == 'refs/heads/main' && format('main-{0}', github.run_id)
+    || github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number)
+    || format('branch-{0}-{1}', inputs.record_snapshots && 'record' || 'verify', github.ref_name) }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
@@ -54,8 +69,62 @@ env:
   XCODEGEN_SHA256: 4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806
 
 jobs:
+  # What the push or the pull request changed, on a Linux runner, so no macOS runner waits on it. The
+  # simulator job runs when a file under apps/ios other than the generated spec copy changed, or this
+  # workflow did; a spec-only change (an API lane's regeneration) or a shared-only change is checked
+  # by the packages job, which builds CommishAPI against the spec and runs the package tests on the
+  # shared fixtures. Main and a run by hand always run the simulator job; so does any change the diff
+  # cannot be read for (fail closed). The decision is printed as a notice either way. A branch is
+  # judged whole, from its merge base with main to its head, never by one push: a spec-only push
+  # after a Swift commit still runs the simulator job, so a branch head is never green over Swift the
+  # simulator has not built. Known risk, accepted: the app target (Commish/, CommishTests/) uses
+  # generated types directly and only the simulator job compiles it, so a spec-only change that
+  # renames or drops a case those files use passes the branch and fails main's app job after the merge.
+  # A pull request from a branch of this repository is skipped here, with every job after it: push
+  # runs on every branch, so the push run already tests it. A pull request from a fork (no push run
+  # here) runs.
+  changes:
+    name: What changed
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      simulator: ${{ steps.decide.outputs.simulator }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Does the simulator job run
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          AFTER: ${{ github.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          SPEC_COPY: apps/ios/Packages/CommishAPI/Sources/CommishAPI/openapi.yaml
+        run: |
+          runs() {
+            echo "simulator=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::The simulator job runs: $1"
+            exit 0
+          }
+          [ "$EVENT" = workflow_dispatch ] && runs "a run by hand is a whole run"
+          [ "$REF" = refs/heads/main ] && runs "main is the merge gate"
+          if [ "$EVENT" = pull_request ]; then
+            range="$PR_BASE...HEAD"
+          else
+            base="$(git merge-base origin/main "$AFTER")" || runs "no base to diff $AFTER against"
+            range="$base..$AFTER"
+          fi
+          files="$(git diff --name-only "$range")" || runs "the diff $range could not be read"
+          swift="$(printf '%s\n' "$files" | grep -E '^(apps/ios/|\.github/workflows/ios\.yml$)' | grep -vxF "$SPEC_COPY" || true)"
+          [ -n "$swift" ] && runs "$range changes $(printf '%s\n' "$swift" | head -3 | paste -sd ' ' -) (first three)"
+          echo "simulator=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::The simulator job is skipped: $range changes no file under apps/ios but the generated spec copy, and not this workflow. The packages job builds CommishAPI against the spec."
+
   packages:
     name: Packages, snapshots and style
+    needs: changes
     runs-on: macos-26
     defaults: { run: { working-directory: apps/ios } }
     steps:
@@ -115,8 +184,9 @@ jobs:
   app:
     name: App build and tests on a simulator
     runs-on: macos-26
-    needs: packages
-    if: ${{ !inputs.record_snapshots }}
+    needs: [changes, packages]
+    # Skipped by name in the run (never absent) on a branch change with no Swift in it; see changes.
+    if: ${{ !inputs.record_snapshots && needs.changes.outputs.simulator == 'true' }}
     defaults: { run: { working-directory: apps/ios } }
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
