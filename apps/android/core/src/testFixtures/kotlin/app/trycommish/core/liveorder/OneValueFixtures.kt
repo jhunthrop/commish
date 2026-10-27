@@ -2,6 +2,9 @@ package app.trycommish.core.liveorder
 
 import app.trycommish.api.ApiFailure
 import app.trycommish.api.decodeEnvelope
+import app.trycommish.api.models.DesignationStatus
+import app.trycommish.api.models.InjuryDesignation
+import app.trycommish.api.models.OrderRow
 import app.trycommish.api.models.PlayerWeek
 import app.trycommish.core.player.PlayerWeekReads
 import app.trycommish.core.rankings.OrderQuery
@@ -44,6 +47,32 @@ object OneValueFixture {
         val body = RankingsFixtures.order("-all", CLOCK)
         return OrderAtClock(body, decodeEnvelope(body), now)
     }
+
+    /** The whole read with one player put on injured reserve after the nightly (Lane 243, B251): the
+     * order returns his row with no points, no value and no rank, and the list's status, which the run's
+     * capture does not hold. */
+    fun missing(id: String): OrderAtClock {
+        val order = order()
+        val rows = order.answer.rows.map { row -> if (row.line.player.boardId == id) reserve(row) else row }
+        return OrderAtClock(order.body, order.answer.copy(rows = rows), order.landed)
+    }
+
+    /** The moment the list's status is read, after the nightly and before the Sunday clock. */
+    private const val RESERVE_READ = "2026-10-18T18:00:00Z"
+
+    private fun reserve(row: OrderRow): OrderRow =
+        row.copy(
+            restOfSeasonPoints = null,
+            pointsOverReplacement = null,
+            line =
+                row.line.copy(
+                    positionRank = null,
+                    facts =
+                        row.line.facts.copy(
+                            designation = InjuryDesignation(DesignationStatus.injured_reserve, RESERVE_READ, seasonLong = true),
+                        ),
+                ),
+        )
 
     /** The parity the screens are held to. */
     val parity: JsonObject by lazy { Json.parseToJsonElement(File(root, "parity/one-value.json").readText()).jsonObject }

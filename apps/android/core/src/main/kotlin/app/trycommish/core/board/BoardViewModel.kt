@@ -14,6 +14,7 @@ import app.trycommish.core.Format
 import app.trycommish.core.SessionEnd
 import app.trycommish.core.liveorder.OrderAtClock
 import app.trycommish.core.liveorder.OrderReader
+import app.trycommish.core.liveorder.OrderShare
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.UnknownHostException
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 
@@ -93,6 +95,9 @@ class BoardViewModel(
      * a read that failed. */
     private var order: OrderAtClock? = null
 
+    /** A chip's read of the order, past the share's window. */
+    private var reread: Job? = null
+
     private class Shown(
         val format: String?,
         val read: RunBoardRead,
@@ -144,10 +149,18 @@ class BoardViewModel(
         return load()
     }
 
-    /** A position chip: the same board in another view, with no read. */
-    fun choose(position: BoardPosition?) {
+    /** A position chip: the same board in another view, with no read of the run. The order held redraws
+     * it only inside the share's window by the screen's clock (Lane 243, B251); one older is dropped, the
+     * run's view drawn, and the order read again through the share, so a board left open never draws an
+     * order of any age. The re-read's job, null where none is made. */
+    fun choose(position: BoardPosition?): Job? {
         mutableFilter.value = mutableFilter.value.copy(position = position)
+        val stale = order?.let { Duration.between(it.landed, clock.now()) >= OrderShare.WINDOW } == true
+        if (stale) order = null
         shown?.let { show(it.read, it.stamp, it.stale) }
+        if (!stale) return null
+        reread?.cancel()
+        return viewModelScope.launch { readOrder() }.also { reread = it }
     }
 
     /** The format's saved read at once when nothing of it is shown, then the run's routes, each naming its

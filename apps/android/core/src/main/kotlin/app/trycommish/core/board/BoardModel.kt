@@ -1,5 +1,6 @@
 package app.trycommish.core.board
 
+import app.trycommish.api.models.OrderRow
 import app.trycommish.api.models.RunBoardAnswer
 import app.trycommish.api.models.RunBoardRow
 import app.trycommish.api.models.RunFormat
@@ -70,9 +71,9 @@ sealed interface BoardColumns {
  * heading, the run's stamp and, in season, the weeks it ranks; the format and position chips; the view's
  * rows in the run's order, a position's in its tiers with their cliffs; and the basis once. In season,
  * once the order the in-season pages read (GET /order) answers, the view is the order's: the run's rows
- * it places, in its order with its figures (as far as its read reaches, the count said once), a
- * position's with no tiers (they are the run's), the players on a season-long list after them with the
- * list's word, and the order's lead under the heading and in the board sentence's place; until then the
+ * it places, in its order with its figures (as far as its read reaches, the count said once when the
+ * answer is cut), a position's with no tiers (they are the run's), the players it does not place after
+ * them (on a season-long list, or returned with no figure) with their status's word, and the order's lead under the heading and in the board sentence's place; until then the
  * run's rows stand and the basis says the run's day and time (Lane 226, LiveOrder).
  */
 data class BoardModel(
@@ -111,8 +112,11 @@ data class BoardModel(
             val statuses = read.designations?.players.orEmpty()
             val cells = BoardCells(statuses, BoardCells.byes(read.clubs), format.rosFromWeek, zone)
             val ranksRest = inSeason && format.rosFromWeek != null
-            val places = order?.takeIf { ranksRest && LiveOrder.inScoring(it.answer, format) }?.places
-            val view = viewRows(board, position, statuses, cells, format.unit, places?.let { ClockPlaces(it, format.teams) })
+            val clock =
+                order
+                    ?.takeIf { ranksRest && LiveOrder.inScoring(it.answer, format) }
+                    ?.let { ClockPlaces(it.places, format.teams, it.rows, LiveOrder.cut(it.answer), zone) }
+            val view = viewRows(board, position, statuses, cells, format.unit, clock)
             val draftOrder = position?.draftOrder == true
             val columns = if (draftOrder) BoardColumns.DraftOrder else BoardColumns.Ranked(format.rosFromWeek == null && view.carriesGap)
             val said =
@@ -185,16 +189,23 @@ private class ViewRows(
     val reach: Pair<Int, Int>? = null,
 )
 
-/** The order's places for a board of `teams`. */
+/** The order's places for a board of `teams`, every row it returned by board id, placed or not, and
+ * whether its answer is cut (it holds more players than it returned). */
 private class ClockPlaces(
     val places: Map<String, LivePlace>,
     val teams: Int,
+    val rows: Map<String, OrderRow>,
+    val cut: Boolean,
+    val zone: ZoneId,
 )
 
 /** A ranked view at the order's clock: the rows the order places, in its order with its figures, a
- * position's as one run with no tiers, then the view's players on a season-long list with the list's
- * word and no figure; the rows its read does not reach are not drawn, so no row of the run's clock
- * stands among them. Null where the read places none of the view's rows. */
+ * position's as one run with no tiers, then the view's players it does not place, in the run's order with
+ * no figure: those on a season-long list and those the order returns with no figure (a player put on a
+ * list after the nightly, Lane 243, B251), each with the word of the order's own row's status, else the
+ * run's, else "--", as the Rankings draw him. The rows its read does not reach are not drawn, so no row
+ * of the run's clock stands among them, and the count is said only when the answer is truly cut. Null
+ * where the read places none of the view's rows. */
 private fun atClock(
     drawn: List<Placed<RunBoardRow>>,
     position: BoardPosition?,
@@ -209,8 +220,8 @@ private fun atClock(
         BoardOrder
             .withStatuses(drawn, statuses)
             .map { it.row }
-            .filter { BoardOrder.heldOut(it.id, statuses) && it.id !in clock.places }
-            .map(cells::listed)
+            .filter { it.id !in clock.places && (BoardOrder.heldOut(it.id, statuses) || it.id in clock.rows) }
+            .map { row -> cells.listed(row, clock.rows[row.id]?.let { HeldStatus.of(it.line, clock.zone) } ?: cells.held(row.id)) }
     val sections =
         if (position == null) {
             listOf(BoardSection("all", null, null, rows + listed))
@@ -219,7 +230,8 @@ private fun atClock(
                 listOfNotNull(BoardSection("${position.id}-held", Words.Board.heldHead, null, listed).takeIf { listed.isNotEmpty() })
         }
     val shown = rows.size + listed.size
-    return ViewRows(sections, carriesGap = false, atClock = true, reach = (shown to drawn.size).takeIf { shown < drawn.size })
+    val reach = (shown to drawn.size).takeIf { clock.cut && shown < drawn.size }
+    return ViewRows(sections, carriesGap = false, atClock = true, reach = reach)
 }
 
 /** All in the run's order, a ranked position in its tiers then its season-long list, a kicker's or a

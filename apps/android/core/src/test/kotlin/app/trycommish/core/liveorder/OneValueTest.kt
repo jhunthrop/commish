@@ -152,7 +152,12 @@ class OneValueTest {
                     .filter { it != swift },
                 model.rows.map { it.id },
             )
-            val short = reads.board(reads.order(StubOrderSearch(rows = { it.take(SHORT_READ) })))
+            assertFalse(model.basis.any { it.startsWith("The first") }, "an answer the order did not cut says no count")
+            // A cut answer: the view holds more players than the rows it returned.
+            val whole = reads.order()
+            val cut = whole.answer.copy(rows = whole.answer.rows.take(SHORT_READ))
+            assertTrue(cut.total > cut.rows.size)
+            val short = reads.board(OrderAtClock(whole.body, cut, whole.landed))
             val total =
                 reads
                     .run()
@@ -216,6 +221,81 @@ class OneValueTest {
                     .rows
                     .map { it.id },
             )
+        }
+
+    @Test
+    fun `a player the order returns with no points and on IR the run does not list is drawn after the ranked rows`() =
+        runTest {
+            val swift = reads.players.first().text("id")
+            assertFalse(
+                reads
+                    .run()
+                    .designations
+                    ?.players
+                    .orEmpty()
+                    .containsKey(swift),
+                "the run's capture does not list him",
+            )
+            val missing = OneValueFixture.missing(swift)
+            assertNull(missing.places[swift], "the order holds his row with no figure")
+            assertNotNull(missing.rows[swift])
+            val all = reads.board(missing)
+            assertTrue(all.atClock)
+            assertEquals(
+                reads.parity
+                    .obj("board")
+                    .strings("ids")
+                    .toSet(),
+                all.rows.map { it.id }.toSet(),
+                "every player is drawn",
+            )
+            val last = all.rows.last()
+            assertEquals(swift, last.id, "he follows the order's ranked rows")
+            assertEquals("RB ${Words.DesignationRank.injured_reserve}", last.pill)
+            assertEquals(Words.Box.none, last.projected)
+            assertEquals(Words.Box.none, last.overReplacement)
+            assertEquals(Words.DesignationRank.injured_reserve, last.status?.rank)
+            assertFalse(all.basis.any { it.startsWith("The first") }, "a whole answer says no count")
+            val backs = reads.board(missing, BoardPosition.RunningBack)
+            assertEquals(Words.Board.heldHead, backs.sections.last().head)
+            assertEquals(
+                listOf(swift),
+                backs.sections
+                    .last()
+                    .rows
+                    .map { it.id },
+            )
+            assertFalse(backs.basis.any { it.startsWith("The first") })
+        }
+
+    @Test
+    fun `a position chip past the share's window reads the order again`() =
+        runTest {
+            val clock = MovingClock(reads.now)
+            val search = StubOrderSearch()
+            val vm =
+                BoardViewModel(
+                    StubRunReads(RunFixture.OneValue),
+                    MemoryCache(),
+                    clock,
+                    reads.zone,
+                    inSeason = true,
+                    following = false,
+                    sessionEnd = SessionEnd {},
+                    orders = OrderReader(OrderShare(search, clock)),
+                )
+            vm.load().join()
+            assertEquals(1, search.routes.size)
+            clock.at = clock.at.plusSeconds(WITHIN_WINDOW)
+            assertNull(vm.choose(BoardPosition.Receiver), "inside the window the held order redraws")
+            assertEquals(1, search.routes.size)
+            clock.at = reads.now.plusSeconds(PAST_WINDOW)
+            val reread = requireNotNull(vm.choose(BoardPosition.RunningBack)) { "past the window the chip reads again" }
+            reread.join()
+            assertEquals(2, search.routes.size, "a held order 61 s old is read again")
+            val model = (vm.state.value as BoardState.Loaded).model
+            assertTrue(model.atClock)
+            assertTrue(model.rows.all { it.pill.startsWith("RB ") })
         }
 
     @Test
@@ -338,5 +418,7 @@ class OneValueTest {
 
     private companion object {
         const val SHORT_READ = 40
+        const val WITHIN_WINDOW = 30L
+        const val PAST_WINDOW = 61L
     }
 }
