@@ -101,7 +101,12 @@ class BoardSnapshotTest(
     @Test
     fun board() {
         // Each scene drawn at its own height: the first screen's room, or the table's run mid-list.
-        paparazzi.unsafeUpdateConfig(deviceConfig = phone.config, renderingMode = RenderingMode.SHRINK)
+        // The clock scenes grow to their basis, so the order's lead and the run's stamp are both drawn.
+        val clock = scene == Scene.Clock || scene == Scene.ClockUnread
+        paparazzi.unsafeUpdateConfig(
+            deviceConfig = phone.config,
+            renderingMode = if (clock) RenderingMode.V_SCROLL else RenderingMode.SHRINK,
+        )
         paparazzi.snapshot(name = "board-${scene.id}-${phone.id}-${if (dark) "dark" else "light"}") {
             CommishTheme(dark = dark) { Mock(scene, phone) }
         }
