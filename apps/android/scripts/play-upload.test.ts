@@ -1,7 +1,7 @@
 /** The Play upload's request shapes against a stub of the Play Developer API (no network). */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { API_ROOT, PlayError, type Fetch, uploadToTrack, type UploadRequest } from './play-upload.ts';
+import { API_ROOT, decideUpload, PlayError, type Fetch, uploadToTrack, type UploadRequest } from './play-upload.ts';
 
 interface Seen {
 	method: string;
@@ -34,6 +34,7 @@ function stub(override: Answer = () => undefined): { fetch: Fetch; seen: Seen[] 
 		if (url === `${BASE}/edits` && request.method === 'POST') return json({ id: 'edit-1' });
 		if (url.startsWith(`${UPLOAD}/edits/edit-1/bundles`)) return new Response('{}', { status: 200, headers: { Location: SESSION } });
 		if (url === SESSION) return json({ versionCode: VERSION_CODE, sha256: 'abc' });
+		if (url === `${BASE}/edits/edit-1/tracks/internal` && request.method === 'GET') return json({ track: 'internal' });
 		if (url === `${BASE}/edits/edit-1/tracks/internal`) return json(JSON.parse(String(init.body)));
 		if (url === `${BASE}/edits/edit-1:commit`) return json({ id: 'edit-1' });
 		if (url === `${BASE}/edits/edit-1` && request.method === 'DELETE') return new Response(null, { status: 204 });
@@ -55,6 +56,7 @@ test('the edits flow: insert, resumable upload, track, commit, each with the bea
 		`POST ${BASE}/edits`,
 		`POST ${UPLOAD}/edits/edit-1/bundles?uploadType=resumable`,
 		`PUT ${SESSION}`,
+		`GET ${BASE}/edits/edit-1/tracks/internal`,
 		`PUT ${BASE}/edits/edit-1/tracks/internal`,
 		`POST ${BASE}/edits/edit-1:commit`
 	]);
@@ -62,7 +64,7 @@ test('the edits flow: insert, resumable upload, track, commit, each with the bea
 	assert.equal(seen[1].headers['X-Upload-Content-Type'], 'application/octet-stream');
 	assert.equal(seen[1].headers['X-Upload-Content-Length'], String(BUNDLE.byteLength));
 	assert.equal(seen[2].body, BUNDLE);
-	assert.deepEqual(JSON.parse(String(seen[3].body)), { track: 'internal', releases: [{ versionCodes: [String(VERSION_CODE)], status: 'completed' }] });
+	assert.deepEqual(JSON.parse(String(seen[4].body)), { track: 'internal', releases: [{ versionCodes: [String(VERSION_CODE)], status: 'completed' }] });
 });
 
 test('a draft request sets the track as draft', async () => {
@@ -70,7 +72,7 @@ test('a draft request sets the track as draft', async () => {
 	const result = await uploadToTrack(request('draft'), fetch, quiet);
 	assert.equal(result.status, 'draft');
 	assert.equal(result.outcome, 'committed');
-	assert.equal((JSON.parse(String(seen[3].body)) as { releases: { status: string }[] }).releases[0].status, 'draft');
+	assert.equal((JSON.parse(String(seen[4].body)) as { releases: { status: string }[] }).releases[0].status, 'draft');
 });
 
 test('the first-review refusal is a named outcome: the track again as draft, committed', async () => {
@@ -83,7 +85,7 @@ test('the first-review refusal is a named outcome: the track again as draft, com
 	const result = await uploadToTrack(request('completed'), fetch, (line) => lines.push(line));
 	assert.equal(result.outcome, 'committed-as-draft');
 	assert.equal(result.status, 'draft');
-	const tracks = seen.filter((s) => s.url.endsWith('/tracks/internal')).map((s) => (JSON.parse(String(s.body)) as { releases: { status: string }[] }).releases[0].status);
+	const tracks = seen.filter((s) => s.url.endsWith('/tracks/internal') && s.method === 'PUT').map((s) => (JSON.parse(String(s.body)) as { releases: { status: string }[] }).releases[0].status);
 	assert.deepEqual(tracks, ['completed', 'draft']);
 	assert.ok(lines.some((line) => line.includes('draft app')));
 });
@@ -111,7 +113,7 @@ test('a 403 on insert (the account not invited in Play Console) fails before any
 test('a draft refusal on a draft request is not retried', async () => {
 	const { fetch, seen } = stub((s) => (s.url.endsWith(':commit') ? refusal('Only releases with status draft may be created on draft app.') : undefined));
 	await assert.rejects(uploadToTrack(request('draft'), fetch, quiet), PlayError);
-	assert.equal(seen.filter((s) => s.url.endsWith('/tracks/internal')).length, 1);
+	assert.equal(seen.filter((s) => s.url.endsWith('/tracks/internal') && s.method === 'PUT').length, 1);
 });
 
 test('a re-run whose code Play already holds is a named outcome: the edit deleted, nothing thrown', async () => {
@@ -139,4 +141,43 @@ test('every request carries a timeout signal', async () => {
 	await uploadToTrack(request('draft'), watching, quiet);
 	assert.equal(signals.length, seen.length);
 	for (const signal of signals) assert.ok(signal instanceof AbortSignal);
+});
+
+test('decideUpload: empty uploads, lower uploads, equal and higher skip, codeless releases upload', () => {
+	assert.equal(decideUpload([], 1219), 'upload');
+	assert.equal(decideUpload([1100, 1218], 1219), 'upload');
+	assert.equal(decideUpload([1219], 1219), 'skip');
+	assert.equal(decideUpload([1100, 1300], 1219), 'skip');
+	assert.equal(decideUpload([], 0), 'upload');
+});
+
+const trackHolding = (releases: unknown): Answer => (s) => (s.method === 'GET' && s.url.endsWith('/tracks/internal') ? json({ track: 'internal', releases }) : undefined);
+
+test('a track already at a higher code: the edit is deleted, nothing set or committed, exit-0 outcome', async () => {
+	const { fetch, seen } = stub(trackHolding([{ versionCodes: ['1300'], status: 'completed' }]));
+	const lines: string[] = [];
+	const result = await uploadToTrack(request('completed'), fetch, (line) => lines.push(line));
+	assert.deepEqual(result, { outcome: 'track-already-ahead', editId: 'edit-1', versionCode: VERSION_CODE, status: null });
+	assert.equal(seen.at(-1)?.method, 'DELETE');
+	assert.equal(seen.filter((s) => s.method === 'PUT' && s.url.endsWith('/tracks/internal')).length, 0);
+	assert.equal(seen.filter((s) => s.url.endsWith(':commit')).length, 0);
+	assert.ok(lines.some((line) => line.includes('1300') && line.includes(String(VERSION_CODE))));
+});
+
+test('a track at the same code skips too', async () => {
+	const { fetch } = stub(trackHolding([{ versionCodes: [String(VERSION_CODE)] }]));
+	assert.equal((await uploadToTrack(request('completed'), fetch, quiet)).outcome, 'track-already-ahead');
+});
+
+test('a track at a lower code, or with codeless releases, still commits', async () => {
+	for (const releases of [[{ versionCodes: ['1100'] }], [{ status: 'draft' }], [{ versionCodes: [] }]]) {
+		const { fetch } = stub(trackHolding(releases));
+		assert.equal((await uploadToTrack(request('completed'), fetch, quiet)).outcome, 'committed');
+	}
+});
+
+test('a failing track read is a real error: the edit is deleted and the run fails', async () => {
+	const { fetch, seen } = stub((s) => (s.method === 'GET' ? refusal('backend error', 500) : undefined));
+	await assert.rejects(uploadToTrack(request('completed'), fetch, quiet), (error: unknown) => error instanceof PlayError && error.step === 'read track');
+	assert.equal(seen.at(-1)?.method, 'DELETE');
 });
