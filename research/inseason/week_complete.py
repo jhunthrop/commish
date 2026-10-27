@@ -125,7 +125,9 @@ def week_state(conn: Connection, season: int, week: int, now: datetime) -> WeekS
         label = f"{game.away_team} at {game.home_team}"
         if game.game_id in voids:
             void = voids[game.game_id]
-            LOG.info(
+            # Debug: every nightly reads each played week's state for the draft record, and the grade
+            # step names the voided games in its own detail line (Lane 250 review L3).
+            LOG.debug(
                 "week %s of %s: %s (%s) is voided, not checked: %s", week, season, label, game.game_id, void.reason
             )
             voided.append(f"{label} ({game.game_id})")
@@ -136,6 +138,13 @@ def week_state(conn: Connection, season: int, week: int, now: datetime) -> WeekS
         if game.away_team not in results or game.home_team not in results:
             unresulted.append(game.game_id)
     return WeekState(last_kickoff, len(games), tuple(incomplete), tuple(unresulted), tuple(voided))
+
+
+def is_complete(state: WeekState | None, now: datetime) -> bool:
+    """The grade's rule for a whole week as of `now`: games on file, none lacking a final or a club's
+    lines, and the last kickoff `GRADE_FLOOR` behind. The grade step says why a week waits; the draft
+    record counts a week by this alone (Lane 250, B254)."""
+    return state is not None and not state.incomplete and now >= state.last_kickoff + GRADE_FLOOR
 
 
 def earliest_grade(last_kickoff: datetime) -> datetime:

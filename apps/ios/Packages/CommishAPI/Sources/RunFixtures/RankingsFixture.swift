@@ -38,7 +38,7 @@ public enum RankingsFixture {
 public enum RecordFixture: Sendable, Equatable {
     /// The contract run's record, before the weekly and draft records.
     case own
-    /// shared/fixtures/record/<mode>.json: `upcoming`, `graded` or `published`.
+    /// shared/fixtures/record/<mode>.json: `waiting`, `upcoming`, `set`, `graded` or `published`.
     case twoRecords(String)
 
     var path: String {

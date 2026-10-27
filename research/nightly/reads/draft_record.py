@@ -3,9 +3,10 @@
 The board a member drafted from is the preseason order the register set before the season's first
 kickoff: the earliest freeze of the served board (`SERVED_SOURCE`), with ADP as it stood then. It is
 graded on each player's season points to date (twelve-team PPR, the register's own scoring,
-`model.register.grade`), over every complete week (its last kickoff `GRADE_AFTER` behind the run, the
-in-season pass's wait before Lane 244 graded on completeness), refreshed each night with the weekly stats. This is the only record that
-grades against ADP.
+`model.register.grade`), over the season's complete weeks from week 1 on, a week complete as the
+grade counts it (`week_complete.is_complete`: every game's final and both clubs' lines in as of the run,
+Lane 250, B254), refreshed each night with the weekly stats. This is the only record that grades
+against ADP.
 
 Every measure is graded within a position (fix round 1): our board's order among the quarterbacks
 against the season's quarterback finishers, ADP's order among them likewise, and so on; the All line is
@@ -21,12 +22,13 @@ after each counted week, the chart's points.
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
 from research.inseason.season_week import last_kickoffs_by_week
+from research.inseason.week_complete import is_complete, week_state
 from research.model.domain import PPR_SCORING, compute_fantasy_points
 from research.model.reads.observations import ObservationQuery, WeekRange, stat_lines_as_of
 from research.model.register.freeze import SERVED_SOURCE
@@ -81,10 +83,6 @@ where f.season = :s and f.board_source = :source and f.adp is not null and p.pos
   and f.frozen_at = (select min(frozen_at) from research.register_freeze_rows where season = :s and board_source = :source)
 """
 
-# A week counts once its last kickoff is this far behind the run (the in-season pass's wait before
-# Lane 244; the draft record keeps it, B254).
-GRADE_AFTER: Final = timedelta(hours=36)
-
 
 def draft_board(conn: Connection, season: int) -> list[Mapping[str, Any]]:
     """The board the season was drafted from: the first freeze's served rows with an ADP, at the four
@@ -93,9 +91,15 @@ def draft_board(conn: Connection, season: int) -> list[Mapping[str, Any]]:
     return [row._asdict() for row in conn.execute(text(_BOARD), params)]
 
 
-def complete_weeks(ends: Mapping[int, datetime], as_of: datetime) -> list[int]:
-    """The weeks whose last kickoff is `GRADE_AFTER` behind the run, in order."""
-    return sorted(week for week, end in ends.items() if end + GRADE_AFTER <= as_of)
+def complete_weeks(conn: Connection, season: int, as_of: datetime) -> list[int]:
+    """The season's weeks complete as of the run, in order, up to the first that is not: "through week
+    N" counts every week to N, so a later week never counts past one still waiting on its stats."""
+    weeks: list[int] = []
+    for week in sorted(last_kickoffs_by_week(conn, season)):
+        if not is_complete(week_state(conn, season, week, as_of), as_of):
+            break
+        weeks.append(week)
+    return weeks
 
 
 def weekly_points(
@@ -177,7 +181,7 @@ def read_draft(conn: Connection, season: int, as_of: datetime) -> DraftRecord | 
     board = draft_board(conn, season)
     if not board:
         return None
-    weeks = complete_weeks(last_kickoffs_by_week(conn, season), as_of)
+    weeks = complete_weeks(conn, season, as_of)
     positions = {row["player_id"]: row["position"] for row in board}
     points = weekly_points(conn, season, weeks, as_of, positions)
     counted = [week for week in weeks if points.get(week)]

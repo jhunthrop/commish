@@ -47,12 +47,16 @@ internal object RecordLines {
         val waiting =
             book.weeks.filter { it.status == frozen && it.week !in unplayed }.map { week ->
                 val lead = RecordWords.lead(listOf(week))
-                week.gradesFrom?.let { "$lead grades ${weekdayWordOf(it)} when the stats land." } ?: "$lead grades when the stats land."
+                "$lead ${gradesWhen(week.gradesFrom?.let(::weekdayWordOf))}."
             }
         return (missedLines + waiting).joinToString(" ")
     }
 
     private fun weekdayWordOf(at: String): String = instantOrNull(at)?.let(RecordWords::weekdayWord).orEmpty()
+
+    /** record.ts gradesWhen: the rule a set week waits on, with the day it usually holds when the run
+     * names one: "grades once every game's stats are in, usually Wednesday". */
+    fun gradesWhen(day: String?): String = day?.let { "${Words.Record.gradesRule}, ${Words.Record.usually} $it" } ?: Words.Record.gradesRule
 
     /** record.ts recordHeadline: the one figure and its caption. */
     fun headline(book: RecordBook): Pair<String, String> {
@@ -111,9 +115,7 @@ internal object RecordLines {
             week.status == graded -> "$set, graded ${week.gradedAt?.let(RecordWords::weekdayDay).orEmpty()}"
             week.week in unplayed -> "$set, ${Words.Record.notPlayed}"
             week.week in underway -> "$set, ${Words.Record.underway}"
-            else ->
-                week.gradesFrom?.let { "$set, grades ${RecordWords.weekdayDay(it)} when the stats land" }
-                    ?: "$set, grades when the stats land"
+            else -> "$set, ${gradesWhen(week.gradesFrom?.let(RecordWords::weekdayDay))}"
         }
     }
 
@@ -154,15 +156,13 @@ internal object RecordLines {
                 week.status == graded && gradedAt != null -> "graded ${RecordWords.weekdayDay(gradedAt)}"
                 week.week in unplayed -> Words.Records.notPlayed
                 week.week in underway -> Words.Records.underway
-                else ->
-                    week.gradesFrom?.let { "grades from ${RecordWords.weekdayDay(it)}, when the stats land" }
-                        ?: Words.Records.gradesLater
+                else -> gradesWhen(week.gradesFrom?.let(RecordWords::weekdayDay))
             }
         return "$set, $then"
     }
 
-    /** records.ts weeklyPending: "Week 7 not graded yet", "Grades after Monday's game."; null once a week
-     * is graded. */
+    /** records.ts weeklyPending: "Week 7 not graded yet", "Grades once every game's stats are in, usually
+     * Wed Oct 28."; null once a week is graded. */
     fun pending(
         book: RecordBook,
         next: NextGrade?,
@@ -174,14 +174,20 @@ internal object RecordLines {
                 ?.gradesFrom
                 ?.let(RecordWords::weekdayDay)
         val game = next.lastKickoff?.let(RecordWords::weekdayWord)
-        val whenSaid =
-            when {
-                game == null -> "Grades when the stats land."
-                day == null -> "Grades after $game's game."
-                else -> "Grades from $day, after $game's game."
-            }
-        return "Week ${next.week} not graded yet" to whenSaid
+        return "Week ${next.week} not graded yet" to pendingWhen(day, game)
     }
+
+    /** records.ts pendingWhen: the grading day when the run names one, else the week's last game, else the
+     * rule alone. */
+    fun pendingWhen(
+        day: String?,
+        game: String?,
+    ): String =
+        if (day == null && game != null) {
+            "${RecordWords.capitalized(Words.Record.gradesRule)}, after $game's game."
+        } else {
+            "${RecordWords.capitalized(gradesWhen(day))}."
+        }
 
     /** record.ts gradedOrders: "Our preseason order, then our rest-of-season order". */
     fun gradedOrders(book: RecordBook): String =

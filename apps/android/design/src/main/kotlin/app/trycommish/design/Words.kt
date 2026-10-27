@@ -598,6 +598,8 @@ object Words {
         const val placesOff = "Places off is how many places a player finished from his rank, lower is better."
         const val notPlayed = "not played yet"
         const val underway = "under way"
+        const val gradesRule = "grades once every game's stats are in"
+        const val usually = "usually"
         const val noneSet = "weeks graded. Our first order is set before the first kickoff"
     }
 
@@ -630,7 +632,7 @@ object Words {
         const val setRulePhone = "Each week's order is graded as set, never as refreshed after."
         const val notPlayed = "not played yet"
         const val underway = "under way"
-        const val gradesLater = "grades when the stats land"
+        const val gradesLater = "grades once every game's stats are in"
         const val setUnknown = "set before its first kickoff"
         const val espnBasis = "ESPN's is its own public PPR projection, read before the week's first kickoff."
         const val espnReadAfter = "ESPN's projection this week was read after our rest-of-season order was set, still before the first kickoff."
