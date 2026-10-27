@@ -161,11 +161,14 @@ class LobbyViewModel(
 
     /** The room already held (a run again after a configuration change, Lane 230 review M1): no read and no
      * reset, a socket that says hello from the last seq applied, the protocol's own reconnect. Null when this view
-     * model holds no room yet. */
+     * model holds no room yet, or the room it holds is over or was left: that room is read again. */
     private fun resumed(): RoomSocket? {
         val room = room ?: return null
         val lobby = mutableLobby.value ?: return null
         if (mutableState.value != LobbyScreenState.Room) return null
+        // A room drafted to its end, closed unattended, or a seat given up is read again, never resumed
+        // (Lane 230 re-review M1).
+        if (lobby.complete || lobby.abandoned || lobby.seats[room.you]?.kind == LobbySeatKind.Left) return null
         return socket(room.socketUrl, lobby.seq)
     }
 
@@ -345,6 +348,10 @@ class LobbyViewModel(
         return try {
             reads.leave(id)
             mutableSocket.value?.close()
+            // The seat is given up: nothing held is resumed, so a rejoin of the same room reads it afresh.
+            room = null
+            mutableLobby.value = null
+            mutableDrawn.value = null
             true
         } catch (e: CancellationException) {
             throw e

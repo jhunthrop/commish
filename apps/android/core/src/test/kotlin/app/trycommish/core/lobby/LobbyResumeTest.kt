@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -91,6 +92,47 @@ class LobbyResumeTest {
             // The room never went back to empty once it held rows.
             assertFalse(seen.dropWhile { it == 0L }.contains(0L), "$seen")
             assertEquals(held, vm.lobby.value?.seq)
+        }
+
+    @Test
+    fun `a room left, then run again, is read afresh`() =
+        runTest {
+            val rows = LobbySocketTest.frames()
+            val opening = listOf(text(LobbySocketTest.welcome(rows[0])))
+            val connector = OpenSockets(listOf(opening, emptyList()))
+            val api = StubLobby()
+            val vm = LobbyViewModel(LobbyFixtures.ID, api, connector, { "t" }, FixedClock(LobbyFixtures.phone), SessionEnd {}) { }
+            val first = launch { vm.run() }
+            testScheduler.advanceUntilIdle()
+            assertTrue(vm.leave())
+            testScheduler.advanceUntilIdle()
+            first.cancel()
+            // The member rejoins the same filling room: its read comes again, the socket from nothing.
+            val again = launch { vm.run() }
+            testScheduler.advanceUntilIdle()
+            again.cancel()
+            assertEquals(2, api.reads)
+            assertEquals(listOf(RoomCommand.hello(0), RoomCommand.hello(0)), connector.hellos)
+        }
+
+    @Test
+    fun `a room drafted to its end, then run again, is read afresh`() =
+        runTest {
+            val rows = LobbySocketTest.frames()
+            val whole = listOf(text(LobbySocketTest.welcome(rows.flatten())))
+            val connector = OpenSockets(listOf(whole, emptyList()))
+            val api = StubLobby()
+            val vm = LobbyViewModel(LobbyFixtures.ID, api, connector, { "t" }, FixedClock(LobbyFixtures.phone), SessionEnd {}) { }
+            val first = launch { vm.run() }
+            testScheduler.advanceUntilIdle()
+            assertTrue(vm.lobby.value?.complete == true)
+            first.cancel()
+            testScheduler.advanceUntilIdle()
+            val again = launch { vm.run() }
+            testScheduler.advanceUntilIdle()
+            again.cancel()
+            assertEquals(2, api.reads)
+            assertEquals(RoomCommand.hello(0), connector.hellos.last())
         }
 
     @Test
