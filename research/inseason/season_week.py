@@ -26,7 +26,8 @@ non-zero when any step failed.
    taken minutes before it (`espn_points`); a failed read fails this step alone, never the freeze.
 2. **props-snapshot**: the odds provider's player props for the coming fourteen days.
 3. **grade**: every frozen week not yet graded, whose games are complete (below), against the
-   stats now held. Each grade row is stamped `implementation = 'python'`.
+   stats now held. It runs after every ingest above on the same pass, so one pass fetches a
+   week's last lines and grades it. Each grade row is stamped `implementation = 'python'`.
 4. **freeze**: the coming week, if no freeze holds it yet, strictly before its first kickoff, and
    again on the final pass before that kickoff (`FINAL_FREEZE_BEFORE`, Lane 93), which supersedes
    the early freeze so the week's order is set once, on the Thursday pass. A week already frozen is
@@ -40,11 +41,14 @@ non-zero when any step failed.
    first kickoff never fills.
 5. **scoreboard**: the running score, read fresh.
 
-ONE CHANGE FROM THE ORACLE, on purpose: a week is graded only once its last kickoff is
-`GRADE_AFTER` behind the pass. The oracle graded any frozen week the store held outcomes for, so a
-Wednesday pass could grade Thursday's freeze on its one played game; the register's grade of a week
-is final (the pass never regrades), so a partial week would stand. Thirty-six hours after Monday
-night's kickoff is Wednesday's pass, by which nflverse has published the week.
+ONE CHANGE FROM THE ORACLE, on purpose: a week is graded only once it is complete. The oracle graded
+any frozen week the store held outcomes for, so a Wednesday pass could grade Thursday's freeze on its
+one played game; the register's grade of a week is final (the pass never regrades), so a partial week
+would stand. Since Lane 244 a week is complete on the first pass where every game the game table lists
+for it has both clubs' results and stat lines as of the pass, read from the rows the grade reads
+(`week_complete`); until then the pass names the games it waits on. The `game-table` step runs before
+`grade` on the same pass, so the games checked are the file's as of that pass. Lane 244 replaced a
+thirty-six hour wait after the last kickoff.
 """
 
 import logging
@@ -59,6 +63,7 @@ from research.errors import ConfigurationError
 from research.inseason import usage_steps
 from research.inseason.scoreboard import scoreboard_lines
 from research.inseason.step_result import Status, StepResult
+from research.inseason.week_complete import GRADE_FLOOR, week_state
 from research.model.instants import js_iso, ms_instant
 from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.espn_fill import fill_empty_espn_yardstick
@@ -78,7 +83,6 @@ from research.pipeline.tank01.capture import PLAYER_LIST_REQUESTS, read_player_l
 from research.pipeline.tank01.client import API_KEY_ENV, Tank01Client
 
 LOG: Final = logging.getLogger(__name__)
-GRADE_AFTER: Final = timedelta(hours=36)
 # The week's order is set on the last pass before its first kickoff (Lane 93, B37): the Thursday 14:00
 # Eastern pass, six hours before a Thursday night game, is the one inside this window. The first pass
 # after the previous week's first kickoff still freezes the week early, so a failed final pass leaves
@@ -91,6 +95,8 @@ GRADE_OVERDUE: Final = timedelta(days=4)
 LAST_POSSIBLE_WEEK: Final = 22
 OPPONENT_RATINGS: Final = "opponent-ratings"
 GAME_TABLE: Final = "game-table"
+GRADE: Final = "grade"
+GRADE_STANDS_DOWN: Final = f"not graded: the {GAME_TABLE} step failed on this pass, so the week's games could be stale"
 KICKING_DEFENSE: Final = "kicking-defense"
 ESPN_PROJECTIONS: Final = "espn-projections"
 ESPN_FILL: Final = "espn-fill"
@@ -104,7 +110,7 @@ STEPS: Final = (
     KICKING_DEFENSE,
     ESPN_PROJECTIONS,
     "props-snapshot",
-    "grade",
+    GRADE,
     "freeze",
     ESPN_FILL,
     "scoreboard",
@@ -283,10 +289,10 @@ def _frozen_and_graded(conn: Connection, season: int) -> tuple[list[int], set[in
 
 
 def grade(context: SeasonWeekContext) -> StepResult:
-    """Every frozen week with no grade yet whose games are complete, each in its own transaction."""
+    """Every frozen week with no grade yet whose games are complete (`week_complete`), each in its own
+    transaction."""
     with context.engine.connect() as conn:
         frozen, graded = _frozen_and_graded(conn, context.season)
-        last_kickoffs = last_kickoffs_by_week(conn, context.season)
     ungraded = [week for week in frozen if week not in graded]
     if not ungraded:
         return StepResult("grade", "skipped", f"no ungraded weeks ({len(frozen)} frozen, all graded)")
@@ -294,32 +300,42 @@ def grade(context: SeasonWeekContext) -> StepResult:
     count = 0
     failed = False
     for week in ungraded:
-        last = last_kickoffs.get(week)
-        if last is None:
-            # No kickoff on file never grades; once the freeze is older than the overdue line it fails.
-            with context.engine.connect() as conn:
-                frozen_at = latest_freeze_for(conn, context.season, week)
-            stale = frozen_at is not None and context.now >= frozen_at + GRADE_OVERDUE
-            detail.append(f"week {week}: {'OVERDUE, ' if stale else ''}waits, no kickoff on file")
-            failed = failed or stale
-            continue
-        if context.now < last + GRADE_AFTER:
-            detail.append(f"week {week}: waits, its last kickoff {js_iso(last)} is under {GRADE_AFTER} ago")
-            continue
-        try:
-            with context.engine.begin() as conn:
-                result = grade_week(conn, context.season, week, context.now)
-        except ValueError as error:
-            overdue = context.now >= last + GRADE_OVERDUE
-            detail.append(f"week {week}: {'OVERDUE, ' if overdue else ''}not graded, {error}")
-            failed = failed or overdue
-            continue
-        count += 1
-        boards = " ".join(f"{board.board_source}={board.population}" for board in result.boards)
-        skipped = "".join(f" SKIPPED {board.board_source}" for board in result.skipped)
-        detail.append(f"week {week}: graded {boards}{skipped}")
+        line, stale, done = _grade_one(context, week)
+        detail.append(f"week {week}: {line}")
+        failed = failed or stale
+        count += done
     status: Status = "failed" if failed else ("ok" if count else "skipped")
     return StepResult("grade", status, f"{len(ungraded)} ungraded weeks, {count} graded", tuple(detail))
+
+
+def _plural(count: int, word: str) -> str:
+    return f"{count} {word}" if count == 1 else f"{count} {word}s"
+
+
+def _grade_one(context: SeasonWeekContext, week: int) -> tuple[str, bool, int]:
+    """One week's line, whether it is overdue (fails the pass) and how many weeks it graded (0 or 1)."""
+    with context.engine.connect() as conn:
+        state = week_state(conn, context.season, week, context.now)
+        frozen_at = latest_freeze_for(conn, context.season, week) if state is None else None
+    if state is None:
+        # No game on file never grades; once the freeze is older than the overdue line it fails.
+        stale = frozen_at is not None and context.now >= frozen_at + GRADE_OVERDUE
+        return f"{'OVERDUE, ' if stale else ''}waits, no games on file", stale, 0
+    last = state.last_kickoff
+    overdue = context.now >= last + GRADE_OVERDUE
+    if state.incomplete:
+        waits = f"waits on {_plural(len(state.incomplete), 'game')} of {state.games}, {'; '.join(state.incomplete)}"
+        return f"{'OVERDUE, ' if overdue else ''}{waits}", overdue, 0
+    if context.now < last + GRADE_FLOOR:
+        return f"waits, its last kickoff {js_iso(last)} is under {GRADE_FLOOR} ago", False, 0
+    try:
+        with context.engine.begin() as conn:
+            result = grade_week(conn, context.season, week, context.now)
+    except ValueError as error:
+        return f"{'OVERDUE, ' if overdue else ''}not graded, {error}", overdue, 0
+    boards = " ".join(f"{board.board_source}={board.population}" for board in result.boards)
+    skipped = "".join(f" SKIPPED {board.board_source}" for board in result.skipped)
+    return f"graded {boards}{skipped}", False, 1
 
 
 def is_final_pass(kickoff: datetime, at: datetime) -> bool:
@@ -417,7 +433,7 @@ def _bodies(context: SeasonWeekContext) -> dict[str, Callable[[], StepResult]]:
         KICKING_DEFENSE: lambda: kicking_defense(context),
         ESPN_PROJECTIONS: lambda: espn_projections_step(context),
         "props-snapshot": lambda: props_snapshot(context),
-        "grade": lambda: grade(context),
+        GRADE: lambda: grade(context),
         "freeze": lambda: freeze(context),
         ESPN_FILL: lambda: espn_fill(context),
         "scoreboard": lambda: scoreboard(context),
@@ -425,9 +441,17 @@ def _bodies(context: SeasonWeekContext) -> dict[str, Callable[[], StepResult]]:
 
 
 def run_season_week(context: SeasonWeekContext) -> list[StepResult]:
-    """Every step in order, each isolated."""
+    """Every step in order, each isolated. A grade is final, so the grade step stands down when the
+    game-table step failed on this pass: its completeness check reads the game table, which may then
+    be stale (Lane 244)."""
     bodies = _bodies(context)
-    return [_safely(name, bodies[name], context) for name in STEPS]
+    results: list[StepResult] = []
+    for name in STEPS:
+        if name == GRADE and any(r.step == GAME_TABLE and r.status == "failed" for r in results):
+            results.append(StepResult(GRADE, "skipped", GRADE_STANDS_DOWN))
+            continue
+        results.append(_safely(name, bodies[name], context))
+    return results
 
 
 def run_usage_backfill(context: SeasonWeekContext) -> list[StepResult]:
