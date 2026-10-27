@@ -138,6 +138,13 @@ def week_state(conn: Connection, season: int, week: int, now: datetime) -> WeekS
     return WeekState(last_kickoff, len(games), tuple(incomplete), tuple(unresulted), tuple(voided))
 
 
+def is_complete(state: WeekState | None, now: datetime) -> bool:
+    """The grade's rule for a whole week as of `now`: games on file, none lacking a final or a club's
+    lines, and the last kickoff `GRADE_FLOOR` behind. The grade step says why a week waits; the draft
+    record counts a week by this alone (Lane 250, B254)."""
+    return state is not None and not state.incomplete and now >= state.last_kickoff + GRADE_FLOOR
+
+
 def earliest_grade(last_kickoff: datetime) -> datetime:
     """The first instant a week can be complete: its lines are dated from its last game, the end of
     that game's Eastern day plus `PUBLICATION_LAG_HOURS` (`kickoff_as_of`), never sooner than

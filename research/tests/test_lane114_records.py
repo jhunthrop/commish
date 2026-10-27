@@ -17,7 +17,9 @@ from research.capsules.site_words import list_file, site_list
 from research.db.engine import make_engine
 from research.db.schema import (
     ESPN_PROJECTION_ROWS,
+    NFLVERSE_GAMES,
     PLAYER_WEEK_OBSERVATIONS,
+    PLAYER_WEEK_TEAMS,
     PLAYERS,
     REGISTER_FREEZE_ROWS,
     REGISTER_GRADE_ROWS,
@@ -60,6 +62,17 @@ _RUN: Final = datetime(2026, 10, 31, 9, 0, tzinfo=UTC)
 _IDS: Final = ("00-a", "00-b", "00-c", "00-d")
 _ESPN_IDS: Final = {"00-a": "11", "00-b": "12", "00-c": "13", "00-d": "14"}
 _CATCHES: Final = {"00-a": 10.0, "00-b": 8.0, "00-c": 6.0, "00-d": 4.0}
+# Weeks 1 and 2 are one game each, DET at PIT at the week's last kickoff, a and b PIT's, c and d DET's.
+# Each club's final and PIT's lines are dated half a day after it; week 2's DET lines land late (Lane
+# 250, B254): past the thirty-six hours the draft record once waited, so the week is not complete then.
+_CLUBS: Final = {"00-a": "PIT", "00-b": "PIT", "00-c": "DET", "00-d": "DET"}
+_COUNTED: Final = (1, 2)
+_IN: Final = timedelta(hours=12)
+_WEEK2_DET_LINES: Final = _LAST[2] + timedelta(hours=60)
+
+
+def _lines_dated(week: int, pid: str) -> datetime:
+    return _WEEK2_DET_LINES if week == _COUNTED_THROUGH and _CLUBS[pid] == "DET" else _LAST[week] + _IN
 
 
 @pytest.fixture(scope="module")
@@ -103,11 +116,12 @@ def _seed(conn: Connection) -> None:
         insert(PLAYER_WEEK_OBSERVATIONS),
         [
             {"season": _SEASON, "week": week, "player_id": pid, "source": "nflverse_player_week",
-             "metric": "receptions", "value": _CATCHES[pid], "as_of": _LAST[week] + timedelta(hours=12)}
-            for week in (1, 2)
+             "metric": "receptions", "value": _CATCHES[pid], "as_of": _lines_dated(week, pid)}
+            for week in _COUNTED
             for pid in _IDS
         ],
     )  # fmt: skip
+    _seed_games(conn)
     rows = [_freeze(1, _DRAFT_SET, SERVED_SOURCE, place, pid) for place, pid in enumerate(_IDS, start=1)]
     rows += [_freeze(6, _WEEK6_SET, SERVED_SOURCE, place, pid) for place, pid in enumerate(_IDS, start=1)]
     for source in (SERVED_SOURCE, SHIPPED_SOURCE):
@@ -122,6 +136,36 @@ def _seed(conn: Connection) -> None:
             for place, pid in enumerate(_IDS, start=1)
         ],
     )  # fmt: skip
+
+
+def _seed_games(conn: Connection) -> None:
+    """The game table's one game a counted week, both clubs' finals and each player's club."""
+    conn.execute(
+        insert(NFLVERSE_GAMES),
+        [
+            {"season": _SEASON, "week": week, "game_id": f"{_SEASON}_{week:02d}_DET_PIT", "game_type": "REG",
+             "gameday": _LAST[week].date(), "kickoff_at": _LAST[week], "home_team": "PIT", "away_team": "DET",
+             "location": "Home", "stadium_id": "PIT", "stadium": "PIT", "read_at": _DRAFT_SET}
+            for week in _COUNTED
+        ],
+    )  # fmt: skip
+    conn.execute(
+        insert(TEAM_WEEK_OBSERVATIONS),
+        [
+            {"season": _SEASON, "week": week, "team": team, "source": "nflverse_kickoff", "metric": "game_result",
+             "value": 1.0, "as_of": _LAST[week] + _IN}
+            for week in _COUNTED
+            for team in ("PIT", "DET")
+        ],
+    )  # fmt: skip
+    conn.execute(
+        insert(PLAYER_WEEK_TEAMS),
+        [
+            {"season": _SEASON, "week": week, "player_id": pid, "team": _CLUBS[pid], "as_of": _LAST[week] + _IN}
+            for week in _COUNTED
+            for pid in _IDS
+        ],
+    )
 
 
 class _Pool:
@@ -237,9 +281,7 @@ def test_before_any_shipped_week_the_weekly_record_starts_at_the_next_week_to_se
 
 def test_the_draft_record_grades_the_first_freeze_on_the_complete_weeks(engine: Engine) -> None:
     with engine.connect() as conn:
-        mid_week_two = draft_record.read_draft(
-            conn, _SEASON, _LAST[2] + draft_record.GRADE_AFTER - timedelta(minutes=1)
-        )
+        mid_week_two = draft_record.read_draft(conn, _SEASON, _LAST[2] + timedelta(hours=36))
         draft = draft_record.read_draft(conn, _SEASON, _RUN)
     assert mid_week_two is not None
     assert draft is not None
@@ -254,6 +296,32 @@ def test_the_draft_record_grades_the_first_freeze_on_the_complete_weeks(engine: 
     assert out["namedBasis"] == (
         "Top named counts how many of the season's top 36 WRs so far the order also ranked that high."
     )
+
+
+def test_a_week_counts_for_the_draft_record_once_every_games_stats_are_in(engine: Engine) -> None:
+    """Lane 250 (B254): the grade's completeness, not thirty-six hours after the last kickoff. Week 2
+    at 36 hours has DET's lines missing, so it is not counted; the minute they land it is."""
+    at_36h = _LAST[2] + timedelta(hours=36)
+    with engine.connect() as conn:
+        waiting = draft_record.complete_weeks(conn, _SEASON, at_36h)
+        landed = draft_record.complete_weeks(conn, _SEASON, _WEEK2_DET_LINES)
+        before = draft_record.complete_weeks(conn, _SEASON, _WEEK2_DET_LINES - timedelta(minutes=1))
+        first_lines = draft_record.complete_weeks(conn, _SEASON, _LAST[1] + _IN - timedelta(minutes=1))
+    assert (waiting, before, landed) == ([1], [1], [1, 2])
+    assert first_lines == []
+
+
+def test_a_later_week_never_counts_past_one_still_waiting(engine: Engine) -> None:
+    """Through week N counts every week to N: week 1 missing its DET lines holds week 2 out too."""
+    with engine.connect() as conn:
+        conn.execute(
+            PLAYER_WEEK_OBSERVATIONS.delete().where(
+                PLAYER_WEEK_OBSERVATIONS.c.week == 1, PLAYER_WEEK_OBSERVATIONS.c.player_id.in_(("00-c", "00-d"))
+            )
+        )
+        held = draft_record.complete_weeks(conn, _SEASON, _RUN)
+        conn.rollback()
+    assert held == []
 
 
 def test_no_draft_record_before_the_first_freeze(engine: Engine) -> None:
