@@ -181,3 +181,8 @@ test('a failing track read is a real error: the edit is deleted and the run fail
 	await assert.rejects(uploadToTrack(request('completed'), fetch, quiet), (error: unknown) => error instanceof PlayError && error.step === 'read track');
 	assert.equal(seen.at(-1)?.method, 'DELETE');
 });
+
+test('a 404 reading a track with no release yet is an empty track: the upload commits', async () => {
+	const { fetch } = stub((s) => (s.method === 'GET' ? refusal('Track not found', 404) : undefined));
+	assert.equal((await uploadToTrack(request('completed'), fetch, quiet)).outcome, 'committed');
+});

@@ -140,9 +140,19 @@ interface TrackAnswer {
 	releases?: { versionCodes?: string[] }[];
 }
 
+/** A track with no release yet answers 404: an empty track. Any other refusal stays an error. */
+async function readTrack(client: Client, editId: string, track: string): Promise<TrackAnswer> {
+	try {
+		return await client.json<TrackAnswer>('read track', `${client.base}/edits/${editId}/tracks/${encodeURIComponent(track)}`);
+	} catch (error) {
+		if (error instanceof PlayError && error.status === 404) return {};
+		throw error;
+	}
+}
+
 /** Every version code on the track's releases; a release without codes contributes none. */
 async function trackVersionCodes(client: Client, editId: string, track: string): Promise<number[]> {
-	const answer = await client.json<TrackAnswer>('read track', `${client.base}/edits/${editId}/tracks/${encodeURIComponent(track)}`);
+	const answer = await readTrack(client, editId, track);
 	return (answer.releases ?? []).flatMap((release) => release.versionCodes ?? []).map(Number).filter(Number.isInteger);
 }
 
