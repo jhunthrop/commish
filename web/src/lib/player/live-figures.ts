@@ -1,6 +1,7 @@
 /** The player page's rest-of-season figures on one clock (Lane 86, re-review N1): the run's until the
  * read answers, then the read's alone, a figure it lacks null (the page prints the empty figure), so no
- * box or column mixes the run's clock with the read's. Imports nothing: the page carries it. */
+ * box or column mixes the run's clock with the read's. Imports nothing; the page loads it with the read
+ * (Lane 234: the player page's script budget). */
 import type { BoardFormat } from '#lib/sheet/model.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
 import type { LiveFormats, LiveTier } from './week-words.ts';
@@ -59,28 +60,43 @@ export function lineFiguresAt(
 }
 
 /** The read's rank for the every-format table: his place at his position in the format the read is
- * in. The table takes it only on the read that switched its figures (`LiveFormats`), never on a read
- * that left the run's figures in place (Lane 220 review H1). */
+ * in, the head's. The table takes it only on the read that switched its figures (`LiveFormats`), never
+ * on a read that left the run's figures in place (Lane 220 review H1). */
 export interface RankRead {
 	format: BoardFormat | null;
 	positionRank: number | null;
 }
 
-/** The every-format table's rank column on the table's one clock (Lane 220, B184; review H1): while
- * the figures are the run's (no read, or a read with no figures for the table), every rank is the
- * run's; once the read's figures stand, the read's format takes the head's rank and every other format
- * shows none, as the read places him in its own format alone (the per-format rank is an API field
- * still to come, B206). `unranked` is the labels of the lines that show none, for the table's one
- * footnote. */
+/** Why the table's footnote names a format whose rank cell reads none: an answer from before the
+ * per-format ranks places him in its own format alone (`unread`); our order in that format does not
+ * place him (`unplaced`). */
+export type UnrankedReason = 'unread' | 'unplaced';
+
+/** The every-format table's rank column on the table's one clock (Lane 220, B184; review H1; Lane 234,
+ * B206 and B211): while the figures are the run's (no read, or a read with no figures for the table),
+ * every rank is the run's; once the read's figures stand, each format takes the read's position rank
+ * in it, from the same answer as its figures (`LiveFormats.ranks`), none where the order does not place
+ * him. An answer from before those ranks (the deploy window) gives the read's format the head's rank
+ * and the others none. `unranked` is the labels of the lines that show none, for the table's one
+ * footnote, never the read's own format (the head says why it has none) and none at all for a player
+ * on a season-long list, whose cells say his list. */
 export function lineRanksAt(
 	lines: readonly { run: number; format: BoardFormat | null; label: string }[],
 	figures: LiveFormats | null,
-	read: RankRead | null
-): { ranks: (number | null)[]; unranked: string[] } {
+	read: RankRead | null,
+	listed: boolean
+): { ranks: (number | null)[]; unranked: string[]; reason: UnrankedReason } {
+	const reason: UnrankedReason = figures?.ranks == null ? 'unread' : 'unplaced';
 	if (figures === null || read === null)
-		return { ranks: lines.map((line) => line.run), unranked: [] };
-	const ranks = lines.map((line) =>
-		line.format !== null && line.format === read.format ? read.positionRank : null
-	);
-	return { ranks, unranked: lines.filter((_, i) => ranks[i] === null).map((line) => line.label) };
+		return { ranks: lines.map((line) => line.run), unranked: [], reason };
+	const own = (format: BoardFormat | null): boolean => format !== null && format === read.format;
+	const ranks = lines.map(({ format }) => {
+		if (format === null) return null;
+		if (figures.ranks === null) return own(format) ? read.positionRank : null;
+		return figures.ranks[format] ?? null;
+	});
+	const unranked = listed
+		? []
+		: lines.filter((line, i) => ranks[i] === null && !own(line.format)).map((line) => line.label);
+	return { ranks, unranked, reason };
 }

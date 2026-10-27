@@ -13,7 +13,7 @@ import { RECORDS_WORDS } from '#lib/run/records.ts';
 import type { Position } from '#lib/types/player.ts';
 import { absentWords } from '#lib/site/absent.ts';
 import { ERROR_WORDS } from '#lib/site/error-words.ts';
-import { headMarkup, pageMeta, siteUrl, type HeadMarkup, type PageMeta } from '#lib/site/head.ts';
+import { headMarkup, pageMeta, type HeadMarkup, type PageMeta } from '#lib/site/head.ts';
 import { HEAD_WORDS, type BoardFacts, type WeekGame } from '#lib/site/head-words.ts';
 import { links } from '#lib/site/links.ts';
 import {
@@ -127,7 +127,7 @@ export function playerHead(player: PlayerHeadSource, clubs: readonly Club[]): He
 			position: player.position,
 			club: isFreeAgent(player.team) ? null : clubName(clubs, player.team),
 			path,
-			image: face === null ? null : siteUrl(face)
+			image: face
 		})
 	});
 }
@@ -253,6 +253,8 @@ export const STATIC_HEADS = {
 	sheet: (): HeadMarkup => built(HEAD_WORDS.sheet, links.sheet()),
 	print: (): HeadMarkup => built(HEAD_WORDS.print, resolve('/sheet/print'), { noindex: true }),
 	account: (): HeadMarkup => built(HEAD_WORDS.account, links.account(), { noindex: true }),
+	accountDelete: (): HeadMarkup =>
+		built(HEAD_WORDS.accountDelete, links.accountDelete(), { noindex: true }),
 	compare: (): HeadMarkup => built(HEAD_WORDS.compare, links.compare(), { noindex: true }),
 	offline: (): HeadMarkup => built(HEAD_WORDS.offline, resolve('/offline'), { noindex: true }),
 	appSignedIn: (): HeadMarkup =>

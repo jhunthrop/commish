@@ -78,7 +78,8 @@ public struct RankingsRow: Equatable, Sendable, Identifiable {
     public let player: RankingsPlayer
     /// The API's rank, never numbered again here (Review Focus 4).
     public let rank: Int
-    /// The # cell: his rank, the list's word for a player on a season-long list, or nothing for a bye.
+    /// The # cell: his number in the full order (overall_rank), a bye's too, or the list's word for a
+    /// player on a season-long list (Lane 234).
     public let place: String
     public let bye: Bool
     /// The week's figure: his Pts once final, his Proj before, "--" without. Pinned by the parity;
@@ -170,13 +171,14 @@ enum RankingsRows {
             + "\(opponent) \(StartRows.halves(theirs))"
     }
 
-    /// order.ts orderView at the phone: byes sit apart (the week's rankings), the # the API's rank.
+    /// order.ts orderView at the phone: byes sit apart (the week's rankings), the # his number in the
+    /// full order (overall.ts overallOf, Lane 234), a bye's too, so with the byes last the numbers skip.
     static func row(_ row: OrderRow, view: OrderViewing, zone: TimeZone, now: Date) -> RankingsRow {
         let line = row.line
         let player = player(line, pillRank: view.pillRank, zone: zone, now: now)
         let listed = player.status?.onList == true
         let bye = line.facts.bye && !listed
-        let place = listed ? player.status?.rank ?? "" : bye ? "" : String(row.rank)
+        let place = listed ? player.status?.rank ?? "" : String(overall(row))
         let week = listed ? nil : weekFigure(line, now: now)
         let read = StartRows.row(line, slot: "", zone: zone, now: now, ranked: false)
         return RankingsRow(
@@ -184,6 +186,11 @@ enum RankingsRows {
             total: StartWords.number(row.restOfSeasonPoints),
             cells: cells(row, week: week, weekHead: RankingsWords.weekHead(view.week), rankBy: view.rankBy, read: read)
         )
+    }
+
+    /// overall.ts overallOf: his overall_rank, his rank on an answer from before the field (Lane 234).
+    static func overall(_ row: OrderRow) -> Int {
+        row.overallRank ?? row.rank
     }
 
     /// order.ts stripCells: the week's figure under its Wk head (a narrow cell), the season's figures

@@ -112,7 +112,7 @@ class AppGraph(
     private val cache: Cache = FileCache(context.cacheDir.resolve("answers")) { what, e -> Log.w(TAG, what, e) }
     private val transport = Transport(apiBaseUrl, token = { session.token })
     private val reads: LeagueReads = ApiLeagueReads(transport)
-    private val account: AccountReads = ApiAccountReads(transport)
+    private val account: AccountReads = ApiAccountReads(transport, BuildConfig.WORKOS_LOGOUT_HOST)
     private val lineups: LineupReads = ApiLineupReads(transport)
     private val matchups: MatchupReads = ApiMatchupReads(transport)
     private val waivers: WaiverReads = ApiWaiverReads(transport)
@@ -158,16 +158,27 @@ class AppGraph(
 
     /** The one place the app's sign-in state turns (sign out, a refused token, a finished sign-in). */
     private val signInState =
-        SignInState(session, cache, SignOut(session, cache, account::revokeDevice) { Log.w(TAG, "revoke device", it) })
+        SignInState(
+            session,
+            cache,
+            SignOut(session, cache, account::revokeDevice) { Log.w(TAG, "revoke device", it) },
+            openLogout = { url -> openEphemeral(appContext, url, newTask = true) { Log.w(TAG, "open the logout", it) } },
+        )
 
     /** Whether the device holds a token, for the tabs that need one. */
     val signedIn: StateFlow<Boolean> = signInState.signedIn
 
+    /** Which account the shell shows, moved at each sign-in and sign-out: the shell rebuilds its tabs on it. */
+    val generation: StateFlow<Int> = signInState.generation
+
     /** What the sign-in screen says about the last attempt or the last sign-out, if anything. */
     val signInMessage: StateFlow<String?> = signInState.message
 
+    /** The sign-in screen's quiet line, if any ("Your account is deleted"). */
+    val signInNotice: StateFlow<String?> = signInState.notice
+
     private val signIn = SignIn(apiBaseUrl, returnTo, Build.MODEL, ApiPairing(transport), session, SecureRandom())
-    val signInFlow = SignInFlow(signIn, returnTo)
+    val signInFlow = SignInFlow(signIn, returnTo) { Log.w(TAG, "open the sign-in", it) }
 
     /** The API refused the token: forget it and every kept answer, and ask for a sign-in. */
     val sessionEnd: SessionEnd = signInState.sessionEnd
@@ -306,10 +317,10 @@ class AppGraph(
             zone,
             push,
             { session.deviceId },
-            AccountHooks(::signOut, sessionEnd, leaguesChanged, signInState::holdsToken),
+            AccountHooks(::signOut, sessionEnd, leaguesChanged, signInState::holdsToken, signInState::deleted),
         )
 
-    fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd)
+    fun shellViewModel(): ShellViewModel = ShellViewModel(account, cache, clock, zone, sessionEnd, signInState)
 
     /** The member signs this phone out (the Account's Sign out, or its own row's): the API forgets its
      * sign-in when it can be reached, the phone forgets its token and every kept answer whatever the API

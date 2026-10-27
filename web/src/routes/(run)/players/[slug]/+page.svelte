@@ -14,7 +14,6 @@
 	import { CARD, compareLeadsWithoutVerb, unreadBasis, type CardTile } from '#lib/player/card.ts';
 	import type { CardLeague, LiveCard } from '#lib/player/week-words.ts';
 	import { noReadWords, shownWeekRead, weekReadLabel } from '#lib/player/week-read.ts';
-	import { cliffAt, lineFiguresAt, lineRanksAt, matesAt } from '#lib/player/live-figures.ts';
 	import { FORMATS_RANK } from '#lib/player/formats-words.ts';
 	import { builtTiles, cardSource } from '#lib/player/card-source.ts';
 	import { PLAYER_PAGE } from '#lib/player/page-words.ts';
@@ -63,6 +62,9 @@
 
 	/** The week's read (Lane 66h): null until it answers, failed when it cannot. */
 	let live = $state<LiveCard | null>(null);
+	/** The tier box's and the every-format table's clock (live-figures.ts), loaded with the read: the
+	 * run's figures before an answer need none of it (the player page's script budget). */
+	let figuresAt = $state<typeof import('#lib/player/live-figures.ts') | null>(null);
 	let failed = $state(false);
 	let ready = $state(false);
 	let comparing = $state(false);
@@ -94,7 +96,10 @@
 		const key = at?.id ?? null;
 		if (key !== readFor) live = null;
 		try {
-			const module = await import('#lib/player/live.ts');
+			const [module, onClock] = await Promise.all([
+				import('#lib/player/live.ts'),
+				import('#lib/player/live-figures.ts')
+			]);
 			const tierFormat = apiFormatOf(lead.format);
 			const ask =
 				tierFormat === null || page.tier.mates.length === 0
@@ -108,6 +113,7 @@
 			// The page's clock: the card is drawn at the moment its week is read.
 			const card = await module.readCard(source, at, ask, () => Date.now());
 			if (mine !== asked) return;
+			figuresAt = onClock;
 			live = card;
 			readFor = key;
 			failed = false;
@@ -154,7 +160,14 @@
 	);
 	/** His status words as built, said again on the member's clock once the page is live. */
 	let liveStatus = $state<LiveStatus | null>(null);
+	/** The run's stamp in the member's zone (as the club page says it), loaded after first paint and
+	 * only in season on a page with an every-format table: the player page's script budget. */
+	let inSeasonRunStamp = $state<string | null>(null);
 	onMount(() => {
+		if (page.lines.length > 1 && page.format.rosFromWeek !== undefined)
+			void import('#lib/player/run-stamp.ts').then((stamp) => {
+				inSeasonRunStamp = stamp.memberRunStamp(page.format);
+			});
 		liveStatusClock(
 			page.status !== null,
 			() => import('#lib/run/status-view.ts'),
@@ -180,45 +193,55 @@
 	const heldOut = $derived(page.status?.status.seasonLong === true);
 	/** The tier box and the every-format table on one clock (live-figures.ts, re-review N1): the run's
 	 * figures until the read answers, then the read's alone. */
+	const read = $derived(live === null || figuresAt === null ? null : { card: live, at: figuresAt });
 	const mates = $derived(
-		matesAt(page.tier.mates, live?.tier ?? null).map((mate) => ({
-			...mate,
-			href: links.player(mate.slug)
-		}))
-	);
-	const tierCliff = $derived(cliffAt(page.tier.cliff, live?.tier ?? null));
-	const lineFigures = (
-		line: (typeof page.lines)[number]
-	): { points: number | null; vor: number | null } =>
-		lineFiguresAt(
-			{ points: line.numbers.projected, vor: line.numbers.vor },
-			apiFormatOf(line.format),
-			live?.formats ?? null
-		);
-	/** The every-format table's ranks on the figures' own clock (review H1): the read's only when
-	 * its figures stand, the formats it does not place said once under the table. */
-	const lineRanks = $derived(
-		lineRanksAt(
-			page.lines.map((line) => ({
-				run: line.numbers.positionRank,
-				format: apiFormatOf(line.format),
-				label: line.format.label
-			})),
-			live?.formats ?? null,
-			live === null ? null : { format: figures, positionRank: live.positionRank }
+		(read === null ? page.tier.mates : read.at.matesAt(page.tier.mates, read.card.tier)).map(
+			(mate) => ({ ...mate, href: links.player(mate.slug) })
 		)
 	);
+	const tierCliff = $derived(
+		read === null ? page.tier.cliff : read.at.cliffAt(page.tier.cliff, read.card.tier)
+	);
+	const lineFigures = (
+		line: (typeof page.lines)[number]
+	): { points: number | null; vor: number | null } => {
+		const run = { points: line.numbers.projected, vor: line.numbers.vor };
+		return read === null
+			? run
+			: read.at.lineFiguresAt(run, apiFormatOf(line.format), read.card.formats);
+	};
+	/** The every-format table's ranks on the figures' own clock (review H1): the run's until the read
+	 * answers, then the read's in each format only when its figures stand (Lane 234), the formats it
+	 * does not place said once under the table. */
+	const lineRanks = $derived(
+		read === null
+			? null
+			: read.at.lineRanksAt(
+					page.lines.map((line) => ({
+						run: line.numbers.positionRank,
+						format: apiFormatOf(line.format),
+						label: line.format.label
+					})),
+					read.card.formats,
+					{ format: figures, positionRank: read.card.positionRank },
+					listed !== null
+				)
+	);
 	const rankText = (i: number): string => {
-		const rank = lineRanks.ranks[i];
+		const rank = lineRanks === null ? page.lines[i]?.numbers.positionRank : lineRanks.ranks[i];
 		return rank === null || rank === undefined ? EMPTY_FIGURE : `${page.position} ${String(rank)}`;
 	};
 	/** The week tile's head as drawn ("Wk 6"), which the unread basis names. */
 	const weekTileHead = $derived(tiles.find((tile) => tile.key === 'proj')?.label ?? CARD.proj);
+	/** The run's stamp while the every-format table shows the run's ranks and figures in season
+	 * (Lane 234, ruling 2): on game day the run and the read share a date, so its time says the clock. */
+	const runStamp = $derived(live?.formats == null ? inSeasonRunStamp : null);
 	/** Every number's basis, once: the week's, the rest of season's, the season's. */
 	const basis = $derived([
 		...(live === null
 			? [unreadBasis(failed, weekTileHead, page.status?.words.view.rank ?? null)]
 			: live.basis),
+		...(runStamp === null ? [] : [runStamp]),
 		...(page.season.basis === null ? [] : [page.season.basis])
 	]);
 </script>
@@ -404,8 +427,8 @@
 					{/each}
 				</Table>
 				{#if page.formatsNote}<Footnote>{page.formatsNote}</Footnote>{/if}
-				{#if lineRanks.unranked.length > 0}<Footnote
-						>{FORMATS_RANK.unranked(lineRanks.unranked)}</Footnote
+				{#if lineRanks !== null && lineRanks.unranked.length > 0}<Footnote
+						>{FORMATS_RANK.unranked(lineRanks.unranked, lineRanks.reason)}</Footnote
 					>{/if}
 			</section>
 		{/if}

@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // The Start screen (the web's Lineup at /league/[id]/start): the lineup as a box score with each
 // slot's starter and the bench, the basis once, and the one verb pinned above the bar that sets the
 // lineup on the platform or copies it. Its snapshots, both themes at two phone sizes and the fixture's
@@ -34,5 +34,6 @@ let package = Package(
             ],
             exclude: ["__Snapshots__"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

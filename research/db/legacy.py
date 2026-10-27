@@ -399,6 +399,7 @@ NEW_IN_RESEARCH: Final[Mapping[str, str]] = MappingProxyType(
         "tank01_projection_rows": "Tank01's weekly projection parsed per player (revision 0009), a benchmark",
         "espn_projection_rows": "ESPN's public weekly projection per player (revision 0017), a yardstick, append-only",
         "espn_kdef_archive_rows": "ESPN's archived 2023-2024 kicker and D/ST projections (revision 0021), a benchmark",
+        "headshot_copies": "our headshot copies per player and season (revision 0022), the images bucket's ledger",
         "player_td_prop_observations": "the anytime-touchdown market (revision 0009), a benchmark",
         "capture_checks": "each capture feed's last successful check (revision 0008), rewritten by every capture pass",
         "register_weekly_rows": "the weekly number frozen per game before its kickoff (revision 0011), append-only",

@@ -713,7 +713,11 @@ function pageSections(
 			note: table.note,
 			rows: lines.map((line, i) => ({
 				label: table.labels[i],
+				// Our rank, the column before Lane 220, which Android's table still prints until Lane 226.
 				rank: held ?? String(line.numbers.ourRank),
+				// The column since Lane 220: his place at his position (formats-words.ts FORMATS_RANK), as
+				// the page's rankText draws it before the week's read answers (iOS since Lane 224).
+				positionRank: held ?? `${page.position} ${String(line.numbers.positionRank)}`,
 				points: fixed(line.numbers.projected),
 				vor: signed(line.numbers.vor),
 				tier: held ?? String(line.numbers.tier)

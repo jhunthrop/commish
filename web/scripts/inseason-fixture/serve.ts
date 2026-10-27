@@ -97,6 +97,7 @@ import {
 const PORT = Number(process.env.PORT ?? 8799);
 
 type PlayerWeekAnswer = components['schemas']['PlayerWeek'];
+type RestOfSeasonFigure = components['schemas']['RestOfSeasonFigure'];
 
 /** His week with his rest of season at the clock, and his figure a game where the line lacks one (the
  * API's per-game rule, Lane 100's vs Avg). */
@@ -106,11 +107,48 @@ function withRestAtClock(
 	params: URLSearchParams
 ): PlayerWeekAnswer {
 	const perGame = week.line.rest_of_season_per_game ?? restPerGameAtClock(id, now());
+	const rest = restAtClock(id, now(), tierAskOf(params));
 	return {
 		...week,
 		line: { ...week.line, rest_of_season_per_game: perGame },
-		...restAtClock(id, now(), tierAskOf(params))
+		...rest,
+		...(rest.rest_of_season == null
+			? {}
+			: { rest_of_season: inPublicOrder(rest.rest_of_season, week.line, id) })
 	};
+}
+
+/** The rows the public order reads at most (the API's MaxOrderRows). */
+const PUBLIC_ORDER_ROWS = '400';
+
+/** Each figure's ranks on the public order's numbers (Lane 227, B206): in PPR his head's position
+ * rank and the order's overall_rank, as the API gives them; in another scoring those moved by as many
+ * places as the stand-in's count on the run's boards moves him from PPR (rest-now.ts placesAtClock).
+ * Null in every scoring where the head has none (a season-long list) or the order does not place him. */
+function inPublicOrder(
+	figures: readonly RestOfSeasonFigure[],
+	line: PlayerWeekAnswer['line'],
+	id: string
+): RestOfSeasonFigure[] {
+	const placed = orderAt(new URLSearchParams({ limit: PUBLIC_ORDER_ROWS }), false).rows.find(
+		(row) => row.line.player.board_id === id
+	);
+	const ppr = figures.find((f) => f.format === 'ppr');
+	const head = line.position_rank;
+	const overall = placed?.overall_rank;
+	const moved = (at: number | null | undefined, from: number | null | undefined, by: number) =>
+		at == null || from == null ? null : Math.max(1, at + by - from);
+	return figures.map((f) => ({
+		...f,
+		position_rank:
+			placed === undefined || head === null
+				? null
+				: moved(f.position_rank, ppr?.position_rank, head),
+		overall_rank:
+			overall === undefined || head === null
+				? null
+				: moved(f.overall_rank, ppr?.overall_rank, overall)
+	}));
 }
 /** The fixture's clock: the real one, or the shots' week clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z,
  * clock.ts FIXTURE_WEEK_CLOCK), so every read stamp agrees with the browser's. */
@@ -746,16 +784,20 @@ function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 					)
 					.map((row, i) => ({ ...row, rank: i + 1 }));
 	// Every player on a season-long list after every available one, numbered on from them (order.go
-	// playingFirst, Lane 128 fix round 1).
-	// With byes=last on the read with no league, every available player on bye after the rest,
-	// numbered on (order.go playingFirst, Lane 163 D06).
+	// playingFirst, Lane 128 fix round 1): each row's full-order number (overall_rank, Lane 227 B209).
+	const full = [
+		...ranked.filter((row) => !seasonLongLine(row.line)),
+		...ranked.filter((row) => seasonLongLine(row.line))
+	].map((row, i) => ({ ...row, overall_rank: i + 1 }));
+	// With byes=last on the read with no league, every available player on bye after the rest, each
+	// row's rank its place as drawn, its overall_rank kept (order.go placesOf, Lane 163 D06, Lane 227).
 	const byesLast = !league && params.get('byes') === 'last';
 	const byeLast = (row: OrderRow): boolean =>
 		byesLast && row.line.facts.bye && !seasonLongLine(row.line);
 	const playingFirst = [
-		...ranked.filter((row) => !seasonLongLine(row.line) && !byeLast(row)),
-		...ranked.filter((row) => seasonLongLine(row.line)),
-		...ranked.filter(byeLast)
+		...full.filter((row) => !seasonLongLine(row.line) && !byeLast(row)),
+		...full.filter((row) => seasonLongLine(row.line)),
+		...full.filter(byeLast)
 	].map((row, i) => ({ ...row, rank: i + 1 }));
 	const roster = params.get('roster');
 	const found = playingFirst.filter(

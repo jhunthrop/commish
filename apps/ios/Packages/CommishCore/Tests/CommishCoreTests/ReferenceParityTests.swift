@@ -87,16 +87,23 @@ struct ReferenceParityTests {
                     leagueFormat: nil
                 )
                 let model = try await Self.loaded(RunScreenViewModel(
-                    reads: reads, zone: Fixtures.zone, onSignedOut: {}, build: CompareReader.build(ask)
+                    reads: reads, zone: Fixtures.zone, onSignedOut: {}, build: CompareReader.build(
+                        ask,
+                        zone: Fixtures.zone
+                    )
                 ))
                 let label = "\(run.fixture) \(want.first) \(want.second) \(want.format)"
                 #expect(model.lead == nil, "\(label)")
-                Self.expect(model.outcome, equals: want, label: label)
+                let ranked = try #require(run.run.manifest().formats.first { $0.id == want.format })
+                let stamp = [LiveOrderWords.runStamp(ranked, zone: Fixtures.zone)].compactMap(\.self)
+                Self.expect(model.outcome, equals: want, label: label, stamp: stamp)
             }
         }
     }
 
-    static func expect(_ outcome: CompareOutcome, equals want: PairCase, label: String) {
+    /// `stamp` is the run's stamp an in-season pair's basis ends with while the order is unread
+    /// (Lane 224, basisAtClock), after the basis the parity holds.
+    static func expect(_ outcome: CompareOutcome, equals want: PairCase, label: String, stamp: [String]) {
         switch outcome {
         case .same:
             #expect(want.kind == "same", "\(label)")
@@ -107,7 +114,7 @@ struct ReferenceParityTests {
             #expect(table.heads.first?.id == want.leader, "\(label)")
             #expect(table.call == want.call, "\(label)")
             #expect(table.evidence == want.evidence, "\(label)")
-            #expect(table.basis == want.basis, "\(label)")
+            #expect(table.basis == want.basis.map { $0 + stamp }, "\(label)")
             let rows = want.rows ?? []
             #expect(table.rows.map(\.label) == rows.map(\.label), "\(label)")
             for (row, wanted) in zip(table.rows, rows) {
@@ -146,7 +153,7 @@ struct ReferenceParityTests {
                 let format = try #require(manifest.formats.first { $0.id == want.format })
                 let input = try CompareInput(
                     manifest: manifest, format: format, sources: run.run.adpSources(), clubs: clubs,
-                    underway: run.underway, reach: .none, scoring: format.label, index: index,
+                    underway: run.underway, zone: Fixtures.zone, reach: .none, scoring: format.label, index: index,
                     sides: [.player(player(want.first, true)), .player(player(want.second, false))]
                 )
                 let model = CompareModel(input)
@@ -174,7 +181,10 @@ struct ReferenceParityTests {
                 let slugs = index.prefix(2).map(\.slug)
                 let model = try await Self.loaded(RunScreenViewModel(
                     reads: reads, zone: Fixtures.zone, onSignedOut: {},
-                    build: CompareReader.build(CompareAsk(slugs: slugs, format: format, leagueFormat: nil))
+                    build: CompareReader.build(
+                        CompareAsk(slugs: slugs, format: format, leagueFormat: nil),
+                        zone: Fixtures.zone
+                    )
                 ))
                 guard case let .table(table) = model.outcome else {
                     Issue.record("no table in \(format)")
@@ -183,7 +193,10 @@ struct ReferenceParityTests {
                 let gapless = basis.filter { $0 != Words.BoardBasis.gap }
                 // Exactly the one basis the table prints: the Gap's sentence only beside a Gap row.
                 let gapRow = table.rows.contains { $0.label == CompareRows.gapLabel }
-                #expect(table.basis == (gapRow ? basis : gapless), "\(run.fixture) \(format)")
+                // In season the run's stamp follows while the order is unread (Lane 224, basisAtClock).
+                let ranked = try #require(run.run.manifest().formats.first { $0.id == format })
+                let stamp = [LiveOrderWords.runStamp(ranked, zone: Fixtures.zone)].compactMap(\.self)
+                #expect(table.basis == (gapRow ? basis : gapless) + stamp, "\(run.fixture) \(format)")
                 #expect(gapRow == basis.contains(Words.BoardBasis.gap), "a format that compares draws the Gap")
             }
         }
@@ -244,7 +257,8 @@ struct ReferenceParityTests {
                 #expect(model.columns == .ranked(gap: want.gap))
                 #expect((model.compare?.ids ?? []) == (want.pair.count == 2 ? want.pair : []))
                 #expect(Array(model.basis.prefix(want.basis.count)) == want.basis, "\(want.abbr)")
-                #expect(model.basis.count == want.basis.count + capture)
+                let stamp = LiveOrderWords.runStamp(files.format, zone: Fixtures.zone) == nil ? 0 : 1
+                #expect(model.basis.count == want.basis.count + capture + stamp)
             }
         }
     }

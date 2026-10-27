@@ -11,20 +11,37 @@ public struct MockSetupScreen: View {
     @Environment(\.colorScheme) private var colorScheme
     private let viewModel: MockSetupViewModel
     private let started: (String) -> Void
+    private let lobbies: LobbyLandingViewModel?
+    private let joined: (String) -> Void
     var live = true
 
-    public init(viewModel: MockSetupViewModel, started: @escaping (String) -> Void, live: Bool = true) {
+    /// `lobbies` draws the open house drafts under the form and the quiet "Join a lobby with people"
+    /// beside the verb, as the web's setup does; `joined` opens a lobby room by its id.
+    public init(
+        viewModel: MockSetupViewModel, started: @escaping (String) -> Void, live: Bool = true,
+        lobbies: LobbyLandingViewModel? = nil, joined: @escaping (String) -> Void = { _ in }
+    ) {
         self.viewModel = viewModel
         self.started = started
         self.live = live
+        self.lobbies = lobbies
+        self.joined = joined
     }
 
     public var body: some View {
         let theme = Theme(colorScheme)
         Group {
             if live {
-                ScrollView { form(theme) }
-                    .safeAreaInset(edge: .bottom, spacing: 0) { pin(theme) }
+                // A join asking for a handle scrolls its question into view, wherever the tap was.
+                ScrollViewReader { reader in
+                    ScrollView { form(theme) }
+                        .onChange(of: lobbies?.handleFor != nil) { _, asking in
+                            if asking {
+                                withAnimation { reader.scrollTo(Self.handleID, anchor: .top) }
+                            }
+                        }
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) { pin(theme) }
             } else {
                 VStack(spacing: 0) {
                     form(theme)
@@ -37,6 +54,16 @@ public struct MockSetupScreen: View {
 
     private func form(_ theme: Theme) -> some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s4) {
+            if let lobbies, lobbies.handleFor != nil {
+                LobbyHandleView(problem: lobbies.handleProblem, busy: lobbies.busy) { handle in
+                    Task {
+                        if let id = await lobbies.saveHandle(handle) {
+                            joined(id)
+                        }
+                    }
+                }
+                .id(Self.handleID)
+            }
             Text(Words.Mock.setupTitle)
                 .font(Faces.font(.num, size: Tokens.TypeScale.display, weight: .bold))
                 .textCase(.uppercase)
@@ -50,6 +77,11 @@ public struct MockSetupScreen: View {
             row(Words.Mock.teams, chips: viewModel.teamChips) { viewModel.choose(teamsChip: $0) }
             slots
             row(Words.Mock.lineup, chips: viewModel.lineupChips) { viewModel.choose(lineup: $0) }
+            if let lobbies, lobbies.read {
+                LobbyListView(
+                    head: lobbies.head, cards: lobbies.cards, problem: lobbies.problem, enabled: !lobbies.busy
+                ) { card in join(card.format) }
+            }
         }
         .padding(.vertical, Tokens.Space.s4)
     }
@@ -74,6 +106,20 @@ public struct MockSetupScreen: View {
         }
     }
 
+    /// The handle question's place in the scroll.
+    static let handleID = "lobby-handle"
+
+    private func join(_ format: LobbyFormat) {
+        guard let lobbies else {
+            return
+        }
+        Task {
+            if let id = await lobbies.join(format) {
+                joined(id)
+            }
+        }
+    }
+
     private func row(_ label: String, chips: [BoardChip<String>], choose: @escaping (String) -> Void) -> some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s2) {
             Head(text: label, alignment: .leading).padding(.horizontal, Tokens.Space.s3)
@@ -92,6 +138,12 @@ public struct MockSetupScreen: View {
                         started(id)
                     }
                 }
+            }
+            if let lobbies {
+                QuietButton(Words.Lobby.joinWithPeople) {
+                    join(LobbyLandingViewModel.nearest(viewModel.settings))
+                }
+                .disabled(lobbies.busy || viewModel.busy)
             }
         }
         .padding(.horizontal, Tokens.Space.s3)

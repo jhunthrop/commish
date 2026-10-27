@@ -3290,7 +3290,7 @@
 		},
 		"scale": "Order matched is how closely an order ranked the players to the week's finish: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards.",
 		"startersBasis": null,
-		"method": "From week 7 we set our weekly rankings before each week's first kickoff and graded them on the week's points.",
+		"method": "From week 7 we set our rest-of-season order before each week's first kickoff and graded it on the week's points.",
 		"honest": null,
 		"weeks": [
 			{

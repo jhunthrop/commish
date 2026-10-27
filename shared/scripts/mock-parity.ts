@@ -307,11 +307,13 @@ function room(
   };
 }
 
-/** The report as Report.svelte draws it, for your draft or a shared one. */
-function report(
+/** The report as Report.svelte draws it, for your draft or a shared one; `seats` is the seats cell
+ * ("Bots by ADP" in a mock, "3 drafters, 9 bots" in a lobby, which lobby-parity.ts reads it for). */
+export function report(
   r: MockReport,
   names: readonly string[],
   shared: { by: string | null } | undefined,
+  seats: string = MOCK.botsByAdp,
 ) {
   const board = boardOf(r.board, r.teams);
   const head = standingCells(r.standings, r.slot, r.teams);
@@ -336,7 +338,7 @@ function report(
     title: reportTitle(r.slot, shared),
     points: head ? points(head.points) : null,
     caption: totalCaption(whose),
-    cells: [...(head?.cells ?? []), ...settingCells(r, MOCK.botsByAdp)].map(
+    cells: [...(head?.cells ?? []), ...settingCells(r, seats)].map(
       (c) => ({
         label: c.label,
         value: c.value,

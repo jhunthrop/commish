@@ -2,14 +2,19 @@ package app.trycommish.core.shell
 
 import app.trycommish.api.Unauthorized
 import app.trycommish.api.models.SiteSeason
+import app.trycommish.core.AccountGeneration
 import app.trycommish.core.Cached
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
+import app.trycommish.core.MemorySession
 import app.trycommish.core.SessionEnd
+import app.trycommish.core.SignInState
+import app.trycommish.core.SignOut
 import app.trycommish.core.leaguehome.Fixtures
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -62,7 +67,7 @@ class ShellViewModelTest {
             return taken
         }
 
-        override suspend fun revokeDevice(deviceId: String) = Unit
+        override suspend fun revokeDevice(deviceId: String): String? = null
     }
 
     private class Ends : SessionEnd {
@@ -75,11 +80,32 @@ class ShellViewModelTest {
 
     private fun offline(): String = throw IOException("Unable to resolve host")
 
+    /** The phone's account generation, moved by hand. */
+    private class Accounts : AccountGeneration {
+        override val generation = MutableStateFlow(1)
+        private val hooks = mutableListOf<() -> Unit>()
+
+        override fun onSignOut(hook: () -> Unit): AutoCloseable {
+            hooks += hook
+            return AutoCloseable { hooks -= hook }
+        }
+
+        fun signedOut() {
+            generation.value++
+            hooks.toList().forEach { it() }
+        }
+
+        fun signedIn() {
+            generation.value++
+        }
+    }
+
     private fun viewModel(
         reads: AccountReads,
         cache: MemoryCache = MemoryCache(),
         ends: Ends = Ends(),
-    ) = ShellViewModel(reads, cache, clock, Fixtures.zone, ends)
+        accounts: AccountGeneration = Accounts(),
+    ) = ShellViewModel(reads, cache, clock, Fixtures.zone, ends, accounts)
 
     private fun ShellViewModel.ready(): ShellState.Ready = assertInstanceOf(ShellState.Ready::class.java, state.value)
 
@@ -220,6 +246,169 @@ class ShellViewModelTest {
                 advanceUntilIdle()
                 assertEquals(leagues[1].id, vm.ready().selected?.id)
             }
+        }
+
+    /** GET /me answers the site's selection as `site` says; PUT /me/league waits on `gate` the first
+     * time and then fails with no signal, and every later PUT lands. */
+    private class HeldThenFailed(
+        var site: String,
+        private val leagues: List<FollowedLeague>,
+    ) : AccountReads {
+        val gate = CompletableDeferred<Unit>()
+        val selected = mutableListOf<String>()
+
+        override suspend fun me(): String = ShellFixtures.meBody(leagues, site)
+
+        override suspend fun selectLeague(leagueId: String): Boolean {
+            selected += leagueId
+            if (selected.size == 1) {
+                gate.await()
+                throw IOException("no signal")
+            }
+            site = leagueId
+            return true
+        }
+
+        override suspend fun revokeDevice(deviceId: String): String? = null
+    }
+
+    @Test
+    fun `a PUT held then failed is sent again on the next read, and once it lands the web's choice shows`() =
+        runTest(main) {
+            val reads = HeldThenFailed(leagues[0].id, leagues)
+            val vm = viewModel(reads)
+            vm.open()
+            advanceUntilIdle()
+            vm.choose(leagues[2].id)
+            runCurrent()
+            // The PUT is held: a read in between keeps the choice and sends nothing more.
+            vm.open()
+            advanceUntilIdle()
+            assertEquals(leagues[2].id, vm.ready().selected?.id)
+            assertEquals(listOf(leagues[2].id), reads.selected)
+            // The PUT fails with no signal; the next read that goes through still disagrees, so it is sent again.
+            reads.gate.complete(Unit)
+            advanceUntilIdle()
+            vm.open()
+            advanceUntilIdle()
+            assertEquals(listOf(leagues[2].id, leagues[2].id), reads.selected)
+            assertEquals(leagues[2].id, vm.ready().selected?.id)
+            // The site has it now: the web's next choice shows, with no relaunch.
+            reads.site = leagues[1].id
+            vm.open()
+            advanceUntilIdle()
+            assertEquals(leagues[1].id, vm.ready().selected?.id)
+            assertEquals(2, reads.selected.size)
+        }
+
+    @Test
+    fun `a held choice the account no longer follows is dropped, not sent again`() =
+        runTest(main) {
+            var shown = leagues
+            val failed = FakeAccount({ "" }, write = IOException("no signal"))
+            val reads =
+                object : AccountReads by failed {
+                    override suspend fun me(): String = ShellFixtures.meBody(shown, shown[0].id)
+                }
+            val vm = viewModel(reads)
+            vm.open()
+            advanceUntilIdle()
+            vm.choose(leagues[2].id)
+            advanceUntilIdle()
+            shown = leagues.take(2)
+            vm.open()
+            advanceUntilIdle()
+            assertEquals(leagues[0].id, vm.ready().selected?.id)
+            assertEquals(listOf(leagues[2].id), failed.selected)
+        }
+
+    @Test
+    fun `signing out forgets the account, the held choice and the write on its way`() =
+        runTest(main) {
+            val reads = HeldThenFailed(leagues[0].id, leagues)
+            val vm = viewModel(reads)
+            vm.open()
+            advanceUntilIdle()
+            vm.choose(leagues[2].id)
+            runCurrent()
+            vm.forget()
+            assertEquals(ShellState.Restoring, vm.state.value)
+            reads.gate.complete(Unit)
+            advanceUntilIdle()
+            // The next account's read shows its own selection, and nothing of the last is sent.
+            vm.open()
+            advanceUntilIdle()
+            assertEquals(leagues[0].id, vm.ready().selected?.id)
+            assertEquals(listOf(leagues[2].id), reads.selected)
+        }
+
+    @Test
+    fun `a read in flight at sign-out keeps nothing of the last account`() =
+        runTest(main) {
+            val gate = CompletableDeferred<Unit>()
+            val session = MemorySession("token", "device-1")
+            val cache = MemoryCache()
+            val state = SignInState(session, cache, SignOut(session, cache, { null }))
+            val vm = viewModel(FakeAccount({ ShellFixtures.meBody(leagues, leagues[1].id) }, gate = gate), cache, accounts = state)
+            vm.open()
+            runCurrent()
+            state.signOut()
+            assertEquals(ShellState.Restoring, vm.state.value)
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertNull(cache.read(ShellKeys.ACCOUNT))
+            assertNull(cache.read(ShellKeys.LAST_LEAGUE))
+            assertEquals(ShellState.Restoring, vm.state.value)
+        }
+
+    @Test
+    fun `a 401 for an account already let go signs nothing out`() =
+        runTest(main) {
+            val gate = CompletableDeferred<Unit>()
+            val ends = Ends()
+            val accounts = Accounts()
+            val reads =
+                object : AccountReads by FakeAccount({ "" }) {
+                    override suspend fun me(): String {
+                        gate.await()
+                        throw Unauthorized()
+                    }
+                }
+            val vm = viewModel(reads, ends = ends, accounts = accounts)
+            vm.open()
+            runCurrent()
+            // The generation moves with no hook (another account's sign-in); the read in flight answers 401.
+            accounts.signedIn()
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(0, ends.count)
+            assertEquals(ShellState.Restoring, vm.state.value)
+        }
+
+    @Test
+    fun `the shell rebuilds once per account, and a held link waits for the rebuild and its sign-in`() =
+        runTest(main) {
+            val accounts = Accounts()
+            val vm = viewModel(FakeAccount({ ShellFixtures.meBody(leagues, leagues[0].id) }), accounts = accounts)
+            val companion = ShellRoute.Companion("draft")
+            val shared = ShellRoute.SharedMock("abc123")
+            // Built for the account in hand at start: no rebuild, a public link opens signed out, the
+            // companion waits.
+            assertEquals(ShellStep(rebuild = false, push = shared), vm.step(signedIn = false, asked = shared))
+            assertEquals(ShellStep(rebuild = false, push = null), vm.step(signedIn = false, asked = companion))
+            // Signed in: the screens are owed a rebuild and nothing is pushed until it is done.
+            accounts.signedIn()
+            assertEquals(ShellStep(rebuild = true, push = null), vm.step(signedIn = true, asked = companion))
+            vm.rebuilt()
+            assertEquals(ShellStep(rebuild = false, push = companion), vm.step(signedIn = true, asked = companion))
+            vm.open()
+            advanceUntilIdle()
+            // Signed out: the account is forgotten at once and the rebuild is owed again.
+            accounts.signedOut()
+            assertEquals(ShellState.Restoring, vm.state.value)
+            assertEquals(ShellStep(rebuild = true, push = null), vm.step(signedIn = false, asked = shared))
+            vm.rebuilt()
+            assertEquals(ShellStep(rebuild = false, push = null), vm.step(signedIn = false, asked = null))
         }
 
     @Test

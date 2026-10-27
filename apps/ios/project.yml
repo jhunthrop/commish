@@ -10,6 +10,9 @@ options:
   developmentLanguage: en
 settings:
   base:
+    # The Swift 6 language mode, the newest there is: Swift 6.1 to 6.4 (Xcode 26.6 ships 6.3) add
+    # compiler releases, not modes (`swiftc -language-mode` takes 4, 4.2, 5 and 6). The packages say
+    # the same in their swiftLanguageModes.
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     MARKETING_VERSION: "0.1.0"

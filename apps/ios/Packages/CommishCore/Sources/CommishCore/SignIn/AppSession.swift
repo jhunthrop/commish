@@ -1,4 +1,5 @@
 import CommishAPI
+import CommishDesign
 import Foundation
 import Observation
 
@@ -45,6 +46,10 @@ public final class AppSession {
     /// of the same account), so the shell rebuilds every tab per account and no screen's state (a mock
     /// setup's saved league) passes from one member to the next on a shared phone.
     public private(set) var generation = 0
+
+    /// The one line the sign-in screen says after the account was deleted on this phone ("Your account is
+    /// deleted"); nil otherwise, and gone at the next sign-in or launch.
+    public private(set) var notice: String?
 
     /// Whether the phone is signed in (with or without a league followed).
     public var isSignedIn: Bool {
@@ -128,6 +133,7 @@ public final class AppSession {
         if !isSignedIn {
             generation += 1
         }
+        notice = nil
         state = .signedIn(league: league)
         lastLeague = league?.id
     }
@@ -164,6 +170,15 @@ public final class AppSession {
             try? await account.revokeDevice(id: device)
         }
         await expire()
+    }
+
+    /// The account was deleted (POST /me/delete answered 204): the phone forgets its token and the saved
+    /// answers as a sign-out does, with nothing to revoke (the API deleted every device) and no sign-in
+    /// provider's logout (the API deleted the user), and the sign-in screen says so until the next sign-in.
+    /// The line is held in memory only, so it does not outlast this launch.
+    public func deleted() async {
+        await expire()
+        notice = Words.DeleteAccount.doneTitle
     }
 
     /// The API refused the token (a signed-in read answered 401): forget it and the saved answers, and

@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { clockLabel, pickLabel, snakeSlot } from '#lib/format/draft.ts';
-	import { plural } from '#lib/format/number.ts';
+	import { pickLabel, snakeSlot } from '#lib/format/draft.ts';
 	import Keys from '#lib/ui/Keys.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import ScoreBug from '#lib/ui/ScoreBug.svelte';
@@ -27,6 +26,7 @@
 	import { lobbyFillWords } from './setup/setup.ts';
 	import Wall from './Wall.svelte';
 	import { presetWords } from './words.ts';
+	import { aboutHead, aboutWords, queueFirstWords, waitWords } from './lobby-words.ts';
 
 	interface Props {
 		room: LobbyRoom;
@@ -135,10 +135,8 @@
 	{#if !started}
 		<Panel>
 			<p class="wait">
-				<b>{lobbyFillWords(people).words}.</b> The draft starts when {teams} are in, or in {clockLabel(
-					fillLeft
-				)}
-				with bots in the open seats.
+				<b>{lobbyFillWords(people).words}.</b>
+				{waitWords(teams, fillLeft)}
 			</p>
 		</Panel>
 	{/if}
@@ -153,7 +151,7 @@
 						onclick: () => draft(call.player.id)
 					}
 				: {
-						label: `${draftWords(call.player.position, 'Queue')} first`,
+						label: queueFirstWords(draftWords(call.player.position, 'Queue')),
 						onclick: () => queueFirst(call.player.id)
 					}}
 		/>
@@ -191,13 +189,12 @@
 	{#snippet dock()}
 		<Panel padding="sm">
 			<p class="about">
-				<b>{teams} {presetWords(room.settings.scoring.preset ?? 'ppr')} lobby</b>, {plural(
+				<b>{aboutHead(teams, presetWords(room.settings.scoring.preset ?? 'ppr'))}</b>, {aboutWords(
 					people,
-					'drafter'
-				)}{started
-					? ` and ${plural(teams - people, 'bot')}`
-					: `, ${plural(teams - people, 'seat')} open`}. {room.clock_seconds} seconds a pick, your queue
-				drafts if you step away, a bot takes any seat that closes the tab.
+					teams,
+					started,
+					room.clock_seconds
+				)}
 			</p>
 		</Panel>
 		<TeamPanel slots={teamSlots(room.settings, mine, board)} rosterSize={room.rounds} {teams} />

@@ -92,7 +92,7 @@ func (s *Service) previewGroupPass(w http.ResponseWriter, r *http.Request) {
 		seasonEnded(w, r)
 		return
 	}
-	handle, err := s.Handles.HandleOf(r.Context(), g.PurchaserID)
+	handle, err := s.purchaserHandle(r.Context(), g)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "billing: group pass purchaser", err)
 		return
@@ -147,4 +147,13 @@ func (s *Service) claimGroupPass(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeAccount(w, r)
+}
+
+// purchaserHandle is the buyer's handle, nil when they have none or
+// deleted their account.
+func (s *Service) purchaserHandle(ctx context.Context, g GroupPass) (*string, error) {
+	if g.PurchaserID == nil {
+		return nil, nil
+	}
+	return s.Handles.HandleOf(ctx, *g.PurchaserID)
 }

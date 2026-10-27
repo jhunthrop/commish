@@ -32,8 +32,7 @@ enum RecordWords {
 
     /// day-time.ts dayTimeStamp on the build's clock: "Thu Oct 22, 1:00 pm Central".
     static func dayTimeStamp(_ date: Date) -> String {
-        "\(weekday(date, zone: buildZone)) \(Formatting.shortDay(date, zone: buildZone)), "
-            + "\(Formatting.timeOfDay(date, zone: buildZone)) \(Formatting.zoneWord(buildZone))"
+        Formatting.dayTimeStamp(date, zone: buildZone)
     }
 
     private static func weekday(_ date: Date, zone: TimeZone) -> String {

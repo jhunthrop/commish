@@ -2121,6 +2121,11 @@ type Account struct {
 	Season SiteSeason `json:"season"`
 }
 
+// AccountDeletion The member's confirmation that the account goes: the email they sign in with, typed by hand, compared without regard to case or the spaces around it.
+type AccountDeletion struct {
+	Email string `json:"email"`
+}
+
 // AccountUpdate defines model for AccountUpdate.
 type AccountUpdate struct {
 	Handle string `json:"handle"`
@@ -3943,7 +3948,7 @@ type PlayerLine struct {
 	// GamesPlayed the completed games season_avg is over, a final game the platform's points count included (facts.last_games source platform, Lane 111); absent before his first game and from an older answer
 	GamesPlayed *int `json:"games_played,omitempty"`
 
-	// Headshot his face from our player directory, null without one
+	// Headshot our copy of his headshot, null without one
 	Headshot *string `json:"headshot"`
 
 	// Held the drafter tags him Hold on a sheet
@@ -6705,6 +6710,9 @@ type JoinLobbyJSONRequestBody = LobbyJoin
 
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = AccountUpdate
+
+// DeleteMeJSONRequestBody defines body for DeleteMe for application/json ContentType.
+type DeleteMeJSONRequestBody = AccountDeletion
 
 // SelectLeagueJSONRequestBody defines body for SelectLeague for application/json ContentType.
 type SelectLeagueJSONRequestBody = LeagueChoice

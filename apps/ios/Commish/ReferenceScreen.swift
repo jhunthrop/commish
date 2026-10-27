@@ -20,21 +20,21 @@ struct ReferenceScreen: View {
         route: ShellRoute, environment: AppEnvironment, league: FollowedLeague?,
         expired: @escaping @MainActor () -> Void
     ) {
-        let (api, cache, clock) = (environment.api, environment.cache, environment.clock)
+        let (api, cache, clock, orders) = (environment.api, environment.cache, environment.clock, environment.orders)
         let screen: Screen = switch route {
         case let .adp(format):
             .adp(.adp(format: format, run: api, pages: api, cache: cache, clock: clock, onSignedOut: expired))
         case let .compare(first, second):
             .compare(.compare(
                 slugs: [first, second], league: league, run: api, pages: api, cache: cache, clock: clock,
-                onSignedOut: expired
+                orders: orders, onSignedOut: expired
             ))
         case let .club(abbr):
-            .club(.club(abbr, run: api, pages: api, cache: cache, clock: clock, onSignedOut: expired))
+            .club(.club(abbr, run: api, pages: api, cache: cache, clock: clock, orders: orders, onSignedOut: expired))
         case .schedule:
             .schedule(.schedule(run: api, pages: api, cache: cache, clock: clock, onSignedOut: expired))
         default:
-            .clubs(.clubs(run: api, pages: api, cache: cache, clock: clock, onSignedOut: expired))
+            .clubs(.clubs(run: api, pages: api, cache: cache, clock: clock, orders: orders, onSignedOut: expired))
         }
         _screen = State(initialValue: screen)
     }

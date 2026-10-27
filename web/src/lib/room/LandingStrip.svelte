@@ -4,6 +4,7 @@
 	import type { StripPick } from '#lib/types/room.ts';
 	import { type LobbyPick, type LobbySeatState, pickCredit } from './lobby.ts';
 	import type { Board } from './model.ts';
+	import { LOBBY, byPeopleWords } from './lobby-words.ts';
 
 	interface Props {
 		/** The last round of picks, newest first. */
@@ -42,7 +43,7 @@
 {#if picks.length > 0}
 	<PickStrip
 		lead={pickLabel(picks[0]?.pick ?? 1, teams)}
-		leadLines={['just taken, newest first', `${people} of the last ${picks.length} by people`]}
+		leadLines={[LOBBY.justTaken, byPeopleWords(people, picks.length)]}
 		picks={strip}
 		width="lg"
 	/>

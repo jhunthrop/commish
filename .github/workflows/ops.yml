@@ -10,9 +10,9 @@ on:
         description: the Cloud Run job to execute
         required: true
         type: choice
-        options: [nightly, nightly-publish, inseason, inseason-capture]
+        options: [nightly, nightly-publish, inseason, inseason-capture, headshots]
       args:
-        description: "optional: the container's arguments for this execution only, comma-separated (the image's entrypoint is python -m, so for example research.capsules,queue,--slugs,a,b)"
+        description: "optional: the container's arguments for this execution only, comma-separated (the image's entrypoint is python -m, so for example research.capsules,queue,--slugs,a,b or research.headshots,curate,--player,<id>,--url,<url>,--by,<who>)"
         required: false
         type: string
         default: ""
@@ -52,4 +52,4 @@ jobs:
           [ -n "$EX" ] || exit 0
           sleep 20
           gcloud logging read "resource.type=\"cloud_run_job\" AND labels.\"run.googleapis.com/execution_name\"=\"$EX\"" \
-            --limit 60 --format='value(textPayload)' --freshness=12h | grep -E '^[0-9T:.+-]+ (ingest|fit|capsules|gate|run |publish|freeze|grade|scoreboard|stats-ingest|play-by-play|ftn|next-gen|pfr)' | cut -c1-400 || true
+            --limit 60 --format='value(textPayload)' --freshness=12h | grep -E '^[0-9T:.+-]+ (ingest|fit|capsules|gate|run |publish|freeze|grade|scoreboard|stats-ingest|play-by-play|ftn|next-gen|pfr|headshots)' | cut -c1-400 || true

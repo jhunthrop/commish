@@ -17,20 +17,25 @@ enum UIPasteboardBridge {
 }
 
 /// The report's verbs (the report page's): the solid one that runs the draft again, then the quiet
-/// ones. A shared draft's report has its own lead and no link of its own to copy.
+/// ones. A shared draft's report has its own lead and no link of its own to copy; a lobby's has its
+/// own lead and quiet verb, and no link.
 public struct MockReportVerbs {
     let lead: String
     let run: () -> Void
     let another: (() -> Void)?
+    /// The quiet verb's words: Try another slot in a mock, the same draft against bots in a lobby.
+    let anotherLabel: String
     let copied: Bool
     let copy: (() -> Void)?
 
     public init(
-        lead: String, run: @escaping () -> Void, another: (() -> Void)?, copied: Bool, copy: (() -> Void)?
+        lead: String, run: @escaping () -> Void, another: (() -> Void)?,
+        anotherLabel: String = Words.Mock.tryAnother, copied: Bool, copy: (() -> Void)?
     ) {
         self.lead = lead
         self.run = run
         self.another = another
+        self.anotherLabel = anotherLabel
         self.copied = copied
         self.copy = copy
     }
@@ -100,7 +105,7 @@ public struct MockReportScreen: View {
                 Verb(verbs.lead, action: verbs.run)
                 HStack(spacing: Tokens.Space.s3) {
                     if let another = verbs.another {
-                        QuietButton(Words.Mock.tryAnother, action: another)
+                        QuietButton(verbs.anotherLabel, action: another)
                     }
                     if let copy = verbs.copy {
                         QuietButton(verbs.copied ? Words.Mock.copied : Words.Mock.copyLink, action: copy)

@@ -633,7 +633,7 @@ object Words {
         const val gradesLater = "grades when the stats land"
         const val setUnknown = "set before its first kickoff"
         const val espnBasis = "ESPN's is its own public PPR projection, read before the week's first kickoff."
-        const val espnReadAfter = "ESPN's projection this week was read after our weekly rankings were set, still before the first kickoff."
+        const val espnReadAfter = "ESPN's projection this week was read after our rest-of-season order was set, still before the first kickoff."
         const val espnUnread = "ESPN's projection was not read before this week's first kickoff, so the week is graded against the week's published projection alone."
         const val noYardstick = "No yardstick was read before this week's first kickoff, so the week is graded on its own order alone."
         const val waiting = "This record is written by the next nightly run."
@@ -719,8 +719,6 @@ object Words {
 
     object AccountFoot {
         const val label = "Your data"
-        const val before = "To delete your account, write to "
-        const val after = " from the email you sign in with. What we keep is in the "
         const val privacy = "Privacy Policy"
         const val joint = " and the "
         const val terms = "Terms of Service"
@@ -941,5 +939,95 @@ object Words {
         const val none = "None"
         const val lobbyClock = "Clock in a lobby"
         const val lobbyStarts = "A lobby starts"
+    }
+
+    object FormatsRank {
+        const val head = "Position rank"
+    }
+
+    object LiveStrip {
+        const val yourLeague = "your league"
+        const val leagueAvg = "Avg in your league's scoring."
+    }
+
+    object LiveOrder {
+
+    }
+
+    object Lobby {
+        const val join = "Join"
+        const val yourSeat = "Your seat"
+        const val joinWithPeople = "Join a lobby with people"
+        const val signInToJoin = "Sign in to join a lobby"
+        const val handleAsk = "The name the room shows the other drafters"
+        const val handleLabel = "Handle"
+        const val handlePlaceholder = "3 to 20 letters, digits or _"
+        const val saveAndJoin = "Save and join"
+        const val handleFailed = "That handle did not save."
+        const val searchPool = "Search the pool"
+        const val leave = "Leave"
+        const val leaveFilling = "Leave? Your seat opens for someone else."
+        const val leaveDrafting = "Leave? Your queue drafts your seat, then the board, and the report is yours when the draft ends."
+        const val leaveVerb = "Leave the lobby"
+        const val stay = "Stay"
+        const val reconnecting = "Reconnecting to the room."
+        const val refused = "The room refused that."
+        const val over = "The draft is over."
+        const val readReport = "Read the report"
+        const val abandoned = "This lobby closed because nobody was here when it filled."
+        const val joinAnother = "Join another lobby"
+        const val signedOut = "Sign in to draft in a lobby. The other drafters see your handle."
+        const val gone = "This lobby is gone."
+        const val noSeat = "You do not have a seat in this lobby."
+        const val joinLobby = "Join a lobby"
+        const val onTheClock = "On the clock"
+        const val clock = "Clock"
+        const val yourPick = "Your pick"
+        const val now = "Now"
+        const val yourPickIsNow = "Your pick is now"
+        const val seatOnClock = "on the clock"
+        const val seatLeft = "left, queue drafts"
+        const val seatDrafter = "drafter"
+        const val seatWaiting = "waiting"
+        const val seatOpen = "open"
+        const val seats = "Seats"
+        const val standInWeb = "a bot takes any seat that closes the tab"
+        const val standInApp = "a bot takes any seat that closes the app"
+        const val justTaken = "just taken, newest first"
+        const val leftTitle = "You left a lobby"
+        const val leftOver = "The draft is over and your report is ready."
+        const val leftDrafting = "Your queue drafts your seat, then the board. Return and the seat is yours again."
+        const val returnVerb = "Return to the lobby"
+    }
+
+    object DeleteAccount {
+        const val title = "Delete account"
+        const val heading = "Delete your account"
+        const val lead = "Your account and everything kept with it go for good. This cannot be undone."
+        const val deletedHead = "Deleted"
+        const val keptHead = "Kept"
+        const val signedInAs = "Signed in as"
+        const val confirm = "Type your email to confirm"
+        const val verb = "Delete account"
+        const val sheetVerb = "Delete my account"
+        const val failed = "Your account was not deleted. Try again."
+        const val doneTitle = "Your account is deleted"
+        const val doneLine = "Everything kept with it is gone, and you are signed out on every device."
+        const val home = "Back to Commish"
+        const val signedOutTitle = "Sign in to delete your account"
+        const val signedOutLine = "Sign in with the account to delete, and you come back to this page."
+        const val signIn = "Sign in"
+        const val offlineTitle = "You're offline"
+        const val offlineLine = "This page loads your account as soon as you are back online."
+        const val unreachableTitle = "Your account can't be reached right now"
+        const val unreachableLine = "Nothing was deleted."
+        const val tryAgain = "Try again"
+        val deleted: List<String> = listOf("Your sign-in, email, name and handle", "Your cheat sheets and their exports", "Your mock drafts and their reports", "The leagues you follow and your platform connections", "Every browser and phone paired with your account", "Your passes and your membership")
+        val kept: List<String> = listOf("Your seats and picks in lobby drafts, under the name Former member", "A group pass you bought, for the people who claimed it")
+    }
+
+    object AccountDeleteFoot {
+        const val verb = "Delete account"
+        const val keep = "What we keep is in the "
     }
 }

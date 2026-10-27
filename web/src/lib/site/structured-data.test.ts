@@ -17,7 +17,7 @@ const PERSON = personData({
 	position: 'WR',
 	club: 'Los Angeles Rams',
 	path: '/players/puka-nacua',
-	image: 'https://trycommish.app/img/headshots/nfl/4426515/480'
+	image: 'https://images.trycommish.app/headshots/2026/4426515/480.webp'
 });
 
 void test("a player's Person names his position at his club, his page, his face and his club", () => {
