@@ -7,6 +7,8 @@ import app.trycommish.api.models.HostMovePlan
 import app.trycommish.api.models.HostMoveResult
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.LeaguePhase
+import app.trycommish.api.models.LineupAdvice
+import app.trycommish.api.models.LineupSlot
 import app.trycommish.api.models.ScoringPreset
 import app.trycommish.api.models.TradeCheck
 import app.trycommish.api.models.TradeCheckInput
@@ -139,11 +141,27 @@ fun screenOf(
 /** Saturday noon, the lineup on a platform that takes it: the swaps and the one verb that sets them. */
 private fun lineup(): @Composable () -> Unit {
     val now = StartFixtures.instant(StartFixtures.WEEK)
-    val model = startModel(StartFixtures.writes(StartFixtures.WEEK), storeLeague.host, now, Fixtures.zone)
+    val model = startModel(everySlotFilled(StartFixtures.writes(StartFixtures.WEEK)), storeLeague.host, now, Fixtures.zone)
     val ui = StartUi(state = StartState.Loaded(model, now, stale = false))
     val stamp = startStamp(ui, Fixtures.zone)
     val pin = startPin(ui, ValueWords.platform(storeLeague.host), Fixtures.zone)
     return { StartScreen(ui, stamp, pin, refreshing = false, actions = StartActions()) }
+}
+
+/**
+ * The first store shot shows the lineup working, not a hole (the coordinator's ruling, Lane 255): in the
+ * fixture the set TE is on his bye and the bench TE is ruled out, so no one can fill the slot. Here the
+ * bench TE is cleared to play and the advice starts him, the bye TE goes to the bench, as the API answers a
+ * playable swap. The store run only; every other line is the fixture's own.
+ */
+internal fun everySlotFilled(advice: LineupAdvice): LineupAdvice {
+    val empty = advice.slots.single { it.slot == LineupSlot.Slot.TE && it.noOneCanPlay }
+    val ruledOut = advice.bench.single { it.player.position == "TE" && it.facts.designation != null }
+    val playing = ruledOut.copy(facts = ruledOut.facts.copy(designation = null))
+    return advice.copy(
+        slots = advice.slots.map { if (it == empty) it.copy(ours = playing, changed = true, noOneCanPlay = false) else it },
+        bench = advice.bench.map { if (it == ruledOut) empty.ours else it },
+    )
 }
 
 /** Saturday noon, the wire before it clears: the best add first, the claim pinned. */

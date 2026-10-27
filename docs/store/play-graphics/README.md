@@ -19,7 +19,7 @@ The script runs `./gradlew :storeshots:testDebugUnitTest -PstoreGraphics=<this f
 | --- | --- | --- | --- | --- |
 | `icon-512.png` | 512 x 512 | 32-bit PNG, RGBA | App icon | `web/static/icons/icon-512.png` pixel for pixel, re-saved with an alpha channel (opaque) |
 | `feature-graphic.png` | 1024 x 500 | 24-bit PNG, no alpha | Feature graphic | The whistle (the `Mark` composable) and "Commish" in Outfit on the dark page colour |
-| `phone-1-lineup.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 1 | "The lineup to start, every week": Lineup, Saturday noon, three changes and the verb that makes them |
+| `phone-1-lineup.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 1 | "The lineup to start, every week": Lineup, Saturday noon, four changes filling every slot and the verb that makes them |
 | `phone-2-waivers.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 2 | "Your best add on waivers": Waivers, the two pickups with the best first and the claim pinned |
 | `phone-3-trades.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 3 | "Trades that help both teams": Trades, two trades worth proposing with each side's gain |
 | `phone-4-matchup.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 4 | "Your game, kept up to date": Matchup, Sunday afternoon with points coming in |
@@ -34,5 +34,6 @@ Upload the eight phone shots in this order: the captions are drawn into each ima
 
 - Dark theme, the caption in Outfit SemiBold on the surface token with the whistle above it, the screen below as the phone draws it: the top bar and the bottom bar are the app's own (`TopBar`, `PhoneTabBar`), lit on the screen's tab; the rankings, board and player page are pushed pages, so no tab is lit; the mock room is full screen, as in the app.
 - The data is the shared fixtures (`shared/fixtures`) at their clocks. The fixture league is a recorded public league, so its team names and its members' handles are real people's: the store run draws from a copy with each replaced by a made-up name (`apps/android/storeshots/store-names.json`), the league named "Sunday Standard" and read as ESPN, the platform the lineup and the claim are made on. Player names are public NFL players.
+- The lineup shot fills every slot: in the fixture the set TE is on his bye and the bench TE is ruled out, so the store run clears the bench TE to play and starts him (`everySlotFilled` in `StoreScenes.kt`). The first shot shows the lineup working, not a hole; every other line is the fixture's own.
 - No team logos (D/ST rows draw the club chip), no headshots (a face draws its initials, as every snapshot does), no projection or data provider named, no league member's data. The member's platform is named where the screen names it ("as set on ESPN", "Add on ESPN", "Open ESPN trades"), as the listing's description names the platforms a league can be followed on.
 - The cheat sheet is not in the apps yet and no caption or shot shows it; §1.2's eight captions name none of it, so none was dropped.
