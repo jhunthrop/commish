@@ -21,7 +21,6 @@ from research.db.schema import (
     TEAM_WEEK_OBSERVATIONS,
 )
 from research.db.url import sqlalchemy_url
-from research.inseason.season_week import GRADE_AFTER
 from research.model.register.freeze import SERVED_SOURCE, SHIPPED_SOURCE, shipped_board
 from research.nightly.reads import record
 from research.parity import databases
@@ -33,6 +32,8 @@ _PUBLISHED_AT: Final = datetime(2026, 10, 22, 10, 0, tzinfo=UTC)
 _SET: Final = datetime(2026, 10, 22, 18, 0, tzinfo=UTC)
 _KICKOFF: Final = datetime(2026, 10, 23, 0, 15, tzinfo=UTC)
 _LAST_KICKOFF: Final = datetime(2026, 10, 27, 0, 15, tzinfo=UTC)
+# Monday night's lines are dated the end of its Eastern day plus a day: Tuesday 20:00 Eastern (Lane 244).
+_LINES_DATED: Final = datetime(2026, 10, 28, 0, 0, tzinfo=UTC)
 _GRADED: Final = datetime(2026, 10, 28, 22, 0, tzinfo=UTC)
 # Three receivers: ours ranks them a, b, c; the preseason board c, b, a; they finished a, b, c.
 _PLAYERS: Final = (("00-a", "pa", 1, 30.0), ("00-b", "pb", 2, 20.0), ("00-c", "pc", 3, 10.0))
@@ -135,4 +136,4 @@ def test_a_frozen_week_says_when_it_grades(engine: Engine) -> None:
         waiting, _ = record.read_record(conn, _SEASON, _SET)
         conn.rollback()
     assert weeks[6].status == "graded"
-    assert (waiting[6].status, waiting[6].grades_from, waiting[6].placed) == ("frozen", _LAST_KICKOFF + GRADE_AFTER, ())
+    assert (waiting[6].status, waiting[6].grades_from, waiting[6].placed) == ("frozen", _LINES_DATED, ())

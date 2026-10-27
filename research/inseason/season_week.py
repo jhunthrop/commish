@@ -26,7 +26,8 @@ non-zero when any step failed.
    taken minutes before it (`espn_points`); a failed read fails this step alone, never the freeze.
 2. **props-snapshot**: the odds provider's player props for the coming fourteen days.
 3. **grade**: every frozen week not yet graded, whose games are complete (below), against the
-   stats now held. Each grade row is stamped `implementation = 'python'`.
+   stats now held. It runs after every ingest above on the same pass, so one pass fetches a
+   week's last lines and grades it. Each grade row is stamped `implementation = 'python'`.
 4. **freeze**: the coming week, if no freeze holds it yet, strictly before its first kickoff, and
    again on the final pass before that kickoff (`FINAL_FREEZE_BEFORE`, Lane 93), which supersedes
    the early freeze so the week's order is set once, on the Thursday pass. A week already frozen is
@@ -40,11 +41,17 @@ non-zero when any step failed.
    first kickoff never fills.
 5. **scoreboard**: the running score, read fresh.
 
-ONE CHANGE FROM THE ORACLE, on purpose: a week is graded only once its last kickoff is
-`GRADE_AFTER` behind the pass. The oracle graded any frozen week the store held outcomes for, so a
-Wednesday pass could grade Thursday's freeze on its one played game; the register's grade of a week
-is final (the pass never regrades), so a partial week would stand. Thirty-six hours after Monday
-night's kickoff is Wednesday's pass, by which nflverse has published the week.
+ONE CHANGE FROM THE ORACLE, on purpose: a week is graded only once it is complete. The oracle graded
+any frozen week the store held outcomes for, so a Wednesday pass could grade Thursday's freeze on its
+one played game; the register's grade of a week is final (the pass never regrades), so a partial week
+would stand. A week is complete (Lane 244) on the first pass where every club with a kickoff that week
+(the same nflverse kickoff observations `last_kickoffs_by_week` reads) holds its game's final result
+and nflverse player-week stat lines for its players, each as of the pass, the instant the grade reads
+its lines at; until then the pass names the clubs it waits on. `GRADE_FLOOR` after the last kickoff
+keeps a pass that lands between a final whistle and nflverse's next publish from reading a game half
+ingested. The store dates a game's lines the end of its Eastern day plus `PUBLICATION_LAG_HOURS`, so a
+Monday night week is first complete on Tuesday evening Eastern (`earliest_grade`). Lane 244 replaced
+the thirty-six hour wait (`GRADE_AFTER`) the pass held before, which the draft record still counts by.
 """
 
 import logging
@@ -52,6 +59,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Final
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import Connection, Engine, text
 
@@ -69,16 +77,24 @@ from research.pipeline.espn import projections as espn_projections
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import ingest, season_stats
 from research.pipeline.nflverse.client import NflverseClient, NflverseError
+from research.pipeline.nflverse.config import PUBLICATION_LAG_HOURS
 from research.pipeline.nflverse.context import ingest_opponent_defence_to_date
 from research.pipeline.nflverse.games import ingest_games
 from research.pipeline.nflverse.kdef_lines import refresh_kdef_season
-from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
+from research.pipeline.nflverse.participation import NflverseSource
+from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource, kickoff_as_of
 from research.pipeline.odds.ingest import run_odds_snapshot
 from research.pipeline.tank01.capture import PLAYER_LIST_REQUESTS, read_player_list
 from research.pipeline.tank01.client import API_KEY_ENV, Tank01Client
 
 LOG: Final = logging.getLogger(__name__)
+# The draft record's complete-week line (`nightly/reads/draft_record.py`); the pass grades on
+# completeness since Lane 244.
 GRADE_AFTER: Final = timedelta(hours=36)
+# No week grades sooner than this after its last kickoff, its stat lines held or not (Lane 244): a pass
+# between a final whistle and nflverse's next publish must not see a game half ingested.
+GRADE_FLOOR: Final = timedelta(hours=6)
+_EASTERN: Final = ZoneInfo("America/New_York")
 # The week's order is set on the last pass before its first kickoff (Lane 93, B37): the Thursday 14:00
 # Eastern pass, six hours before a Thursday night game, is the one inside this window. The first pass
 # after the previous week's first kickoff still freezes the week early, so a failed final pass leaves
@@ -264,6 +280,57 @@ def last_kickoffs_by_week(conn: Connection, season: int) -> dict[int, datetime]:
     return {int(row.week): ms_instant(row.latest) for row in rows if row.latest is not None}
 
 
+_CLUBS_HELD: Final = """
+select k.team,
+  exists(
+    select 1 from research.team_week_observations r
+    where r.season = k.season and r.week = k.week and r.team = k.team
+      and r.source = :kickoff and r.metric = :result and r.as_of <= :now
+  ) as final,
+  exists(
+    select 1 from research.player_week_teams t
+    join research.player_week_observations o
+      on o.season = t.season and o.week = t.week and o.player_id = t.player_id
+    where t.season = k.season and t.week = k.week and t.team = k.team and o.source = :lines and o.as_of <= :now
+  ) as lined
+from (
+  select distinct season, week, team from research.team_week_observations
+  where season = :s and week = :w and source = :kickoff and metric = :kickoff_instant
+) k
+order by k.team
+"""
+
+
+def incomplete_clubs(conn: Connection, season: int, week: int, now: datetime) -> list[str]:
+    """Each club with a kickoff in the week whose game the store does not yet hold whole as of `now`,
+    with what it lacks ("DAL no final", "PHI no stat lines"): its final result (the nflverse game
+    result `stats-ingest` writes with the lines) and a stat line for one of its players that week (the
+    nflverse player-week source `grade_week` reads). Empty when the week is complete."""
+    params = {
+        "s": season,
+        "w": week,
+        "now": now,
+        "kickoff": ScheduleSource.KICKOFF,
+        "kickoff_instant": ScheduleMetric.KICKOFF_INSTANT,
+        "result": ScheduleMetric.GAME_RESULT,
+        "lines": NflverseSource.PLAYER_WEEK,
+    }
+    missing: list[str] = []
+    for row in conn.execute(text(_CLUBS_HELD), params):
+        lacks = [word for word, held in (("no final", row.final), ("no stat lines", row.lined)) if not held]
+        if lacks:
+            missing.append(f"{row.team} {' and '.join(lacks)}")
+    return missing
+
+
+def earliest_grade(last_kickoff: datetime) -> datetime:
+    """The first instant a week can be complete: its last game's lines are dated the end of that game's
+    Eastern day plus `PUBLICATION_LAG_HOURS` (`kickoff_as_of`), never sooner than `GRADE_FLOOR`. A
+    Monday night week's is Tuesday evening Eastern; the record says its day from this."""
+    gameday = last_kickoff.astimezone(_EASTERN).date().isoformat()
+    return max(last_kickoff + GRADE_FLOOR, kickoff_as_of(gameday, PUBLICATION_LAG_HOURS))
+
+
 def _frozen_and_graded(conn: Connection, season: int) -> tuple[list[int], set[int]]:
     frozen = [
         int(row.week)
@@ -303,8 +370,16 @@ def grade(context: SeasonWeekContext) -> StepResult:
             detail.append(f"week {week}: {'OVERDUE, ' if stale else ''}waits, no kickoff on file")
             failed = failed or stale
             continue
-        if context.now < last + GRADE_AFTER:
-            detail.append(f"week {week}: waits, its last kickoff {js_iso(last)} is under {GRADE_AFTER} ago")
+        if context.now < last + GRADE_FLOOR:
+            detail.append(f"week {week}: waits, its last kickoff {js_iso(last)} is under {GRADE_FLOOR} ago")
+            continue
+        with context.engine.connect() as conn:
+            missing = incomplete_clubs(conn, context.season, week, context.now)
+        if missing:
+            overdue = context.now >= last + GRADE_OVERDUE
+            waits = f"waits on {len(missing)} clubs, {', '.join(missing)}"
+            detail.append(f"week {week}: {'OVERDUE, ' if overdue else ''}{waits}")
+            failed = failed or overdue
             continue
         try:
             with context.engine.begin() as conn:

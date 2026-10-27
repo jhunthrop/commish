@@ -22,6 +22,7 @@ SCHEDULE=(
   "research-nightly|30 5 * * *|Etc/UTC|nightly|The nightly run (research.nightly run), 05:30 UTC, after the 00:00 ET capture pass in standard time too"
   "research-nightly-publish|0 * * * *|Etc/UTC|nightly-publish|The run made public an hour after it passed, and the web build dispatched"
   "research-season-week-tue|0 8 * 1,2,9-12 2|America/New_York|inseason|The register's weekly pass, Tuesday 08:00 ET"
+  "research-season-week-tue-pm|30 20 * 1,2,9-12 2|America/New_York|inseason|The register's weekly pass, Tuesday 20:30 ET, the first after a Monday night week's lines are dated"
   "research-season-week-wed|0 18 * 1,2,9-12 3|America/New_York|inseason|The register's weekly pass, Wednesday 18:00 ET"
   "research-season-week-thu|0 14 * 1,2,9-12 4|America/New_York|inseason|The register's weekly pass and freeze, Thursday 14:00 ET"
   "research-capture-harvest|0 0,2,6-23 * * *|America/New_York|inseason-capture|The hourly provider capture, 06:00-23:00, 00:00 and 02:00 ET (00:00 reads a Monday or Thursday night final before the nightly)"

@@ -27,7 +27,7 @@ from research.season import REGULAR_SEASON_WEEKS
 
 # The week-one freeze runs in the days before the opener.
 LEAD: Final = timedelta(days=14)
-# The last week grades 36 hours after its games and is overdue four days later.
+# The last week grades once its games' stats are in (Lane 244) and is overdue four days after its last kickoff.
 TAIL: Final = timedelta(days=10)
 # A season is named by the year its September falls in.
 SEASON_START_MONTH: Final = 9
