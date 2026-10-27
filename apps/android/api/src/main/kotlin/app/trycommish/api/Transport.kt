@@ -7,6 +7,7 @@ import app.trycommish.api.apis.DevicesApi
 import app.trycommish.api.apis.LeagueSyncApi
 import app.trycommish.api.apis.LeaguesApi
 import app.trycommish.api.apis.MocksApi
+import app.trycommish.api.apis.RoomsApi
 import app.trycommish.api.apis.RunApi
 import app.trycommish.api.infrastructure.HttpResponse
 import io.ktor.client.HttpClientConfig
@@ -62,6 +63,7 @@ class Transport(
     private val companionsApi by lazy { CompanionsApi(baseUrl, engine, config) }
     private val mocksApi by lazy { MocksApi(baseUrl, engine, config) }
     private val leaguesApi by lazy { LeaguesApi(baseUrl, engine, config) }
+    private val roomsApi by lazy { RoomsApi(baseUrl, engine, config) }
 
     fun leagueSync(): LeagueSyncApi = leagueSyncApi
 
@@ -85,6 +87,10 @@ class Transport(
 
     /** The account's saved leagues, which a mock reruns from. */
     fun leagues(): LeaguesApi = leaguesApi
+
+    /** The lobby: the formats and how full each filling room is, a seat in one, the room, leaving it, the turn's
+     * call and the report. Picks and the queue go over the room's socket, never through these. */
+    fun rooms(): RoomsApi = roomsApi
 }
 
 /** An answer's body whole, or Unauthorized when the API no longer takes the device's token. */

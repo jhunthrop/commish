@@ -32,6 +32,12 @@ private data class SocketEnd(
  * text that is no frame closes with 1002 and retries. The connector, the token, the clock and the wait are
  * injected, so a recorded exchange drives it in a test.
  *
+ * B219: with an owner that resyncs ([onGap]), rows whose first seq skips past the next (`rows.first.seq >
+ * lastSeq + 1`) are a gap and apply nothing: the socket closes with 1000 "resync", the owner reads the room
+ * again over HTTP, and the next socket says hello from 0 at once (no wait on the ladder), so its welcome's
+ * whole log rebuilds the state; an owner whose read is refused for good ends it. Without an owner the rows
+ * apply as the web's client applies them.
+ *
  * [run] is the one way in, from the owner's structured scope (a LaunchedEffect, a view model's job): when that
  * coroutine is cancelled the open socket is closed with 1000 at once and no retry follows, so the socket never
  * outlives the screen that opened it. [close] leaves the room the same way.
@@ -45,6 +51,7 @@ class RoomSocket(
     lastSeq: Long = 0,
     private val onRows: (List<RoomRow>) -> Unit,
     private val onSignedOut: () -> Unit = {},
+    private val onGap: (suspend () -> Boolean)? = null,
 ) {
     private val mutableStatus = MutableStateFlow(RoomStatus.Connecting)
     private val mutableRefusal = MutableStateFlow<String?>(null)
@@ -73,6 +80,9 @@ class RoomSocket(
     @Volatile private var connection: RoomConnection? = null
 
     @Volatile private var leaving = false
+
+    /** A frame skipped past the last seq applied: the socket was closed to resync from the welcome. */
+    private var gapped = false
     private var attempt = 0
     private var tries = 0
 
@@ -96,6 +106,11 @@ class RoomSocket(
             connection = null
             if (ended() || stop(end)) return
             mutableStatus.value = RoomStatus.Reconnecting
+            if (gapped) {
+                gapped = false
+                if (!resync()) return
+                continue
+            }
             wait(RETRY_LADDER_MS[minOf(attempt, RETRY_LADDER_MS.lastIndex)])
             attempt++
         }
@@ -147,7 +162,11 @@ class RoomSocket(
                         return SocketEnd(RoomClosed(PROTOCOL_ERROR, UNREADABLE_REASON), welcomed)
                     }
                 if (frame is RoomFrame.Welcome) welcomed = true
-                receive(frame)
+                if (!receive(frame)) {
+                    gapped = true
+                    opened.close(NORMAL, RESYNC_REASON)
+                    return SocketEnd(RoomClosed(NORMAL, RESYNC_REASON), welcomed)
+                }
             }
         } catch (e: CancellationException) {
             throw e
@@ -175,9 +194,13 @@ class RoomSocket(
         return true
     }
 
-    private fun receive(frame: RoomFrame) {
+    /** Applies a frame; false when its rows skip past the last seq applied (a gap), which applies none. */
+    private fun receive(frame: RoomFrame): Boolean =
         when (frame) {
-            is RoomFrame.Error -> mutableRefusal.value = frame.message
+            is RoomFrame.Error -> {
+                mutableRefusal.value = frame.message
+                true
+            }
             is RoomFrame.Welcome -> {
                 attempt = 0
                 mutableStatus.value = RoomStatus.Open
@@ -187,14 +210,31 @@ class RoomSocket(
             }
             is RoomFrame.Update -> apply(frame.rows)
         }
+
+    /** The rows past the last applied, in seq order; one already applied is never applied twice. With an owner
+     * that resyncs, rows that skip past the next seq are a gap and apply nothing (B219). */
+    private fun apply(rows: List<RoomRow>): Boolean {
+        val fresh = rows.filter { it.seq > lastSeq }.sortedBy { it.seq }
+        val first = fresh.firstOrNull() ?: return true
+        if (onGap != null && first.seq > lastSeq + 1) {
+            log("seq gap after $lastSeq, resyncing")
+            return false
+        }
+        lastSeq = fresh.last().seq
+        onRows(fresh)
+        return true
     }
 
-    /** The rows past the last applied, in seq order; one already applied is never applied twice. */
-    private fun apply(rows: List<RoomRow>) {
-        val fresh = rows.filter { it.seq > lastSeq }.sortedBy { it.seq }
-        val last = fresh.lastOrNull() ?: return
-        lastSeq = last.seq
-        onRows(fresh)
+    /** The owner reads the room again (false when the read is refused for good) and the next socket says hello
+     * from nothing, so its welcome carries the whole log. */
+    private suspend fun resync(): Boolean {
+        val gap = onGap
+        if (gap == null || !gap()) {
+            stopped = stopped ?: mutableRefusal.value
+            return false
+        }
+        lastSeq = 0
+        return !ended()
     }
 
     companion object {
@@ -217,6 +257,9 @@ class RoomSocket(
         const val SIGNED_OUT_REASON = "signed out"
         const val LEFT_REASON = "left the page"
         const val UNREADABLE_REASON = "unreadable frame"
+
+        /** The client's close when rows went missing and it resyncs from the welcome. */
+        const val RESYNC_REASON = "resync"
 
         /** The upgrade statuses no retry gets past (lobby api.ts isFinalRefusal). */
         val FINAL_STATUSES = setOf(401, 403, 404)

@@ -186,3 +186,7 @@ private class OkHttpRoomConnection : RoomConnection {
         const val ABNORMAL = 1006
     }
 }
+
+/** The phone's socket client on its own OkHttp client, for a caller that holds no OkHttp of its own (the app's
+ * graph). */
+fun phoneRoomConnector(): RoomConnector = OkHttpRoomConnector()
