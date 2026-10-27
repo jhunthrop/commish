@@ -6,6 +6,9 @@ package app.trycommish.design
 /** A colour in each theme as 0xAARRGGBB: the light value and the dark one. */
 data class ThemedColor(val light: Long, val dark: Long)
 
+/** A club's chip as 0xAARRGGBB: its fill, the same in both themes, and the ink its letters take. */
+data class ClubColor(val fill: Long, val ink: Long)
+
 /** The design tokens: colours in both themes, spacing, radii and type sizes in dp and sp, the faces. */
 object Tokens {
     object Color {
@@ -128,5 +131,44 @@ object Tokens {
         const val ui = "Outfit"
         const val num = "Big Shoulders Display"
         const val read = "Newsreader"
+    }
+
+    /** a club's chip, never a team logo (B245): its abbreviation on its primary colour, in whichever of paper or ink reads better on it, 4.5:1 at least; the colours are facts, the drawing ours */
+    object Club {
+        val colors: Map<String, ClubColor> =
+            mapOf(
+                "ARI" to ClubColor(0xFF97233F, 0xFFFFFFFF),
+                "ATL" to ClubColor(0xFFA71930, 0xFFFFFFFF),
+                "BAL" to ClubColor(0xFF241773, 0xFFFFFFFF),
+                "BUF" to ClubColor(0xFF00338D, 0xFFFFFFFF),
+                "CAR" to ClubColor(0xFF0085CA, 0xFF15120F),
+                "CHI" to ClubColor(0xFF0B162A, 0xFFFFFFFF),
+                "CIN" to ClubColor(0xFFFB4F14, 0xFF15120F),
+                "CLE" to ClubColor(0xFF311D00, 0xFFFFFFFF),
+                "DAL" to ClubColor(0xFF003594, 0xFFFFFFFF),
+                "DEN" to ClubColor(0xFFFB4F14, 0xFF15120F),
+                "DET" to ClubColor(0xFF0076B6, 0xFFFFFFFF),
+                "GB" to ClubColor(0xFF203731, 0xFFFFFFFF),
+                "HOU" to ClubColor(0xFF03202F, 0xFFFFFFFF),
+                "IND" to ClubColor(0xFF002C5F, 0xFFFFFFFF),
+                "JAX" to ClubColor(0xFF006778, 0xFFFFFFFF),
+                "KC" to ClubColor(0xFFE31837, 0xFFFFFFFF),
+                "LAC" to ClubColor(0xFF0079C0, 0xFFFFFFFF),
+                "LAR" to ClubColor(0xFF003594, 0xFFFFFFFF),
+                "LV" to ClubColor(0xFF000000, 0xFFFFFFFF),
+                "MIA" to ClubColor(0xFF008E97, 0xFF15120F),
+                "MIN" to ClubColor(0xFF4F2683, 0xFFFFFFFF),
+                "NE" to ClubColor(0xFF002244, 0xFFFFFFFF),
+                "NO" to ClubColor(0xFFD3BC8D, 0xFF15120F),
+                "NYG" to ClubColor(0xFF0B2265, 0xFFFFFFFF),
+                "NYJ" to ClubColor(0xFF125740, 0xFFFFFFFF),
+                "PHI" to ClubColor(0xFF004C54, 0xFFFFFFFF),
+                "PIT" to ClubColor(0xFFFFB612, 0xFF15120F),
+                "SEA" to ClubColor(0xFF002244, 0xFFFFFFFF),
+                "SF" to ClubColor(0xFFAA0000, 0xFFFFFFFF),
+                "TB" to ClubColor(0xFFD50A0A, 0xFFFFFFFF),
+                "TEN" to ClubColor(0xFF0C2340, 0xFFFFFFFF),
+                "WSH" to ClubColor(0xFF5A1414, 0xFFFFFFFF),
+            )
     }
 }

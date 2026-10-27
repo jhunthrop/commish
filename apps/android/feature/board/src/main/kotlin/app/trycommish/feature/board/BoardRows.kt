@@ -154,7 +154,7 @@ fun BoardRowView(
             horizontalArrangement = Arrangement.spacedBy(GAP),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Headshot(row.headshot, row.initials, Widths.face)
+            Headshot(row.headshot, row.initials, Widths.face, club = row.club.takeIf { row.clubMark })
             RowWho(row, club, Modifier.weight(1f))
             Figures(row, columns)
         }

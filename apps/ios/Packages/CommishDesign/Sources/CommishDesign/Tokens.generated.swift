@@ -12,6 +12,17 @@ public struct ThemedColor: Sendable, Equatable {
     }
 }
 
+/// A club's chip as 0xRRGGBB: its fill, the same in both themes, and the ink its letters take.
+public struct ClubColor: Sendable, Equatable {
+    public let fill: UInt32
+    public let ink: UInt32
+
+    public init(fill: UInt32, ink: UInt32) {
+        self.fill = fill
+        self.ink = ink
+    }
+}
+
 /// The design tokens: colours in both themes, spacing, radii and type sizes in points, the faces.
 public enum Tokens {
     public enum Color {
@@ -134,5 +145,43 @@ public enum Tokens {
         public static let ui = "Outfit"
         public static let num = "Big Shoulders Display"
         public static let read = "Newsreader"
+    }
+
+    /// a club's chip, never a team logo (B245): its abbreviation on its primary colour, in whichever of paper or ink reads better on it, 4.5:1 at least; the colours are facts, the drawing ours
+    public enum Club {
+        public static let colors: [String: ClubColor] = [
+            "ARI": ClubColor(fill: 0x97233F, ink: 0xFFFFFF),
+            "ATL": ClubColor(fill: 0xA71930, ink: 0xFFFFFF),
+            "BAL": ClubColor(fill: 0x241773, ink: 0xFFFFFF),
+            "BUF": ClubColor(fill: 0x00338D, ink: 0xFFFFFF),
+            "CAR": ClubColor(fill: 0x0085CA, ink: 0x15120F),
+            "CHI": ClubColor(fill: 0x0B162A, ink: 0xFFFFFF),
+            "CIN": ClubColor(fill: 0xFB4F14, ink: 0x15120F),
+            "CLE": ClubColor(fill: 0x311D00, ink: 0xFFFFFF),
+            "DAL": ClubColor(fill: 0x003594, ink: 0xFFFFFF),
+            "DEN": ClubColor(fill: 0xFB4F14, ink: 0x15120F),
+            "DET": ClubColor(fill: 0x0076B6, ink: 0xFFFFFF),
+            "GB": ClubColor(fill: 0x203731, ink: 0xFFFFFF),
+            "HOU": ClubColor(fill: 0x03202F, ink: 0xFFFFFF),
+            "IND": ClubColor(fill: 0x002C5F, ink: 0xFFFFFF),
+            "JAX": ClubColor(fill: 0x006778, ink: 0xFFFFFF),
+            "KC": ClubColor(fill: 0xE31837, ink: 0xFFFFFF),
+            "LAC": ClubColor(fill: 0x0079C0, ink: 0xFFFFFF),
+            "LAR": ClubColor(fill: 0x003594, ink: 0xFFFFFF),
+            "LV": ClubColor(fill: 0x000000, ink: 0xFFFFFF),
+            "MIA": ClubColor(fill: 0x008E97, ink: 0x15120F),
+            "MIN": ClubColor(fill: 0x4F2683, ink: 0xFFFFFF),
+            "NE": ClubColor(fill: 0x002244, ink: 0xFFFFFF),
+            "NO": ClubColor(fill: 0xD3BC8D, ink: 0x15120F),
+            "NYG": ClubColor(fill: 0x0B2265, ink: 0xFFFFFF),
+            "NYJ": ClubColor(fill: 0x125740, ink: 0xFFFFFF),
+            "PHI": ClubColor(fill: 0x004C54, ink: 0xFFFFFF),
+            "PIT": ClubColor(fill: 0xFFB612, ink: 0x15120F),
+            "SEA": ClubColor(fill: 0x002244, ink: 0xFFFFFF),
+            "SF": ClubColor(fill: 0xAA0000, ink: 0xFFFFFF),
+            "TB": ClubColor(fill: 0xD50A0A, ink: 0xFFFFFF),
+            "TEN": ClubColor(fill: 0x0C2340, ink: 0xFFFFFF),
+            "WSH": ClubColor(fill: 0x5A1414, ink: 0xFFFFFF),
+        ]
     }
 }

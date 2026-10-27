@@ -37,7 +37,7 @@ struct RankingsNameLine: View {
     var body: some View {
         let theme = Theme(colorScheme)
         HStack(alignment: .center, spacing: 0) {
-            Avatar(player.clubMark ? player.club : Initials.of(player.name), side: RankingsColumn.face)
+            Avatar(Initials.of(player.name), side: RankingsColumn.face, club: player.clubMark ? player.club : nil)
                 .padding(.trailing, Tokens.Space.s2)
             name.frame(maxWidth: .infinity, alignment: .leading)
             Group {

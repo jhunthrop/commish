@@ -10,7 +10,8 @@ import Testing
 
 /// The Rankings' mock: the fixture's order with no league through the view model at the week's clock
 /// (Saturday noon Central), both themes, iPhone 17 Pro and iPhone SE, at 1x: the top in season (every
-/// position), a position's view (WR), the kickers' week (K), a search ("wa", the matches at their places
+/// position), a position's view (WR), the kickers' week (K), the defenses' (DEF, each face its club's
+/// chip, B245), a search ("wa", the matches at their places
 /// in the order), a row whose game line wraps (the RB view: Travis Etienne's kickoff, weather glyph and
 /// "Due back" chip take two lines), every position scrolled to its three-digit ranks ("WR 125" to
 /// "WR 138", each pill whole), and the order saved and read again with no signal, stale with its stamp.
@@ -27,6 +28,8 @@ struct RankingsSnapshotTests {
         case top
         case position
         case kicker
+        /// The defenses' week, each face its club's chip (B245).
+        case defense
         case search
         case wrapped
         case deep
@@ -36,6 +39,7 @@ struct RankingsSnapshotTests {
             switch self {
             case .position: .receiver
             case .kicker: .kicker
+            case .defense: .defense
             case .wrapped: .runningBack
             default: nil
             }

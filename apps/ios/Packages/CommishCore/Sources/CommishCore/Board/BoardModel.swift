@@ -115,6 +115,8 @@ public struct BoardRow: Equatable, Sendable, Identifiable {
     public let adp: String
     /// The player his row opens in the sheet; nil where the site has no page for him.
     public let sheetPlayer: SheetPlayer?
+    /// A defense: its face is its club's chip (B245), never a logo.
+    public let clubMark: Bool
 }
 
 /// A tier's band over its rows as the phone draws it (TierStrip.svelte): its number on the tier's

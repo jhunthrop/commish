@@ -7,7 +7,12 @@
  *
  * A colour is a pair of hex values (light, dark), a reference to another colour (`ref`), or a mix of
  * two in sRGB (`mix`, the web's `color-mix`). The CSS keeps references and mixes as expressions, so a
- * theme's redefinition flows through them as it always has; the apps get each resolved per theme. */
+ * theme's redefinition flows through them as it always has; the apps get each resolved per theme.
+ *
+ * A club's chip (B245) is its abbreviation on its primary colour, drawn by us, never a team logo: the
+ * `club` table names each club's colour once, and the generator gives each the ink (paper or ink, as
+ * the light theme has them) that reads better on it, failing any club where neither holds 4.5:1. The
+ * apps get the table; the web reads it from the same source when it draws the chip. */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { REPOSITORY, generatedBy, stringLiteral, writeOutputs, type Outputs } from './generated.ts';
@@ -32,6 +37,8 @@ export interface Tokens {
 	/** Type sizes in pixels. */
 	type: Readonly<Record<string, number>>;
 	font: Readonly<Record<string, string>>;
+	/** A club's primary colour by its abbreviation (`HOU`), the fill of its chip in both themes. */
+	club?: Readonly<Record<string, string>>;
 	/** A token's note by `group.name` (`color.accent`), carried as a comment into each output. */
 	notes?: Readonly<Record<string, string>>;
 }
@@ -56,6 +63,20 @@ export const OUTPUT = {
 /** The CSS a rem is, in pixels. */
 const REM_PX = 16;
 const HEX = /^#[0-9a-f]{6}$/;
+/** A club as the API names it: two or three capitals. */
+const CLUB = /^[A-Z]{2,3}$/;
+/** The inks a chip may take, as colour tokens in the light theme: whichever reads better on the fill. */
+export const CLUB_INKS: readonly string[] = ['paper', 'ink'];
+/** The least contrast a chip's letters hold on its fill (WCAG AA for text). */
+export const CLUB_MIN_CONTRAST = 4.5;
+/** WCAG 2's relative luminance: the linear knee, its slope, the gamma curve's offset and exponent, and
+ * the channel weights; and the flare added to each side of a contrast ratio. */
+const SRGB_KNEE = 0.03928;
+const SRGB_SLOPE = 12.92;
+const SRGB_OFFSET = 0.055;
+const SRGB_GAMMA = 2.4;
+const LUMA = [0.2126, 0.7152, 0.0722] as const;
+const FLARE = 0.05;
 const CHANNEL_MAX = 255;
 const PERCENT = 100;
 /** A type key the web names by its step (`--t-2xl`), not its letters. */
@@ -131,6 +152,53 @@ function mix(a: string, b: string, percent: number): string {
 	return `#${channels.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/** WCAG 2 relative luminance of a #rrggbb. */
+function luminance(hex: string): number {
+	return LUMA.reduce((sum, weight, i) => {
+		const c = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / CHANNEL_MAX;
+		const linear = c <= SRGB_KNEE ? c / SRGB_SLOPE : ((c + SRGB_OFFSET) / (1 + SRGB_OFFSET)) ** SRGB_GAMMA;
+		return sum + weight * linear;
+	}, 0);
+}
+
+/** WCAG 2 contrast ratio between two #rrggbb. */
+export function contrast(a: string, b: string): number {
+	const [x, y] = [luminance(a), luminance(b)];
+	return (Math.max(x, y) + FLARE) / (Math.min(x, y) + FLARE);
+}
+
+export interface ClubColor {
+	fill: string;
+	ink: string;
+}
+
+/** Each club's fill and the ink that reads better on it, or an error naming the club. */
+export function resolveClubs(
+	clubs: Readonly<Record<string, string>>,
+	colors: Map<string, Record<Theme, string>>
+): Map<string, ClubColor> {
+	const inks = CLUB_INKS.map((name) => {
+		const ink = colors.get(name);
+		if (ink === undefined) throw new Error(`club inks name color.${name}, which is not a token.`);
+		return ink.light;
+	});
+	return new Map(
+		Object.entries(clubs).map(([club, fill]): [string, ClubColor] => {
+			if (!CLUB.test(club)) throw new Error(`club.${club} is not two or three capitals.`);
+			if (!HEX.test(fill)) throw new Error(`club.${club} "${fill}" is not a lower-case #rrggbb.`);
+			const ranked = inks
+				.map((ink) => ({ ink, ratio: contrast(fill, ink) }))
+				.sort((a, b) => b.ratio - a.ratio);
+			const best = ranked[0];
+			if (best === undefined || best.ratio < CLUB_MIN_CONTRAST)
+				throw new Error(
+					`club.${club} holds ${(best?.ratio ?? 0).toFixed(2)}:1 at best, under ${String(CLUB_MIN_CONTRAST)}:1.`
+				);
+			return [club, { fill, ink: best.ink }];
+		})
+	);
+}
+
 function cssColor(token: ColorToken, theme: Theme): string {
 	if (isPair(token)) return token[theme];
 	if (isRef(token)) return `var(--${kebab(token.ref)})`;
@@ -200,7 +268,11 @@ function swiftDoc(note: string | undefined, indent: string): string {
 	return note === undefined ? '' : `${indent}/// ${note}\n`;
 }
 
-function renderSwift(tokens: Tokens, colors: Map<string, Record<Theme, string>>): string {
+function renderSwift(
+	tokens: Tokens,
+	colors: Map<string, Record<Theme, string>>,
+	clubs: Map<string, ClubColor>
+): string {
 	const notes = tokens.notes ?? {};
 	const numbers = (group: 'space' | 'radius' | 'type'): string =>
 		Object.entries(tokens[group])
@@ -220,6 +292,17 @@ function renderSwift(tokens: Tokens, colors: Map<string, Record<Theme, string>>)
 	const fontLines = Object.entries(tokens.font)
 		.map(([name, face]) => `        public static let ${name} = ${stringLiteral(face, 'swift')}`)
 		.join('\n');
+	const clubLines = [...clubs]
+		.map(
+			([club, { fill, ink }]) =>
+				`            "${club}": ClubColor(fill: 0x${hexDigits(fill)}, ink: 0x${hexDigits(ink)}),`
+		)
+		.join('\n');
+	const clubEnum = `${swiftDoc(tokens.notes?.club, '    ')}    public enum Club {
+        public static let colors: [String: ClubColor] = [
+${clubLines}
+        ]
+    }`;
 	return `// ${generatedBy(SCRIPT, SOURCE)}
 // swiftlint:disable all
 
@@ -234,6 +317,17 @@ public struct ThemedColor: Sendable, Equatable {
     }
 }
 
+/// A club's chip as 0xRRGGBB: its fill, the same in both themes, and the ink its letters take.
+public struct ClubColor: Sendable, Equatable {
+    public let fill: UInt32
+    public let ink: UInt32
+
+    public init(fill: UInt32, ink: UInt32) {
+        self.fill = fill
+        self.ink = ink
+    }
+}
+
 /// The design tokens: colours in both themes, spacing, radii and type sizes in points, the faces.
 public enum Tokens {
 ${[
@@ -241,7 +335,8 @@ ${[
 	enumOf('Space', numbers('space')),
 	enumOf('Radius', numbers('radius')),
 	enumOf(SWIFT_TYPE_ENUM, numbers('type')),
-	enumOf('Font', fontLines)
+	enumOf('Font', fontLines),
+	clubEnum
 ].join('\n\n')}
 }
 `;
@@ -251,7 +346,11 @@ function kotlinDoc(note: string | undefined, indent: string): string {
 	return note === undefined ? '' : `${indent}/** ${note} */\n`;
 }
 
-function renderKotlin(tokens: Tokens, colors: Map<string, Record<Theme, string>>): string {
+function renderKotlin(
+	tokens: Tokens,
+	colors: Map<string, Record<Theme, string>>,
+	clubs: Map<string, ClubColor>
+): string {
 	const notes = tokens.notes ?? {};
 	const numbers = (group: 'space' | 'radius' | 'type'): string =>
 		Object.entries(tokens[group])
@@ -270,6 +369,18 @@ function renderKotlin(tokens: Tokens, colors: Map<string, Record<Theme, string>>
 	const fontLines = Object.entries(tokens.font)
 		.map(([name, face]) => `        const val ${name} = ${stringLiteral(face, 'kotlin')}`)
 		.join('\n');
+	const clubLines = [...clubs]
+		.map(
+			([club, { fill, ink }]) =>
+				`                "${club}" to ClubColor(0xFF${hexDigits(fill)}, 0xFF${hexDigits(ink)}),`
+		)
+		.join('\n');
+	const clubObject = `${kotlinDoc(tokens.notes?.club, '    ')}    object Club {
+        val colors: Map<String, ClubColor> =
+            mapOf(
+${clubLines}
+            )
+    }`;
 	return `// ${generatedBy(SCRIPT, SOURCE)}
 @file:Suppress("ktlint", "MagicNumber")
 
@@ -278,6 +389,9 @@ package app.trycommish.design
 /** A colour in each theme as 0xAARRGGBB: the light value and the dark one. */
 data class ThemedColor(val light: Long, val dark: Long)
 
+/** A club's chip as 0xAARRGGBB: its fill, the same in both themes, and the ink its letters take. */
+data class ClubColor(val fill: Long, val ink: Long)
+
 /** The design tokens: colours in both themes, spacing, radii and type sizes in dp and sp, the faces. */
 object Tokens {
 ${[
@@ -285,7 +399,8 @@ ${[
 	objectOf('Space', numbers('space')),
 	objectOf('Radius', numbers('radius')),
 	objectOf('Type', numbers('type')),
-	objectOf('Font', fontLines)
+	objectOf('Font', fontLines),
+	clubObject
 ].join('\n\n')}
 }
 `;
@@ -298,10 +413,11 @@ export function render(tokens: Tokens): Rendered {
 			throw new Error(`notes.${key} would close the comment it is carried in.`);
 	}
 	const colors = resolveColors(tokens.color);
+	const clubs = resolveClubs(tokens.club ?? {}, colors);
 	return {
 		css: renderCss(tokens),
-		swift: renderSwift(tokens, colors),
-		kotlin: renderKotlin(tokens, colors)
+		swift: renderSwift(tokens, colors, clubs),
+		kotlin: renderKotlin(tokens, colors, clubs)
 	};
 }
 

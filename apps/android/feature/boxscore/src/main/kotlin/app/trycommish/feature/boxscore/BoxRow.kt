@@ -227,7 +227,7 @@ fun PlayerCell(
     val row = cells.row
     val ink = if (cells.idle) c.ink3 else c.ink
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
-        Avatar(if (row.clubMark) row.club else initialsOf(row.name), BoxColumn.face)
+        Avatar(initialsOf(row.name), BoxColumn.face, club = row.club.takeIf { row.clubMark })
         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             NameLine(cells, ink, sheetPlayer, open, shortName)
             ClubLine(cells)

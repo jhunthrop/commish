@@ -45,7 +45,8 @@ import org.junit.runners.Parameterized
 /**
  * The Rankings' mock, the iOS screen's states (Lane 194 after its fix round), each the view model's over
  * the order's fixtures through a stub of the API at the week's clock (Saturday noon Central): the top in
- * season (every position), a position's view (WR), the kickers' week (K), a search ("wa", the matches at
+ * season (every position), a position's view (WR), the kickers' week (K), the defenses' (DEF, each face
+ * its club's chip, B245), a search ("wa", the matches at
  * their places in the order), the order saved and read again with no signal (stale with its stamp), and
  * WR never read failing over All (All's rows kept with the reason said once, the chips still there); and,
  * as if scrolled, the RB view as far as its fifth row (Travis Etienne's game line wraps his status to a
@@ -70,6 +71,9 @@ class RankingsSnapshotTest(
         Top("top"),
         Position("position"),
         Kicker("kicker"),
+
+        /** The defenses' week, each face its club's chip (B245). */
+        Defense("defense"),
         Search("search"),
         Stale("stale"),
         Problem("problem"),
@@ -192,6 +196,7 @@ internal fun viewModelAt(
         RankingsSnapshotTest.Scene.Position, RankingsSnapshotTest.Scene.Problem -> vm.choose(RankingsChip.WR)
         RankingsSnapshotTest.Scene.Wrapped -> vm.choose(RankingsChip.RB)
         RankingsSnapshotTest.Scene.Kicker -> vm.choose(RankingsChip.K)
+        RankingsSnapshotTest.Scene.Defense -> vm.choose(RankingsChip.DEF)
         RankingsSnapshotTest.Scene.Search -> vm.find("wa")
         RankingsSnapshotTest.Scene.Top, RankingsSnapshotTest.Scene.Stale, RankingsSnapshotTest.Scene.Deep -> Unit
     }

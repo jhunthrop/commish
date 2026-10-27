@@ -167,7 +167,7 @@ public struct PlayerCell: View {
         let theme = Theme(colorScheme)
         let row = cells.row
         HStack(alignment: .center, spacing: Tokens.Space.s2) {
-            Avatar(row.clubMark ? row.club : Initials.of(row.name), side: Column.face)
+            Avatar(Initials.of(row.name), side: Column.face, club: row.clubMark ? row.club : nil)
             VStack(alignment: .leading, spacing: 1) {
                 name(theme)
                 club(theme)

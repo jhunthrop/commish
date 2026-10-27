@@ -110,7 +110,7 @@ fun AdpRowView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RowFigure(row.adp, Modifier.width(widths.adp), ink = c.ink)
-            Headshot(drawn.headshot, drawn.initials, widths.face)
+            Headshot(drawn.headshot, drawn.initials, widths.face, club = drawn.club.takeIf { drawn.clubMark })
             RowWho(drawn, actions::club, Modifier.weight(1f), wraps = false)
             RowFigure(drawn.projected, Modifier.width(widths.projected), ink = c.ink)
             val tint = roundTint(drawn.heat)

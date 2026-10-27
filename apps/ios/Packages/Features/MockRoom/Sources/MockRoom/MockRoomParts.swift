@@ -241,11 +241,14 @@ struct SinceView: View {
         HStack(alignment: .top, spacing: Tokens.Space.s2) {
             ForEach(strip.picks) { pick in
                 VStack(spacing: 2) {
-                    Headshot(URL(string: pick.player.headshot), initials: Initials.of(pick.player.name), side: 36)
-                        .overlay(Circle().strokeBorder(
-                            theme.color(Tokens.Color.accent),
-                            lineWidth: pick.strong ? 2 : 0
-                        ))
+                    Headshot(
+                        URL(string: pick.player.headshot), initials: Initials.of(pick.player.name), side: 36,
+                        club: pick.player.clubMark
+                    )
+                    .overlay(Circle().strokeBorder(
+                        theme.color(Tokens.Color.accent),
+                        lineWidth: pick.strong ? 2 : 0
+                    ))
                     Text(pick.name)
                         .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
                         .lineLimit(1)

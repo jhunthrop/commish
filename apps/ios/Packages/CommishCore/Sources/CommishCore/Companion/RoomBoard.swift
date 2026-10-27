@@ -24,6 +24,11 @@ public struct RoomPlayer: Equatable, Sendable, Identifiable {
         position == "K" || position == "DST"
     }
 
+    /// A defense's club, whose chip is its face (B245); nil for a player.
+    public var clubMark: String? {
+        position == "DST" && !team.isEmpty ? team : nil
+    }
+
     /// His pill: "WR 6".
     public var pill: String {
         "\(position) \(positionRank)"

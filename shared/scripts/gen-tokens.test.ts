@@ -2,7 +2,7 @@
 // object from one source (shared/design/tokens.json). Run with `node --test shared/scripts/*.test.ts`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { render, type Tokens } from './gen-tokens.ts';
+import { CLUB_MIN_CONTRAST, contrast, readTokens, render, type Tokens } from './gen-tokens.ts';
 
 const TOKENS: Tokens = {
 	color: {
@@ -92,4 +92,30 @@ void test('a bad source fails with the token named', () => {
 		() => render({ ...TOKENS, color: { a: { ref: 'b' }, b: { ref: 'a' } } }),
 		/color\.(a|b)/
 	);
+});
+
+void test('a club is a chip: its fill and the ink that reads better on it, in both apps, not in the CSS', () => {
+	const { css, swift, kotlin } = render({ ...TOKENS, club: { HOU: '#03202f', PIT: '#ffb612' } });
+	assert.match(swift, /public struct ClubColor: Sendable, Equatable \{/);
+	assert.match(swift, /"HOU": ClubColor\(fill: 0x03202F, ink: 0xFFFFFF\),/);
+	assert.match(swift, /"PIT": ClubColor\(fill: 0xFFB612, ink: 0x15120F\),/);
+	assert.match(kotlin, /data class ClubColor\(val fill: Long, val ink: Long\)/);
+	assert.match(kotlin, /"HOU" to ClubColor\(0xFF03202F, 0xFFFFFFFF\),/);
+	assert.match(kotlin, /"PIT" to ClubColor\(0xFFFFB612, 0xFF15120F\),/);
+	assert.doesNotMatch(css, /HOU|03202f/i);
+});
+
+void test('a club whose letters cannot read, or that is named or written wrong, fails naming it', () => {
+	assert.throws(() => render({ ...TOKENS, club: { LAC: '#0080c6' } }), /club\.LAC holds 4\.36:1/);
+	assert.throws(() => render({ ...TOKENS, club: { hou: '#03202f' } }), /club\.hou/);
+	assert.throws(() => render({ ...TOKENS, club: { HOU: '#03202F' } }), /club\.HOU/);
+});
+
+void test('the source names all 32 clubs and every one holds 4.5:1', async () => {
+	const clubs = Object.entries((await readTokens()).club ?? {});
+	assert.equal(clubs.length, 32);
+	for (const [club, fill] of clubs) {
+		const best = Math.max(contrast(fill, '#ffffff'), contrast(fill, '#15120f'));
+		assert.ok(best >= CLUB_MIN_CONTRAST, `${club} ${best.toFixed(2)}`);
+	}
 });

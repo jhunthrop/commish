@@ -138,7 +138,7 @@ private fun RankingsNameLine(
 ) {
     val c = CommishTheme.colors
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Avatar(if (player.clubMark) player.club else initialsOf(player.name), RankingsColumn.face)
+        Avatar(initialsOf(player.name), RankingsColumn.face, club = player.club.takeIf { player.clubMark })
         NameText(player, open, Modifier.padding(start = Tokens.Space.s2.dp).weight(1f))
         Box(Modifier.width(pillSlot)) {
             // Its own width, never squeezed: the words are a fact (Lane 215 review H1).

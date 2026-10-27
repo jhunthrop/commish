@@ -108,7 +108,8 @@ private const val ATTEMPT = "attempt"
  * it loads, when it cannot (no signal and none cached) and where he has none or the address is not a
  * provider headshot. The circle is its side whatever the image does, so a row never waits on it. A face
  * that failed asks again when it is next drawn or a network starts working while it is on screen. A
- * preview or a snapshot loads nothing and draws the initials.
+ * preview or a snapshot loads nothing and draws the initials. A defense's face (`club`, B245) is its
+ * club's chip, and no image is asked for: the app draws no team logo.
  */
 @Composable
 fun Headshot(
@@ -116,7 +117,12 @@ fun Headshot(
     initials: String,
     side: Dp,
     modifier: Modifier = Modifier,
+    club: String? = null,
 ) {
+    if (club != null) {
+        Avatar(initials, side, modifier, club = club)
+        return
+    }
     val density = LocalDensity.current
     val address =
         url

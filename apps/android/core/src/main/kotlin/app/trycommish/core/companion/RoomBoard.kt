@@ -30,6 +30,9 @@ data class RoomPlayer(
     /** A kicker or a defense, ranked in draft order with no projection (run/market.ts isMarketPosition). */
     val isMarket: Boolean get() = position == "K" || position == "DST"
 
+    /** A defense's club, whose chip is its face (B245); null for a player. */
+    val clubMark: String? get() = team.takeIf { position == "DST" && it.isNotEmpty() }
+
     /** His pill: "WR 6". */
     val pill: String get() = "$position $positionRank"
 

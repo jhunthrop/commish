@@ -58,7 +58,8 @@ struct BoardCells {
             sheetPlayer: SheetPlayer(
                 id: row.id, slug: row.slug, name: row.name, position: label, rank: rank, club: row.team,
                 boardID: row.id
-            )
+            ),
+            clubMark: false
         )
     }
 
@@ -70,7 +71,8 @@ struct BoardCells {
             id: drawn.id, name: drawn.name, initials: drawn.initials, headshot: drawn.headshot, pill: drawn.pill,
             club: drawn.club, bye: drawn.bye, status: drawn.status, projected: Words.Box.none,
             overReplacement: Words.Box.none, heat: .none, gap: Words.Box.none, gapTone: nil,
-            draftOrder: drawn.draftOrder, adp: drawn.adp, sheetPlayer: drawn.sheetPlayer
+            draftOrder: drawn.draftOrder, adp: drawn.adp, sheetPlayer: drawn.sheetPlayer,
+            clubMark: drawn.clubMark
         )
     }
 
@@ -97,7 +99,8 @@ struct BoardCells {
             gapTone: nil,
             draftOrder: String(row.positionRank),
             adp: Formatting.fixed(row.adp),
-            sheetPlayer: nil
+            sheetPlayer: nil,
+            clubMark: BoardPosition(rawValue: row.positionName) == .defense && !row.team.isEmpty
         )
     }
 

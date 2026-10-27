@@ -56,7 +56,10 @@ struct AdpRowView: View {
         let theme = Theme(colorScheme)
         HStack(alignment: .center, spacing: AdpColumn.spacing) {
             RowFigure(text: row.adp, ink: Tokens.Color.ink).frame(width: AdpColumn.adp, alignment: .trailing)
-            Headshot(row.row.headshot, initials: row.row.initials, side: AdpColumn.face)
+            Headshot(
+                row.row.headshot, initials: row.row.initials, side: AdpColumn.face,
+                club: row.row.clubMark ? row.row.club : nil
+            )
             who(theme).frame(maxWidth: .infinity, alignment: .leading)
             RowFigure(text: row.row.projected, ink: Tokens.Color.ink)
                 .frame(width: AdpColumn.projected, alignment: .trailing)
