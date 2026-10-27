@@ -125,7 +125,8 @@ struct PlayerPageParityTests {
 
     struct FormatRow: Decodable, Equatable {
         let label: String
-        let rank: String
+        /// His place at his position, the column since Lane 220.
+        let positionRank: String
         let points: String
         let vor: String
         let tier: String
@@ -293,8 +294,9 @@ struct PlayerPageParityTests {
             let table = try #require(model.formats, "\(name)")
             #expect(table.head == page.formats.head, "\(name)")
             #expect(table.note == page.formats.note, "\(name)")
+            #expect(table.footnote == nil, "\(name): no read, every rank the run's")
             #expect(table.rows.map {
-                FormatRow(label: $0.label, rank: $0.rank, points: $0.points, vor: $0.vor, tier: $0.tier)
+                FormatRow(label: $0.label, positionRank: $0.rank, points: $0.points, vor: $0.vor, tier: $0.tier)
             } == page.formats.rows, "\(name)")
         } else {
             #expect(model.formats == nil, "\(name): one format draws no table")

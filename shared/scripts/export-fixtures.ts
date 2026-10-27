@@ -347,10 +347,21 @@ export const ORDER_READS: readonly {
 /** The order's limit and the byes' order, as the Rankings page asks (order/path.ts). */
 const ORDER_QUERY = 'limit=100&byes=last';
 
-/** Every order read at a clock: our order's views, then the kickers' and defenses' week. */
+/** The order's whole read with the byes in their places, as the in-season pages read it at their clock
+ * (web/src/lib/run/live-order-read.ts, the apps' OrderReader, Lane 224): the API's most rows, no byes. */
+const FULL_ORDER_QUERY = 'limit=400';
+
+/** Every order read at a clock: our order's views, its whole read, then the kickers' and defenses'
+ * week. */
 function orderFiles(clock: string, name: string): FixtureFile[] {
 	const at = clockPart(clock);
 	return [
+		{
+			file: `order-all-${at}.json`,
+			route: `GET /order?${FULL_ORDER_QUERY}`,
+			clock,
+			about: `our rest-of-season order with no league, every row with the byes in their places, as the in-season pages read it, ${name}`
+		},
 		...ORDER_READS.map((read) => ({
 			file: `order${read.part}-${at}.json`,
 			route: `GET /order?${ORDER_QUERY}${read.path}`,
@@ -368,7 +379,11 @@ function orderFiles(clock: string, name: string): FixtureFile[] {
 
 /** On Sunday the order with every position and the kickers' week, a game kicked off among them. */
 function sundayOrder(file: FixtureFile): boolean {
-	return file.file.startsWith('order-2') || file.file.startsWith('order-week-K-');
+	return (
+		file.file.startsWith('order-2') ||
+		file.file.startsWith('order-all-') ||
+		file.file.startsWith('order-week-K-')
+	);
 }
 
 const CLOCK_WORDS: Readonly<Record<Exclude<keyof FixtureClocks, 'week'>, string>> = {

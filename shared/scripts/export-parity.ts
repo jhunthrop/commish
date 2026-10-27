@@ -75,6 +75,7 @@ import { HOLDING_PLAYER, OTHER_GAME_ROSTER } from './export-fixtures.ts';
 import { ACCOUNT_OUTPUT, renderAccount } from './account-parity.ts';
 import { COMPANION_OUTPUT, renderCompanion } from './companion-parity.ts';
 import { MOCK_OUTPUT, renderMock } from './mock-parity.ts';
+import { renderOneValue } from './one-value-parity.ts';
 import { LOBBY_OUTPUT, renderLobby } from './lobby-parity.ts';
 import type { Account } from '../../web/src/lib/account/account-api.ts';
 import type { AttachedLeague } from '../../web/src/lib/league/api.ts';
@@ -712,6 +713,12 @@ export async function generate(): Promise<Outputs> {
 				)
 			)
 		],
+		...(await renderOneValue(
+			generatedBy(
+				SCRIPT,
+				'web/src/lib/run/live-order.ts, front/live-board.ts, player/live-figures.ts and formats-words.ts over the fixture order and a stand-in run made from it'
+			)
+		)),
 		[
 			LOBBY_OUTPUT,
 			await renderLobby(

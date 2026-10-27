@@ -943,6 +943,19 @@ object Words {
         const val lobbyStarts = "A lobby starts"
     }
 
+    object FormatsRank {
+        const val head = "Position rank"
+    }
+
+    object LiveStrip {
+        const val yourLeague = "your league"
+        const val leagueAvg = "Avg in your league's scoring."
+    }
+
+    object LiveOrder {
+
+    }
+
     object Lobby {
         const val join = "Join"
         const val yourSeat = "Your seat"

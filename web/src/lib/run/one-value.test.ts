@@ -183,11 +183,11 @@ void test("the formats table's ranks stay the run's while its figures do (review
 	});
 	assert.equal(
 		FORMATS_RANK.unranked(['Half PPR', 'Standard']),
-		'Half PPR and Standard show no position rank at this read; their points are.'
+		'Half PPR and Standard show no position rank at this read, only their points.'
 	);
 	assert.equal(
 		FORMATS_RANK.unranked(['Standard']),
-		'Standard shows no position rank at this read; its points are.'
+		'Standard shows no position rank at this read, only its points.'
 	);
 });
 

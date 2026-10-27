@@ -941,6 +941,19 @@ public enum Words {
         public static let lobbyStarts = "A lobby starts"
     }
 
+    public enum FormatsRank {
+        public static let head = "Position rank"
+    }
+
+    public enum LiveStrip {
+        public static let yourLeague = "your league"
+        public static let leagueAvg = "Avg in your league's scoring."
+    }
+
+    public enum LiveOrder {
+
+    }
+
     public enum Lobby {
         public static let join = "Join"
         public static let yourSeat = "Your seat"

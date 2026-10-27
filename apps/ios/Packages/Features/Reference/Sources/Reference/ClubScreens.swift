@@ -82,7 +82,8 @@ struct ClubCardView: View {
     }
 }
 
-/// The clubs index at 390: the heading, its lead, the link to the schedule, every club's card.
+/// The clubs index at 390: the heading, its lead, the link to the schedule, every club's card, and in
+/// season the clock its leads are on said once under them.
 public struct ClubsScreen: View {
     let model: ClubsModel
     let stamp: String?
@@ -100,6 +101,9 @@ public struct ClubsScreen: View {
                 }
             }
             .padding(.horizontal, Tokens.Space.s3)
+            if !model.basis.isEmpty {
+                BoardBasisView(lines: model.basis)
+            }
         }
         .padding(.vertical, Tokens.Space.s4)
     }

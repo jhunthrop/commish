@@ -5359,6 +5359,7 @@
 					{
 						"label": "PPR",
 						"rank": "50",
+						"positionRank": "WR 25",
 						"points": "199.2",
 						"vor": "+19.1",
 						"tier": "5"
@@ -5774,6 +5775,7 @@
 					{
 						"label": "PPR",
 						"rank": "40",
+						"positionRank": "RB 14",
 						"points": "182.9",
 						"vor": "+34.8",
 						"tier": "3"
@@ -6103,6 +6105,7 @@
 					{
 						"label": "PPR",
 						"rank": "IR",
+						"positionRank": "IR",
 						"points": "252.2",
 						"vor": "+0.0",
 						"tier": "IR"
@@ -6508,6 +6511,7 @@
 					{
 						"label": "PPR",
 						"rank": "2",
+						"positionRank": "WR 2",
 						"points": "333.2",
 						"vor": "+153.2",
 						"tier": "1"
@@ -6958,6 +6962,7 @@
 					{
 						"label": "PPR",
 						"rank": "90",
+						"positionRank": "QB 12",
 						"points": "248.2",
 						"vor": "−4.0",
 						"tier": "2"
@@ -7331,6 +7336,7 @@
 					{
 						"label": "PPR",
 						"rank": "1",
+						"positionRank": "RB 1",
 						"points": "242.5",
 						"vor": "+153.6",
 						"tier": "1"
@@ -7338,6 +7344,7 @@
 					{
 						"label": "Half PPR",
 						"rank": "1",
+						"positionRank": "RB 1",
 						"points": "223.7",
 						"vor": "+148.0",
 						"tier": "1"
@@ -7345,6 +7352,7 @@
 					{
 						"label": "Standard",
 						"rank": "1",
+						"positionRank": "RB 1",
 						"points": "193.7",
 						"vor": "+131.9",
 						"tier": "1"
@@ -7707,6 +7715,7 @@
 					{
 						"label": "PPR",
 						"rank": "24",
+						"positionRank": "QB 1",
 						"points": "195.3",
 						"vor": "+52.3",
 						"tier": "1"
@@ -7714,6 +7723,7 @@
 					{
 						"label": "Half PPR",
 						"rank": "21",
+						"positionRank": "QB 1",
 						"points": "194.8",
 						"vor": "+51.8",
 						"tier": "1"
@@ -7721,6 +7731,7 @@
 					{
 						"label": "Standard",
 						"rank": "17",
+						"positionRank": "QB 1",
 						"points": "194.2",
 						"vor": "+51.3",
 						"tier": "1"
@@ -8083,6 +8094,7 @@
 					{
 						"label": "PPR",
 						"rank": "139",
+						"positionRank": "RB 42",
 						"points": "67.4",
 						"vor": "−21.5",
 						"tier": "7"
@@ -8090,6 +8102,7 @@
 					{
 						"label": "Half PPR",
 						"rank": "131",
+						"positionRank": "RB 40",
 						"points": "60.1",
 						"vor": "−15.7",
 						"tier": "7"
@@ -8097,6 +8110,7 @@
 					{
 						"label": "Standard",
 						"rank": "117",
+						"positionRank": "RB 39",
 						"points": "52.5",
 						"vor": "−9.3",
 						"tier": "9"
@@ -8372,6 +8386,7 @@
 					{
 						"label": "PPR",
 						"rank": "262",
+						"positionRank": "RB 67",
 						"points": "30.8",
 						"vor": "−58.1",
 						"tier": "13"
@@ -8379,6 +8394,7 @@
 					{
 						"label": "Half PPR",
 						"rank": "267",
+						"positionRank": "RB 66",
 						"points": "27.5",
 						"vor": "−48.2",
 						"tier": "11"
@@ -8386,6 +8402,7 @@
 					{
 						"label": "Standard",
 						"rank": "286",
+						"positionRank": "RB 65",
 						"points": "24.2",
 						"vor": "−37.5",
 						"tier": "12"
