@@ -83,6 +83,7 @@ class SignOutReturnTest {
                                     sessionEnd = state.sessionEnd,
                                     leaguesChanged = { shellReads++ },
                                     signedIn = state::holdsToken,
+                                    deleted = {},
                                 ),
                             )
                         }

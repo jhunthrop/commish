@@ -18,6 +18,7 @@ filter:
     - revokeDevice
     - pairDevice
     - getMe
+    - deleteMe
     - selectLeague
     - leagueLineup
     - planHostMove

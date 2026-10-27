@@ -12,13 +12,15 @@ public struct AccountActions {
     public let toggle: (PushKind, Bool) -> Void
     public let editQuiet: (QuietEnd) -> Void
     public let signOut: () -> Void
+    /// Opens the confirmation sheet that deletes the account.
+    public let deleteAccount: () -> Void
     public let openLink: (URL) -> Void
 
     public init(
         openLeague: @escaping (String) -> Void, detach: @escaping (String) -> Void,
         restore: @escaping (String) -> Void, unpair: @escaping (String) -> Void,
         toggle: @escaping (PushKind, Bool) -> Void, editQuiet: @escaping (QuietEnd) -> Void,
-        signOut: @escaping () -> Void, openLink: @escaping (URL) -> Void
+        signOut: @escaping () -> Void, deleteAccount: @escaping () -> Void, openLink: @escaping (URL) -> Void
     ) {
         self.openLeague = openLeague
         self.detach = detach
@@ -27,6 +29,7 @@ public struct AccountActions {
         self.toggle = toggle
         self.editQuiet = editQuiet
         self.signOut = signOut
+        self.deleteAccount = deleteAccount
         self.openLink = openLink
     }
 
@@ -34,7 +37,7 @@ public struct AccountActions {
     public static var none: AccountActions {
         AccountActions(
             openLeague: { _ in }, detach: { _ in }, restore: { _ in }, unpair: { _ in }, toggle: { _, _ in },
-            editQuiet: { _ in }, signOut: {}, openLink: { _ in }
+            editQuiet: { _ in }, signOut: {}, deleteAccount: {}, openLink: { _ in }
         )
     }
 }
@@ -106,7 +109,7 @@ public struct AccountScreen: View {
                     PushSwitchesView(push: state.push, toggle: actions.toggle, editQuiet: actions.editQuiet)
                 case .devices:
                     AccountDevicesView(model: model, state: state, unpair: actions.unpair)
-                    AccountFootView(openLink: actions.openLink)
+                    AccountFootView(deleteAccount: actions.deleteAccount, openLink: actions.openLink)
                 }
             }
         }
@@ -215,24 +218,29 @@ struct ProblemText: View {
     }
 }
 
-/// How to have the account deleted and the two legal pages (AccountFoot.svelte), in the basis's quiet
-/// type, each link the site's.
+/// The page's foot (AccountFoot.svelte): the quiet Delete account verb, which opens the confirmation
+/// sheet, then the two legal pages in the basis's quiet type, each link the site's.
 struct AccountFootView: View {
     @Environment(\.colorScheme) private var colorScheme
+    let deleteAccount: () -> Void
     let openLink: (URL) -> Void
 
     var body: some View {
         let theme = Theme(colorScheme)
-        Text(foot(theme))
-            .font(Faces.font(.ui, size: Tokens.TypeScale.sm))
-            .foregroundStyle(theme.color(Tokens.Color.ink3))
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityLabel(Words.AccountFoot.label)
-            .environment(\.openURL, OpenURLAction { url in
-                openLink(url)
-                return .handled
-            })
+        VStack(alignment: .leading, spacing: Tokens.Space.s2) {
+            QuietButton(Words.AccountDeleteFoot.verb, action: deleteAccount)
+            Text(foot(theme))
+                .font(Faces.font(.ui, size: Tokens.TypeScale.sm))
+                .foregroundStyle(theme.color(Tokens.Color.ink3))
+                .fixedSize(horizontal: false, vertical: true)
+                .environment(\.openURL, OpenURLAction { url in
+                    openLink(url)
+                    return .handled
+                })
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Words.AccountFoot.label)
     }
 
     private func foot(_ theme: Theme) -> AttributedString {
@@ -243,8 +251,7 @@ struct AccountFootView: View {
             return part
         }
         let words = Words.AccountFoot.self
-        return AttributedString(words.before) + link(Words.Support.email, SiteLinks.support)
-            + AttributedString(words.after) + link(words.privacy, SiteLinks.privacy)
+        return AttributedString(Words.AccountDeleteFoot.keep) + link(words.privacy, SiteLinks.privacy)
             + AttributedString(words.joint) + link(words.terms, SiteLinks.terms) + AttributedString(words.end)
     }
 }

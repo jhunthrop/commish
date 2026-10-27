@@ -32,7 +32,8 @@ fun LeagueTab(
     if (!signedIn) {
         val context = LocalContext.current
         val message by graph.signInMessage.collectAsStateWithLifecycle()
-        SignInScreen(message, onSignIn = { graph.signInFlow.launch(context) })
+        val notice by graph.signInNotice.collectAsStateWithLifecycle()
+        SignInScreen(message, onSignIn = { graph.signInFlow.launch(context) }, notice = notice)
         return
     }
     val league = (shell as? ShellState.Ready)?.selected

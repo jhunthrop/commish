@@ -22,6 +22,10 @@ public protocol AccountScreenAPI: Sendable {
     /// The founder's one switch, /billing/plans `free_season`: nil from an API older than the free
     /// season, which sends none. Only the flag is read; the app never shows a price.
     func freeSeasonFlag() async throws -> Bool?
+    /// Deletes the account (POST /me/delete, Lane 233) with the email the member typed: nothing to read
+    /// on a 204. A 400 throws the API's sentence for the email, a 409 its sentence (a membership that
+    /// still renews), a 401 signs out.
+    func deleteAccount(email: String) async throws
 }
 
 extension APIClient: AccountScreenAPI {
@@ -78,6 +82,31 @@ extension APIClient: AccountScreenAPI {
         case let .undocumented(status, _):
             throw APIError.status(status)
         }
+    }
+
+    public func deleteAccount(email: String) async throws {
+        switch try await Self.unwrapped({ try await client.deleteMe(body: .json(.init(email: email))) }) {
+        case .noContent:
+            return
+        case let .badRequest(answer):
+            throw try Self.refusal(answer.body.json, field: "email")
+        case let .unauthorized(answer):
+            throw try Self.problem(answer.body.json)
+        case let .conflict(answer):
+            throw try Self.problem(answer.body.json)
+        case let .undocumented(status, _):
+            throw APIError.status(status)
+        }
+    }
+
+    /// A refused field's own sentence where the API names one ("Type the email you sign in with"), else
+    /// the envelope's.
+    static func refusal(_ envelope: Components.Schemas.Envelope, field: String) -> APIError {
+        guard let error = envelope.error?.value1 else {
+            return .emptyEnvelope
+        }
+        let sentence = error.fields?.additionalProperties[field] ?? error.message
+        return .envelope(code: error.code, message: sentence)
     }
 
     public func devices() async throws -> [PairedDeviceRow] {

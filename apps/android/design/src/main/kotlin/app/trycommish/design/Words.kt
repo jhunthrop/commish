@@ -719,8 +719,6 @@ object Words {
 
     object AccountFoot {
         const val label = "Your data"
-        const val before = "To delete your account, write to "
-        const val after = " from the email you sign in with. What we keep is in the "
         const val privacy = "Privacy Policy"
         const val joint = " and the "
         const val terms = "Terms of Service"
@@ -1000,5 +998,36 @@ object Words {
         const val leftOver = "The draft is over and your report is ready."
         const val leftDrafting = "Your queue drafts your seat, then the board. Return and the seat is yours again."
         const val returnVerb = "Return to the lobby"
+    }
+
+    object DeleteAccount {
+        const val title = "Delete account"
+        const val heading = "Delete your account"
+        const val lead = "Your account and everything kept with it go for good. This cannot be undone."
+        const val deletedHead = "Deleted"
+        const val keptHead = "Kept"
+        const val signedInAs = "Signed in as"
+        const val confirm = "Type your email to confirm"
+        const val verb = "Delete account"
+        const val sheetVerb = "Delete my account"
+        const val failed = "Your account was not deleted. Try again."
+        const val doneTitle = "Your account is deleted"
+        const val doneLine = "Everything kept with it is gone, and you are signed out on every device."
+        const val home = "Back to Commish"
+        const val signedOutTitle = "Sign in to delete your account"
+        const val signedOutLine = "Sign in with the account to delete, and you come back to this page."
+        const val signIn = "Sign in"
+        const val offlineTitle = "You're offline"
+        const val offlineLine = "This page loads your account as soon as you are back online."
+        const val unreachableTitle = "Your account can't be reached right now"
+        const val unreachableLine = "Nothing was deleted."
+        const val tryAgain = "Try again"
+        val deleted: List<String> = listOf("Your sign-in, email, name and handle", "Your cheat sheets and their exports", "Your mock drafts and their reports", "The leagues you follow and your platform connections", "Every browser and phone paired with your account", "Your passes and your membership")
+        val kept: List<String> = listOf("Your seats and picks in lobby drafts, under the name Former member", "A group pass you bought, for the people who claimed it")
+    }
+
+    object AccountDeleteFoot {
+        const val verb = "Delete account"
+        const val keep = "What we keep is in the "
     }
 }

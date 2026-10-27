@@ -73,6 +73,7 @@ import {
 } from './trades-parity.ts';
 import { HOLDING_PLAYER, OTHER_GAME_ROSTER } from './export-fixtures.ts';
 import { ACCOUNT_OUTPUT, renderAccount } from './account-parity.ts';
+import { ACCOUNT_DELETE_OUTPUT, renderAccountDelete } from './account-delete-parity.ts';
 import { COMPANION_OUTPUT, renderCompanion } from './companion-parity.ts';
 import { MOCK_OUTPUT, renderMock } from './mock-parity.ts';
 import { renderOneValue } from './one-value-parity.ts';
@@ -684,6 +685,16 @@ export async function generate(): Promise<Outputs> {
 				},
 				instantOf(WEEK_CLOCK),
 				ZONE
+			)
+		],
+		[
+			ACCOUNT_DELETE_OUTPUT,
+			renderAccountDelete(
+				generatedBy(
+					SCRIPT,
+					'web/src/lib/account/delete-words.ts and delete-api.ts (confirmed) over shared/fixtures/inseason'
+				),
+				await answer<Account>('me.json')
 			)
 		],
 		[

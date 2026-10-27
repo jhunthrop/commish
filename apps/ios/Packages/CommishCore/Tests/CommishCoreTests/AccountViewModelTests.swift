@@ -18,6 +18,7 @@ struct AccountViewModelTests {
         var signedOut = 0
         var signOuts = 0
         var leaguesChanged = 0
+        var deleted = 0
     }
 
     static func viewModel(
@@ -30,6 +31,7 @@ struct AccountViewModelTests {
             deviceID: { device },
             signOut: { calls.signOuts += 1 },
             onSignedOut: { calls.signedOut += 1 },
+            deleted: { calls.deleted += 1 },
             leaguesChanged: { calls.leaguesChanged += 1 },
             wait: wait
         )
@@ -162,7 +164,7 @@ struct AccountViewModelTests {
         let gate = Gate()
         let viewModel = try AccountViewModel(
             api: StubAccountScreen.fixture(), cache: NullCache(), clock: FixedClock(Self.now), zone: Fixtures.zone,
-            push: MemoryPushStore(), deviceID: { Self.phone }, signOut: {}, onSignedOut: {},
+            push: MemoryPushStore(), deviceID: { Self.phone }, signOut: {}, onSignedOut: {}, deleted: {},
             leaguesChanged: { Task { await session.restore() } }, wait: { _ in await gate.wait() }
         )
         await viewModel.load()
@@ -240,7 +242,8 @@ struct AccountViewModelTests {
         let viewModel = try AccountViewModel(
             api: StubAccountScreen.fixture(), cache: NullCache(), clock: FixedClock(Self.now), zone: Fixtures.zone,
             push: MemoryPushStore(), deviceID: { await store.deviceID() },
-            signOut: { await session.signOut() }, onSignedOut: { Task { await session.expire() } }
+            signOut: { await session.signOut() }, onSignedOut: { Task { await session.expire() } },
+            deleted: { await session.deleted() }
         )
         await viewModel.load()
         await viewModel.signOut()

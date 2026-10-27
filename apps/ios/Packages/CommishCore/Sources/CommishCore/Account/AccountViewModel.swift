@@ -61,17 +61,21 @@ public final class AccountViewModel {
     private let deviceID: @Sendable () async -> String?
     private let signOutSession: @MainActor () async -> Void
     private let onSignedOut: @MainActor () -> Void
+    private let accountDeleted: @MainActor () async -> Void
     private let leaguesChanged: @MainActor () -> Void
     private let wait: @Sendable (Double) async -> Void
 
     /// `signOut` is the session's (it revokes this phone and forgets it); `onSignedOut` runs when the API
-    /// refuses the token or this phone was unpaired here; `leaguesChanged` after a detach or a restore,
-    /// so the league switch reads the account again; `wait` sleeps for seconds, the undo's window.
+    /// refuses the token or this phone was unpaired here; `deleted` is the session's once the account is
+    /// deleted (it forgets this phone as a sign-out does, with nothing left to revoke); `leaguesChanged`
+    /// after a detach or a restore, so the league switch reads the account again; `wait` sleeps for
+    /// seconds, the undo's window.
     public init(
         api: any AccountScreenAPI, cache: any AnswerCache, clock: any Clock, zone: TimeZone, push: any PushStore,
         deviceID: @escaping @Sendable () async -> String?,
         signOut: @escaping @MainActor () async -> Void,
         onSignedOut: @escaping @MainActor () -> Void,
+        deleted: @escaping @MainActor () async -> Void,
         leaguesChanged: @escaping @MainActor () -> Void = {},
         wait: @escaping @Sendable (Double) async -> Void = { try? await Task.sleep(for: .seconds($0)) }
     ) {
@@ -84,8 +88,47 @@ public final class AccountViewModel {
         self.deviceID = deviceID
         signOutSession = signOut
         self.onSignedOut = onSignedOut
+        accountDeleted = deleted
         self.leaguesChanged = leaguesChanged
         self.wait = wait
+    }
+
+    /// The confirmation sheet for the account shown: its email to type, the delete through this screen's
+    /// API, and the session's hooks. Nil until an account has been read.
+    public func deletion() -> DeleteAccountViewModel? {
+        guard let email = answer?.me.email else {
+            return nil
+        }
+        let deleted = accountDeleted
+        return DeleteAccountViewModel(
+            email: email, api: api,
+            deleted: { [weak self] in
+                // No detach still in its window may write the deleted account back after the session
+                // cleared it (review H1).
+                self?.forgetPending()
+                await deleted()
+            },
+            onSignedOut: { [weak self, onSignedOut] in
+                self?.forgetPending()
+                onSignedOut()
+            }
+        )
+    }
+
+    /// The phone lets the account go (signed out, refused, or deleted): every detach still in its undo
+    /// window stops, its row is let go, and nothing is written back to the cleared cache or told to the
+    /// switch. Each detach is final on the API already (Android's forgetPending, Lane 201 review H1).
+    func forgetPending() {
+        undoWindows.values.forEach { $0.cancel() }
+        undoWindows = [:]
+        detached = []
+        lastDetached = nil
+    }
+
+    /// The API refused the token: the pending detaches are let go, then the app signs out.
+    private func signedOut() {
+        forgetPending()
+        onSignedOut()
     }
 
     /// "Last read Sat 12:00 pm" while the account shown is a saved one.
@@ -110,7 +153,7 @@ public final class AccountViewModel {
             show(read, stamp: now, stale: false)
         } catch where APIError.signsOut(error) {
             state = .failed(AppWords.Failure.signedOut)
-            onSignedOut()
+            signedOut()
         } catch {
             if answer != nil {
                 show(answer, stamp: stamp, stale: true)
@@ -198,8 +241,10 @@ public final class AccountViewModel {
         }
     }
 
-    /// Signs this phone out: the session revokes it and returns to sign-in.
+    /// Signs this phone out: the pending detaches are let go (nothing is written to the cache the session
+    /// clears), then the session revokes this phone and returns to sign-in.
     public func signOut() async {
+        forgetPending()
         busy = Words.Account.signOut
         await signOutSession()
         busy = nil
@@ -226,7 +271,7 @@ public final class AccountViewModel {
             try await step()
         } catch where APIError.signsOut(error) {
             problem = AccountProblem(section: section, text: AppWords.Failure.signedOut)
-            onSignedOut()
+            signedOut()
         } catch let APIError.envelope(_, message) where !message.isEmpty {
             problem = AccountProblem(section: section, text: message)
         } catch {

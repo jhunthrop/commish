@@ -18,6 +18,7 @@ import app.trycommish.core.account.AccountViewModel
 import app.trycommish.core.account.QuietEnd
 import app.trycommish.feature.account.AccountActions
 import app.trycommish.feature.account.AccountScreen
+import app.trycommish.feature.account.DeleteAccountDialog
 import app.trycommish.feature.account.QuietHoursDialog
 
 /**
@@ -35,6 +36,7 @@ fun AccountTab(
     val vm: AccountViewModel = viewModel(key = "account") { graph.accountViewModel(leaguesChanged) }
     val ui by vm.ui.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val deletion by vm.deletion.ui.collectAsStateWithLifecycle()
     var editing by rememberSaveable { mutableStateOf<QuietEnd?>(null) }
     val context = LocalContext.current
     LaunchedEffect(vm) { vm.load() }
@@ -51,6 +53,7 @@ fun AccountTab(
                 toggle = vm::set,
                 editQuiet = { editing = it },
                 signOut = vm::signOut,
+                deleteAccount = vm::openDeletion,
                 openLink = { url ->
                     try {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -63,5 +66,13 @@ fun AccountTab(
     )
     editing?.let { end ->
         QuietHoursDialog(end, ui.push, save = { vm.setQuiet(end, it) }, dismiss = { editing = null })
+    }
+    deletion?.let { shown ->
+        DeleteAccountDialog(
+            shown,
+            type = vm.deletion::type,
+            delete = { vm.deletion.delete() },
+            close = vm.deletion::close,
+        )
     }
 }

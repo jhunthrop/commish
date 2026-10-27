@@ -11,6 +11,7 @@ import io.ktor.client.request.HttpResponseData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -110,5 +111,48 @@ class AccountScreenReadsTest {
             val lapsed = reads { respond("", HttpStatusCode.Unauthorized, json) }
             assertThrows<Unauthorized> { lapsed.me() }
             assertThrows<Unauthorized> { lapsed.detach(league) }
+        }
+
+    @Test
+    fun `a delete posts the typed email and a 204 is done`() =
+        runTest {
+            var sent = ""
+            val reads =
+                reads { request ->
+                    sent = (request.body as TextContent).text
+                    respond("", HttpStatusCode.NoContent)
+                }
+            reads.deleteAccount(" Fixture@Example.com ")
+            assertEquals(listOf("${HttpMethod.Post.value} /me/delete"), asked)
+            assertEquals("""{"email":" Fixture@Example.com "}""", sent)
+        }
+
+    @Test
+    fun `a refused delete says the API's sentence for the email, a renewing membership's, and a 401 signs out`() =
+        runTest {
+            val wrong =
+                reads {
+                    respond(
+                        """{"ok":false,"data":null,"error":{"code":"invalid","message":"Some of that did not check out",""" +
+                            """"fields":{"email":"Type the email you sign in with"}}}""",
+                        HttpStatusCode.BadRequest,
+                        json,
+                    )
+                }
+            val refusal = assertThrows<ApiFailure> { wrong.deleteAccount("other@example.com") }
+            assertEquals("Type the email you sign in with", refusal.message)
+            assertEquals(400, refusal.status)
+            val renewing = "Cancel your membership first, so your card is not charged again"
+            val membership =
+                reads {
+                    respond(
+                        """{"ok":false,"data":null,"error":{"code":"conflict","message":"$renewing"}}""",
+                        HttpStatusCode.Conflict,
+                        json,
+                    )
+                }
+            assertEquals(renewing, assertThrows<ApiFailure> { membership.deleteAccount("fixture@example.com") }.message)
+            val lapsed = reads { respond("", HttpStatusCode.Unauthorized, json) }
+            assertThrows<Unauthorized> { lapsed.deleteAccount("fixture@example.com") }
         }
 }

@@ -61,13 +61,15 @@ data class AccountUi(
 )
 
 /** What the Account asks of the app: sign this phone out through the session (it revokes the device and
- * returns to sign-in), end a session the API refused, tell the league switch the leagues changed, and
- * whether the phone still holds a sign-in (once it does not, a pending detach needs no follow-up). */
+ * returns to sign-in), end a session the API refused, tell the league switch the leagues changed, whether
+ * the phone still holds a sign-in (once it does not, a pending detach needs no follow-up), and forget the
+ * phone once its account is deleted (as a sign-out does, with nothing left to revoke). */
 class AccountHooks(
     val signOut: () -> Unit,
     val sessionEnd: SessionEnd,
     val leaguesChanged: () -> Unit,
     val signedIn: () -> Boolean,
+    val deleted: () -> Unit,
 )
 
 /**
@@ -101,6 +103,18 @@ class AccountViewModel(
 
     /** A read is running: the pull-to-refresh spinner. */
     val refreshing: StateFlow<Boolean> = mutableRefreshing.asStateFlow()
+
+    /** The Delete account dialog: its state, the typed email and the delete. */
+    val deletion =
+        AccountDeletion(reads, viewModelScope, hooks.sessionEnd) {
+            forgetPending()
+            hooks.deleted()
+        }
+
+    /** Opens the Delete account dialog for the account shown; nothing until an account has been read. */
+    fun openDeletion() {
+        answer?.let { deletion.open(it.me.email) }
+    }
 
     /** "Last read Sat 12:00 pm" while the account shown is a saved one. */
     fun stampWords(ui: AccountUi = this.ui.value): String? {

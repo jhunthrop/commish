@@ -8,6 +8,7 @@ import app.trycommish.api.Transport
 import app.trycommish.api.Unauthorized
 import app.trycommish.api.data
 import app.trycommish.api.infrastructure.HttpResponse
+import app.trycommish.api.models.AccountDeletion
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.LeaguePhase
 import app.trycommish.api.models.LeagueStanding
@@ -91,6 +92,11 @@ interface AccountScreenReads {
 
     /** /billing/plans `free_season`: null from an API that sends none. */
     suspend fun freeSeasonFlag(): Boolean?
+
+    /** Deletes the account (POST /me/delete, Lane 233) with the email the member typed: nothing to read on a
+     * 204. A 400 throws the API's sentence for the email, a 409 its sentence (a membership that still
+     * renews), a 401 [Unauthorized]. */
+    suspend fun deleteAccount(email: String)
 }
 
 /** The Account's routes through the generated clients. */
@@ -115,14 +121,25 @@ class ApiAccountScreenReads(
             .getPlans()
             .data<PlansRead>()
             .freeSeason
+
+    override suspend fun deleteAccount(email: String) {
+        val answer = transport.auth().deleteMe(AccountDeletion(email))
+        if (answer.status == HTTP_NO_CONTENT) return
+        answer.done(field = "email")
+    }
 }
 
-/** A write's answer: nothing to read when it went through, the API's failure when it did not. */
-private suspend fun HttpResponse<*>.done() {
+private const val HTTP_NO_CONTENT = 204
+
+/** A write's answer: nothing to read when it went through, the API's failure when it did not, in the
+ * refused `field`'s own sentence where the API names one ("Type the email you sign in with"). */
+private suspend fun HttpResponse<*>.done(field: String? = null) {
     if (status == HTTP_UNAUTHORIZED) throw Unauthorized()
     val envelope = CommishJson.decodeFromString<Envelope<JsonElement>>(response.bodyAsText())
     val error = envelope.error
     if (!envelope.ok || error != null) {
-        throw ApiFailure(status, error?.code ?: "unknown", error?.message.orEmpty())
+        val fields = error?.fields.orEmpty()
+        val sentence = field?.let { fields[it] } ?: error?.message.orEmpty()
+        throw ApiFailure(status, error?.code ?: "unknown", sentence, fields)
     }
 }

@@ -23,7 +23,7 @@ Limits were read from Google's help pages on 2026-10-26 (sources at the foot). C
 | Tags | At most 5, from the console's list | Proposed: Fantasy sports, Football, Sports stats, Sports news, Sports. Pick the closest five the console offers | The console holds the list. This lane could not read it signed out |
 | Contact email | Required | `help@trycommish.app` | `web/src/lib/legal/contact.ts` `SUPPORT_EMAIL`, the footer address |
 | Website | Optional, recommended | `https://trycommish.app` | `PUBLIC_BASE_URL` in `.github/workflows/api.yml` |
-| Phone | Optional | Leave empty | The site prints no phone |
+| Phone | Optional | `(479) 227-2208` | The public number (F5, resolved 2026-10-26). The founder's private number goes to Apple's App Review contact only |
 | Privacy policy URL | Required | `https://trycommish.app/privacy` | `web/src/routes/privacy`, words in `web/src/lib/legal/privacy-words.ts` |
 
 ### 1.1 Full description
@@ -96,14 +96,14 @@ Captions sit above the screen on a plain tokens background (`shared/design/token
 | Financial features | "My app doesn't provide any financial features" | No billing in the app (spec §2, the 2026 season is free). Stripe stays in test mode (`STRIPE_ENVIRONMENT` default `test`) |
 | COVID-19 contact tracing and status | Not applicable | |
 | Data safety | Answers in §4 | |
-| Account deletion URL | `https://trycommish.app/account/delete` | The web page (Lane 233): what is deleted and kept, the email typed to confirm, one verb. The policy's section is `https://trycommish.app/privacy#deleting-your-account`. In-app verb still to come, see §4.3 |
+| Account deletion URL | `https://trycommish.app/account/delete` | The web page (Lane 233): what is deleted and kept, the email typed to confirm, one verb. The policy's section is `https://trycommish.app/privacy#deleting-your-account`. In the app: Account, then Delete account (Lane 237), see §4.3 |
 
 ### 2.1 App access instructions for review
 
 Paste into App content, App access, "All or some functionality is restricted", one instruction set:
 
 - Name: `Review account`
-- Username and password: **FOUNDER** enters them in the console only, never in this file. See F2 for what the account needs.
+- Username and password: `help+review@trycommish.app` with password sign-in, created 2026-10-26 (F2, resolved). The password is in the local env file, pasted into the console only, never in this file. The account follows one public Sleeper league after its first sign-in.
 - Other information, drafted:
 
 ```text
@@ -126,7 +126,7 @@ Draft checked against the banned list (§7 of the report). The verb is the app's
 | Unrestricted internet access | No | Sign-in and the follow page open in the system browser (Custom Tabs, `androidx.browser`), not an in-app browser |
 | Contains a web browser or search engine | No | As above |
 
-Expected outcome: the lowest rating in each region, with the "Users Interact" notice. Target audience (§2) stays 18 and over whatever the rating says.
+Expected outcome: the lowest rating in each region, with the "Users Interact" notice. The age rating is 18+ on both stores (F4, resolved 2026-10-26): Play computes its rating from these answers, so on Play the 18+ is the target audience (§2), which stays 18 and over whatever the rating says.
 
 ## 4. Data safety
 
@@ -138,7 +138,7 @@ Google's rule: "collect" is data the app sends off the device. Data sent to a se
 | --- | --- | --- |
 | Does the app collect or share any of the required user data types? | Yes, it collects. It shares none | §4.2 |
 | Is all user data collected by the app encrypted in transit? | Yes | Release builds call `https://api.trycommish.app`. `network_security_config.xml` sets `cleartextTrafficPermitted="false"`. The room socket is `wss://room.trycommish.app` |
-| Do you provide a way for users to request that their data is deleted? | Yes: on the web at `https://trycommish.app/account/delete`, and in the app under Account once the app's verb ships (§4.3); writing to `help@trycommish.app` still works | `POST /me/delete` (`api/internal/deletion`, Lane 233) deletes the account and every row kept with it at once. Kept: lobby draft seats and picks under "Former member", a group pass for its claimants. Policy: `privacy-words.ts`, `#deleting-your-account` |
+| Do you provide a way for users to request that their data is deleted? | Yes: on the web at `https://trycommish.app/account/delete`, and in the app on the Account screen's Delete account (§4.3); writing to `help@trycommish.app` still works | `POST /me/delete` (`api/internal/deletion`, Lane 233) deletes the account and every row kept with it at once. Kept: lobby draft seats and picks under "Former member", a group pass for its claimants. Policy: `privacy-words.ts`, `#deleting-your-account` |
 
 ### 4.2 Data types
 
@@ -160,19 +160,19 @@ Notes:
 - Platform connections (ESPN cookies, Yahoo tokens, FFPC sign-in) are made on the web, not in the app (the app opens `/league/new` in the browser, `PlayerSheet.kt` `LEAGUE_START`), so the app does not collect them. If the app ever connects a platform itself, revisit this form.
 - Sign-in runs in Custom Tabs on AuthKit's pages, which we control, so the email and name it collects are declared above.
 
-### 4.3 Account deletion: one gap before production
+### 4.3 Account deletion: done in the app and on the web
 
 Play requires both an in-app path (or an in-app link to the web resource) and a web resource where deletion can be requested without the app.
 
 1. **On the web: done (Lane 233).** `https://trycommish.app/account/delete` names Commish, lists what is deleted and what is kept, takes the email typed to confirm and deletes at once through `POST /me/delete`; the page after says "Your account is deleted" at the same address. The account page opens it with "Delete account". The policy's section has its anchor, `https://trycommish.app/privacy#deleting-your-account`, and names the page.
-2. **In the app: still to do.** The Account screen prints "To delete your account, write to help@trycommish.app" (`Words.kt:722`, from `shared/words/account-foot.json`). The follow-up lane adds the "Delete account" verb on Account calling `POST /me/delete` with the device token and the typed email, then clearing the device as sign-out does. The web page cannot stand in for it: an app's sign-in makes no site session (Lane 225), so the page would ask the member to sign in again.
-
-The in-app verb is needed before a production release, not for the internal track.
+2. **In the app: done (Lane 237).** The **Account** screen (the person icon in the top bar) ends with a "Delete account" verb where the old "write to help@trycommish.app" line was. It opens a dialog that lists what is deleted and what is kept, takes the account's email typed by hand, and holds its one verb, "Delete my account", until the email matches. The verb calls `POST /me/delete` with the device token; on success the phone forgets its sign-in and every saved answer, as Sign out does, and lands signed out with "Your account is deleted". The app does not send the member to the web page: an app's sign-in makes no site session (Lane 225), so the page would ask them to sign in again.
 
 ## 5. Release tracks and the founder's device
 
 - Internal track: live (first CI upload 2026-10-26, run 40254247245). The organization account is exempt from the 20-tester closed-test rule.
-- Production: needs §1 to §4 complete, the feature graphic and screenshots (§6), and §4.3 closed.
+- Production: needs §1 to §4 complete and the feature graphic and screenshots (§6); §4.3 is closed (Lane 237).
+- Countries: the United States only (F7, resolved 2026-10-26). No EU trader declaration.
+- The organization address on the listing stays as the payments profile shows it (F6, resolved 2026-10-26).
 - The founder checks the listing and the app on the Mac's emulator (a Play Store AVD signed into his Google account for the internal track), never on a phone.
 
 ## 6. Graphics checklist
@@ -194,7 +194,10 @@ The in-app verb is needed before a production release, not for the internal trac
 - Provide information for Google Play's Data safety section: https://support.google.com/googleplay/android-developer/answer/10787469
 - Understanding Google Play's app account deletion requirements: https://support.google.com/googleplay/android-developer/answer/13327111
 
-## FOUNDER questions for Play
+## FOUNDER questions for Play (resolved 2026-10-26)
 
-- **F2** (shared with the App Store): the review account. See the App Store file, F2.
-- **F6**: Play shows an organization's address on the listing from the payments profile. The business address is your own (the LLC's filing). Confirm that is acceptable or set a different public address in the payments profile before production.
+- **F2** (shared with the App Store): the review account is `help+review@trycommish.app` with password sign-in; the credentials are in the local env file, pasted into the console only. §2.1.
+- **F4** (shared): age rating 18+ on both stores; Play's target audience stays 18 and over. §2, §3.
+- **F5** (shared): the listing's phone is the public number, (479) 227-2208. §1.
+- **F6**: Play keeps the organization address as the payments profile shows it.
+- **F7** (shared): the United States only, no EU trader declaration.
