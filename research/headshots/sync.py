@@ -220,9 +220,10 @@ def _take_due(everyone: list[Candidate], limit: int | None, counts: SyncCounts) 
     return taken
 
 
-def _collect(deps: SyncDeps, season: int, futures: dict[Future[Write | None], Candidate], counts: SyncCounts) -> None:
-    for future in as_completed(futures):
-        candidate = futures[future]
+def _collect(deps: SyncDeps, season: int, pending: dict[Future[Write | None], Candidate], counts: SyncCounts) -> None:
+    """Counts and logs each player as he finishes, taking him off `pending` first."""
+    for future in as_completed(list(pending)):
+        candidate = pending.pop(future)
         error = future.exception()
         if error is None:
             row = future.result()
@@ -237,6 +238,21 @@ def _collect(deps: SyncDeps, season: int, futures: dict[Future[Write | None], Ca
         deps.log(f"headshots: {candidate.player_id} failed, {_record_unmapped(deps, season, candidate, error)}")
 
 
+def _log_in_flight(deps: SyncDeps, pending: dict[Future[Write | None], Candidate]) -> None:
+    """After an abort has waited for them: the failures of the players that were mid-work (those not
+    started were cancelled), logged as the pass would have, though not counted."""
+    for future, candidate in pending.items():
+        if future.cancelled():
+            continue
+        error = future.exception()
+        if error is not None:
+            deps.log(f"headshots: {candidate.player_id} failed, {error_reason(error)}")
+            continue
+        row = future.result()
+        if row is not None and row.status == FAILED:
+            deps.log(f"headshots: {candidate.player_id} failed, {row.reason}")
+
+
 def sync(deps: SyncDeps, season: int, limit: int | None = None) -> SyncCounts:
     """One pass over every provider player; `limit` caps the players fetched (an operator's check).
 
@@ -244,7 +260,8 @@ def sync(deps: SyncDeps, season: int, limit: int | None = None) -> SyncCounts:
     player raises that nobody mapped (a bucket or database error) fails only his row: it is logged,
     counted and kept in the ledger, and the other players carry on; `SyncCounts.systemic` says when
     every player died so. Anything that is not an `Exception` (an interrupt, an exit), or any error
-    leaving the collection, cancels the players not started and propagates.
+    leaving the collection, cancels the players not started, waits for the ones mid-work (at most
+    one fetch each, so the caller's engine and client outlive them), logs their failures and propagates.
     """
     workers = check_workers(deps.workers)
     with deps.engine.connect() as conn:
@@ -252,11 +269,14 @@ def sync(deps: SyncDeps, season: int, limit: int | None = None) -> SyncCounts:
     counts = SyncCounts()
     taken = _take_due(everyone, limit, counts)
     pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="headshots")
+    pending: dict[Future[Write | None], Candidate] = {}
     try:
-        futures = {pool.submit(_sync_one, deps, season, candidate): candidate for candidate in taken}
-        _collect(deps, season, futures, counts)
+        for candidate in taken:
+            pending[pool.submit(_sync_one, deps, season, candidate)] = candidate
+        _collect(deps, season, pending, counts)
     except BaseException:
-        pool.shutdown(wait=False, cancel_futures=True)
+        pool.shutdown(wait=True, cancel_futures=True)
+        _log_in_flight(deps, pending)
         raise
     pool.shutdown(wait=True)
     return counts

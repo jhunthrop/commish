@@ -8,6 +8,7 @@ import itertools
 import os
 import threading
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 
@@ -37,7 +38,6 @@ _NO_PHOTO = "https://a.espncdn.com/combiner/i?img=/i/headshots/nophoto.png&w=200
 _INTERVAL = 0.5  # the sync's two fetches a second
 _MANY = 24
 _PAIR = 2
-_STARTED_AT_MOST = 4  # of twelve, after a cancel: the ones a worker had already taken
 
 
 def _png(width: int = 600, height: int = 436) -> bytes:
@@ -560,29 +560,72 @@ def _many(engine: Engine, count: int = 12) -> None:
     _players(engine, [(str(n), "WR", _ESPN.format(n)) for n in range(1, count + 1)])
 
 
-def test_a_worker_raising_system_exit_propagates_and_later_players_never_start(engine: Engine) -> None:
+class GatedPool(ThreadPoolExecutor):
+    """A pool whose shutdown first cancels the queue without waiting, then opens the gate, then waits:
+    a worker blocked on the gate (a player mid-work) can only finish after the queue is cancelled."""
+
+    gate = threading.Event()
+
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        super().shutdown(wait=False, cancel_futures=cancel_futures)
+        self.gate.set()
+        super().shutdown(wait=wait)
+
+
+@dataclass
+class GatedSource(StubSource):
+    """Player 1 answers at once; every other player's source waits on the pool's gate."""
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        if not request.url.path.rsplit("/", 1)[-1].startswith("1."):
+            assert GatedPool.gate.wait(timeout=30)
+        return super().handler(request)
+
+
+def _gated(monkeypatch: pytest.MonkeyPatch) -> None:
+    GatedPool.gate = threading.Event()
+    monkeypatch.setattr("research.headshots.sync.ThreadPoolExecutor", GatedPool)
+
+
+def test_a_worker_raising_system_exit_propagates_and_later_players_never_start(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _gated(monkeypatch)
     _many(engine)
-    source = StubSource()
+    source = GatedSource()
+    lines: list[str] = []
     with source.client() as http:
-        deps = _deps(engine, http, ExitingBucket(), FakeClock(), workers=1)
+        deps = replace(_deps(engine, http, ExitingBucket(), FakeClock(), workers=1), log=lines.append)
         with pytest.raises(SystemExit):
             sync(deps, 2026)
-    assert len(source.requests) <= _STARTED_AT_MOST
+    started = {request.rsplit("/", 1)[-1] for request in source.requests}
+    assert started <= {"1.png", "2.png"}  # the one in flight when the exit came, never a third
     assert _rows(engine).get("1") is None
 
 
-def test_an_interrupt_leaving_the_collection_cancels_the_players_not_started(engine: Engine) -> None:
+def test_an_interrupt_leaving_the_collection_cancels_the_queue_and_logs_the_player_in_flight(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _gated(monkeypatch)
     _many(engine)
-    source = StubSource(broken=frozenset({"2"}))
+    source = GatedSource(broken=frozenset({"1", "2"}))
+    lines: list[str] = []
 
-    def interrupt(line: str) -> None:
-        raise KeyboardInterrupt
+    def interrupt_first(line: str) -> None:
+        if not lines:
+            lines.append(line)
+            raise KeyboardInterrupt
+        lines.append(line)
 
     with source.client() as http:
-        deps = replace(_deps(engine, http, StubBucket(), FakeClock(), workers=1), log=interrupt)
+        deps = replace(_deps(engine, http, StubBucket(), FakeClock(), workers=1), log=interrupt_first)
         with pytest.raises(KeyboardInterrupt):
             sync(deps, 2026)
-    assert len(source.requests) <= _STARTED_AT_MOST
+    started = {request.rsplit("/", 1)[-1] for request in source.requests}
+    assert started <= {"1.png", "2.png"}
+    assert lines[0].startswith("headshots: 1 failed, HTTP 500")
+    # The second player, when a worker had taken him before the cancel, ran to the end and is logged.
+    assert (len(lines) == _PAIR) == ("2.png" in started)
 
 
 def test_a_mapped_and_an_unmapped_failure_in_one_run_each_keep_their_line(engine: Engine) -> None:
