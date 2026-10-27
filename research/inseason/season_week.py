@@ -95,6 +95,8 @@ GRADE_OVERDUE: Final = timedelta(days=4)
 LAST_POSSIBLE_WEEK: Final = 22
 OPPONENT_RATINGS: Final = "opponent-ratings"
 GAME_TABLE: Final = "game-table"
+GRADE: Final = "grade"
+GRADE_STANDS_DOWN: Final = f"not graded: the {GAME_TABLE} step failed on this pass, so the week's games could be stale"
 KICKING_DEFENSE: Final = "kicking-defense"
 ESPN_PROJECTIONS: Final = "espn-projections"
 ESPN_FILL: Final = "espn-fill"
@@ -108,7 +110,7 @@ STEPS: Final = (
     KICKING_DEFENSE,
     ESPN_PROJECTIONS,
     "props-snapshot",
-    "grade",
+    GRADE,
     "freeze",
     ESPN_FILL,
     "scoreboard",
@@ -431,7 +433,7 @@ def _bodies(context: SeasonWeekContext) -> dict[str, Callable[[], StepResult]]:
         KICKING_DEFENSE: lambda: kicking_defense(context),
         ESPN_PROJECTIONS: lambda: espn_projections_step(context),
         "props-snapshot": lambda: props_snapshot(context),
-        "grade": lambda: grade(context),
+        GRADE: lambda: grade(context),
         "freeze": lambda: freeze(context),
         ESPN_FILL: lambda: espn_fill(context),
         "scoreboard": lambda: scoreboard(context),
@@ -439,9 +441,17 @@ def _bodies(context: SeasonWeekContext) -> dict[str, Callable[[], StepResult]]:
 
 
 def run_season_week(context: SeasonWeekContext) -> list[StepResult]:
-    """Every step in order, each isolated."""
+    """Every step in order, each isolated. A grade is final, so the grade step stands down when the
+    game-table step failed on this pass: its completeness check reads the game table, which may then
+    be stale (Lane 244)."""
     bodies = _bodies(context)
-    return [_safely(name, bodies[name], context) for name in STEPS]
+    results: list[StepResult] = []
+    for name in STEPS:
+        if name == GRADE and any(r.step == GAME_TABLE and r.status == "failed" for r in results):
+            results.append(StepResult(GRADE, "skipped", GRADE_STANDS_DOWN))
+            continue
+        results.append(_safely(name, bodies[name], context))
+    return results
 
 
 def run_usage_backfill(context: SeasonWeekContext) -> list[StepResult]:

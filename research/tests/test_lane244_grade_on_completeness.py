@@ -262,3 +262,32 @@ def test_a_week_with_no_games_on_file_waits_then_is_overdue(engine: Engine) -> N
     overdue, _ = _grade(engine, 2029, _FROZEN_AT + GRADE_OVERDUE)
     assert (waits.status, waits.detail) == ("skipped", ("week 7: waits, no games on file",))
     assert (overdue.status, overdue.detail) == ("failed", ("week 7: OVERDUE, waits, no games on file",))
+
+
+def test_the_grade_stands_down_when_the_game_table_failed_on_the_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    graded: list[datetime] = []
+
+    def failed_read(context: SeasonWeekContext) -> StepResult:
+        raise RuntimeError("games.csv answered 503")
+
+    def grade(context: SeasonWeekContext) -> StepResult:
+        graded.append(context.now)
+        return StepResult(season_week.GRADE, "ok", "graded")
+
+    monkeypatch.setattr(season_week, "game_table", failed_read)
+    monkeypatch.setattr(season_week, "grade", grade)
+    only = frozenset(season_week.STEPS) - {season_week.GAME_TABLE, season_week.GRADE}
+    context = SeasonWeekContext(
+        engine=cast(Engine, _FakeEngine()), fetcher=cast(Fetcher, None), now=_TUESDAY_EVENING, season=2026,
+        environ={}, skip=only,
+    )  # fmt: skip
+    results = {result.step: result for result in season_week.run_season_week(context)}
+    assert results[season_week.GAME_TABLE].status == "failed"
+    assert (results[season_week.GRADE].status, results[season_week.GRADE].summary) == (
+        "skipped",
+        "not graded: the game-table step failed on this pass, so the week's games could be stale",
+    )
+    assert graded == []
+    monkeypatch.setattr(season_week, "game_table", lambda context: StepResult(season_week.GAME_TABLE, "ok", "0 games"))
+    season_week.run_season_week(context)
+    assert graded == [_TUESDAY_EVENING]
