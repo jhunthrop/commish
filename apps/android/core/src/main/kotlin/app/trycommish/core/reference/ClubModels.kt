@@ -2,6 +2,7 @@ package app.trycommish.core.reference
 
 import app.trycommish.api.models.RunAdpSource
 import app.trycommish.api.models.RunBoardAnswer
+import app.trycommish.api.models.RunBoardRow
 import app.trycommish.api.models.RunClub
 import app.trycommish.api.models.RunDesignations
 import app.trycommish.api.models.RunFormat
@@ -23,6 +24,12 @@ import app.trycommish.core.board.RunReadFailure
 import app.trycommish.core.board.RunWords
 import app.trycommish.core.board.placed
 import app.trycommish.core.instantOrNull
+import app.trycommish.core.liveorder.LiveOrder
+import app.trycommish.core.liveorder.LiveOrderWords
+import app.trycommish.core.liveorder.LivePlace
+import app.trycommish.core.liveorder.OrderAtClock
+import app.trycommish.core.liveorder.OrderReader
+import app.trycommish.core.liveorder.PlacedFigures
 import app.trycommish.core.player.Read
 import app.trycommish.core.player.ReadStamp
 import app.trycommish.core.shell.SheetPlayer
@@ -58,7 +65,10 @@ data class ClubCard(
 )
 
 /** The clubs index as the web's /clubs says it (server/pages/clubs.ts clubsPage, schedule-view.ts
- * clubCards): its lead with the strength's sentence, then every club's card in the run's order. */
+ * clubCards): its lead with the strength's sentence, then every club's card in the run's order. In season
+ * each card's lead is the first of its club's first three on the board at the order's clock, once the
+ * order places every club's three (Lane 226, placedLeads), and the basis under the cards says which clock
+ * they are on. */
 data class ClubsModel(
     val title: String,
     val stamp: String,
@@ -66,6 +76,10 @@ data class ClubsModel(
     val clubs: List<ClubCard>,
     /** The link to the strength of schedule, as the web's pages link it. */
     val scheduleLink: String,
+    /** In season the order's lead or the run's stamp, said once under the cards; none before. */
+    val basis: List<String> = emptyList(),
+    /** Whether the leads are the order's. */
+    val atClock: Boolean = false,
 )
 
 /** A club page's verb: its words and the two players it compares, by id and by slug. */
@@ -78,7 +92,10 @@ data class ClubCompare(
 /** A club's page as the web's /clubs/[abbr] says it at 390: the hero (its name, line, strength and rank),
  * the basis once, its players on the default board in the board's order with the round tint and the Gap
  * where drawn, its kickers and defense in draft order, its schedule with the games played set back, and
- * the verb that sets its two best available players side by side. */
+ * the verb that sets its two best available players side by side. In season its players carry the order's
+ * figures in the order's order once the order places every one of them, the head says the order, and the
+ * order's lead takes the board sentence's place in the basis; until then the run's rows stand with the
+ * run's stamp (Lane 226). */
 data class ClubPageModel(
     val abbr: String,
     val name: String,
@@ -86,8 +103,9 @@ data class ClubPageModel(
     val stamp: String,
     val hero: ClubHero?,
     val basis: List<String>,
-    /** "On our PPR board": the head names what the basis beside it names, the run's board (reference-words.ts
-     * CLUB_PAGE.onBoard, Lane 223's D2); the order's head waits on this page reading the live order (B207). */
+    /** "On our PPR board" while the rows are the run's, "On our rest-of-season order" once they are the
+     * order's: the head names what the basis beside it names (reference-words.ts CLUB_PAGE.onBoard and
+     * CLUB_ORDER.onOrder, Lane 223's D2). */
     val boardHead: String,
     /** The section's spoken label after the head, as the web's table label: "Cincinnati Bengals, On our PPR board". */
     val boardLabel: String,
@@ -105,6 +123,8 @@ data class ClubPageModel(
     /** Null with fewer than two available players. */
     val compare: ClubCompare?,
     val clubsLink: String,
+    /** Whether the rows are the order's. */
+    val atClock: Boolean = false,
 )
 
 /** The strength of schedule screen: its heading, the run's stamp, the grid, its legend and the verb. */
@@ -165,6 +185,28 @@ class ClubFiles(
         zone: ZoneId,
     ): String? = capture?.let { BoardWords.capture(instantOrNull(it.readAt) ?: now, instantOrNull(it.checkedAt), now, zone) }
 
+    /** The order's places when the run ranks the rest of the season and the order is in the board's
+     * scoring; null before the season, while unread, or in another scoring. */
+    fun places(order: OrderAtClock?): Map<String, LivePlace>? =
+        order?.takeIf { format.rosFromWeek != null && LiveOrder.inScoring(it.answer, format) }?.places
+
+    /** A page's basis on its clock: the order's lead in the board sentence's place once its rows stand,
+     * else in season the run's stamp after the whole basis. */
+    fun basis(
+        run: List<String>,
+        order: OrderAtClock?,
+        atClock: Boolean,
+        zone: ZoneId,
+    ): List<String> {
+        if (format.rosFromWeek == null) return run
+        return LiveOrder.basis(
+            run,
+            BoardBasis.ourBoard(format, manifest.manifest.season),
+            order?.takeIf { atClock }?.lead(format.teams, zone),
+            LiveOrderWords.runStamp(format, zone),
+        )
+    }
+
     companion object {
         /** The default format's files; the ADP's sources where the screen says the board's basis; and in
          * season the run's complete week from an own page, for the games played. */
@@ -209,34 +251,72 @@ class ClubFiles(
     }
 }
 
-/** The clubs index's model from its files. */
+/** A club's first players on the board, its card's lead's pool at the order's clock (server/pages/clubs.ts
+ * CLUB_LEAD_POOL). */
+private const val LEAD_POOL = 3
+
+/** Each club's lead with his figures and whether they are the order's: the first of its rows on no
+ * season-long list, whose rank assumes he plays (held-places.ts leadOf), the run's; at the order's clock
+ * the first of its pool so placed, with the order's figures, when the order places every club's pool
+ * (placedLeads), else every lead the run's. */
+private fun clubLeads(
+    files: ClubFiles,
+    ordered: List<RunBoardRow>,
+    places: Map<String, LivePlace>?,
+): Pair<Map<String, Pair<RunBoardRow, PlacedFigures>>, Boolean> {
+    val available = { row: RunBoardRow -> !BoardOrder.heldOut(row.id, files.statuses) }
+    val run =
+        files.clubs
+            .mapNotNull { club ->
+                ordered.firstOrNull { it.team == club.abbr && available(it) }?.let {
+                    club.abbr to
+                        (it to PlacedFigures.of(it))
+                }
+            }.toMap()
+    if (places == null) return run to false
+    val placed =
+        files.clubs.filter { it.abbr in run }.mapNotNull { club ->
+            val pool = ordered.filter { it.team == club.abbr }.take(LEAD_POOL)
+            val pooled = LiveOrder.placed(pool, { it.id }, places) ?: return run to false
+            pooled.firstOrNull { available(it.row) }?.let {
+                club.abbr to
+                    (it.row to PlacedFigures.of(it.row).at(it.place, files.format.teams))
+            }
+        }
+    return placed.toMap() to true
+}
+
+/** The clubs index's model from its files; `order` the order at the screen's clock, null while unread. */
 fun clubsModel(
     files: ClubFiles,
     zone: ZoneId,
+    order: OrderAtClock? = null,
 ): ClubsModel {
     val format = files.format
     val ordered = BoardOrder.withStatuses(files.board.rows.map { it.placed() }, files.statuses).map { it.row }
     val views = ScheduleViews.views(files.schedule, files.underway)
     val first = files.clubs.firstNotNullOfOrNull { views[it.abbr] }
     val cells = files.cells(zone)
+    val (leads, atClock) = clubLeads(files, ordered, files.places(order))
     return ClubsModel(
         title = Words.ClubPage.clubs,
         stamp = RunWords.stamp(files.manifest.manifest),
         lead = StrengthWords.clubsLead(format.label, first),
         scheduleLink = Words.AdpPage.scheduleLink,
+        basis = files.basis(emptyList(), order, atClock, zone),
+        atClock = atClock,
         clubs =
             files.clubs.map { club ->
                 val own = ordered.filter { it.team == club.abbr }
-                // Never a player on a season-long list, whose rank assumes he plays (held-places.ts leadOf).
                 val lead =
-                    own.firstOrNull { !BoardOrder.heldOut(it.id, files.statuses) }?.let { row ->
-                        val drawn = cells.ranked(row)
+                    leads[club.abbr]?.let { (row, figures) ->
+                        val drawn = cells.ranked(row, figures)
                         ClubLead(
                             name = row.name,
                             initials = drawn.initials,
                             headshot = drawn.headshot,
-                            pill = "${row.position.value} ${row.positionRank}",
-                            rank = "${Words.ClubPage.ourRank} ${row.ourRank}",
+                            pill = "${row.position.value} ${figures.positionRank}",
+                            rank = "${Words.ClubPage.ourRank} ${figures.ourRank}",
                             sheetPlayer =
                                 drawn.sheetPlayer ?: SheetPlayer(row.id, row.slug, row.name, row.position.value, null, row.team, null),
                         )
@@ -253,17 +333,23 @@ fun clubsModel(
     )
 }
 
-/** A club's page by its abbreviation in any case ("ari"), null for a club the run does not carry. */
+/** A club's page by its abbreviation in any case ("ari"), null for a club the run does not carry; `order`
+ * the order at the screen's clock, its rows the order's when it places every one. */
 fun clubPageModel(
     files: ClubFiles,
     abbr: String,
     now: Instant,
     zone: ZoneId,
+    order: OrderAtClock? = null,
 ): ClubPageModel? {
     val club = files.clubs.firstOrNull { it.abbr.equals(abbr, ignoreCase = true) } ?: return null
     val format = files.format
     val cells = files.cells(zone)
-    val own = BoardOrder.withStatuses(files.board.rows.map { it.placed() }, files.statuses).map { it.row }.filter { it.team == club.abbr }
+    val run = BoardOrder.withStatuses(files.board.rows.map { it.placed() }, files.statuses).map { it.row }.filter { it.team == club.abbr }
+    val placed = files.places(order)?.let { places -> LiveOrder.placed(run, { it.id }, places) }
+    val shown = placed?.map { it.row to PlacedFigures.of(it.row).at(it.place, format.teams) } ?: run.map { it to PlacedFigures.of(it) }
+    val own = shown.map { it.first }
+    val atClock = placed != null
     val market =
         listOf(BoardPosition.Kicker, BoardPosition.Defense).flatMap { position ->
             BoardOrder
@@ -271,10 +357,10 @@ fun clubPageModel(
                 .map { it.row }
                 .filter { it.team == club.abbr }
         }
-    val gap = format.rosFromWeek == null && own.any { it.gap != null }
+    val gap = format.rosFromWeek == null && shown.any { it.second.gap != null }
     val scheduled = ScheduleViews.club(club, files.schedule, files.clubs, files.played, files.underway, files.states(zone))
     val pair = own.filter { !BoardOrder.heldOut(it.id, files.statuses) }.take(2)
-    val head = filled(Words.ClubPage.onBoard, format.label)
+    val head = if (atClock) Words.ClubOrder.onOrder else filled(Words.ClubPage.onBoard, format.label)
     val name = "${club.city} ${club.nickname}"
     return ClubPageModel(
         abbr = club.abbr,
@@ -283,14 +369,19 @@ fun clubPageModel(
         stamp = RunWords.stamp(files.manifest.manifest),
         hero = scheduled.hero,
         basis =
-            listOf(StrengthWords.winsBasis(files.schedule.opponentBasis)) +
-                BoardBasis.ranked(format, files.manifest.manifest.season, null, files.sources.orEmpty(), gap) +
-                listOfNotNull(files.captureWords(now, zone)),
+            files.basis(
+                listOf(StrengthWords.winsBasis(files.schedule.opponentBasis)) +
+                    BoardBasis.ranked(format, files.manifest.manifest.season, null, files.sources.orEmpty(), gap) +
+                    listOfNotNull(files.captureWords(now, zone)),
+                order,
+                atClock,
+                zone,
+            ),
         boardHead = head,
         boardLabel = "$name, $head",
-        nobody = if (own.isEmpty()) filled(Words.ClubPage.nobody, club.city) else null,
+        nobody = if (own.isEmpty()) filled(if (atClock) Words.ClubOrder.nobody else Words.ClubPage.nobody, club.city) else null,
         columns = BoardColumns.Ranked(gap),
-        rows = own.map(cells::ranked),
+        rows = shown.map { (row, figures) -> cells.ranked(row, figures) },
         marketHead = Words.ClubPage.kickers,
         market = market.map { cells.market(it) },
         scheduleCaption = scheduled.caption,
@@ -299,6 +390,7 @@ fun clubPageModel(
         asOf = scheduled.asOf,
         compare = if (pair.size == 2) ClubCompare(Words.ClubPage.comparePair, pair.map { it.id }, pair.map { it.slug }) else null,
         clubsLink = Words.ClubPage.clubs,
+        atClock = atClock,
     )
 }
 
@@ -328,26 +420,46 @@ class UnknownClub(
 
 /** The club screens' view models. */
 object ClubScreens {
+    /** `orders` reads the order in season, the leads drawn again at its clock: every club's first three,
+     * the order's first rows, which a club's leads are among. */
     fun clubs(
         reads: ReferenceReads,
         zone: ZoneId,
         sessionEnd: SessionEnd,
+        orders: OrderReader? = null,
     ): RunScreenViewModel<ClubsModel> =
-        RunScreenViewModel(reads, zone, sessionEnd) { r ->
+        RunScreenViewModel(reads, zone, sessionEnd, orders) { r ->
             val files = ClubFiles.read(r, sources = false)
-            Built(clubsModel(files, zone), files.manifest.manifest, files.reads)
+            Built(clubsModel(files, zone), files.manifest.manifest, files.reads) { reader ->
+                reader
+                    .takeIf { files.format.rosFromWeek != null }
+                    ?.readOrNull()
+                    ?.let { clubsModel(files, zone, it) }
+                    ?.takeIf { it.atClock }
+            }
         }
 
+    /** `orders` reads the order in season, every player of the club read by its name as the web's club
+     * page reads him, the page drawn again at its clock. */
     fun club(
         abbr: String,
         reads: ReferenceReads,
         zone: ZoneId,
         sessionEnd: SessionEnd,
+        orders: OrderReader? = null,
     ): RunScreenViewModel<ClubPageModel> =
-        RunScreenViewModel(reads, zone, sessionEnd) { r ->
+        RunScreenViewModel(reads, zone, sessionEnd, orders) { r ->
             val files = ClubFiles.read(r, sources = true)
-            val model = clubPageModel(files, abbr, r.clock.now(), zone) ?: throw UnknownClub(abbr)
-            Built(model, files.manifest.manifest, files.reads)
+            val now = r.clock.now()
+            val model = clubPageModel(files, abbr, now, zone) ?: throw UnknownClub(abbr)
+            Built(model, files.manifest.manifest, files.reads) { reader ->
+                reader
+                    .takeIf {
+                        files.format.rosFromWeek != null
+                    }?.readOrNull(search = model.abbr)
+                    ?.let { clubPageModel(files, abbr, now, zone, it) }
+                    ?.takeIf { it.atClock }
+            }
         }
 
     fun schedule(
@@ -355,7 +467,7 @@ object ClubScreens {
         zone: ZoneId,
         sessionEnd: SessionEnd,
     ): RunScreenViewModel<ScheduleModel> =
-        RunScreenViewModel(reads, zone, sessionEnd) { r ->
+        RunScreenViewModel(reads, zone, sessionEnd, null) { r ->
             val files = ClubFiles.read(r, sources = false)
             Built(scheduleModel(files, zone), files.manifest.manifest, files.reads)
         }

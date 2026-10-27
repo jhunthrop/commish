@@ -36,6 +36,8 @@ import app.trycommish.core.companion.NewCompanionViewModel
 import app.trycommish.core.leaguehome.ApiLeagueReads
 import app.trycommish.core.leaguehome.LeagueHomeViewModel
 import app.trycommish.core.leaguehome.LeagueReads
+import app.trycommish.core.liveorder.OrderReader
+import app.trycommish.core.liveorder.OrderShare
 import app.trycommish.core.matchup.ApiMatchupReads
 import app.trycommish.core.matchup.MatchupReads
 import app.trycommish.core.matchup.MatchupViewModel
@@ -118,7 +120,12 @@ class AppGraph(
     private val waivers: WaiverReads = ApiWaiverReads(transport)
     private val trades: TradeReads = ApiTradeReads(transport)
     private val runs: RunReads = ApiRunReads(transport)
-    private val rankings: RankingsReads = ApiRankingsReads(transport)
+
+    /** The order's reads, shared by the Rankings and every in-season screen that ranks a player, one read
+     * per route for a minute (Lane 226). */
+    private val orderShare = OrderShare(ApiRankingsReads(transport), clock)
+    private val rankings: RankingsReads = orderShare
+    private val orders = OrderReader(orderShare)
     private val records: RecordReads = ApiRecordReads(transport)
     private val accountScreen: AccountScreenReads = ApiAccountScreenReads(transport)
     private val companions: CompanionReads = ApiCompanionReads(transport)
@@ -194,7 +201,7 @@ class AppGraph(
     fun boardViewModel(
         inSeason: Boolean,
         following: Boolean,
-    ): BoardViewModel = BoardViewModel(runs, cache, clock, zone, inSeason, following, sessionEnd)
+    ): BoardViewModel = BoardViewModel(runs, cache, clock, zone, inSeason, following, sessionEnd, orders)
 
     /** A league's Start screen, the lineup copied to the phone's clipboard. */
     fun startViewModel(league: LeagueHost): StartViewModel = StartViewModel(lineups, cache, clock, zone, league, ::copy, sessionEnd)
@@ -288,11 +295,11 @@ class AppGraph(
     fun compareViewModel(
         slugs: List<String?>,
         league: FollowedLeague?,
-    ): RunScreenViewModel<CompareModel> = CompareReader.viewModel(slugs, league, references, zone, sessionEnd)
+    ): RunScreenViewModel<CompareModel> = CompareReader.viewModel(slugs, league, references, zone, sessionEnd, orders)
 
-    fun clubsViewModel(): RunScreenViewModel<ClubsModel> = ClubScreens.clubs(references, zone, sessionEnd)
+    fun clubsViewModel(): RunScreenViewModel<ClubsModel> = ClubScreens.clubs(references, zone, sessionEnd, orders)
 
-    fun clubViewModel(abbr: String): RunScreenViewModel<ClubPageModel> = ClubScreens.club(abbr, references, zone, sessionEnd)
+    fun clubViewModel(abbr: String): RunScreenViewModel<ClubPageModel> = ClubScreens.club(abbr, references, zone, sessionEnd, orders)
 
     fun scheduleViewModel(): RunScreenViewModel<ScheduleModel> = ClubScreens.schedule(references, zone, sessionEnd)
 

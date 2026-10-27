@@ -20,12 +20,15 @@ import app.trycommish.core.board.BoardPosition
 import app.trycommish.core.board.BoardSection
 import app.trycommish.core.board.RunFixture
 import app.trycommish.core.board.RunWords
+import app.trycommish.core.liveorder.OneValueFixture
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Tokens
 import com.android.ide.common.rendering.api.SessionParams.RenderingMode
 import com.android.resources.Density
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,6 +73,13 @@ class BoardSnapshotTest(
 
         /** In season, saved and read with no signal. */
         Stale("stale", null, true),
+
+        /** In season at the order's clock (Lane 226, the iOS board-clock): the one-value stand-in at the
+         * Sunday clock, its top rows the order's with the order's lead under the heading and in the basis. */
+        Clock("clock", null, true),
+
+        /** The same board while the order is unread: the run's rows with the run's stamp in the basis. */
+        ClockUnread("clock-unread", null, true),
     }
 
     enum class Phone(
@@ -117,6 +127,16 @@ class BoardSceneTest {
     }
 
     @Test
+    fun `the clock scenes say the order's lead and the run's stamp`() {
+        val read = modelOf(BoardSnapshotTest.Scene.Clock)
+        assertTrue(read.atClock)
+        assertEquals(read.restLine, read.basis.first())
+        val unread = modelOf(BoardSnapshotTest.Scene.ClockUnread)
+        assertFalse(unread.atClock)
+        assertTrue(unread.basis.last().startsWith("Projected updated"))
+    }
+
+    @Test
     fun `the stale scene says why its board shows`() {
         assertEquals(
             "You're offline, so this is the last board this device saved, updated Oct 21.",
@@ -128,6 +148,9 @@ class BoardSceneTest {
 /** Rows enough to fill the first screen of the tallest phone. */
 private const val FIRST_ROWS = 12
 
+/** The clock scenes' top rows, drawn above the basis so the lead and the stamp are both in the picture. */
+private const val CLOCK_ROWS = 6
+
 /** The rows drawn on each side of a tier's cliff, and above the basis. */
 private const val AROUND = 4
 
@@ -135,6 +158,18 @@ private const val AROUND = 4
 private const val FIRST_MID_LIST = 3
 
 private fun modelOf(scene: BoardSnapshotTest.Scene): BoardModel {
+    if (scene == BoardSnapshotTest.Scene.Clock || scene == BoardSnapshotTest.Scene.ClockUnread) {
+        val order = OneValueFixture.order().takeIf { scene == BoardSnapshotTest.Scene.Clock }
+        return BoardModel.of(
+            RunFixture.OneValue.read(),
+            null,
+            inSeason = true,
+            following = false,
+            now = OneValueFixture.now,
+            zone = RunFixture.zone,
+            order = order,
+        )
+    }
     val fixture = if (scene.inSeason) RunFixture.Contract else RunFixture.StandIn
     val now = if (scene.inSeason) RunFixture.inSeason else RunFixture.preDraft
     return BoardModel.of(fixture.read(), scene.position, scene.inSeason, following = false, now = now, zone = RunFixture.zone)
@@ -145,8 +180,11 @@ private fun stampOf(scene: BoardSnapshotTest.Scene): String? =
     if (scene == BoardSnapshotTest.Scene.Stale) RunWords.offline(RunFixture.Contract.read().manifest) else null
 
 /** The sections the first screen reaches, their rows up to the tallest phone's first screen. */
-private fun firstScreen(sections: List<BoardSection>): List<BoardSection> {
-    var left = FIRST_ROWS
+private fun firstScreen(
+    sections: List<BoardSection>,
+    rows: Int = FIRST_ROWS,
+): List<BoardSection> {
+    var left = rows
     return sections.mapNotNull { section ->
         if (left <= 0) return@mapNotNull null
         val kept = section.rows.take(left)
@@ -177,6 +215,8 @@ private fun Mock(
     val model = modelOf(scene)
     val bg = Modifier.background(CommishTheme.colors.bg)
     when (scene) {
+        BoardSnapshotTest.Scene.Clock, BoardSnapshotTest.Scene.ClockUnread ->
+            Column(bg.fillMaxWidth()) { BoardPage(model, null, firstScreen(model.sections, CLOCK_ROWS)) }
         BoardSnapshotTest.Scene.Cliff ->
             Column(bg.fillMaxWidth().padding(vertical = Tokens.Space.s4.dp)) { BoardTable(model, aroundCliff(model.sections)) }
         BoardSnapshotTest.Scene.Foot ->

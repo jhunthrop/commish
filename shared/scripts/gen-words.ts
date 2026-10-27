@@ -643,6 +643,12 @@ export const TABLES: readonly TableSource[] = [
     json: "shared/words/live-order.json",
   },
   {
+    name: "ClubOrder",
+    module: REFERENCE_MODULE,
+    picks: ["CLUB_ORDER"],
+    json: "shared/words/club-order.json",
+  },
+  {
     name: "Lobby",
     module: "web/src/lib/room/lobby-words.ts",
     picks: ["LOBBY"],

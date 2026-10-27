@@ -954,6 +954,11 @@ object Words {
 
     }
 
+    object ClubOrder {
+        const val onOrder = "On our rest-of-season order"
+        const val nobody = "Nobody from {city} is in this order"
+    }
+
     object Lobby {
         const val join = "Join"
         const val yourSeat = "Your seat"

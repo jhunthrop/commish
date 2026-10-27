@@ -1,10 +1,16 @@
 package app.trycommish.core.board
 
 import app.trycommish.api.models.RunBoardAnswer
+import app.trycommish.api.models.RunBoardRow
 import app.trycommish.api.models.RunFormat
 import app.trycommish.api.models.RunPlayerStatus
 import app.trycommish.core.Format
 import app.trycommish.core.instantOrNull
+import app.trycommish.core.liveorder.LiveOrder
+import app.trycommish.core.liveorder.LiveOrderWords
+import app.trycommish.core.liveorder.LivePlace
+import app.trycommish.core.liveorder.OrderAtClock
+import app.trycommish.core.liveorder.PlacedFigures
 import app.trycommish.design.Words
 import java.time.Instant
 import java.time.ZoneId
@@ -62,7 +68,12 @@ sealed interface BoardColumns {
 /**
  * The Board screen as the web's board says it at 390 (the iOS BoardModel's twin), from the run: the
  * heading, the run's stamp and, in season, the weeks it ranks; the format and position chips; the view's
- * rows in the run's order, a position's in its tiers with their cliffs; and the basis once.
+ * rows in the run's order, a position's in its tiers with their cliffs; and the basis once. In season,
+ * once the order the in-season pages read (GET /order) answers, the view is the order's: the run's rows
+ * it places, in its order with its figures (as far as its read reaches, the count said once), a
+ * position's with no tiers (they are the run's), the players on a season-long list after them with the
+ * list's word, and the order's lead under the heading and in the board sentence's place; until then the
+ * run's rows stand and the basis says the run's day and time (Lane 226, LiveOrder).
  */
 data class BoardModel(
     val words: BoardWords,
@@ -76,11 +87,15 @@ data class BoardModel(
     val sections: List<BoardSection>,
     /** What the numbers are as the web's board says them, then the capture the statuses come from. */
     val basis: List<String>,
+    /** Whether the rows carry the order's figures at its clock. */
+    val atClock: Boolean = false,
 ) {
     val rows: List<BoardRow> get() = sections.flatMap { it.rows }
 
     companion object {
-        /** `inSeason` is the bar's season; `following` whether the member follows a league. */
+        /** `inSeason` is the bar's season; `following` whether the member follows a league; `order` the
+         * order as read at the screen's clock, null while unread or when the read failed. */
+        @Suppress("LongParameterList")
         fun of(
             read: RunBoardRead,
             position: BoardPosition?,
@@ -88,13 +103,16 @@ data class BoardModel(
             following: Boolean,
             now: Instant,
             zone: ZoneId,
+            order: OrderAtClock? = null,
         ): BoardModel {
             val manifest = read.manifest
             val format = read.format
             val board = read.board
             val statuses = read.designations?.players.orEmpty()
             val cells = BoardCells(statuses, BoardCells.byes(read.clubs), format.rosFromWeek, zone)
-            val view = viewRows(board, position, statuses, cells, format.unit)
+            val ranksRest = inSeason && format.rosFromWeek != null
+            val places = order?.takeIf { ranksRest && LiveOrder.inScoring(it.answer, format) }?.places
+            val view = viewRows(board, position, statuses, cells, format.unit, places?.let { ClockPlaces(it, format.teams) })
             val draftOrder = position?.draftOrder == true
             val columns = if (draftOrder) BoardColumns.DraftOrder else BoardColumns.Ranked(format.rosFromWeek == null && view.carriesGap)
             val said =
@@ -114,6 +132,15 @@ data class BoardModel(
                         zone = zone,
                     )
                 }
+            val run = said + listOfNotNull(capture)
+            val lead = order?.takeIf { view.atClock }?.lead(format.teams, zone)
+            val basis =
+                if (draftOrder || !ranksRest) {
+                    run
+                } else {
+                    LiveOrder.basis(run, BoardBasis.ourBoard(format, manifest.season), lead, LiveOrderWords.runStamp(format, zone)) +
+                        listOfNotNull(view.reach?.let { (shown, total) -> LiveOrderWords.reach(shown, total) })
+                }
             val present = (board.rows.map { it.position.value } + board.market.map { it.position.value }).toSet()
             return BoardModel(
                 words =
@@ -123,14 +150,16 @@ data class BoardModel(
                         following,
                     ),
                 stamp = RunWords.stamp(manifest),
-                restLine = RunWords.restCaption(format, manifest.season),
+                // The head follows the basis's clock: the order's lead once its rows stand.
+                restLine = lead ?: RunWords.restCaption(format, manifest.season),
                 formats = manifest.formats.map { BoardChip(it.label, it.id, it.id == format.id) },
                 positions =
                     listOf(BoardChip<BoardPosition?>(Words.Board.all, null, position == null)) +
                         BoardPosition.entries.filter { it.id in present }.map { BoardChip(it.label, it, it == position) },
                 columns = columns,
                 sections = view.sections,
-                basis = said + listOfNotNull(capture),
+                basis = basis,
+                atClock = view.atClock,
             )
         }
 
@@ -146,11 +175,52 @@ data class BoardModel(
     }
 }
 
-/** A view's sections and whether its ranked rows carry a Gap (format/gap.ts carriesGap). */
+/** A view's sections, whether its ranked rows carry a Gap (format/gap.ts carriesGap), whether they are
+ * the order's, and at the order's clock the view's rows drawn and its rows on the run, when fewer are
+ * drawn. */
 private class ViewRows(
     val sections: List<BoardSection>,
     val carriesGap: Boolean,
+    val atClock: Boolean = false,
+    val reach: Pair<Int, Int>? = null,
 )
+
+/** The order's places for a board of `teams`. */
+private class ClockPlaces(
+    val places: Map<String, LivePlace>,
+    val teams: Int,
+)
+
+/** A ranked view at the order's clock: the rows the order places, in its order with its figures, a
+ * position's as one run with no tiers, then the view's players on a season-long list with the list's
+ * word and no figure; the rows its read does not reach are not drawn, so no row of the run's clock
+ * stands among them. Null where the read places none of the view's rows. */
+private fun atClock(
+    drawn: List<Placed<RunBoardRow>>,
+    position: BoardPosition?,
+    statuses: Map<String, RunPlayerStatus>,
+    cells: BoardCells,
+    clock: ClockPlaces,
+): ViewRows? {
+    val reached = drawn.map { it.row }.filter { it.id in clock.places }
+    val placed = LiveOrder.placed(reached, { it.id }, clock.places)?.takeIf { it.isNotEmpty() } ?: return null
+    val rows = placed.map { cells.ranked(it.row, PlacedFigures.of(it.row).at(it.place, clock.teams)) }
+    val listed =
+        BoardOrder
+            .withStatuses(drawn, statuses)
+            .map { it.row }
+            .filter { BoardOrder.heldOut(it.id, statuses) && it.id !in clock.places }
+            .map(cells::listed)
+    val sections =
+        if (position == null) {
+            listOf(BoardSection("all", null, null, rows + listed))
+        } else {
+            listOf(BoardSection(position.id, null, null, rows)) +
+                listOfNotNull(BoardSection("${position.id}-held", Words.Board.heldHead, null, listed).takeIf { listed.isNotEmpty() })
+        }
+    val shown = rows.size + listed.size
+    return ViewRows(sections, carriesGap = false, atClock = true, reach = (shown to drawn.size).takeIf { shown < drawn.size })
+}
 
 /** All in the run's order, a ranked position in its tiers then its season-long list, a kicker's or a
  * defense's list in the drafts' order. */
@@ -160,8 +230,12 @@ private fun viewRows(
     statuses: Map<String, RunPlayerStatus>,
     cells: BoardCells,
     unit: String,
+    clock: ClockPlaces?,
 ): ViewRows {
     val ranked = board.rows.map { it.placed() }
+    if (clock != null && position?.draftOrder != true) {
+        atClock(position?.let { BoardOrder.at(ranked, it) } ?: ranked, position, statuses, cells, clock)?.let { return it }
+    }
     if (position == null) {
         val rows = BoardOrder.withStatuses(ranked, statuses).map { it.row }
         return ViewRows(listOf(BoardSection("all", null, null, rows.map(cells::ranked))), rows.any { it.gap != null })

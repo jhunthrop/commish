@@ -9,6 +9,7 @@ import app.trycommish.core.Format
 import app.trycommish.core.board.BoardFigures
 import app.trycommish.core.board.Byes
 import app.trycommish.core.board.GapTone
+import app.trycommish.core.liveorder.LivePlace
 import app.trycommish.core.start.RowStatuses
 import app.trycommish.core.start.StartRows
 import app.trycommish.design.Words
@@ -36,6 +37,22 @@ data class CompareNumbers(
     /** compare-rows.ts sideRange: all three, or none. */
     val range: CompareRange?
         get() = if (floor != null && median != null && ceiling != null) CompareRange(floor, median, ceiling) else null
+
+    /** His numbers at the order's clock (live-order.ts placedAt): the order's rank, place, points and
+     * value, the run's Gap unsaid; his ADP and range as the run gives them. */
+    fun at(
+        place: LivePlace,
+        teams: Int,
+    ): CompareNumbers {
+        val figures = place.figures(teams, positionRank)
+        return copy(
+            ourRank = figures.ourRank,
+            positionRank = figures.positionRank,
+            projected = figures.projected,
+            vor = figures.vor,
+            gap = figures.gap,
+        )
+    }
 
     companion object {
         fun of(format: RunPlayerFormat): CompareNumbers =
