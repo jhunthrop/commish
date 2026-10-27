@@ -762,8 +762,6 @@ object Words {
 
     object ClubPage {
         const val clubs = "Clubs"
-        const val byeWeek = "bye week"
-        const val byeNotSet = "not set"
         const val ourRank = "Our rank"
         const val player = "player"
         const val onOurBoard = "on our board"
@@ -776,6 +774,11 @@ object Words {
         const val home = "vs"
         const val away = "at"
         const val comparePair = "Compare two of them"
+    }
+
+    object ClubOrder {
+        const val onOrder = "On our rest-of-season order"
+        const val nobody = "Nobody from {city} is in this order"
     }
 
     object SchedulePage {

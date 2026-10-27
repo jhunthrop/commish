@@ -185,7 +185,7 @@ export function weeklyAsRecord(run: RunRecord): RunRecord | null {
 }
 
 /** The words the record's sentences are built from: the page's (RECORDS_WORDS), or a table of the
- * same keys (the apps' parity, shared/scripts/apps-pending-words.ts, until their lane follows). */
+ * same keys. */
 export type RecordsWords = {
 	readonly [K in keyof typeof RECORDS_WORDS]: (typeof RECORDS_WORDS)[K] extends string
 		? string

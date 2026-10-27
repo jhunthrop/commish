@@ -36,9 +36,8 @@ import { oursAccented, type FigurePair } from '../../web/src/lib/run/record-pair
 import {
 	DRAFT_FIGURES,
 	DRAFT_SOURCES,
-	RECORDS_WORDS as WEB_RECORDS_WORDS,
+	RECORDS_WORDS,
 	beforeLine,
-	frontRecord,
 	draftBasis,
 	draftCell,
 	draftHeads,
@@ -67,8 +66,6 @@ import {
 	type Schedule
 } from '../../web/src/lib/run/schema.ts';
 import { weekStates } from '../../web/src/lib/server/pages/week-state.ts';
-// The apps' record words (Lane 223): the parity holds what the apps draw until their lane follows.
-import { RECORDS_WORDS } from './apps-pending-words.ts';
 import { REPOSITORY } from './generated.ts';
 
 export const RECORD_OUTPUT = 'shared/fixtures/parity/record.json';
@@ -203,7 +200,7 @@ function weeklySection(
 	const pending = weekly ? weeklyPending(record, next) : null;
 	const headline = recordHeadline(record, unplayed);
 	const gaps = gapWords(record, unplayed);
-	const before = fromWeek === null ? null : beforeLine(fromWeek, RECORDS_WORDS);
+	const before = fromWeek === null ? null : beforeLine(fromWeek);
 	const rows = weekly
 		? weeklyLines(record.weeks, unplayed, underway)
 		: weekLines(record.weeks, unplayed, underway);
@@ -263,7 +260,7 @@ function weeklySection(
 				row.week?.order === null || row.week === null
 					? null
 					: weekly
-						? weeklyOrderWords(row.week, RECORDS_WORDS)
+						? weeklyOrderWords(row.week)
 						: weekOrderWords(row.week);
 			return {
 				lead: row.lead,
@@ -393,34 +390,7 @@ async function recordCase(file: string, now: string): Promise<unknown> {
 						weeklyStates.underway,
 						nextGrade(weekly, schedule)
 					),
-		draft: draftSection(run),
-		webPending: webPending(run)
-	};
-}
-
-/** The web's own record sentences (Lane 223 review M4), which Android's parity holds it to since Lane
- * 231 while the live values above stay iOS's (apps-pending-words.ts) until Lane 232. Null on a run
- * with no weekly record. */
-function webPending(run: RunRecord): unknown {
-	const weekly = weeklyAsRecord(run);
-	if (weekly === null || run.weekly === undefined) return null;
-	const front = frontRecord(run);
-	return {
-		lead: WEB_RECORDS_WORDS.lead,
-		weeklyWhat: WEB_RECORDS_WORDS.weeklyWhat,
-		before: beforeLine(run.weekly.fromWeek)?.text ?? null,
-		setRulePhone: WEB_RECORDS_WORDS.setRulePhone,
-		// Each set week's order words and, graded, its phone caption with them (captionOf's words).
-		orders: weekly.weeks.flatMap((week) => {
-			const words = weeklyOrderWords(week);
-			if (words === null) return [];
-			const caption =
-				week.gradedAt === null
-					? null
-					: `${words}, ${WEB_RECORDS_WORDS.gradedOn(weekdayLabel(week.gradedAt))}`;
-			return [{ week: week.week, order: words, caption }];
-		}),
-		front: front === null ? null : { caption: front.caption, note: front.note }
+		draft: draftSection(run)
 	};
 }
 
