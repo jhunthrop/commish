@@ -17,6 +17,9 @@
 import { stampAt } from '#lib/format/clock.ts';
 import type { Designations, PlayerStatus, WeekRead } from '#lib/run/schema.ts';
 import { CAPTION_ZONE } from './read-byline.ts';
+import { STATUS_HELD_WORDS } from './status-words.ts';
+
+export { STATUS_HELD_WORDS } from './status-words.ts';
 /** The writer's hourly passes, Eastern hours (`capsules/week/caption.py HOURLY_PASS_HOURS_ET`, the
  * capture's schedule in `infra/research-schedule.sh`): midnight, 2 am, then 6 am through 11 pm. */
 const HOURLY_PASS_HOURS_ET: ReadonlySet<number> = new Set([
@@ -26,16 +29,6 @@ const PASS_ZONE = 'America/New_York';
 const HOUR_MS = 3_600_000;
 /** A day of hours and one more: every day holds a pass, so the search ends within it. */
 const HOURS_SEARCHED = 48;
-
-/** How the run's status-changed caption opens, whatever due time it names (`caption.py
- * status_changed_caption`, capped or not). */
-const CHANGED_LEAD = 'His status changed since this read was written.';
-
-export const STATUS_HELD_WORDS = {
-	changedLead: CHANGED_LEAD,
-	/** The run's caption for a read his status moved past (`caption.py status_changed_caption`). */
-	changed: (due: string): string => `${CHANGED_LEAD} A new read is due by ${due}.`
-} as const;
 
 const passHour = new Intl.DateTimeFormat('en-US', {
 	timeZone: PASS_ZONE,
@@ -78,26 +71,66 @@ export function statusChangedSince(
 	return listed?.since != null && Date.parse(listed.since) > written;
 }
 
-/** Whether the run sent its own status-changed caption: then its due time is the run's, which knows when a
- * rewrite is capped to the next day's first pass (Lane 275), and the clients say it as sent. */
-export function runSaysStatusChanged(read: Pick<WeekRead, 'caption'>): boolean {
-	return read.caption.startsWith(CHANGED_LEAD);
+/** The months a stamp names, in order (`format/clock.ts stampAt`, en-US short). */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** Central's offsets from UTC in hours, daylight then standard. */
+const CENTRAL_OFFSETS_H = [5, 6] as const;
+/** "Sun Oct 18, 1:00 am CT" as `stampAt` says it in the caption zone. */
+const STAMP = /^\w{3} (\w{3}) (\d{1,2}), (\d{1,2}):(\d{2}) (am|pm) \w+$/;
+
+/** The instant a caption-zone stamp names, as ms: the stamp carries no year, so the write's year or the
+ * next, at Central's daylight or standard offset, whichever `stampAt` says back as the same stamp (its
+ * weekday settles the year). Null for a stamp that does not read back. */
+export function stampInstant(stamp: string, writtenAt: string): number | null {
+	const parts = STAMP.exec(stamp);
+	if (parts === null) return null;
+	const [, month, day, hour, minute, half] = parts;
+	const monthIndex = MONTHS.indexOf(month ?? '');
+	const hour24 = (Number(hour) % 12) + (half === 'pm' ? 12 : 0);
+	const year = new Date(writtenAt).getUTCFullYear();
+	for (const candidateYear of [year, year + 1])
+		for (const offset of CENTRAL_OFFSETS_H) {
+			const at = Date.UTC(candidateYear, monthIndex, Number(day), hour24 + offset, Number(minute));
+			if (stampAt(new Date(at).toISOString(), CAPTION_ZONE) === stamp) return at;
+		}
+	return null;
 }
 
-/** His read as the page and the shelf are built with it at `now` (ms): under the status caption and the
- * next hourly pass when his designation changed since it was written (the run's own caption when it sent
- * one, our next hourly pass only when it did not), its body and call kept (or still
- * null where an older run nulled them); as the run served it otherwise, and with no capture to judge it
- * by. Returns the read itself when we add nothing to it. */
+/** The due time the run's own status caption names (ms), null when the caption is not one or its time
+ * does not read: the run builds its caption at its nightly, so the time is true only until then. */
+export function runCaptionDue(read: Pick<WeekRead, 'caption' | 'writtenAt'>): number | null {
+	const prefix = `${STATUS_HELD_WORDS.changedLead} ${STATUS_HELD_WORDS.dueBy} `;
+	if (!read.caption.startsWith(prefix) || !read.caption.endsWith('.')) return null;
+	return stampInstant(read.caption.slice(prefix.length, -1), read.writtenAt);
+}
+
+/** The status caption his read is shown under at `now` (ms), null when the capture says his designation
+ * has not changed since it was written (the one arbiter, so a status that changed back stands), or with
+ * no capture. The run's own caption while the time it names is still ahead (it knows a capped rewrite,
+ * Lane 275), else our next hourly pass. */
+export function statusCaption(
+	read: WeekRead,
+	capture: Designations | null,
+	playerId: string,
+	now: number
+): string | null {
+	if (capture === null || !statusChangedSince(read, capture, capture.players[playerId]))
+		return null;
+	const runDue = runCaptionDue(read);
+	if (runDue !== null && runDue > now) return read.caption;
+	const due = new Date(nextHourlyPass(now)).toISOString();
+	return STATUS_HELD_WORDS.changed(stampAt(due, CAPTION_ZONE));
+}
+
+/** His read as the page and the shelf are built with it at `now` (ms): under the status caption
+ * (statusCaption) when his designation changed since it was written, its body and call kept (or still
+ * null where an older run nulled them); as the run served it otherwise. */
 export function readAtStatus(
 	read: WeekRead,
 	capture: Designations | null,
 	playerId: string,
 	now: number
 ): WeekRead {
-	if (capture === null || !statusChangedSince(read, capture, capture.players[playerId]))
-		return read;
-	if (runSaysStatusChanged(read)) return read;
-	const due = new Date(nextHourlyPass(now)).toISOString();
-	return { ...read, caption: STATUS_HELD_WORDS.changed(stampAt(due, CAPTION_ZONE)) };
+	const caption = statusCaption(read, capture, playerId, now);
+	return caption === null ? read : { ...read, caption };
 }

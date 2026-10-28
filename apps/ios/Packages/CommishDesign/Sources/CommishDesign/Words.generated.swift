@@ -494,6 +494,11 @@ public enum Words {
         public static let basis = "His figures are the board's. His game log and our read of him are not written yet."
     }
 
+    public enum StatusHeld {
+        public static let changedLead = "His status changed since this read was written."
+        public static let dueBy = "A new read is due by"
+    }
+
     public enum WeekTile {
         public static let published = "published projection"
         public static let sinceEarlier = "since the earlier read"

@@ -268,7 +268,7 @@ function weekReadCases(): ReadCase[] {
         ppr(points),
       ),
     ),
-    ...[26.9, 25.9, 28.4, 24.4, 32.4, 20.4, null].map((points) =>
+    ...[26.9, 25.9, 28.0, 24.8, 28.4, 24.4, 32.4, 20.4, null].map((points) =>
       readCase(
         `a move the tile prints shows the read, the card at ${String(points)}`,
         READ,
@@ -320,6 +320,13 @@ function weekReadCases(): ReadCase[] {
       ),
     ),
     readCase("withheld for his status, the card unread", withheld, null),
+    ...(["upcoming", "kicked_off", "final"] as const).map((state) =>
+      readCase(
+        `a written read under a status caption, ${state}`,
+        { ...READ, caption: STATUS_CAPTION },
+        ppr(26.4, state),
+      ),
+    ),
     readCase(
       "the run already withheld it",
       { ...READ, body: null, caption: MOVED },
@@ -379,7 +386,7 @@ async function statusHeldCases(standin: Run): Promise<unknown[]> {
       now: CLOCKS.week,
     },
     {
-      name: "an older run nulled it under its own caption: said as sent",
+      name: "an older run nulled it under its own caption, its due time passed: our next pass",
       read: {
         ...read,
         body: null,
@@ -422,6 +429,26 @@ async function statusHeldCases(standin: Run): Promise<unknown[]> {
       name: "cleared from the list since",
       read,
       capture: { ...capture, players: rest },
+      now: CLOCKS.week,
+    },
+    {
+      name: "the run's capped caption once its due time has passed: our next pass",
+      read: {
+        ...read,
+        caption:
+          "His status changed since this read was written. A new read is due by Sun Oct 18, 1:00 am CT.",
+      },
+      capture,
+      now: "2026-10-18T07:00:00.000Z",
+    },
+    {
+      name: "the run says changed, the capture says changed back: it stands",
+      read: {
+        ...read,
+        caption:
+          "His status changed since this read was written. A new read is due by Sun Oct 18, 1:00 am CT.",
+      },
+      capture: { ...capture, players: { ...capture.players, [etienne]: ir } },
       now: CLOCKS.week,
     },
     {

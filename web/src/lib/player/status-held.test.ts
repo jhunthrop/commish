@@ -7,9 +7,12 @@ import { test } from 'node:test';
 import { designationsSchema, weekReadSchema, type WeekRead } from '#lib/run/schema.ts';
 import { CARD } from './card.ts';
 import {
+	STATUS_HELD_WORDS,
 	nextHourlyPass,
 	readAtStatus,
-	runSaysStatusChanged,
+	runCaptionDue,
+	stampInstant,
+	statusCaption,
 	statusChangedSince
 } from './status-held.ts';
 import { shownWeekRead, type CardProjection } from './week-read.ts';
@@ -50,17 +53,23 @@ void test('a read written before he became due back keeps its body under the sta
 	const shown = { withheld: false, body: read.body, caption: DUE };
 	assert.deepEqual(shownWeekRead(built, card('upcoming')), shown);
 	assert.deepEqual(shownWeekRead(built, null), shown);
+	// From kickoff no new read comes for the game: the caption is its lead alone (review M2).
 	for (const state of ['kicked_off', 'final'] as const)
-		assert.deepEqual(shownWeekRead(built, card(state)), shown);
+		assert.deepEqual(shownWeekRead(built, card(state)), {
+			...shown,
+			caption: STATUS_HELD_WORDS.changedLead
+		});
+	// Another week's game says nothing of this read's.
+	assert.deepEqual(shownWeekRead(built, { ...card('kicked_off'), week: 7 }), shown);
 });
 
-void test('a read an older run already nulled for his status keeps the run caption alone (old data)', () => {
+void test('a read an older run already nulled keeps a caption alone, its passed due time restamped (old data)', () => {
 	const runCaption =
 		'His status changed since this read was written. A new read is due by Fri Oct 16, 10:00 pm CT.';
 	const nulled = { ...readOf(ETIENNE), body: null, call: null, caption: runCaption };
 	const built = readAtStatus(nulled, CAPTURE, ETIENNE, BUILD);
-	assert.equal(built, nulled);
-	assert.deepEqual(shownWeekRead(built, card('upcoming')), { withheld: true, words: runCaption });
+	assert.deepEqual(built, { ...nulled, caption: DUE });
+	assert.deepEqual(shownWeekRead(built, card('upcoming')), { withheld: true, words: DUE });
 	for (const state of ['kicked_off', 'final'] as const)
 		assert.deepEqual(shownWeekRead(built, card(state)), {
 			withheld: true,
@@ -68,22 +77,73 @@ void test('a read an older run already nulled for his status keeps the run capti
 		});
 });
 
-void test("the run's own status caption is said as sent, a capped due time with it (Lane 275 N1)", () => {
+const CAPPED =
+	'His status changed since this read was written. A new read is due by Sun Oct 18, 1:00 am CT.';
+
+void test("the run's own status caption is said while its due time is ahead (Lane 275 N1, review H1)", () => {
 	// Three falls since the write cap the rewrite: the run names the next day's first pass, which an
 	// hourly guess of ours would put hours early.
-	const capped =
-		'His status changed since this read was written. A new read is due by Sun Oct 18, 1:00 am CT.';
-	const sent = { ...readOf(ETIENNE), caption: capped };
-	assert.ok(runSaysStatusChanged(sent));
-	assert.ok(!runSaysStatusChanged(readOf(ETIENNE)));
-	assert.equal(readAtStatus(sent, CAPTURE, ETIENNE, BUILD), sent);
-	assert.deepEqual(shownWeekRead(sent, card('upcoming')), {
+	const sent = { ...readOf(ETIENNE), caption: CAPPED };
+	assert.equal(runCaptionDue(sent), Date.parse('2026-10-18T06:00:00.000Z'));
+	assert.equal(runCaptionDue(readOf(ETIENNE)), null);
+	assert.equal(statusCaption(sent, CAPTURE, ETIENNE, BUILD), CAPPED);
+	assert.deepEqual(shownWeekRead(readAtStatus(sent, CAPTURE, ETIENNE, BUILD), card('upcoming')), {
 		withheld: false,
 		body: sent.body,
-		caption: capped
+		caption: CAPPED
 	});
 	// With no run caption the client says its own next hourly pass.
-	assert.equal(readAtStatus(readOf(ETIENNE), CAPTURE, ETIENNE, BUILD).caption, DUE);
+	assert.equal(statusCaption(readOf(ETIENNE), CAPTURE, ETIENNE, BUILD), DUE);
+});
+
+void test("once the run's due time has passed the client says its own next pass, never a time gone by (review H1)", () => {
+	const sent = { ...readOf(ETIENNE), caption: CAPPED };
+	// Sunday 2:00 am Central, an hour after the run's due time: the next pass is 6 am Eastern.
+	const later = Date.parse('2026-10-18T07:00:00.000Z');
+	assert.equal(
+		statusCaption(sent, CAPTURE, ETIENNE, later),
+		'His status changed since this read was written. A new read is due by Sun Oct 18, 5:00 am CT.'
+	);
+	// At the very due time it has passed too.
+	assert.notEqual(
+		statusCaption(sent, CAPTURE, ETIENNE, Date.parse('2026-10-18T06:00:00.000Z')),
+		CAPPED
+	);
+});
+
+void test('a status the capture says changed back stands: the run caption is not the arbiter (review M1)', () => {
+	const ir = {
+		status: 'injured_reserve',
+		seasonLong: true,
+		since: '2026-10-01T15:00:00.000Z'
+	} as const;
+	const still = { ...CAPTURE, players: { ...CAPTURE.players, [ETIENNE]: ir } };
+	const sent = { ...readOf(ETIENNE), caption: CAPPED };
+	assert.equal(statusCaption(sent, still, ETIENNE, BUILD), null);
+	assert.equal(statusCaption(sent, null, ETIENNE, BUILD), null);
+});
+
+void test('a caption stamp reads back to its instant: daylight, standard, the year after the write', () => {
+	const written = '2026-10-13T21:00:00.000Z';
+	assert.equal(
+		stampInstant('Sun Oct 18, 1:00 am CT', written),
+		Date.parse('2026-10-18T06:00:00.000Z')
+	);
+	assert.equal(
+		stampInstant('Mon Nov 2, 1:00 am CT', written),
+		Date.parse('2026-11-02T07:00:00.000Z')
+	);
+	assert.equal(
+		stampInstant('Sat Oct 17, 12:00 pm CT', written),
+		Date.parse('2026-10-17T17:00:00.000Z')
+	);
+	assert.equal(
+		stampInstant('Fri Jan 1, 1:00 am CT', '2026-12-30T21:00:00.000Z'),
+		Date.parse('2027-01-01T07:00:00.000Z')
+	);
+	// A weekday that names no day of either year, and words that are no stamp.
+	assert.equal(stampInstant('Tue Oct 18, 1:00 am CT', written), null);
+	assert.equal(stampInstant('soon', written), null);
 });
 
 void test('a read written after the capture was read is the one the writer read against: it stands', () => {

@@ -153,6 +153,56 @@
 			}
 		},
 		{
+			"name": "a move the tile prints shows the read, the card at 28",
+			"read": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"card": {
+				"week": 7,
+				"scoring": "ppr",
+				"points": 28,
+				"state": "upcoming"
+			},
+			"shown": {
+				"withheld": false,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7"
+			}
+		},
+		{
+			"name": "a move the tile prints shows the read, the card at 24.8",
+			"read": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"card": {
+				"week": 7,
+				"scoring": "ppr",
+				"points": 24.8,
+				"state": "upcoming"
+			},
+			"shown": {
+				"withheld": false,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7"
+			}
+		},
+		{
 			"name": "a move the tile prints shows the read, the card at 28.4",
 			"read": {
 				"week": 7,
@@ -681,6 +731,81 @@
 			"shown": {
 				"withheld": true,
 				"words": "His status changed since this read was written. A new read is due by Sat 9:00 am Central."
+			}
+		},
+		{
+			"name": "a written read under a status caption, upcoming",
+			"read": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "His status changed since this read was written. A new read is due by Sat 9:00 am Central.",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"card": {
+				"week": 7,
+				"scoring": "ppr",
+				"points": 26.4,
+				"state": "upcoming"
+			},
+			"shown": {
+				"withheld": false,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "His status changed since this read was written. A new read is due by Sat 9:00 am Central."
+			}
+		},
+		{
+			"name": "a written read under a status caption, kicked_off",
+			"read": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "His status changed since this read was written. A new read is due by Sat 9:00 am Central.",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"card": {
+				"week": 7,
+				"scoring": "ppr",
+				"points": 26.4,
+				"state": "kicked_off"
+			},
+			"shown": {
+				"withheld": false,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "His status changed since this read was written."
+			}
+		},
+		{
+			"name": "a written read under a status caption, final",
+			"read": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "His status changed since this read was written. A new read is due by Sat 9:00 am Central.",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"card": {
+				"week": 7,
+				"scoring": "ppr",
+				"points": 26.4,
+				"state": "final"
+			},
+			"shown": {
+				"withheld": false,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "His status changed since this read was written."
 			}
 		},
 		{
@@ -2635,7 +2760,7 @@
 			}
 		},
 		{
-			"name": "an older run nulled it under its own caption: said as sent",
+			"name": "an older run nulled it under its own caption, its due time passed: our next pass",
 			"read": {
 				"week": 6,
 				"body": null,
@@ -3088,7 +3213,7 @@
 			"built": {
 				"week": 6,
 				"body": null,
-				"caption": "His status changed since this read was written. A new read is due by Fri Oct 16, 10:00 pm CT.",
+				"caption": "His status changed since this read was written. A new read is due by Sat Oct 17, 1:00 pm CT.",
 				"status": "injured_reserve",
 				"call": null,
 				"writtenAt": "2026-10-13T21:00:00.000Z",
@@ -5393,6 +5518,927 @@
 			}
 		},
 		{
+			"name": "the run's capped caption once its due time has passed: our next pass",
+			"read": {
+				"week": 6,
+				"body": "Travis Etienne Jr. does not play in week 6 of 2026: he sits on injured reserve on Tuesday's report. Keep him on your roster and find a fill-in at running back for this week.",
+				"caption": "His status changed since this read was written. A new read is due by Sun Oct 18, 1:00 am CT.",
+				"status": "injured_reserve",
+				"call": "sit",
+				"writtenAt": "2026-10-13T21:00:00.000Z",
+				"factsAt": null
+			},
+			"capture": {
+				"readAt": "2026-10-14T02:03:35.613Z",
+				"checkedAt": null,
+				"source": "fixture",
+				"players": {
+					"2576980": {
+						"status": "doubtful",
+						"seasonLong": false,
+						"since": null
+					},
+					"2976212": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"2991662": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-10T22:00:00.000Z"
+					},
+					"3043116": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-26T23:00:00.000Z"
+					},
+					"3045147": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"3052587": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"3052897": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-07T23:00:00.000Z"
+					},
+					"3123076": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T16:00:00.000Z"
+					},
+					"3126486": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"3149687": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-10T22:00:00.000Z"
+					},
+					"3915416": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"3916387": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"3916945": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"3921690": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-30T00:00:00.000Z"
+					},
+					"3929630": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4035538": {
+						"status": "doubtful",
+						"seasonLong": false,
+						"since": null
+					},
+					"4035656": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4035687": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-10T21:00:00.000Z"
+					},
+					"4036133": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4038815": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4047365": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4047646": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"4061956": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4239944": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-06T22:00:00.000Z"
+					},
+					"4239996": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null,
+						"returning": "2026-10-18"
+					},
+					"4240603": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"4241372": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4241389": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4241424": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4241476": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4241478": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4242433": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4259147": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"4360078": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-26T18:00:00.000Z"
+					},
+					"4360423": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4360569": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"4361529": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T19:00:00.000Z"
+					},
+					"4362249": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-30T23:00:00.000Z"
+					},
+					"4362921": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-12T19:00:00.000Z"
+					},
+					"4368003": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-26T22:00:00.000Z"
+					},
+					"4382466": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4426385": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4427366": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4428331": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4429013": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-07T00:00:00.000Z"
+					},
+					"4429025": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4429105": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-23T01:00:00.000Z"
+					},
+					"4429160": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-28T22:00:00.000Z"
+					},
+					"4429205": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4430034": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-03T22:00:00.000Z"
+					},
+					"4430834": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-30T16:00:00.000Z"
+					},
+					"4430870": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T18:00:00.000Z"
+					},
+					"4430878": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4431492": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4431545": {
+						"status": "doubtful",
+						"seasonLong": false,
+						"since": null
+					},
+					"4431574": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T20:00:00.000Z"
+					},
+					"4431611": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4432710": {
+						"status": "doubtful",
+						"seasonLong": false,
+						"since": null
+					},
+					"4565859": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4570037": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-02T22:00:00.000Z"
+					},
+					"4573697": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4597500": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4600981": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-09T23:00:00.000Z"
+					},
+					"4601080": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-13T21:23:07.900Z"
+					},
+					"4602667": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-06T22:00:00.000Z"
+					},
+					"4603186": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-29T22:00:00.000Z"
+					},
+					"4608686": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4612826": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4685512": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-03T21:00:00.000Z"
+					},
+					"4685553": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4685702": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4686612": {
+						"status": "doubtful",
+						"seasonLong": false,
+						"since": null
+					},
+					"4689114": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T22:00:00.000Z"
+					},
+					"4695883": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4696700": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4702555": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-26T22:00:00.000Z"
+					},
+					"4710714": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T21:00:00.000Z"
+					},
+					"4723820": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T13:00:00.000Z"
+					},
+					"4869645": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4870653": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4870847": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T13:00:00.000Z"
+					},
+					"4880281": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"4912052": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"5081397": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"5083315": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"5092508": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					}
+				}
+			},
+			"now": "2026-10-18T07:00:00.000Z",
+			"id": "4239996",
+			"built": {
+				"week": 6,
+				"body": "Travis Etienne Jr. does not play in week 6 of 2026: he sits on injured reserve on Tuesday's report. Keep him on your roster and find a fill-in at running back for this week.",
+				"caption": "His status changed since this read was written. A new read is due by Sun Oct 18, 5:00 am CT.",
+				"status": "injured_reserve",
+				"call": "sit",
+				"writtenAt": "2026-10-13T21:00:00.000Z",
+				"factsAt": null
+			}
+		},
+		{
+			"name": "the run says changed, the capture says changed back: it stands",
+			"read": {
+				"week": 6,
+				"body": "Travis Etienne Jr. does not play in week 6 of 2026: he sits on injured reserve on Tuesday's report. Keep him on your roster and find a fill-in at running back for this week.",
+				"caption": "His status changed since this read was written. A new read is due by Sun Oct 18, 1:00 am CT.",
+				"status": "injured_reserve",
+				"call": "sit",
+				"writtenAt": "2026-10-13T21:00:00.000Z",
+				"factsAt": null
+			},
+			"capture": {
+				"readAt": "2026-10-14T02:03:35.613Z",
+				"checkedAt": null,
+				"source": "fixture",
+				"players": {
+					"2576980": {
+						"status": "doubtful",
+						"seasonLong": false,
+						"since": null
+					},
+					"2976212": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"2991662": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-10T22:00:00.000Z"
+					},
+					"3043116": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-26T23:00:00.000Z"
+					},
+					"3045147": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"3052587": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"3052897": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-07T23:00:00.000Z"
+					},
+					"3123076": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T16:00:00.000Z"
+					},
+					"3126486": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"3149687": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-10T22:00:00.000Z"
+					},
+					"3915416": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"3916387": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"3916945": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"3921690": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-30T00:00:00.000Z"
+					},
+					"3929630": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4035538": {
+						"status": "doubtful",
+						"seasonLong": false,
+						"since": null
+					},
+					"4035656": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4035687": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-10T21:00:00.000Z"
+					},
+					"4036133": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4038815": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4047365": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4047646": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"4061956": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4239944": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-06T22:00:00.000Z"
+					},
+					"4239996": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-01T15:00:00.000Z"
+					},
+					"4240603": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"4241372": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4241389": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4241424": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4241476": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4241478": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4242433": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4259147": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"4360078": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-26T18:00:00.000Z"
+					},
+					"4360423": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4360569": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"4361529": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T19:00:00.000Z"
+					},
+					"4362249": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-30T23:00:00.000Z"
+					},
+					"4362921": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-12T19:00:00.000Z"
+					},
+					"4368003": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-26T22:00:00.000Z"
+					},
+					"4382466": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4426385": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4427366": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4428331": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4429013": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-07T00:00:00.000Z"
+					},
+					"4429025": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4429105": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-23T01:00:00.000Z"
+					},
+					"4429160": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-28T22:00:00.000Z"
+					},
+					"4429205": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4430034": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-03T22:00:00.000Z"
+					},
+					"4430834": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-30T16:00:00.000Z"
+					},
+					"4430870": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T18:00:00.000Z"
+					},
+					"4430878": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4431492": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4431545": {
+						"status": "doubtful",
+						"seasonLong": false,
+						"since": null
+					},
+					"4431574": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T20:00:00.000Z"
+					},
+					"4431611": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4432710": {
+						"status": "doubtful",
+						"seasonLong": false,
+						"since": null
+					},
+					"4565859": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4570037": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-02T22:00:00.000Z"
+					},
+					"4573697": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4597500": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4600981": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-09T23:00:00.000Z"
+					},
+					"4601080": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-13T21:23:07.900Z"
+					},
+					"4602667": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-06T22:00:00.000Z"
+					},
+					"4603186": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-29T22:00:00.000Z"
+					},
+					"4608686": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4612826": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4685512": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-10-03T21:00:00.000Z"
+					},
+					"4685553": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4685702": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4686612": {
+						"status": "doubtful",
+						"seasonLong": false,
+						"since": null
+					},
+					"4689114": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T22:00:00.000Z"
+					},
+					"4695883": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4696700": {
+						"status": "out",
+						"seasonLong": false,
+						"since": null
+					},
+					"4702555": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-26T22:00:00.000Z"
+					},
+					"4710714": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T21:00:00.000Z"
+					},
+					"4723820": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T13:00:00.000Z"
+					},
+					"4869645": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4870653": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"4870847": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-24T13:00:00.000Z"
+					},
+					"4880281": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"4912052": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"5081397": {
+						"status": "injured_reserve",
+						"seasonLong": true,
+						"since": "2026-09-22T22:00:00.000Z"
+					},
+					"5083315": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					},
+					"5092508": {
+						"status": "questionable",
+						"seasonLong": false,
+						"since": null
+					}
+				}
+			},
+			"now": "2026-10-17T17:00:00.000Z",
+			"id": "4239996",
+			"built": {
+				"week": 6,
+				"body": "Travis Etienne Jr. does not play in week 6 of 2026: he sits on injured reserve on Tuesday's report. Keep him on your roster and find a fill-in at running back for this week.",
+				"caption": "His status changed since this read was written. A new read is due by Sun Oct 18, 1:00 am CT.",
+				"status": "injured_reserve",
+				"call": "sit",
+				"writtenAt": "2026-10-13T21:00:00.000Z",
+				"factsAt": null
+			}
+		},
+		{
 			"name": "no capture to judge it by",
 			"read": {
 				"week": 6,
@@ -5848,7 +6894,7 @@
 				"written": true,
 				"withheld": false,
 				"body": "Travis Etienne Jr. does not play in week 6 of 2026: he sits on injured reserve on Tuesday's report. Keep him on your roster and find a fill-in at running back for this week.",
-				"caption": "His status changed since this read was written. A new read is due by Sun Oct 18, 2:00 pm CT."
+				"caption": "His status changed since this read was written."
 			}
 		},
 		{
@@ -5915,7 +6961,7 @@
 				"written": true,
 				"withheld": false,
 				"body": "Travis Etienne Jr. does not play in week 6 of 2026: he sits on injured reserve on Tuesday's report. Keep him on your roster and find a fill-in at running back for this week.",
-				"caption": "His status changed since this read was written. A new read is due by Mon Oct 19, 12:00 pm CT."
+				"caption": "His status changed since this read was written."
 			}
 		},
 		{

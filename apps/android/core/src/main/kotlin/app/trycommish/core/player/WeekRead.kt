@@ -109,7 +109,18 @@ object WeekReads {
         card: CardProjection?,
     ): ShownRead {
         val body = read.body ?: return ShownRead.Withheld(withheldWords(read, card))
-        return ShownRead.Written(body, read.caption)
+        return ShownRead.Written(body, shownCaption(read, card))
+    }
+
+    /** shownCaption: a status caption says its lead alone once his game for the read's week is under way,
+     * as no new read comes for a game being played (Lane 274 review M2). */
+    private fun shownCaption(
+        read: RunWeekRead,
+        card: CardProjection?,
+    ): String {
+        val played = card?.week == read.week && underway(card.state)
+        val lead = Words.StatusHeld.changedLead
+        return if (played && read.caption.startsWith(lead)) lead else read.caption
     }
 
     /** noReadWords: his next game while it is to come, never "next" for one under way or final; while the

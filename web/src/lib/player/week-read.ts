@@ -10,6 +10,7 @@ import type { GameHead } from '#lib/league/box/kickoff.ts';
 import { weekdayWord } from '#lib/format/date.ts';
 import type { ReadsDue, WeekRead } from '#lib/run/schema.ts';
 import { CARD } from './card.ts';
+import { STATUS_HELD_WORDS, isStatusCaption } from './status-words.ts';
 
 /** A nightly in the small hours belongs to the night before: its night is the Eastern day this long
  * before it (research capsules/week/rollover.py NIGHT_RUNS_PAST_MIDNIGHT, ported to both apps). */
@@ -55,7 +56,14 @@ export function shownWeekRead(read: WeekRead, card: CardProjection | null): Show
 	// due) while his game is to come; from kickoff through final that due time has passed, so the place
 	// says no read was written for this game (Lane 160, B140).
 	if (read.body === null) return { withheld: true, words: withheldWords(read, card) };
-	return { withheld: false, body: read.body, caption: read.caption };
+	return { withheld: false, body: read.body, caption: shownCaption(read, card) };
+}
+
+/** A written read's caption at the card's clock: a status caption says its lead alone once his game for
+ * the read's week is under way, as no new read comes for a game being played (Lane 274 review M2). */
+function shownCaption(read: WeekRead, card: CardProjection | null): string {
+	const played = card?.week === read.week && underway(card.state);
+	return played && isStatusCaption(read.caption) ? STATUS_HELD_WORDS.changedLead : read.caption;
 }
 
 /** The night a nightly at `at` belongs to, on the Eastern clock: "Tuesday" for Wednesday 05:30 UTC. */

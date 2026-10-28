@@ -104,7 +104,15 @@ public enum WeekReads {
         guard let body = read.body else {
             return .withheld(withheldWords(read, card: card))
         }
-        return .written(body: body, caption: read.caption)
+        return .written(body: body, caption: shownCaption(read, card: card))
+    }
+
+    /// shownCaption: a status caption says its lead alone once his game for the read's week is under way,
+    /// as no new read comes for a game being played (Lane 274 review M2).
+    private static func shownCaption(_ read: RunWeekRead, card: CardProjection?) -> String {
+        let played = card?.week == read.week && underway(card?.state)
+        let lead = Words.StatusHeld.changedLead
+        return played && read.caption.hasPrefix(lead) ? lead : read.caption
     }
 
     /// noReadWords: his next game while it is to come, never "next" for one under way or final; while the

@@ -1,4 +1,5 @@
 import CommishAPI
+import CommishDesign
 import Foundation
 
 /// A week read written before his designation changed (web/src/lib/player/status-held.ts, Lane 162):
@@ -16,18 +17,59 @@ public enum StatusHeld {
     /// A day of hours and one more: every day holds a pass, so the search ends within it.
     static let hoursSearched = 48
 
-    /// How the run's status-changed caption opens, whatever due time it names (caption.py).
-    static let changedLead = "His status changed since this read was written."
+    /// The months a stamp names, in order (Formatting.stampAt, en-US short).
+    static let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    /// Central's offsets from UTC in hours, daylight then standard.
+    static let centralOffsetsHours: [Double] = [5, 6]
+    /// The parts of "Sun Oct 18, 1:00 am CT": weekday, month, day with its comma, clock, half, zone.
+    static let stampParts = 6
 
-    /// STATUS_HELD_WORDS.changed: the run's caption for a read his status moved past.
+    /// STATUS_HELD_WORDS.changed: the caption over a read his status moved past, with the next write.
     static func changed(due: String) -> String {
-        "\(changedLead) A new read is due by \(due)."
+        "\(Words.StatusHeld.changedLead) \(Words.StatusHeld.dueBy) \(due)."
     }
 
-    /// runSaysStatusChanged: the run sent its own status caption, whose due time knows a capped rewrite
-    /// (Lane 275); it is said as sent.
-    static func runSaysChanged(_ read: RunWeekRead) -> Bool {
-        read.caption.hasPrefix(changedLead)
+    /// stampInstant: the instant a caption-zone stamp names. The stamp carries no year, so the write's year
+    /// or the next, at Central's daylight or standard offset, whichever Formatting.stampAt says back as the
+    /// same stamp; nil for a stamp that does not read back.
+    static func stampInstant(_ stamp: String, writtenAt: Date) -> Date? {
+        let parts = stamp.split(separator: " ").map(String.init)
+        guard parts.count == stampParts, parts[2].hasSuffix(","),
+              let month = months.firstIndex(of: parts[1]), let day = Int(parts[2].dropLast())
+        else {
+            return nil
+        }
+        let clock = parts[3].split(separator: ":").compactMap { Int($0) }
+        guard clock.count == 2 else {
+            return nil
+        }
+        let hour24 = Double(clock[0] % 12 + (parts[4] == "pm" ? 12 : 0))
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let year = utc.component(.year, from: writtenAt)
+        for candidate in [year, year + 1] {
+            let components = DateComponents(year: candidate, month: month + 1, day: day)
+            guard components.isValidDate(in: utc), let midnight = utc.date(from: components) else {
+                continue
+            }
+            for offset in centralOffsetsHours {
+                let instant = midnight.addingTimeInterval((hour24 + offset) * hour + Double(clock[1]) * 60)
+                if Formatting.stampAt(instant, zone: captionZone) == stamp {
+                    return instant
+                }
+            }
+        }
+        return nil
+    }
+
+    /// runCaptionDue: the due time the run's own status caption names, nil when the caption is not one or
+    /// its time does not read. The run builds it at its nightly, so it is true only until then.
+    static func runCaptionDue(_ read: RunWeekRead) -> Date? {
+        let prefix = "\(Words.StatusHeld.changedLead) \(Words.StatusHeld.dueBy) "
+        guard read.caption.hasPrefix(prefix), read.caption.hasSuffix(".") else {
+            return nil
+        }
+        return stampInstant(String(read.caption.dropFirst(prefix.count).dropLast()), writtenAt: read.writtenAt)
     }
 
     /// nextHourlyPass: the first hourly pass strictly after `after`, on the hour.
@@ -59,21 +101,30 @@ public enum StatusHeld {
         return listed?.since.map { $0 > read.writtenAt } ?? false
     }
 
-    /// readAtStatus: his read under the status caption when his designation changed since it was written
-    /// (the run's own when it sent one, our next hourly pass only when it did not), its body and call kept;
-    /// as the run served it otherwise, and with no capture.
-    public static func read(_ read: RunWeekRead, capture: RunDesignations?, player: String, now: Date) -> RunWeekRead {
+    /// statusCaption: the caption his read is shown under at `now`, nil when the capture says his
+    /// designation has not changed since it was written (the one arbiter), or with no capture. The run's own
+    /// caption while the time it names is still ahead (it knows a capped rewrite, Lane 275), else our next
+    /// hourly pass.
+    static func statusCaption(_ read: RunWeekRead, capture: RunDesignations?, player: String, now: Date) -> String? {
         guard let capture,
               changedSince(read, capture: capture, listed: capture.players.additionalProperties[player])
         else {
+            return nil
+        }
+        if let runDue = runCaptionDue(read), runDue > now {
+            return read.caption
+        }
+        return changed(due: Formatting.stampAt(nextHourlyPass(after: now), zone: captionZone))
+    }
+
+    /// readAtStatus: his read under the status caption (statusCaption) when his designation changed since it
+    /// was written, its body and call kept; as the run served it otherwise.
+    public static func read(_ read: RunWeekRead, capture: RunDesignations?, player: String, now: Date) -> RunWeekRead {
+        guard let caption = statusCaption(read, capture: capture, player: player, now: now) else {
             return read
         }
-        if runSaysChanged(read) {
-            return read
-        }
-        let due = Formatting.stampAt(nextHourlyPass(after: now), zone: captionZone)
         return RunWeekRead(
-            week: read.week, body: read.body, caption: changed(due: due), status: read.status, call: read.call,
+            week: read.week, body: read.body, caption: caption, status: read.status, call: read.call,
             writtenAt: read.writtenAt, factsAt: read.factsAt, projection: read.projection,
             movedCaption: read.movedCaption
         )

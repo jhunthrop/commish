@@ -53,7 +53,7 @@ import {
 import { unwrittenByFormat } from './player-unwritten.ts';
 import { playerHead } from './head.ts';
 import type { HeadMarkup } from '#lib/site/head.ts';
-import { lastRead, readAtStatus, runSaysStatusChanged } from '#lib/player/status-held.ts';
+import { lastRead, statusCaption } from '#lib/player/status-held.ts';
 import { scheduleKickoffs, standingByline } from '#lib/player/read-byline.ts';
 import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
 import {
@@ -346,21 +346,21 @@ function clubNoteOf(
 }
 
 /** His read as the build serves it (Lane 222, B186): a standing read's byline names the status read
- * this build took and the next game-day read, never the night's baked into the run; a read withheld, or
- * one the run sent under its status-changed caption (Lane 274), keeps its own words. */
+ * this build took and the next game-day read, never the night's baked into the run; a read withheld
+ * keeps its own words. */
 function servedRead(
 	read: WeekRead,
 	capture: Designations | null,
 	slates: readonly Slate[],
 	now: number
 ): WeekRead {
-	if (read.body === null || runSaysStatusChanged(read)) return read;
+	if (read.body === null) return read;
 	const statusRead = capture === null ? null : lastRead(capture);
 	return { ...read, caption: standingByline(read, statusRead, scheduleKickoffs(slates), now) };
 }
 
 /** His read as the page builds it: under the status caption when his designation moved since it was
- * written (status-held.ts: the run's own when it sent one), else with the standing byline. */
+ * written (status-held.ts statusCaption), else with the standing byline. */
 function weekReadAt(
 	read: WeekRead,
 	capture: Designations | null,
@@ -368,8 +368,8 @@ function weekReadAt(
 	slates: readonly Slate[],
 	now: number
 ): WeekRead {
-	const atStatus = readAtStatus(read, capture, playerId, now);
-	return atStatus === read ? servedRead(read, capture, slates, now) : atStatus;
+	const caption = statusCaption(read, capture, playerId, now);
+	return caption === null ? servedRead(read, capture, slates, now) : { ...read, caption };
 }
 
 /** Each week's last kickoff across the run's schedule. */

@@ -95,6 +95,24 @@ void test('from kickoff through final a withheld read says it was not written, n
 	}
 });
 
+void test('a status caption over a written read drops its due time from kickoff (Lane 274 review M2)', () => {
+	const status =
+		'His status changed since this read was written. A new read is due by Sat 9:00 am Central.';
+	const held = { ...READ, caption: status };
+	const lead = 'His status changed since this read was written.';
+	for (const state of ['upcoming', null] as const)
+		assert.deepEqual(shownWeekRead(held, ppr(26.4, state)), { ...BUILT, caption: status });
+	for (const state of ['kicked_off', 'final'] as const) {
+		assert.deepEqual(shownWeekRead(held, ppr(26.4, state)), { ...BUILT, caption: lead });
+		// A written caption stands as written, and another week's game says nothing of this read's.
+		assert.deepEqual(shownWeekRead(READ, ppr(26.4, state)), BUILT);
+		assert.deepEqual(shownWeekRead(held, { ...ppr(26.4, state), week: 8 }), {
+			...BUILT,
+			caption: status
+		});
+	}
+});
+
 void test('a read the run already withheld stays withheld', () => {
 	const withheld = { ...READ, body: null, caption: MOVED };
 	assert.deepEqual(shownWeekRead(withheld, ppr(26.4)), { withheld: true, words: MOVED });

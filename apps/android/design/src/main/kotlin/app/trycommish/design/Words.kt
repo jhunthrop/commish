@@ -496,6 +496,11 @@ object Words {
         const val basis = "His figures are the board's. His game log and our read of him are not written yet."
     }
 
+    object StatusHeld {
+        const val changedLead = "His status changed since this read was written."
+        const val dueBy = "A new read is due by"
+    }
+
     object WeekTile {
         const val published = "published projection"
         const val sinceEarlier = "since the earlier read"
