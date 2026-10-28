@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"google.golang.org/api/idtoken"
@@ -33,9 +32,6 @@ const StarterStatusPath = "/internal/notifications/starter-status"
 
 // maxIdentityHeader bounds the Authorization header read.
 const maxIdentityHeader = 4096
-
-// produceTimeout bounds one producer run off the request.
-const produceTimeout = 10 * time.Minute
 
 // googleIssuers are the issuers of a Google-signed identity token.
 var googleIssuers = []string{"https://accounts.google.com", "accounts.google.com"}
@@ -97,32 +93,24 @@ func tokenAlg(token string) (string, error) {
 	return h.Alg, nil
 }
 
-// Marks is the part of Store the internal route and its runner use.
-type Marks interface {
+// Requests records that a producer was asked to run. *Store implements
+// it.
+type Requests interface {
 	RequestRun(ctx context.Context, producer string, at time.Time) error
-	RunExclusive(ctx context.Context, producer string, fn func(context.Context) (time.Time, error)) (bool, error)
 }
 
 // Internal serves the routes our own jobs call: a verified identity on
-// Callers, never a member. The route records the request and answers
-// 202; the producer runs off the request on Context, the process's, one
-// run at a time in this process and, by the mark's advisory lock, across
-// instances (review M6). A run cut short (a deploy, an instance stopped)
-// is caught up by the next, which walks every capture pair in the window.
+// Callers, never a member. The starter status route only records the
+// request and answers 202; the notify job runs the producer (re-review
+// N1), so nothing runs on the API service after the answer.
 type Internal struct {
 	Verifier IdentityVerifier
 	// Callers are the service accounts allowed (INTERNAL_CALLERS); none
 	// refuses every call.
-	Callers       []string
-	StarterStatus *StarterStatus
-	Marks         Marks
-	Context       context.Context
-	Now           func() time.Time
-	Log           *slog.Logger
-
-	running atomic.Bool
-	// done, when set, is called after each run (tests wait on it).
-	done func()
+	Callers  []string
+	Requests Requests
+	Now      func() time.Time
+	Log      *slog.Logger
 }
 
 type callerKey struct{}
@@ -166,42 +154,11 @@ func unauthorized(w http.ResponseWriter, r *http.Request) {
 
 func (h *Internal) starterStatus(w http.ResponseWriter, r *http.Request) {
 	at := h.Now()
-	if err := h.Marks.RequestRun(r.Context(), markStarterStatus, at); err != nil {
+	if err := h.Requests.RequestRun(r.Context(), markStarterStatus, at); err != nil {
 		httpx.WriteInternal(w, r, h.Log, "notify: request starter status", err)
 		return
 	}
 	email, _ := r.Context().Value(callerKey{}).(string)
 	h.Log.Info("notify: starter status requested", "caller", email)
-	h.kick()
 	httpx.WriteOK(w, r, http.StatusAccepted, apitypes.StarterStatusAccepted{RequestedAt: at})
-}
-
-// kick starts a producer run unless one is running in this process.
-func (h *Internal) kick() {
-	if !h.running.CompareAndSwap(false, true) {
-		return
-	}
-	go func() {
-		defer h.running.Store(false)
-		if h.done != nil {
-			defer h.done()
-		}
-		ctx, cancel := context.WithTimeout(h.Context, produceTimeout)
-		defer cancel()
-		ran, err := h.Marks.RunExclusive(ctx, markStarterStatus, func(ctx context.Context) (time.Time, error) {
-			got, err := h.StarterStatus.Produce(ctx)
-			h.Log.Info("notify: starter status produced", "pairs", got.Pairs, "changes", got.Changes,
-				"queued", got.Queued, "skipped", got.Skipped, "err", err)
-			if got.NewerAt == nil {
-				return time.Time{}, err
-			}
-			return *got.NewerAt, err
-		})
-		switch {
-		case err != nil:
-			h.Log.Error("notify: starter status run failed", "err", err)
-		case !ran:
-			h.Log.Info("notify: starter status already running on another instance")
-		}
-	}()
 }

@@ -35,12 +35,6 @@ type Queue interface {
 	Enqueue(ctx context.Context, rows []Notification) (int, error)
 }
 
-// DefaultMaxChangeAge is how far back a change is still news: every
-// capture pair whose newer capture is inside it is compared, so a run
-// that failed or was skipped is caught up by the next (review H2); a
-// producer that first runs on captures from yesterday says nothing.
-const DefaultMaxChangeAge = 3 * time.Hour
-
 // StarterStatus is the first producer: after each hourly capture, a push
 // for every account whose followed league starts a player whose status
 // changed, one row per account, player and change.
@@ -50,7 +44,6 @@ type StarterStatus struct {
 	Queue        Queue
 	Now          func() time.Time
 	Log          *slog.Logger
-	MaxChangeAge time.Duration
 }
 
 // Produced is one run's count.
@@ -61,7 +54,7 @@ type Produced struct {
 	// Skipped is the accounts whose lineups could not be read this run
 	// (review L3); the next run's catch-up tries them again.
 	Skipped int
-	// NewerAt is the newest capture compared, nil with none in the window.
+	// NewerAt is the newest capture compared, nil with none after since.
 	NewerAt *time.Time
 }
 
@@ -71,12 +64,14 @@ type pairChanges struct {
 	changes []Change
 }
 
-// Produce compares every capture pair in the window, oldest first, and
-// queues the pushes. A change already queued adds nothing; a newer change
-// for the same player gives up the older unsent row (TopicKey).
-func (p *StarterStatus) Produce(ctx context.Context) (Produced, error) {
+// Produce compares every capture pair whose newer capture is after since,
+// oldest first, and queues the pushes (the catch-up, CatchUp, picks since
+// from the producer's mark). A change already queued adds nothing; a
+// newer change for the same player gives up the older unsent row
+// (TopicKey).
+func (p *StarterStatus) Produce(ctx context.Context, since time.Time) (Produced, error) {
 	now := p.Now()
-	pairs, err := p.Designations.DesignationPairs(ctx, now.Add(-p.maxAge()))
+	pairs, err := p.Designations.DesignationPairs(ctx, since)
 	if err != nil {
 		return Produced{}, err
 	}
@@ -115,10 +110,6 @@ func (p *StarterStatus) Produce(ctx context.Context) (Produced, error) {
 		out.Queued += n
 	}
 	return out, nil
-}
-
-func (p *StarterStatus) maxAge() time.Duration {
-	return orDuration(p.MaxChangeAge, DefaultMaxChangeAge)
 }
 
 // produceFor queues one account's pushes: each changed player one of its

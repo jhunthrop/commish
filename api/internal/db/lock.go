@@ -42,3 +42,32 @@ func WithLock(ctx context.Context, pool *pgxpool.Pool, key string, fn func(conte
 	}
 	return nil
 }
+
+// TryWithLock is WithLock that does not wait: when another caller holds
+// key it answers ran false at once and fn never runs. The lock is the
+// same transaction-level lock on its own connection.
+func TryWithLock(ctx context.Context, pool *pgxpool.Pool, key string, fn func(context.Context) error) (ran bool, err error) {
+	conn, err := pgx.ConnectConfig(ctx, pool.Config().ConnConfig)
+	if err != nil {
+		return false, fmt.Errorf("db: lock %s: connect: %w", key, err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return false, fmt.Errorf("db: lock %s: begin: %w", key, err)
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	if err := tx.QueryRow(ctx, `select pg_try_advisory_xact_lock(hashtext($1))`, key).Scan(&ran); err != nil {
+		return false, fmt.Errorf("db: lock %s: %w", key, err)
+	}
+	if !ran {
+		return false, nil
+	}
+	if err := fn(ctx); err != nil {
+		return true, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return true, fmt.Errorf("db: lock %s: release: %w", key, err)
+	}
+	return true, nil
+}

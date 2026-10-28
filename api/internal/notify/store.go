@@ -133,10 +133,24 @@ func supersede(ctx context.Context, tx pgx.Tx, n Notification, id uuid.UUID, top
 		return fmt.Errorf("notify: a row with a topic needs its %s: %w", TopicAtKey, err)
 	}
 	const onTopic = `account_id = $1 and kind = $2 and data ->> 'topic' = $3 and id <> $4`
-	if _, err := tx.Exec(ctx, `update app.notifications set failed_at = now(), attempts = greatest(attempts, $6)
-		where `+onTopic+` and sent_at is null and (data ->> 'topic_at')::bigint < $5`,
-		n.AccountID, string(n.Kind), topic, id, when, deadAttempts); err != nil {
+	// The rows to give up are locked first, in id order, as every writer
+	// of a topic's rows locks them (lockTopic), and rows already given up
+	// are never touched again (re-review N8).
+	rows, err := tx.Query(ctx, `select id from app.notifications
+		where `+onTopic+` and sent_at is null and attempts < $6 and (data ->> 'topic_at')::bigint < $5
+		order by id for update`, n.AccountID, string(n.Kind), topic, id, when, deadAttempts)
+	if err != nil {
 		return err
+	}
+	older, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return err
+	}
+	if len(older) > 0 {
+		if _, err := tx.Exec(ctx, `update app.notifications set failed_at = now(), attempts = $2 where id = any($1)`,
+			older, deadAttempts); err != nil {
+			return err
+		}
 	}
 	_, err = tx.Exec(ctx, `update app.notifications set failed_at = now(), attempts = $6 where id = $4
 		and exists (select 1 from app.notifications where `+onTopic+` and (data ->> 'topic_at')::bigint > $5)`,
@@ -237,6 +251,9 @@ func (s *Store) Release(ctx context.Context, rows []Notification, at time.Time) 
 func (s *Store) SentWithChildren(ctx context.Context, n Notification, at, retryAt time.Time, devices []uuid.UUID) (bool, error) {
 	held := false
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		if err := lockTopic(ctx, tx, n); err != nil {
+			return err
+		}
 		tag, err := tx.Exec(ctx, `update app.notifications set sent_at = $3 where id = $1 and attempts = $2 and sent_at is null`,
 			n.ID, n.Attempts, at)
 		if err != nil || tag.RowsAffected() == 0 {
@@ -254,6 +271,19 @@ func (s *Store) SentWithChildren(ctx context.Context, n Notification, at, retryA
 		return false, fmt.Errorf("notify: sent with children %s: %w", n.ID, err)
 	}
 	return held, nil
+}
+
+// lockTopic locks, in id order, the row and the live rows on its topic
+// before any of them is written: the children's insert gives up older
+// rows on the topic, and a producer's insert locks the same rows in the
+// same order, so the two never wait on each other in a cycle (re-review
+// N8). A row with no topic locks itself alone.
+func lockTopic(ctx context.Context, tx pgx.Tx, n Notification) error {
+	_, err := tx.Exec(ctx, `select id from app.notifications
+		where id = $1 or ($2 <> '' and account_id = $3 and kind = $4 and data ->> 'topic' = $2
+			and sent_at is null and attempts < $5)
+		order by id for update`, n.ID, n.Data[TopicKey], n.AccountID, string(n.Kind), deadAttempts)
+	return err
 }
 
 // childOf is the row aimed at one device, due at retryAt.

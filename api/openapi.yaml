@@ -2397,15 +2397,14 @@ paths:
       tags: [devices]
       operationId: produceStarterStatus
       summary: >-
-        The starter status producer (Lane 262): the hourly capture calls it after each pass with its Google identity.
-        The call records the request and answers 202; the producer runs off the request, one run at a time across
-        instances. It compares every consecutive pair of readable injury captures from the last three hours and, for
-        each player whose status changed (out, doubtful, cleared of a week's designation, injured reserve, activated
-        from a season-long list), queues one push for every account with an active registered device and the kind
-        switched on whose followed league starts him. One row per account, player and change: a call again adds
-        nothing, and a run that was missed is caught up by the next. Nothing sends here; the notify job delivers. A
-        Google-signed RS256 identity token for the API's own URL, from a caller on INTERNAL_CALLERS; anything else is
-        401. 6 a minute a caller, 60 a minute an address.
+        The starter status request (Lane 262): the hourly capture calls it after each pass with its Google identity.
+        The call only records the request and answers 202; nothing runs here. The api-notify job, each minute, runs
+        the producer when a capture landed or a request came after its last run: it compares every consecutive pair
+        of readable injury captures since its mark and, for each player whose status changed (out, doubtful, cleared
+        of a week's designation, injured reserve, activated from a season-long list), queues one push for every
+        account with an active registered device and the kind switched on whose followed league starts him. One row
+        per account, player and change. A Google-signed RS256 identity token for the API's own URL, from a caller on
+        INTERNAL_CALLERS; anything else is 401. 6 a minute a caller, 60 a minute an address.
       security: [{ google_identity: [] }]
       responses:
         "202":

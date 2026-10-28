@@ -2,6 +2,7 @@ package boards
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -19,44 +20,67 @@ type DesignationPair struct {
 
 // pairsTried is how many of a source's newest captures the pair read
 // takes: a capture is stored only when the list changed, at most one an
-// hour, so a few hours' window is a handful, and the floor may refuse a
-// short one among them.
-const pairsTried = 12
+// hour, so a day's catch-up is under this, with room for the floor to
+// refuse a short one among them.
+const pairsTried = 30
 
 // DesignationPairs is every consecutive pair of readable captures of the
 // source Designations reads (the by-date list, else the roster sweep)
-// whose newer capture is at or after since, oldest first. A capture the
-// floor refuses is passed over, as Designations passes it over, so a
-// cut-short list never reads as everyone cleared. Walking every pair in
-// the window, not only the newest, lets a producer that missed an hour
-// catch up at the next (review H2).
+// whose newer capture is after since, oldest first. A capture the floor
+// refuses is passed over, as Designations passes it over, so a cut-short
+// list never reads as everyone cleared. Walking every pair since the
+// producer's last run lets a run that missed an hour catch up at the next
+// (review H2). A source with fewer than two readable captures gives way
+// to the next, so the first by-date capture never silences the producer
+// (re-review N7).
 func (s *PGSource) DesignationPairs(ctx context.Context, since time.Time) ([]DesignationPair, error) {
 	for _, source := range []string{injuriesByDate, injuriesRosterWide} {
 		captures, err := s.captures(ctx, source, pairsTried, time.Time{})
 		if err != nil {
 			return nil, err
 		}
-		if len(captures) == 0 {
+		read := readable(captures)
+		if len(read) < 2 {
 			continue
 		}
-		return pairsOf(source, captures, since), nil
+		return pairsOf(source, read, since), nil
 	}
 	return nil, nil
 }
 
-// pairsOf is the readable captures, newest first, paired with the one
-// before each, oldest pair first.
-func pairsOf(source string, captures []capture, since time.Time) []DesignationPair {
+// NewestCaptureAt is when the newest injury capture of either source was
+// stored, zero with none: what tells a producer there is something new.
+func (s *PGSource) NewestCaptureAt(ctx context.Context) (time.Time, error) {
+	var at *time.Time
+	err := s.Pool.QueryRow(ctx, `select max(captured_at) from `+s.table("capture_snapshots")+` where source = any($1)`,
+		[]string{injuriesByDate, injuriesRosterWide}).Scan(&at)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("boards: newest injury capture: %w", err)
+	}
+	if at == nil {
+		return time.Time{}, nil
+	}
+	return at.UTC(), nil
+}
+
+// readable is the captures, newest first, the floor reads.
+func readable(captures []capture) []capture {
 	var read []capture
 	for i := range captures {
 		if readableAt(captures, i) == nil {
 			read = append(read, captures[i])
 		}
 	}
+	return read
+}
+
+// pairsOf is the readable captures, newest first, paired with the one
+// before each, oldest pair first.
+func pairsOf(source string, read []capture, since time.Time) []DesignationPair {
 	var out []DesignationPair
 	for i := len(read) - 2; i >= 0; i-- {
 		newer, older := read[i], read[i+1]
-		if newer.at.Before(since) {
+		if !newer.at.After(since) {
 			continue
 		}
 		out = append(out, DesignationPair{

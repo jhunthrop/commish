@@ -432,6 +432,52 @@ func TestEnqueueSupersedesByTopic(t *testing.T) {
 	}
 }
 
+// A row already given up is never written again by a newer one on its
+// topic (re-review N8), and a row sent with children on a topic with a
+// given-up row beside it completes: the locks are taken in one order.
+func TestSupersedeSkipsGivenUpRows(t *testing.T) {
+	f := newOutbox(t)
+	f.device("android", PlatformFCM, androidToken)
+	f.device("android", PlatformFCM, tabletToken)
+	ctx := context.Background()
+	mk := func(key, at string) Notification {
+		return Notification{AccountID: f.acct, Kind: KindStarterStatus, Title: key, Body: "B", SendAfter: noon,
+			Data: map[string]string{DedupeKey: key, TopicKey: "player:p1", TopicAtKey: at}}
+	}
+	failedAt := func(key string) *time.Time {
+		t.Helper()
+		var at *time.Time
+		if err := f.pool.QueryRow(ctx, `select failed_at from app.notifications where data ->> 'key' = $1`, key).Scan(&at); err != nil {
+			t.Fatal(err)
+		}
+		return at
+	}
+	if _, err := f.store.Enqueue(ctx, []Notification{mk("a", "100"), mk("b", "200")}); err != nil {
+		t.Fatal(err)
+	}
+	first := failedAt("a")
+	if first == nil || failedAt("b") != nil {
+		t.Fatal("the newer row did not give up the older")
+	}
+	if _, err := f.pool.Exec(ctx, `update app.notifications set failed_at = failed_at - interval '1 hour' where data ->> 'key' = 'a'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.Enqueue(ctx, []Notification{mk("c", "300")}); err != nil {
+		t.Fatal(err)
+	}
+	if again := failedAt("a"); again == nil || !again.Equal(first.Add(-time.Hour)) {
+		t.Fatalf("a given-up row was written again: %v", again)
+	}
+	if failedAt("b") == nil || failedAt("c") != nil {
+		t.Fatal("the newest row did not give up the one before it")
+	}
+	fcm := &fakeSender{errs: map[string]error{tabletToken: errors.New("503")}}
+	c := &clock{now: noon}
+	if got, err := f.drainer(c, map[Platform]Sender{PlatformFCM: fcm}).Run(ctx); err != nil || got.Sent != 1 {
+		t.Fatalf("sent with children beside given-up rows: %+v %v", got, err)
+	}
+}
+
 // Two runs claiming at once get disjoint rows, the whole due set between
 // them (review M9).
 func TestConcurrentClaimsAreDisjoint(t *testing.T) {

@@ -6,19 +6,28 @@ import (
 	"net/http"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 )
 
-// The starters of the member's own team in each followed league, placed
-// on our board as the league page places them (review M8): the team that
-// starts Aaron Rodgers yields him, on his board id, with the host's name
-// for him and the league's name; starters our small board does not hold
-// are left out; a league whose read fails is left out and the others are
-// kept; the directory comes through Players.For (Sleeper's read carries
-// none).
+// memoryDirectory is the hosts' directories from the replay, as the
+// store's kept directory answers them.
+type memoryDirectory struct{ players memoryPlayers }
+
+func (m memoryDirectory) HostPlayersByID(ctx context.Context, host string, ids []string) (map[string]HostPlayer, error) {
+	return m.players.For(ctx, host, 0, ids)
+}
+
+// The starters of the member's own team in each followed league, from the
+// read the API kept, placed on our board as the league page places them
+// (review M8, re-review N1): the team that starts Aaron Rodgers yields
+// him, on his board id, with the host's name for him and the league's
+// name; starters our small board does not hold are left out; a league the
+// API has never read is left out and the others are kept; the directory
+// comes through the kept directory (Sleeper's read carries none).
 func TestStartersOnOurBoard(t *testing.T) {
 	pool := dbtest.Pool(t)
 	ctx := context.Background()
@@ -53,13 +62,16 @@ func TestStartersOnOurBoard(t *testing.T) {
 	if status != http.StatusCreated || json.Unmarshal(body, &attached) != nil {
 		t.Fatalf("attach: %d %s", status, body)
 	}
-	// A second league no host answers: its read fails.
+	// A second league the API has never read: no kept snapshot.
 	if _, err := pool.Exec(ctx, `insert into app.league_links (account_id, host, host_league_id, host_season, roster_id)
 		values ($1, 'sleeper', '999000111', 0, 1)`, alice.ID); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := svc.Starters(ctx, alice.ID)
+	store := &Store{Pool: pool}
+	reads := &StoredStarters{Links: store, Snapshots: store, Directory: memoryDirectory{memoryPlayers{replayHosts(time.Now)}},
+		Boards: smallBoard{}, Log: quietLog()}
+	got, err := reads.Starters(ctx, alice.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

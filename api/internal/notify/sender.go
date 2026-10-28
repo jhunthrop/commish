@@ -47,7 +47,7 @@ type Sender interface {
 // The outcomes a sender names.
 var (
 	// ErrDeadToken is a token the platform no longer delivers to (FCM
-	// UNREGISTERED, APNs 410 or BadDeviceToken): the registration goes.
+	// UNREGISTERED, APNs 410 or Unregistered): the registration goes.
 	ErrDeadToken = errors.New("notify: the platform says the token is dead")
 	// ErrNotConfigured is a platform whose sender has no credentials here
 	// (APNs until its key is in Secret Manager): nothing is tried.

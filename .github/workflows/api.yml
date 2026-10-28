@@ -175,9 +175,9 @@ jobs:
           region: ${{ vars.GCP_REGION }}
           image: ${{ env.IMAGE }}
           # INTERNAL_CALLERS (Lane 262), the service accounts whose identity tokens open the internal routes, is
-          # the service's alone and quoted, so a list of several, comma or space separated, never splits the
-          # variables (the action keeps a quoted value whole).
-          env_vars: ${{ env.API_ENV_VARS }},INTERNAL_CALLERS="${{ vars.INTERNAL_CALLERS || 'research-runtime@trycommish.iam.gserviceaccount.com' }}"
+          # the service's alone. Separate several with spaces, never commas: the action splits this list on
+          # commas and keeps quotes as part of a value, and the API splits the value on whitespace.
+          env_vars: ${{ env.API_ENV_VARS }},INTERNAL_CALLERS=${{ vars.INTERNAL_CALLERS || 'research-runtime@trycommish.iam.gserviceaccount.com' }}
           env_vars_update_strategy: overwrite
           secrets: ${{ env.API_SECRETS }},${{ env.RUNS_SECRETS }}
           secrets_update_strategy: overwrite
@@ -218,12 +218,13 @@ jobs:
               --set-env-vars "$API_ENV_VARS" --set-secrets "$API_SECRETS,$JOB_SECRETS" \
               --max-retries 1 --task-timeout 600s --quiet
           done
-          # The push outbox's drain (Lane 262), every minute in season: no retry of the execution (the
-          # next minute's run is the retry, and rows are leased), and a timeout well under the lease (the
-          # drain keeps its own budget too). It mounts the database alone (security review L5): FCM sends as
-          # the runtime (roles/firebasecloudmessaging.admin); APNs waits on APNS_KEY_ID, APNS_TEAM_ID and
-          # APNS_KEY in Secret Manager, added to these secrets once they exist. Cloud Scheduler runs it as
-          # research-runtime, the research schedule's caller, which holds run.invoker on this job alone.
+          # The push job (Lane 262), every minute in season: it catches the starter status producer up from
+          # its mark, then drains the outbox. No retry of the execution (the next minute's run is the retry,
+          # and rows are leased), a timeout well under the lease (the drain keeps its own budget too). It
+          # loads its own narrow configuration (config.LoadNotify) and mounts the database alone (security
+          # review L5): FCM sends as the runtime (roles/firebasecloudmessaging.admin); APNs waits on
+          # APNS_KEY_ID, APNS_TEAM_ID and APNS_KEY in Secret Manager, added to these secrets once they exist.
+          # Cloud Scheduler runs it as research-runtime, which holds run.invoker on this job alone.
           gcloud run jobs deploy api-notify --image "$IMAGE" --region "$REGION" \
             --command /api --args notify --service-account "$RUNTIME_SA" \
             --set-cloudsql-instances "$CLOUDSQL_INSTANCE" \

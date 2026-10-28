@@ -1,6 +1,6 @@
 """The service alerts' bodies and their check, for infra/service-alerts.sh, which calls the API.
 
-One source for what the alerts are: the three uptime checks, the eight policies on the founder's
+One source for what the alerts are: the three uptime checks, the seven policies on the founder's
 channel, and what `verify` holds the live ones to. Reads its inputs from argv and stdin, prints JSON
 or check lines, and never calls the network.
 """
@@ -52,13 +52,13 @@ UPTIME_POLICIES = {
 # the session's length and its p95 would be over 3 s whenever a room is open.
 ERROR_POLICIES = {"Service api 5xx over 2%": "api", "Service room 5xx over 2%": "room"}
 LATENCY_POLICIES = {"Service api p95 over 3 s": "api"}
-# Push (Lane 262): the hourly capture's call is advisory (it never fails the capture), so the API's side
-# alerts. A starter status run that fails logs one error line; the drain job logs its own at exit.
-# Log-match policies email at most once an hour.
+# Push (Lane 262): the hourly capture's request is advisory (it never fails the capture), so the push job's
+# side alerts. The api-notify job catches the starter status producer up and drains the outbox; any error line
+# it logs (a failed catch-up, a failed drain, its exit) emails, at most once an hour. An alert on the absence
+# of a producer run would need a log-based metric, which these scripts (Cloud Monitoring alone) do not create.
 LOG_POLICIES = {
-    "Push starter status run failed": 'resource.type = "cloud_run_revision" AND resource.labels.service_name = "api" '
-    'AND jsonPayload.level = "ERROR" AND jsonPayload.msg = "notify: starter status run failed"',
-    "Push drain failed": 'resource.type = "cloud_run_job" AND resource.labels.job_name = "api-notify" AND jsonPayload.level = "ERROR"',
+    "Push job error": 'resource.type = "cloud_run_job" AND resource.labels.job_name = "api-notify" '
+    'AND jsonPayload.level = "ERROR"',
 }
 LOG_RATE_LIMIT = "3600s"
 POLICIES = [*UPTIME_POLICIES, *ERROR_POLICIES, *LATENCY_POLICIES, *LOG_POLICIES]

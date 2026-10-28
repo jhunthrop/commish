@@ -53,9 +53,6 @@ func jobTable() map[string]job {
 		// espn-week-reads runs Wednesday evening and Thursday afternoon: every
 		// attached ESPN league's projection and points (espnweekjob.go).
 		"espn-week-reads": runESPNWeekReads,
-		// notify runs every minute in season (Lane 262): the push outbox
-		// drained to FCM and APNs (notifyjob.go).
-		"notify": runNotify,
 		// yahoo-probe runs by hand once (Lane 130): the shapes of Yahoo's
 		// rank, week stats and projected points answers (yahooprobejob.go).
 		"yahoo-probe": runYahooProbe,
@@ -69,15 +66,20 @@ func jobTable() map[string]job {
 
 func jobNames() string {
 	table := jobTable()
-	names := make([]string, 0, len(table))
+	names := make([]string, 0, len(table)+1)
 	for n := range table {
 		names = append(names, n)
 	}
+	names = append(names, notifyJob)
 	slices.Sort(names)
 	return strings.Join(names, "|")
 }
 
 func runJob(ctx context.Context, log *slog.Logger, name string, args []string) error {
+	if name == notifyJob {
+		// The push job loads its own narrow configuration (notifyjob.go).
+		return runNotify(ctx, log)
+	}
 	run, ok := jobTable()[name]
 	if !ok {
 		return usage()

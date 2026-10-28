@@ -225,15 +225,12 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 
 	// A member deletes their own account (Lane 233): their live lobby seats
 	// given up, every row in one transaction, then the sign-in user.
-	// The starter status producer the hourly capture calls with its Google
-	// identity (Lane 262): the two newest injury captures compared, a push
-	// queued for each account whose followed league starts a changed player.
+	// The hourly capture's request for the starter status pushes (Lane
+	// 262): verified, recorded and answered 202; the api-notify job runs
+	// the producer.
 	internal := &notify.Internal{
 		Verifier: notify.GoogleIdentity{Audience: cfg.HTTP.APIBaseURL}, Callers: cfg.Push.InternalCallers,
-		Marks: notifyStore, Context: ctx, Now: now, Log: log,
-		StarterStatus: &notify.StarterStatus{
-			Designations: draftBoards.Schedule, Lineups: leagueSync, Queue: notifyStore, Now: now, Log: log,
-		},
+		Requests: notifyStore, Now: now, Log: log,
 	}
 
 	deleter := &deletion.Service{

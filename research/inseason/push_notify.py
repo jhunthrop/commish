@@ -1,14 +1,15 @@
 """THE STARTER STATUS PUSH: after each hourly capture, ask the API to queue its pushes (Lane 262).
 
-The API records the request, answers 202 and does the work off the request: it compares every pair of
-injury captures from the last three hours and queues one push per account, player and change for the
-members whose followed league starts a changed player, so a call that fails is caught up by the next.
+The API records the request and answers 202; the api-notify job does the work each minute: it compares
+every pair of injury captures since its last run and queues one push per account, player and change for
+the members whose followed league starts a changed player. The job also runs on a new capture without a
+request, so this call only hurries it.
 This module only calls `POST /internal/notifications/starter-status` with the job's own Google identity:
 an OIDC identity token from the Cloud Run metadata server whose audience is the API's URL, which the API
 verifies against INTERNAL_CALLERS. No key file, no secret.
 
-The call is advisory, like the week-ahead reads: its line is logged and the capture's verdict never
-depends on it (review M5); the API's side alerts when no run lands. `COMMISH_API_URL`
+The call is advisory, like the week-ahead reads: its line is logged, it never raises, and the capture's
+verdict never depends on it (review M5); the push job's own error lines alert. `COMMISH_API_URL`
 (https://api.trycommish.app in production) names the API and must be https; unset, the call is skipped.
 """
 
@@ -49,7 +50,7 @@ def notify_starter_status(client: httpx.Client | None = None, api_url: str | Non
         if response.status_code not in ACCEPTED:
             return f"starter-status push: not requested, the API answered {response.status_code}"
         return "starter-status push: requested"
-    except httpx.HTTPError as err:
+    except Exception as err:  # advisory: an odd URL (httpx.InvalidURL) or anything else is a line
         return f"starter-status push: not requested, {type(err).__name__}: {err}"
     finally:
         if own:

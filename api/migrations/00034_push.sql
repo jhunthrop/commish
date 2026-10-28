@@ -66,14 +66,16 @@ create table app.apns_provider_tokens (
   issued_at timestamptz not null
 );
 
--- The producers' marks: when a producer was last asked to run, and the
--- newest input it has finished (the starter status producer's newest
--- capture compared). The internal route writes requested_at and answers;
--- the work runs off the request, one instance at a time.
+-- The producers' marks: when a producer was last asked to run, when its
+-- last finished run began, and the newest input it has finished through
+-- (the starter status producer's newest capture). The internal route
+-- writes requested_at and answers 202; each api-notify run catches the
+-- producer up from done_through, and runs again for a request that came
+-- after its last run began.
 create table app.notify_marks (
   producer     text primary key check (producer in ('starter_status')),
   requested_at timestamptz,
-  finished_at  timestamptz,
+  started_at   timestamptz,
   done_through timestamptz
 );
 

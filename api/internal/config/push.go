@@ -20,9 +20,10 @@ type Push struct {
 	APNsTopic string
 	// APNsSandbox is APNS_SANDBOX: Apple's sandbox, for a build from Xcode.
 	APNsSandbox bool
-	// InternalCallers are INTERNAL_CALLERS, the service accounts whose
-	// Google identity tokens open the internal routes (the research
-	// runtime's, for the starter status producer); none opens nothing.
+	// InternalCallers are INTERNAL_CALLERS, space-separated service
+	// accounts whose Google identity tokens open the internal routes (the
+	// research runtime's, for the starter status request); none opens
+	// nothing.
 	InternalCallers []string
 }
 
@@ -52,7 +53,9 @@ func (l *loader) push() Push {
 	if set > 0 && set < 3 {
 		l.invalid("APNS_KEY_ID", "APNS_KEY_ID, APNS_TEAM_ID and APNS_KEY are set together or not at all")
 	}
-	for _, caller := range strings.FieldsFunc(l.get("INTERNAL_CALLERS"), func(r rune) bool { return r == ',' || r == ' ' || r == '\t' || r == '\n' }) {
+	// Separated by whitespace alone: the deploy action splits its list on
+	// commas, so a comma never reaches here as a separator (re-review N2).
+	for _, caller := range strings.Fields(l.get("INTERNAL_CALLERS")) {
 		if addr, err := mail.ParseAddress(caller); err != nil || addr.Address != caller {
 			l.invalid("INTERNAL_CALLERS", "every entry must be a service account email")
 			continue
@@ -60,4 +63,25 @@ func (l *loader) push() Push {
 		p.InternalCallers = append(p.InternalCallers, caller)
 	}
 	return p
+}
+
+// Notify is the push job's whole configuration (cmd/api notify): the
+// database, the board it places starters on, and push delivery. It never
+// reads the API's sign-in, billing or host credentials, so the job runs
+// with DATABASE_URL alone mounted (re-review N3, security L5).
+type Notify struct {
+	Env      Env
+	Database Database
+	Board    Board
+	Push     Push
+}
+
+// LoadNotify reads the push job's configuration.
+func LoadNotify(get Getenv) (Notify, error) {
+	l := &loader{get: get}
+	c := Notify{Env: l.env()}
+	c.Database = l.database()
+	c.Board = l.board()
+	c.Push = l.push()
+	return c, l.err()
 }

@@ -52,3 +52,10 @@ def test_an_unreachable_metadata_server_is_a_line() -> None:
 
     line = notify_starter_status(httpx.Client(transport=httpx.MockTransport(refuse)), API)
     assert "ConnectError" in line
+
+
+def test_an_odd_url_is_a_line() -> None:
+    line = notify_starter_status(
+        httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200))), "https://[::1"
+    )
+    assert "not requested" in line
