@@ -230,7 +230,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		deleter.Routes(),
 		(&account.SeasonHandler{Season: site}).Routes(),
 		(&leagues.Handler{Store: leagueStore, Gate: gate, Log: log}).Routes(),
-		(&sheets.Handler{Store: sheetStore, Log: log}).Routes(),
+		(&sheets.Handler{Store: sheetStore, Boards: draftBoards.Raw, Log: log}).Routes(),
 		exportHandler.Routes(),
 		billingService.Routes(),
 		(&mocks.Handler{Store: mockStore, Log: log}).Routes(),
