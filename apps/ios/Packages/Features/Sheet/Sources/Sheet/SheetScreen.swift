@@ -184,8 +184,8 @@ struct SheetEmptyView: View {
     }
 }
 
-/// The import panel (ImportPanel.svelte): a CSV file or a pasted one, what was refused, what the import
-/// read and skipped by line, the verb that replaces the sheet and Cancel.
+/// The import panel (ImportPanel.svelte): a CSV file, or a CSV or a list of names pasted, what was refused,
+/// what the import read and skipped by line, the verb that replaces the sheet and Cancel.
 struct SheetImportView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Bindable var viewModel: CheatSheetViewModel
@@ -254,7 +254,7 @@ struct SheetImportView: View {
         HStack(spacing: Tokens.Space.s3) {
             let sending = viewModel.importing == .sending
             Verb(viewModel.importVerb, enabled: !sending && !typed.trimmingCharacters(in: .whitespaces).isEmpty) {
-                Task { await viewModel.importCSV(typed) }
+                Task { await viewModel.importText(typed) }
             }
             QuietButton(SheetWords.cancel) { viewModel.closeImport() }
         }

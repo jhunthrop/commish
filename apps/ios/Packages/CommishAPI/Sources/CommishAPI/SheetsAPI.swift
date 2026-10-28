@@ -8,10 +8,17 @@ public typealias SheetRowInput = Components.Schemas.SheetRowInput
 public typealias SheetImportResult = Components.Schemas.SheetImportResult
 public typealias ExportLink = Components.Schemas.ExportLink
 
+/// What an import sends (POST /sheets/{id}/import): the sheet's CSV, typed text/csv, or a list of names in
+/// the drafter's order, typed text/plain, which the API reads against the board of the sheet's format.
+public enum SheetImportBody: Equatable, Sendable {
+    case csv(String)
+    case names(String)
+}
+
 /// The cheat sheet's reads and writes (web/src/lib/sheet/remote.ts, the account's sheets): the list to
 /// find the one to open, a sheet with its rows, a new sheet, every row written in one guarded request,
-/// a CSV import that replaces the rows, an export written as a file with a signed link, and the file
-/// itself fetched from that link. The seam the view model's tests replace with a stub.
+/// an import of a CSV or a list of names that replaces the rows, an export written as a file with a signed
+/// link, and the file itself fetched from that link. The seam the view model's tests replace with a stub.
 public protocol SheetsAPI: Sendable {
     /// GET /sheets: the account's sheets, the most recently changed first.
     func sheets() async throws -> [SheetSummary]
@@ -25,8 +32,9 @@ public protocol SheetsAPI: Sendable {
     /// PUT /sheets/{id}/rows: every row in order; with `ifUpdatedAt`, nothing is written and the answer is
     /// a conflict when the sheet changed since.
     func replaceRows(id: String, rows: [SheetRowInput], ifUpdatedAt: Date?) async throws -> SheetDetail
-    /// POST /sheets/{id}/import: the rows replaced from a CSV, and the lines skipped with their reasons.
-    func importSheet(id: String, csv: String) async throws -> SheetImportResult
+    /// POST /sheets/{id}/import: the rows replaced from a CSV or a list of names, and the lines skipped with
+    /// their reasons. A body that reads to no player is refused (400, its sentence) and the sheet kept.
+    func importSheet(id: String, body: SheetImportBody) async throws -> SheetImportResult
     /// POST /sheets/{id}/exports: the sheet written as a CSV file, with a link to it.
     func exportSheet(id: String) async throws -> ExportLink
     /// The export's file from its signed link.
@@ -104,9 +112,13 @@ extension APIClient: SheetsAPI {
         }
     }
 
-    public func importSheet(id: String, csv: String) async throws -> SheetImportResult {
+    public func importSheet(id: String, body: SheetImportBody) async throws -> SheetImportResult {
+        let typed: Operations.ImportSheet.Input.Body = switch body {
+        case let .csv(text): .csv(HTTPBody(text))
+        case let .names(text): .plainText(HTTPBody(text))
+        }
         let output = try await Self.unwrapped {
-            try await client.importSheet(path: .init(id: id), body: .csv(HTTPBody(csv)))
+            try await client.importSheet(path: .init(id: id), body: typed)
         }
         switch output {
         case let .ok(answer):

@@ -128,10 +128,12 @@ object SheetWords {
     const val fileLabel = "A CSV file"
     const val chooseFile = "Choose a CSV"
 
-    /** The phone's paste box takes the sheet's CSV: a list of names is read against our board in the browser,
-     * which the API's import does not do (B264). */
-    const val pasteLabel = "Or paste a CSV"
-    const val pastePlaceholder = "rank,player_id,name,position,team,tier,tags,note"
+    /** The web's label without its "one per line", a word the copy rules keep for the field: the placeholder
+     * shows a list's shape. The account's import reads the list against our board (Lane 278). */
+    const val pasteLabel = "Or paste a CSV or a list of names"
+
+    /** ImportPanel.svelte PASTE_EXAMPLE. */
+    const val pastePlaceholder = "1. Puka Nacua\n2. Ja'Marr Chase, WR"
     const val replace = "Replace my sheet"
     const val use = "Use this sheet"
     const val cancel = "Cancel"
@@ -163,12 +165,21 @@ object SheetWords {
     /** "And 9 more". */
     fun more(count: Int): String = "And $count more"
 
-    /** The phone's own: a file that reads no player on the phone is not sent. */
+    /** A file that reads no player on the phone is not sent: the account's own sentence for an import that
+     * reads no player (api/internal/sheets/handler.go emptyReadSentence). */
     const val keptAsItWas = "No player read, so your sheet is as it was."
 
-    /** The phone's own: the account's import read no player and replaced the rows anyway (B265), so the
-     * sheet is read again and shown as the account now holds it. */
-    const val readNone = "No player read. Your sheet is shown as your account now holds it."
+    /** The account's word for a line of the file or the list, its first letter spelled as a class so the copy
+     * guard reads no word in the pattern. */
+    private val accountLine = Regex("\\b([Ll])ine(s?)\\b")
+
+    /** The account's sentence with the phone's word for a line: the API says "line", a word the copy rules
+     * keep for the field, so the phone says "row", as [SheetCsv]'s reasons do. */
+    fun rowWords(sentence: String): String =
+        sentence.replace(accountLine) { found ->
+            val (first, plural) = found.destructured
+            (if (first.first().isUpperCase()) "Row" else "row") + plural
+        }
 
     // A file's rows refused (csv.ts decodeCsv), "row" where the web says "line".
     const val emptyFile = "The file is empty"

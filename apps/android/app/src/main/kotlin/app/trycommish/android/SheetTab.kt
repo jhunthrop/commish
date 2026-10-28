@@ -25,7 +25,7 @@ import app.trycommish.core.sheet.chose
 import app.trycommish.core.sheet.closeImport
 import app.trycommish.core.sheet.exportFile
 import app.trycommish.core.sheet.finishExport
-import app.trycommish.core.sheet.importCsv
+import app.trycommish.core.sheet.importText
 import app.trycommish.core.sheet.openImport
 import app.trycommish.core.sheet.paste
 import app.trycommish.core.sheet.start
@@ -125,7 +125,7 @@ fun SheetTab(
                         closeImport = vm::closeImport,
                         chooseFile = { picker.launch(PICKED_TYPES) },
                         paste = vm::paste,
-                        importCsv = { vm.importCsv(it) },
+                        importText = { vm.importText(it) },
                     ),
                 choose = vm::choose,
                 export = { vm.exportFile() },

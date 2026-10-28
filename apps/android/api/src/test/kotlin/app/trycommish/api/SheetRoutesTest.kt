@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.util.UUID
 
-/** The sheet's routes as the phone sends them (Lane 267): the import's CSV whole as a text/csv body (the API
- * reads the body as the file), the rows' write guarded by the stamp exactly as it was read, and an export's
+/** The sheet's routes as the phone sends them (Lanes 267 and 278): the import's CSV whole as a text/csv body and
+ * a list of names as text/plain (the API reads the body as the file or the list), the rows' write guarded by the stamp exactly as it was read, and an export's
  * signed link fetched with no bearer. */
 class SheetRoutesTest {
     private val id = UUID.fromString("0b7a3c9e-5d1f-4a26-9a26-000000000254")
@@ -45,6 +45,23 @@ class SheetRoutesTest {
             assertEquals("text/csv", type?.substringBefore(';'))
             assertEquals(csv, sent)
             assertEquals(0, result.imported)
+        }
+
+    @Test
+    fun `an import of a list of names sends it as plain text`() =
+        runTest {
+            var type: String? = null
+            var sent: String? = null
+            val engine =
+                MockEngine { request ->
+                    type = request.body.contentType?.toString()
+                    sent = (request.body as TextContent).text
+                    respond("""{"ok":true,"data":{"imported":0,"skipped":[],"sheet":$sheet},"error":null}""", HttpStatusCode.OK, json)
+                }
+            val list = "1. Puka Nacua\n2. Ja'Marr Chase, WR"
+            Transport("http://api.test", engine, token = { "tok" }).sheets().importNames(id, list).data()
+            assertEquals("text/plain", type?.substringBefore(';'))
+            assertEquals(list, sent)
         }
 
     @Test

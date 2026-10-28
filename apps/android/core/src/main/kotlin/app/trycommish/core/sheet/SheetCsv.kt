@@ -5,7 +5,8 @@ package app.trycommish.core.sheet
  * held to shared/fixtures/parity/sheet.json `reads`): the header must name rank, player_id, name and
  * position in any order and case, a bad row is skipped with its reason, and the players kept are counted.
  * The import sends nothing the web's panel would not let replace a sheet: a file whose header cannot be
- * used is refused with its sentence, and one that reads no player with what it skipped. The web's reasons
+ * used is refused with its sentence, and one that reads no player with what it skipped. A list of names is not
+ * read here: the API reads it (Lane 278). The web's reasons
  * say "line" where the phone says "row" (SheetWords).
  */
 object SheetCsv {
@@ -44,6 +45,16 @@ object SheetCsv {
      * it, and Java's suffixes ("1d") are never a number. The API refuses "1.0" too (Lane 267 review M3, the
      * API's to settle). */
     private val decimal = Regex("^[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?$")
+
+    /** True when the text is the sheet's CSV, not a list of names: its first line names player_id (paste.ts
+     * looksLikeCsv, the API's looksLikeCSV, held to sheet.json `lists`). */
+    fun looksLikeCsv(text: String): Boolean =
+        text
+            .trimStart { it.isWhitespace() || it == byteOrderMark }
+            .lineSequence()
+            .first()
+            .lowercase()
+            .contains("player_id")
 
     /** The file read as the web reads it; throws [HeaderError] when the header cannot be used. */
     fun read(text: String): Read {

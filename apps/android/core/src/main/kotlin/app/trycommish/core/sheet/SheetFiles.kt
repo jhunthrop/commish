@@ -1,6 +1,7 @@
 package app.trycommish.core.sheet
 
 import androidx.lifecycle.viewModelScope
+import app.trycommish.api.ApiFailure
 import app.trycommish.api.Unauthorized
 import app.trycommish.api.models.SheetImportResult
 import kotlinx.coroutines.CancellationException
@@ -107,19 +108,22 @@ private fun utf8(bytes: ByteArray): String? =
     }
 
 /**
- * The CSV read on the phone first, as the web's panel reads it: a header that cannot be used (a list of
- * names, an empty file) is refused with its sentence and a file that reads no player with what it skipped,
- * and nothing is sent or made. Otherwise it is sent to the account's import, which replaces the rows; an
- * empty account's sheet is made for it first. An import the account answers with no player read is shown as
- * refused and the sheet read again as the account now holds it; nothing is written back.
+ * A pasted or chosen text sent to the account's import, which replaces the rows; an empty account's sheet is
+ * made for it first. A list of names (a first line that does not name player_id) goes as it is, typed
+ * text/plain, and the account reads it against our board. A CSV is read on the phone first, as the web's
+ * panel reads it: a header that cannot be used is refused with its sentence and a file that reads no player
+ * with what it skipped, and nothing is sent or made. An import the account refuses because it read no player
+ * is shown as the import's result in the account's sentence, and the sheet read again as the account holds
+ * it; nothing is written back.
  */
-fun SheetViewModel.importCsv(text: String): Job? {
+fun SheetViewModel.importText(text: String): Job? {
     if (text.toByteArray(Charsets.UTF_8).size > SheetLimits.CSV_BYTES) {
         update { it.copy(importing = SheetImport.Open(SheetWords.tooLarge)) }
         return null
     }
     val ui = ui.value
     if (text.isBlank() || ui.importing == SheetImport.Sending || !ui.canImport) return null
+    if (!SheetCsv.looksLikeCsv(text)) return sending(SheetImportBody.Names(text))
     val read =
         try {
             SheetCsv.read(text)
@@ -131,11 +135,19 @@ fun SheetViewModel.importCsv(text: String): Job? {
         update { it.copy(importing = SheetImport.Done(SheetImportWords.of(0, read.skipped, SheetWords.keptAsItWas))) }
         return null
     }
-    update { it.copy(importing = SheetImport.Sending) }
-    return viewModelScope.launch { send(text) }
+    return sending(SheetImportBody.Csv(text))
 }
 
-private suspend fun SheetViewModel.send(text: String) {
+private fun SheetViewModel.sending(body: SheetImportBody): Job {
+    update { it.copy(importing = SheetImport.Sending) }
+    return viewModelScope.launch { send(body) }
+}
+
+/** The code of the import's 400 (api/internal/sheets/handler.go, WriteInvalid): the body read to no player, or
+ * its first line was a header the import cannot use, and the sheet is as it was. */
+private const val READ_NOTHING = "invalid"
+
+private suspend fun SheetViewModel.send(body: SheetImportBody) {
     var made: String? = null
     try {
         val id =
@@ -146,28 +158,29 @@ private suspend fun SheetViewModel.send(text: String) {
                 update { it.shown(sheet, deps.clock.now(), false) }
                 sheet.id.toString()
             }
-        val result = reads().import(id, text)
-        if (result.imported > 0) {
-            update {
-                it
-                    .copy(
-                        edits = emptyMap(),
-                        notices = emptyMap(),
-                        save = SheetSave.Idle,
-                        pasted = "",
-                        chosen = null,
-                        importing = SheetImport.Done(words(result, null)),
-                    ).shown(result.sheet, deps.clock.now(), false)
-            }
-            keep()
-            return
+        val result = reads().import(id, body)
+        update {
+            it
+                .copy(
+                    edits = emptyMap(),
+                    notices = emptyMap(),
+                    save = SheetSave.Idle,
+                    pasted = "",
+                    chosen = null,
+                    importing = SheetImport.Done(words(result)),
+                ).shown(result.sheet, deps.clock.now(), false)
         }
-        update { it.copy(importing = SheetImport.Done(words(result, if (made == null) SheetWords.readNone else null))) }
+        keep()
+        return
     } catch (e: CancellationException) {
         throw e
     } catch (e: Unauthorized) {
         signOut()
         return
+    } catch (e: ApiFailure) {
+        val said = SheetViewModel.reason(e)
+        val importing = if (e.code == READ_NOTHING) SheetImport.Done(refused(said)) else SheetImport.Open(said)
+        update { it.copy(importing = importing) }
     } catch (
         @Suppress("TooGenericExceptionCaught") e: Exception,
     ) {
@@ -176,10 +189,12 @@ private suspend fun SheetViewModel.send(text: String) {
     reread(made)
 }
 
-private fun words(
-    result: SheetImportResult,
-    kept: String?,
-): SheetImportWords = SheetImportWords.of(result.imported, result.skipped.map { SheetCsv.Skip(it.line, it.reason) }, kept)
+/** The account's answer, its reasons said with the phone's word for a line ([SheetWords.rowWords]). */
+private fun words(result: SheetImportResult): SheetImportWords =
+    SheetImportWords.of(result.imported, result.skipped.map { SheetCsv.Skip(it.line, SheetWords.rowWords(it.reason)) }, null)
+
+/** The account's refusal of a body that read to no player, in its own sentence: the sheet is as it was. */
+private fun refused(sentence: String): SheetImportWords = SheetImportWords.of(0, emptyList(), SheetWords.rowWords(sentence))
 
 /** After an import that did not land: the sheet made for it taken off, else the account's sheet read again,
  * so the phone shows what the account holds (a failed delete leaves the made sheet shown, as it is). */

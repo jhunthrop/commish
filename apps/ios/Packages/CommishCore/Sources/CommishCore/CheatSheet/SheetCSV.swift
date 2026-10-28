@@ -3,8 +3,9 @@ import Foundation
 /// A CSV read on the phone before it is sent (a port of web/src/lib/sheet/csv.ts decodeCsv, held to
 /// shared/fixtures/parity/sheet.json `reads`): the header must name rank, player_id, name and position in
 /// any order and case, a bad line is skipped with its reason, and the players kept are counted. The
-/// import sends nothing the web's panel would not let replace a sheet: a file whose header cannot be used
-/// is refused with its sentence, and one that reads no player is refused with what it skipped. The web's
+/// import sends no CSV the web's panel would not let replace a sheet: a file whose header cannot be used
+/// is refused with its sentence, and one that reads no player is refused with what it skipped. A list of
+/// names is not read here: the API reads it (Lane 278). The web's
 /// reasons say "line" for a row of the file, a word the copy rules keep for the field
 /// (shared/words/banned-words.json), so the phone says "row" where the web says "line" and is held to the
 /// web's reasons with that one word swapped.
@@ -37,6 +38,14 @@ public enum SheetCSV {
 
     static let emptyFile = "The file is empty"
     static let badHeader = "The first row must name rank, player_id, name and position"
+
+    /// True when the text is the sheet's CSV, not a list of names: its first line names player_id (paste.ts
+    /// looksLikeCsv, the API's looksLikeCSV, held to sheet.json `lists`).
+    public static func looksLikeCSV(_ text: String) -> Bool {
+        let first = text.drop(while: { $0.isWhitespace || String($0) == byteOrderMark })
+            .prefix(while: { !$0.isNewline })
+        return first.lowercased().contains("player_id")
+    }
 
     /// The file read as the web reads it; throws HeaderError when the header cannot be used.
     public static func read(_ text: String) throws -> Read {

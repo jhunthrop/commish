@@ -23,10 +23,11 @@ import java.nio.file.Files
 
 /**
  * The cheat sheet's import, export and empty sheet over a stub account at a fixed clock, as the iOS ones are
- * held (Lane 254): a file read on the phone first, a list of names, a bad header or a file that reads no
- * player refused before any request, an import the account answers sent and shown, one it refuses or reads
- * no player from shown as refused with the sheet read again and nothing written back, no import while a
- * row's write is on its way; the export's file shared as the API wrote it, waiting while an edit is unsaved;
+ * held (Lanes 254 and 278): a CSV read on the phone first, a bad header or a CSV that reads no player refused
+ * before any request, a list of names sent as it is (text/plain) for the account to read, an import the
+ * account answers sent and shown, one it refuses for reading no player shown as the import's result in its
+ * sentence with the sheet read again and nothing written back, any other refusal shown as the panel's
+ * problem, no import while a row's write is on its way; the export's file shared as the API wrote it, waiting while an edit is unsaved;
  * the empty sheet started from our board.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -64,9 +65,9 @@ class SheetFilesTest {
             stub.importAnswer = SheetImportAnswer(3, skips, parityRows().take(3))
             assertEquals(SheetWords.replace, vm.ui.value.importVerb)
             val csv = SheetParity.load().csv
-            vm.importCsv(csv)
+            vm.importText(csv)
             settle()
-            assertEquals(listOf(csv), stub.imports)
+            assertEquals(listOf(SheetImportBody.Csv(csv)), stub.imports)
             val words = vm.done()
             assertEquals("3 players read", words.read)
             assertEquals("14 rows skipped", words.skipped)
@@ -78,28 +79,80 @@ class SheetFilesTest {
         }
 
     @Test
-    fun `a refused import says the API's sentence and keeps the sheet`() =
+    fun `a refusal for another reason says the API's sentence and keeps the sheet`() =
         runTest(main) {
             val (stub, vm) = loaded()
-            val sentence = "Some of that did not check out"
-            stub.importRefusal = ApiFailure(400, "invalid", sentence)
-            vm.importCsv(SheetParity.load().csv)
+            val sentence = "Our board did not load, so a list of names cannot be read yet"
+            stub.importRefusal = ApiFailure(503, "unavailable", sentence)
+            vm.importText("1. Puka Nacua")
             settle()
             assertEquals(SheetImport.Open(sentence), vm.ui.value.importing)
             assertEquals(8, vm.players())
             assertTrue(stub.writes.isEmpty())
         }
 
+    /** Every pasted list of the parity file: a list is sent as it is, typed text/plain, and what the account reads
+     * (the web's read, which the API is held to) is shown as a CSV import's is, each reason in the phone's word
+     * for a line; a list the account reads no player from is refused in its sentence; a first line that names
+     * player_id takes the CSV path. */
     @Test
-    fun `a pasted list of names is refused before any request`() =
+    fun `every parity list is sent as names and shown as the account reads it`() =
+        runTest(main) {
+            val parity = SheetParity.load()
+            parity.lists.filter { it.text.isNotBlank() }.forEach { list ->
+                val (stub, vm) = loaded()
+                val kept = parityRows().take(list.ids.size)
+                stub.importAnswer = SheetImportAnswer(kept.size, list.skipped.map { ImportSkip(it.line, it.reason) }, kept)
+                vm.importText(list.text)
+                settle()
+                if (list.csv) {
+                    assertEquals(listOf(SheetImportBody.Csv(list.text)), stub.imports, list.text)
+                    return@forEach
+                }
+                assertEquals(listOf(SheetImportBody.Names(list.text)), stub.imports, list.text)
+                val words = vm.done()
+                assertEquals(SheetWords.read(kept.size), words.read, list.text)
+                if (kept.isEmpty()) {
+                    assertEquals(SheetStub.EMPTY_READ, words.kept, list.text)
+                    assertTrue(words.rows.isEmpty())
+                    assertEquals(8, vm.players(), "the sheet is as it was")
+                    assertTrue(stub.writes.isEmpty())
+                    return@forEach
+                }
+                val named = list.skipped.take(SheetWords.SKIPS_SHOWN).map { "Row ${it.line}: ${it.reason.replace("line", "row")}" }
+                assertEquals(named, words.rows.take(named.size), list.text)
+                assertNull(words.kept)
+                assertEquals(kept.size, vm.players())
+            }
+        }
+
+    @Test
+    fun `the account's word for a line is said as a row`() {
+        assertEquals("This player is already on an earlier row", SheetWords.rowWords("This player is already on an earlier line"))
+        assertEquals(refusedHeader, SheetWords.rowWords("The first line must name rank, player_id, name and position"))
+        assertEquals("Rows past the limit", SheetWords.rowWords("Lines past the limit"))
+        assertEquals("A sideline pass", SheetWords.rowWords("A sideline pass"))
+    }
+
+    @Test
+    fun `a list is told from a CSV by its first line`() {
+        SheetParity.load().lists.forEach { assertEquals(it.csv, SheetCsv.looksLikeCsv(it.text), it.text) }
+        assertTrue(SheetCsv.looksLikeCsv("﻿\n  Rank,Player_ID,Name,Position\n1,a,B,QB"))
+    }
+
+    @Test
+    fun `a list of names into an empty account makes the sheet and takes it off when no player is read`() =
         runTest(main) {
             val stub = SheetStub(null)
             val vm = open(stub)
-            assertNull(vm.importCsv("1. Puka Nacua\n2. Ja'Marr Chase"))
-            assertEquals(SheetImport.Open(refusedHeader), vm.ui.value.importing)
-            assertTrue(stub.imports.isEmpty())
-            assertTrue(stub.created.isEmpty(), "no sheet is made")
-            assertTrue(stub.deleted.isEmpty())
+            vm.importText("Gibbs\nJahmyr")
+            settle()
+            assertEquals(listOf(SheetImportBody.Names("Gibbs\nJahmyr")), stub.imports)
+            val words = vm.done()
+            assertEquals("0 players read", words.read)
+            assertEquals(SheetStub.EMPTY_READ, words.kept)
+            assertEquals(1, stub.created.size)
+            assertEquals(listOf(SheetClock.SHEET_ID), stub.deleted)
             assertNull(vm.model(vm.ui.value))
         }
 
@@ -108,8 +161,8 @@ class SheetFilesTest {
         runTest(main) {
             val (stub, vm) = loaded()
             vm.openImport()
-            vm.paste("name,team\nJa'Marr Chase,CIN")
-            assertNull(vm.importCsv(vm.ui.value.pasted))
+            vm.paste("player_id,name\n4362628,Ja'Marr Chase")
+            assertNull(vm.importText(vm.ui.value.pasted))
             assertEquals(SheetImport.Open(refusedHeader), vm.ui.value.importing)
             assertTrue(stub.imports.isEmpty())
         }
@@ -121,7 +174,7 @@ class SheetFilesTest {
             vm.update { it.copy(save = SheetSave.Saving) }
             vm.openImport()
             assertEquals(SheetImport.Closed, vm.ui.value.importing)
-            assertNull(vm.importCsv(SheetParity.load().csv))
+            assertNull(vm.importText(SheetParity.load().csv))
             assertTrue(stub.imports.isEmpty())
         }
 
@@ -129,7 +182,7 @@ class SheetFilesTest {
     fun `a file over one megabyte or not text is refused before it is sent`() =
         runTest(main) {
             val (stub, vm) = loaded()
-            vm.importCsv("x".repeat(SheetLimits.CSV_BYTES + 1))
+            vm.importText("x".repeat(SheetLimits.CSV_BYTES + 1))
             assertEquals(SheetImport.Open(SheetWords.tooLarge), vm.ui.value.importing)
             vm.chose(ByteArray(SheetLimits.CSV_BYTES + 1), "big.csv")
             assertEquals(SheetImport.Open(SheetWords.tooLarge), vm.ui.value.importing)
@@ -153,9 +206,9 @@ class SheetFilesTest {
             assertNull(vm.ui.value.chosen, "the last way in is the one sent")
             vm.chose(csv.toByteArray(), "rankings.csv")
             stub.importAnswer = SheetImportAnswer(8, emptyList(), parityRows())
-            vm.importCsv(vm.ui.value.importText)
+            vm.importText(vm.ui.value.importText)
             settle()
-            assertEquals(listOf(csv), stub.imports)
+            assertEquals(listOf(SheetImportBody.Csv(csv)), stub.imports)
             assertNull(vm.ui.value.chosen, "an import that lands lets the file go")
         }
 
@@ -193,7 +246,7 @@ class SheetFilesTest {
     fun `a file that reads no player on the phone is not sent`() =
         runTest(main) {
             val (stub, vm) = loaded()
-            vm.importCsv("rank,player_id,name,position\n1,x,Somebody,LB\n")
+            vm.importText("rank,player_id,name,position\n1,x,Somebody,LB\n")
             val words = vm.done()
             assertEquals("0 players read", words.read)
             assertEquals(listOf("Row 2: The position is not QB, RB, WR, TE, K or DST"), words.rows)
@@ -205,19 +258,18 @@ class SheetFilesTest {
         }
 
     @Test
-    fun `an import the account reads no player from is refused and the sheet read again`() =
+    fun `an import the account reads no player from is shown in its sentence and the sheet read again`() =
         runTest(main) {
             val (stub, vm) = loaded()
-            stub.importAnswer = SheetImportAnswer(0, listOf(ImportSkip(2, "name: runs 1 to 80 characters")), emptyList())
-            vm.importCsv(SheetParity.load().csv)
+            stub.importAnswer = null
+            vm.importText(SheetParity.load().csv)
             settle()
             val words = vm.done()
             assertEquals("0 players read", words.read)
-            assertEquals(SheetWords.readNone, words.kept)
+            assertEquals(SheetStub.EMPTY_READ, words.kept)
             assertTrue(stub.writes.isEmpty(), "the old rows are never written back")
             assertEquals(2, stub.reads, "the sheet is read again")
-            assertEquals(0, vm.players(), "the phone shows what the account holds")
-            assertTrue(vm.model(vm.ui.value)?.line?.contains(SheetWords.saved) != true)
+            assertEquals(8, vm.players(), "the account kept the sheet")
         }
 
     @Test
@@ -227,8 +279,8 @@ class SheetFilesTest {
             val vm = open(stub)
             assertNull(vm.model(vm.ui.value))
             assertEquals(SheetWords.use, vm.ui.value.importVerb)
-            stub.importRefusal = ApiFailure(400, "invalid", "Refused")
-            vm.importCsv(SheetParity.load().csv)
+            stub.importRefusal = ApiFailure(503, "unavailable", "Refused")
+            vm.importText(SheetParity.load().csv)
             settle()
             assertEquals(SheetImport.Open("Refused"), vm.ui.value.importing)
             assertEquals(1, stub.created.size)
@@ -236,7 +288,7 @@ class SheetFilesTest {
             assertNull(vm.model(vm.ui.value))
             stub.importRefusal = null
             stub.importAnswer = SheetImportAnswer(8, emptyList(), parityRows())
-            vm.importCsv(SheetParity.load().csv)
+            vm.importText(SheetParity.load().csv)
             settle()
             assertEquals(8, vm.players())
         }

@@ -19,9 +19,9 @@ import java.util.UUID
 
 /**
  * The cheat sheet's reads and writes (web/src/lib/sheet/remote.ts, the iOS SheetsAPI): the list to find the
- * one to open, a sheet with its rows, a new sheet, every row written in one guarded request, a CSV import
- * that replaces the rows, an export written as a file with a signed link, and the file itself fetched from
- * that link. A 401 throws [app.trycommish.api.Unauthorized]; a refusal throws [app.trycommish.api.ApiFailure]
+ * one to open, a sheet with its rows, a new sheet, every row written in one guarded request, an import of a
+ * CSV or a list of names that replaces the rows, an export written as a file with a signed link, and the
+ * file itself fetched from that link. A 401 throws [app.trycommish.api.Unauthorized]; a refusal throws [app.trycommish.api.ApiFailure]
  * with the API's sentence; no signal throws an [java.io.IOException].
  */
 interface SheetReads {
@@ -49,10 +49,11 @@ interface SheetReads {
         ifUpdatedAt: String?,
     ): SheetDetail
 
-    /** POST /sheets/{id}/import: the rows replaced from a CSV, and the rows skipped with their reasons. */
+    /** POST /sheets/{id}/import: the rows replaced from a CSV or a list of names, and the lines skipped with
+     * their reasons. A body that reads to no player is refused (400, its sentence) and the sheet kept. */
     suspend fun import(
         id: String,
-        csv: String,
+        body: SheetImportBody,
     ): SheetImportResult
 
     /** POST /sheets/{id}/exports: the sheet written as a CSV file, with a link to it. */
@@ -60,6 +61,20 @@ interface SheetReads {
 
     /** The export's file from its signed link. */
     suspend fun download(url: String): ByteArray
+}
+
+/** What an import sends (the iOS SheetImportBody): the sheet's CSV, typed text/csv, or a list of names in the
+ * drafter's order, typed text/plain, which the API reads against the board of the sheet's format. */
+sealed interface SheetImportBody {
+    val text: String
+
+    data class Csv(
+        override val text: String,
+    ) : SheetImportBody
+
+    data class Names(
+        override val text: String,
+    ) : SheetImportBody
 }
 
 /** The sheets' routes through the generated client. */
@@ -91,8 +106,12 @@ class ApiSheetReads(
 
     override suspend fun import(
         id: String,
-        csv: String,
-    ): SheetImportResult = transport.sheets().importSheet(UUID.fromString(id), csv).data()
+        body: SheetImportBody,
+    ): SheetImportResult =
+        when (body) {
+            is SheetImportBody.Csv -> transport.sheets().importSheet(UUID.fromString(id), body.text).data()
+            is SheetImportBody.Names -> transport.sheets().importNames(UUID.fromString(id), body.text).data()
+        }
 
     override suspend fun export(id: String): ExportLink =
         transport.exports().exportSheet(UUID.fromString(id), ExportCreate(ExportFormat.csv)).data()

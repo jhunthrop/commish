@@ -68,6 +68,16 @@ public struct SheetParity: Decodable, Sendable {
         public let skipped: [Skip]
     }
 
+    /// A pasted list as the web reads it against the parity board (paste.ts readList, which the API's
+    /// import is held to): whether it is a CSV instead, else the players read in order and each skipped
+    /// line's reason. The phone sends the text and shows what the account answers.
+    public struct ListRead: Decodable, Sendable {
+        public let text: String
+        public let csv: Bool
+        public let ids: [String]
+        public let skipped: [FileRead.Skip]
+    }
+
     public let defaultName: String
     public let limits: Limits
     public let rows: [Row]
@@ -79,6 +89,7 @@ public struct SheetParity: Decodable, Sendable {
     public let answeredAt: String
     public let statuses: [Status]
     public let reads: [FileRead]
+    public let lists: [ListRead]
 
     public static func load() throws -> SheetParity {
         let file = RunFixture.fixtures.appendingPathComponent("parity/sheet.json")
@@ -142,7 +153,7 @@ public actor SheetStub: SheetsAPI {
     public private(set) var detail: SheetDetail?
     public private(set) var writes: [(rows: [SheetRowInput], guarded: Date?)] = []
     public private(set) var reads = 0
-    public private(set) var imports: [String] = []
+    public private(set) var imports: [SheetImportBody] = []
     public private(set) var created: [[SheetRowInput]] = []
     public private(set) var deleted: [String] = []
     private var offline = false
@@ -251,13 +262,20 @@ public actor SheetStub: SheetsAPI {
         return next
     }
 
-    public func importSheet(id: String, csv: String) async throws -> SheetImportResult {
+    /// The API's refusal of a body that reads to no player (api/internal/sheets/handler.go emptyReadSentence).
+    public static let emptyRead = "No player read, so your sheet is as it was."
+
+    /// The answer set, else the refusal set; an answer of no player is refused as the API refuses it (400,
+    /// code invalid, the body's sentence) and the sheet is left as it was.
+    public func importSheet(id: String, body: SheetImportBody) async throws -> SheetImportResult {
         try reach()
-        imports.append(csv)
+        imports.append(body)
         if let importRefusal {
             throw importRefusal
         }
-        let answer = importAnswer ?? SheetImportAnswer(imported: 0, skipped: [], rows: [])
+        guard let answer = importAnswer, answer.imported > 0 else {
+            throw APIError.envelope(code: "invalid", message: Self.emptyRead)
+        }
         let sheet = sheetDetail(answer.rows, id: id, stamp: SheetClock.now.addingTimeInterval(5))
         detail = sheet
         return SheetImportResult(imported: answer.imported, skipped: answer.skipped, sheet: sheet)

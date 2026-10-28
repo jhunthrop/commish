@@ -40,7 +40,7 @@ class SheetPanelActions(
     val closeImport: () -> Unit = {},
     val chooseFile: () -> Unit = {},
     val paste: (String) -> Unit = {},
-    val importCsv: (String) -> Unit = {},
+    val importText: (String) -> Unit = {},
 )
 
 private val PASTE_LINES = 4..8
@@ -153,7 +153,7 @@ internal fun SheetImportPanel(
                         ui.importVerb,
                         Modifier.weight(1f),
                         enabled = !sending && ui.importText.isNotBlank(),
-                    ) { actions.importCsv(ui.importText) }
+                    ) { actions.importText(ui.importText) }
                     QuietButton(SheetWords.cancel, onClick = actions.closeImport)
                 }
             }
