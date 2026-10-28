@@ -32,8 +32,11 @@ const (
 
 // Field names and the words for them.
 const (
-	fieldQuery  = "q"
-	fieldLimit  = "limit"
+	fieldQuery = "q"
+	fieldLimit = "limit"
+	// fieldOffset skips the view's first rows (Lane 280): an app reads
+	// the whole order a page at a time.
+	fieldOffset = "offset"
 	fieldRoster = "roster"
 	// fieldByes asks for the Players page's week order (Lane 163, D06):
 	// byesLast is its one value.
@@ -41,6 +44,7 @@ const (
 	byesLast    = "last"
 	queryWords  = "Type 2 to 40 letters of a name or a club"
 	limitWords  = "Ask for 1 to 400 rows"
+	offsetWords = "Skip 0 or more rows"
 	rosterWords = "Pick free or yours"
 	byesWords   = "Ask for byes=last or leave it out"
 	// orderPositionWords names the positions the order ranks.
@@ -53,6 +57,9 @@ type orderQuery struct {
 	position draft.Position
 	q        string
 	limit    int
+	// offset is how many of the view's rows come before the answer's
+	// first, 0 for the top (Lane 280).
+	offset int
 	// roster keeps only the free players or the drafter's own (review 66j
 	// H5), "" for everyone; the league's route only.
 	roster apitypes.RosterMarkKind
@@ -91,6 +98,13 @@ func parseOrderQuery(r *http.Request, league bool) (orderQuery, map[string]strin
 			bad[fieldLimit] = limitWords
 		}
 		out.limit = n
+	}
+	if raw := values.Get(fieldOffset); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 {
+			bad[fieldOffset] = offsetWords
+		}
+		out.offset = n
 	}
 	return out, bad
 }
@@ -314,7 +328,7 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 		if p.Team != "" {
 			onClub++
 		}
-		if len(out.Rows) == q.limit {
+		if out.Total <= q.offset || len(out.Rows) == q.limit {
 			continue
 		}
 		out.Rows = append(out.Rows, a.orderRow(p, places.rank[i], places.overall[i], hosts, targets))

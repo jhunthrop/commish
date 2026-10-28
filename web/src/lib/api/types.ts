@@ -469,6 +469,8 @@ export interface paths {
 				limit?: number;
 				/** @description only the free players, or only the drafter's own; total and the limit count after it */
 				roster?: 'free' | 'yours';
+				/** @description skip this many of the view's rows before the limit (Lane 280): an app reads the whole order a page at a time, each row keeping its place and total unchanged; 0 without it, and a view past its end answers no rows */
+				offset?: number;
 			};
 			header?: never;
 			path: {
@@ -1332,6 +1334,8 @@ export interface paths {
 				limit?: number;
 				/** @description last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included; each row's rank is its place in the answer as drawn, its overall_rank its place in the order without byes=last (Lane 227, B209); without it the order keeps them in their places and the two are equal */
 				byes?: 'last';
+				/** @description skip this many of the view's rows before the limit (Lane 280): an app reads the whole order a page at a time, each row keeping its place and total unchanged; 0 without it, and a view past its end answers no rows */
+				offset?: number;
 			};
 			header?: never;
 			path?: never;
@@ -6391,6 +6395,8 @@ export interface operations {
 				limit?: number;
 				/** @description only the free players, or only the drafter's own; total and the limit count after it */
 				roster?: 'free' | 'yours';
+				/** @description skip this many of the view's rows before the limit (Lane 280): an app reads the whole order a page at a time, each row keeping its place and total unchanged; 0 without it, and a view past its end answers no rows */
+				offset?: number;
 			};
 			header?: never;
 			path: {
@@ -8210,6 +8216,8 @@ export interface operations {
 				limit?: number;
 				/** @description last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included; each row's rank is its place in the answer as drawn, its overall_rank its place in the order without byes=last (Lane 227, B209); without it the order keeps them in their places and the two are equal */
 				byes?: 'last';
+				/** @description skip this many of the view's rows before the limit (Lane 280): an app reads the whole order a page at a time, each row keeping its place and total unchanged; 0 without it, and a view past its end answers no rows */
+				offset?: number;
 			};
 			header?: never;
 			path?: never;

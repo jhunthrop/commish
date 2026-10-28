@@ -6707,6 +6707,9 @@ type LeagueOrderParams struct {
 
 	// Roster only the free players, or only the drafter's own; total and the limit count after it
 	Roster *string `form:"roster,omitempty" json:"roster,omitempty"`
+
+	// Offset skip this many of the view's rows before the limit (Lane 280): an app reads the whole order a page at a time, each row keeping its place and total unchanged; 0 without it, and a view past its end answers no rows
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
 // LeagueWeekOrderParams defines parameters for LeagueWeekOrder.
@@ -6766,6 +6769,9 @@ type OrderParams struct {
 
 	// Byes last: the Players page's week rankings (Lane 163), every available player whose club is on bye in the answer's week (line.facts.bye) after the rest, the players on a season-long list included; each row's rank is its place in the answer as drawn, its overall_rank its place in the order without byes=last (Lane 227, B209); without it the order keeps them in their places and the two are equal
 	Byes *string `form:"byes,omitempty" json:"byes,omitempty"`
+
+	// Offset skip this many of the view's rows before the limit (Lane 280): an app reads the whole order a page at a time, each row keeping its place and total unchanged; 0 without it, and a view past its end answers no rows
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
 // WeekOrderParams defines parameters for WeekOrder.

@@ -577,6 +577,13 @@ paths:
         required: false
         description: only the free players, or only the drafter's own; total and the limit count after it
         schema: { type: string, enum: [free, yours] }
+      - name: offset
+        in: query
+        required: false
+        description: >-
+          skip this many of the view's rows before the limit (Lane 280): an app reads the whole order a page at a
+          time, each row keeping its place and total unchanged; 0 without it, and a view past its end answers no rows
+        schema: { type: integer, minimum: 0 }
     get:
       tags: [league-sync]
       operationId: leagueOrder
@@ -2025,6 +2032,13 @@ paths:
           its place in the answer as drawn, its overall_rank its place in the order without byes=last (Lane 227, B209);
           without it the order keeps them in their places and the two are equal
         schema: { type: string, enum: [last] }
+      - name: offset
+        in: query
+        required: false
+        description: >-
+          skip this many of the view's rows before the limit (Lane 280): an app reads the whole order a page at a
+          time, each row keeping its place and total unchanged; 0 without it, and a view past its end answers no rows
+        schema: { type: integer, minimum: 0 }
     get:
       tags: [league-sync]
       operationId: order
