@@ -127,16 +127,14 @@ object SheetWords {
     const val fileLabel = Words.SheetImport.fileLabel
     const val chooseFile = Words.SheetImport.chooseFile
 
-    /** The web's label without its "one per line", a word the copy rules keep for the field: the placeholder
-     * shows a list's shape. The account's import reads the list against our board (Lane 278). */
-    const val pasteLabel = "Or paste a CSV or a list of names"
+    /** The account's import reads the list against our board (Lane 278). */
+    const val pasteLabel = Words.SheetImport.pasteLabel
 
     /** ImportPanel.svelte PASTE_EXAMPLE. */
     const val pastePlaceholder = Words.SheetImport.pasteExample
 
     /** The phone's own: what a list that reads looks like, said under an import that read nothing and named no
-     * skipped row (the account's refusal carries no row's reason). The web says "one per line" in its label; the
-     * copy rules keep that word for the field. */
+     * skipped row (the account's refusal carries no row's reason). */
     const val listShape = "Paste one player to a row, like 1. Puka Nacua"
     const val replace = Words.SheetImport.replace
     const val use = Words.SheetImport.use

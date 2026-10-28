@@ -144,14 +144,12 @@ public enum SheetWords {
     public static let importHead = Words.SheetImport.head
     public static let fileLabel = Words.SheetImport.fileLabel
     public static let chooseFile = Words.SheetImport.chooseFile
-    /// The web's label without its "one per line", a word the copy rules keep for the field: the placeholder
-    /// shows a list's shape. The account's import reads the list against our board (Lane 278).
-    public static let pasteLabel = "Or paste a CSV or a list of names"
+    /// The account's import reads the list against our board (Lane 278).
+    public static let pasteLabel = Words.SheetImport.pasteLabel
     /// ImportPanel.svelte PASTE_EXAMPLE.
     public static let pastePlaceholder = Words.SheetImport.pasteExample
     /// The phone's own: what a list that reads looks like, said under an import that read nothing and named
-    /// no skipped row (the account's refusal carries no row's reason). The web says "one per line" in its
-    /// label; the copy rules keep that word for the field.
+    /// no skipped row (the account's refusal carries no row's reason).
     public static let listShape = "Paste one player to a row, like 1. Puka Nacua"
     public static let replace = Words.SheetImport.replace
     public static let use = Words.SheetImport.use

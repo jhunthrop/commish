@@ -67,6 +67,9 @@ export const SHEET_IMPORT = {
 	chooseFile: 'Choose a CSV',
 	/** Beside the button until a file is chosen. */
 	noFile: 'No file chosen',
+	/** The paste box's label: "row", never "line", which the copy rules keep for the field (Lane 283,
+	 * the coordinator's C1 ruling). */
+	pasteLabel: 'Or paste a CSV or a list of names, one per row',
 	/** The paste box's placeholder: a list's shape. */
 	pasteExample: "1. Puka Nacua\n2. Ja'Marr Chase, WR",
 	replace: 'Replace my sheet',

@@ -109,7 +109,7 @@
 				/>
 			</div>
 			<Field
-				label="Or paste a CSV or a list of names, one per line"
+				label={SHEET_IMPORT.pasteLabel}
 				multiline
 				mono
 				rows={6}

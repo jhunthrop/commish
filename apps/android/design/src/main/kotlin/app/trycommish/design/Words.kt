@@ -1093,6 +1093,7 @@ object Words {
         const val fileLabel = "A CSV file"
         const val chooseFile = "Choose a CSV"
         const val noFile = "No file chosen"
+        const val pasteLabel = "Or paste a CSV or a list of names, one per row"
         const val pasteExample = "1. Puka Nacua\n2. Ja'Marr Chase, WR"
         const val replace = "Replace my sheet"
         const val use = "Use this sheet"

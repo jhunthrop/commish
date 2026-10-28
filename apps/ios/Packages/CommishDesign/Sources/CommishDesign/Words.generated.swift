@@ -1091,6 +1091,7 @@ public enum Words {
         public static let fileLabel = "A CSV file"
         public static let chooseFile = "Choose a CSV"
         public static let noFile = "No file chosen"
+        public static let pasteLabel = "Or paste a CSV or a list of names, one per row"
         public static let pasteExample = "1. Puka Nacua\n2. Ja'Marr Chase, WR"
         public static let replace = "Replace my sheet"
         public static let use = "Use this sheet"
