@@ -82,8 +82,18 @@ func TestTradeCheckAgreesWithTheFinder(t *testing.T) {
 			if !got.Fills.Yours || !got.Fills.Theirs || got.Fills.YoursOpen != nil || got.Basis == "" || got.HostTradesUrl != advice.HostTradesUrl {
 				t.Fatalf("%s: %+v %q %q", team.Name, got.Fills, got.Basis, got.HostTradesUrl)
 			}
+			// The rest-of-season figures agree too, and the finder lists
+			// only trades the other side takes (Lane 269).
+			if !sameFigure(got.Trade.MyRestOfSeason, row.MyRestOfSeason) || !sameFigure(got.Trade.TheirRestOfSeason, row.TheirRestOfSeason) ||
+				got.Acceptable == nil || !got.Acceptable.Theirs || !got.Acceptable.Yours || got.RestOfSeasonBasis == nil {
+				t.Fatalf("%s: rest of season checked %v/%v, the finder %v/%v, acceptable %+v", team.Name,
+					got.Trade.MyRestOfSeason, got.Trade.TheirRestOfSeason, row.MyRestOfSeason, row.TheirRestOfSeason, got.Acceptable)
+			}
 			checked++
 		}
+	}
+	if advice.RestOfSeasonBasis == nil || !strings.HasPrefix(*advice.RestOfSeasonBasis, "Rest of season is ") {
+		t.Fatalf("the finder's rest-of-season line %v", advice.RestOfSeasonBasis)
 	}
 	if checked == 0 {
 		t.Fatal("the fixture's finder found no trade to check")
@@ -209,3 +219,6 @@ func TestTradeCheckLeagueErrors(t *testing.T) {
 		t.Fatalf("no team: %d %+v", code, env.Error)
 	}
 }
+
+// sameFigure is two optional figures both present and equal.
+func sameFigure(a, b *float64) bool { return a != nil && b != nil && *a == *b }

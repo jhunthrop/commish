@@ -24,8 +24,12 @@ const MaxStashRows = 10
 // does one whose dating is still pending (Lane 118, B94): not yet known,
 // he reads as his designation alone, as a questionable or doubtful one
 // does.
-func listedAdd(p person) bool {
-	d := p.words.Facts.Designation
+func listedAdd(p person) bool { return pickupFacts(p.words.Facts) }
+
+// pickupFacts is listedAdd on a free agent's facts alone: the rule the
+// trades' waiver level reads too (freeLevels, Lane 269 fix round 2).
+func pickupFacts(f Facts) bool {
+	d := f.Designation
 	if d == nil {
 		return true
 	}

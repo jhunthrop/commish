@@ -5602,6 +5602,15 @@ type TierMate struct {
 	PositionRank *int `json:"position_rank,omitempty"`
 }
 
+// TradeAcceptable defines model for TradeAcceptable.
+type TradeAcceptable struct {
+	// Theirs the same for theirs
+	Theirs bool `json:"theirs"`
+
+	// Yours trade.my_rest_of_season, as one decimal prints it, falls by no more than the tolerance (GiveUpPerWeek points for each week it covers): the finder's rule for both sides, so a false on either is a trade the finder never lists
+	Yours bool `json:"yours"`
+}
+
 // TradeAdvice defines model for TradeAdvice.
 type TradeAdvice struct {
 	// Basis which trades are listed (a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills an empty spot, Lane 103) and who decides
@@ -5649,6 +5658,9 @@ type TradeAdvice struct {
 	ReadAt            time.Time         `json:"read_at"`
 	Refreshed         time.Time         `json:"refreshed"`
 
+	// RestOfSeasonBasis the line for the rows' rest-of-season figures, the level they are over, and the rule that lists a trade (Lane 269): a trade is listed only when neither side's figure falls by more than the tolerance, GiveUpPerWeek points for each week the figures cover, which the line states for its weeks; absent from an older answer
+	RestOfSeasonBasis *string `json:"rest_of_season_basis,omitempty"`
+
 	// Roster every player on the drafter's active roster (injured reserve and taxi spots left out), by position then name: the picker's own players, a trade found or not
 	Roster []PlayerLine `json:"roster"`
 
@@ -5661,6 +5673,9 @@ type TradeAdvice struct {
 
 // TradeCheck defines model for TradeCheck.
 type TradeCheck struct {
+	// Acceptable whether each side would take the trade on its rest of season (Lane 269), the finder's rule for both sides; absent from an older answer
+	Acceptable *TradeAcceptable `json:"acceptable,omitempty"`
+
 	// Basis the honesty line beside the answer
 	Basis string `json:"basis"`
 
@@ -5678,10 +5693,13 @@ type TradeCheck struct {
 	HostTradesUrl string `json:"host_trades_url"`
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
-	OrderBasis OrderBasis  `json:"order_basis"`
-	ReadAt     time.Time   `json:"read_at"`
-	Refreshed  time.Time   `json:"refreshed"`
-	Totals     TradeTotals `json:"totals"`
+	OrderBasis OrderBasis `json:"order_basis"`
+	ReadAt     time.Time  `json:"read_at"`
+	Refreshed  time.Time  `json:"refreshed"`
+
+	// RestOfSeasonBasis the line for trade.my_rest_of_season and trade.their_rest_of_season, the level they are over, and the rule acceptable reads, the tolerance stated for its weeks (Lane 269); absent from an older answer
+	RestOfSeasonBasis *string     `json:"rest_of_season_basis,omitempty"`
+	Totals            TradeTotals `json:"totals"`
 
 	// Trade the trade as the finder reckons one: my_gain and their_gain fall below zero for a lineup that loses, close_for_them as the finder marks it
 	Trade TradeRow `json:"trade"`
@@ -5759,6 +5777,9 @@ type TradeRow struct {
 	// MyProjChange this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
 	MyProjChange *float64 `json:"my_proj_change"`
 
+	// MyRestOfSeason the drafter's rest-of-season change (Lane 269): what the players he gets score on our order over the waiver level at their position, less the same for those he gives and drops, over the weeks gain_basis names, one decimal. The waiver level is the best free agent at the position in the league's last read that the Waivers screen lists as a pickup (none on injured reserve, ruled out, suspended or on a season-long list), so a bench player counts for what he scores over the one his side could pick up and start, and a player at or under it counts none; at a position with no such free agent, or where the league's free agents are not read, the last starter league-wide (rest_of_season_basis names which). Unlike my_gain it counts the bench; absent from an older answer
+	MyRestOfSeason *float64 `json:"my_rest_of_season,omitempty"`
+
 	// Need the trade's sentence when the need is why it is listed (Lane 103): it sends out a player we rank first at his position for under 1.0 a week and fills a starting spot of the drafter's lineup for the week the page addresses that no one of his who can play fills, leaving no other spot empty ("Fills your empty WR2 while Gibbs sits on bye."); null on every other row, absent from an older answer
 	Need *string `json:"need,omitempty"`
 
@@ -5767,6 +5788,9 @@ type TradeRow struct {
 
 	// TheirProjChange the same for theirs
 	TheirProjChange *float64 `json:"their_proj_change"`
+
+	// TheirRestOfSeason the same for theirs, their drop counted against them; absent from an older answer
+	TheirRestOfSeason *float64 `json:"their_rest_of_season,omitempty"`
 }
 
 // TradeSideTotals defines model for TradeSideTotals.
