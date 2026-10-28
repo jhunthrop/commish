@@ -29,9 +29,13 @@ const PHONE_OWN: Readonly<Record<string, string>> = {
 	'Try again in a minute.': 'the reason when the account answered nothing readable',
 	'Edit ': "a screen reader's label for the row's disclosure, which the web's row has no need of",
 	'No player read, so your sheet is as it was.':
-		'a file the phone read no player from is not sent; the web disables its verb instead',
-	'No player read. Your sheet is shown as your account now holds it.':
-		"the account's import replaced the rows with none (B265); the web never sends such a file"
+		"the account's sentence for an import that reads no player, which the phone also says for a CSV it reads no player from; the web disables its verb instead",
+	'Paste one player to a row, like 1. Puka Nacua':
+		"what a list that reads looks like, under an import the account read nothing from; its refusal names no row, and the web reads in the browser and names each line",
+	'\\b[L]ine(s?)\\b':"a pattern for the account's word for a line, which the phone says as a row",
+	'\\b[l]ine(s?)\\b': "a pattern for the account's word for a line, which the phone says as a row",
+	Row$1: 'the replacement for that pattern, not a word on its own',
+	row$1: 'the replacement for that pattern, not a word on its own'
 };
 
 function sources(path: string): string[] {

@@ -55,12 +55,16 @@ sealed interface SheetBoard {
 }
 
 /** What an import says once it is in or refused: the players read, the rows skipped and why, the first
- * twelve named and the rest counted, and, when it read no player, what became of the sheet. */
+ * twelve named and the rest counted, and, when it read no player, what became of the sheet, what a list that
+ * reads looks like when no skipped row says why ([shape]), and that Done goes back to the box with the text
+ * kept so it can be fixed ([again]). */
 data class SheetImportWords(
     val read: String,
     val skipped: String?,
     val rows: List<String>,
     val kept: String?,
+    val shape: String? = null,
+    val again: Boolean = false,
 ) {
     companion object {
         fun of(
@@ -75,6 +79,8 @@ data class SheetImportWords(
                 skipped = if (skips.isEmpty()) null else SheetWords.skipped(skips.size),
                 rows = named + if (rest > 0) listOf(SheetWords.more(rest)) else emptyList(),
                 kept = kept,
+                shape = if (count == 0 && skips.isEmpty()) SheetWords.listShape else null,
+                again = count == 0,
             )
         }
     }

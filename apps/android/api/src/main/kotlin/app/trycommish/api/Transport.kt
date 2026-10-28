@@ -10,7 +10,6 @@ import app.trycommish.api.apis.LeaguesApi
 import app.trycommish.api.apis.MocksApi
 import app.trycommish.api.apis.RoomsApi
 import app.trycommish.api.apis.RunApi
-import app.trycommish.api.apis.SheetsApi
 import app.trycommish.api.infrastructure.HttpResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
@@ -111,8 +110,8 @@ class Transport(
     fun rooms(): RoomsApi = roomsApi
 
     /** The account's cheat sheets: the list, a sheet with its rows, a new one, its rows written in one
-     * guarded request, and an import that sends the CSV as text/csv, the body the API reads. */
-    fun sheets(): SheetsApi = sheetsApi
+     * guarded request, and an import that sends a CSV as text/csv and a list of names as text/plain. */
+    fun sheets(): CsvSheetsApi = sheetsApi
 
     /** A sheet written as a file, with a signed link to it. */
     fun exports(): ExportsApi = exportsApi

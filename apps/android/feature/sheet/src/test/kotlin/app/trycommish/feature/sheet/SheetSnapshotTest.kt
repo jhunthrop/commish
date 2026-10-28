@@ -27,7 +27,7 @@ import app.trycommish.core.sheet.SheetParity
 import app.trycommish.core.sheet.SheetStub
 import app.trycommish.core.sheet.SheetViewModel
 import app.trycommish.core.sheet.SheetWords
-import app.trycommish.core.sheet.importCsv
+import app.trycommish.core.sheet.importText
 import app.trycommish.core.sheet.openImport
 import app.trycommish.core.sheet.parityRows
 import app.trycommish.core.sheet.paste
@@ -58,9 +58,9 @@ import java.time.ZoneId
  * (shared/fixtures/parity/sheet.json) through the view model over a stub account at the fixture's clock:
  * the sheet with its rows and the mock verb pinned; a row open in its editor (his note, his tags pressed, his
  * own tag's field); a note edited with no signal, its row not saved with the reason and the retry, the head
- * saying the same; the empty sheet over the stand-in's PPR board; the import with a CSV pasted; and the
- * import refused on the phone, before any request, with the header's sentence. Both themes, a Pixel 9 and a
- * small phone (the Nexus 5's 360 by 640 dp). A face draws its initials.
+ * saying the same; the empty sheet over the stand-in's PPR board; the import with a CSV pasted; and a pasted
+ * list of names the account read no player from, its refusal shown as the import's result. Both themes, a
+ * Pixel 9 and a small phone (the Nexus 5's 360 by 640 dp). A face draws its initials.
  */
 @RunWith(Parameterized::class)
 class SheetSnapshotTest(
@@ -136,7 +136,11 @@ class SheetScenesTest {
                 ?.save,
         )
         val refused = SheetScenes.view(SheetSnapshotTest.Scene.Refused)
-        assertEquals(SheetImport.Open("The first row must name rank, player_id, name and position"), refused.ui.importing)
+        val words = (refused.ui.importing as SheetImport.Done).words
+        assertEquals("0 players read", words.read)
+        assertEquals(SheetStub.EMPTY_READ, words.kept)
+        assertEquals(SheetWords.listShape, words.shape)
+        assertEquals("the sheet is as it was", 8, refused.model?.players)
         val empty = SheetScenes.view(SheetSnapshotTest.Scene.Empty)
         assertEquals(5, empty.ui.preview.size)
         assertNull(empty.model)
@@ -188,8 +192,9 @@ private object SheetScenes {
             }
             SheetSnapshotTest.Scene.Refused -> {
                 vm.openImport()
-                vm.paste("name,team\nJa'Marr Chase,CIN")
-                vm.importCsv(vm.ui.value.pasted)
+                // A list of names the account reads no player from: the stub refuses it as the API does.
+                vm.paste("Gibbs\nJahmyr")
+                vm.importText(vm.ui.value.pasted)
             }
         }
         val ui = vm.ui.value

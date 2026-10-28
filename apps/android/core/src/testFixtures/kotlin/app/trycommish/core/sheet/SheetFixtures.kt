@@ -16,6 +16,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
@@ -41,6 +42,7 @@ data class SheetParity(
     val answeredAt: String,
     val statuses: List<Status>,
     val reads: List<FileRead>,
+    val lists: List<ListRead>,
 ) {
     data class Row(
         val id: String,
@@ -106,6 +108,16 @@ data class SheetParity(
         val reason: String,
     )
 
+    /** A pasted list as the web reads it against the parity board (paste.ts readList, which the API's import is
+     * held to): whether it is a CSV instead, else the players read in order and each skipped line's reason. The
+     * phone sends the text and shows what the account answers. */
+    data class ListRead(
+        val text: String,
+        val csv: Boolean,
+        val ids: List<String>,
+        val skipped: List<Skipped>,
+    )
+
     companion object {
         /** The file read by hand: the fixtures' source set has no serialization plugin. */
         fun load(): SheetParity {
@@ -161,6 +173,15 @@ data class SheetParity(
                             read.textOrNull("header"),
                             read.texts("ids"),
                             read.list("skipped").map { Skipped(it.int("line"), it.text("reason")) },
+                        )
+                    },
+                lists =
+                    json.list("lists").map { list ->
+                        ListRead(
+                            list.text("text"),
+                            list.getValue("csv").jsonPrimitive.boolean,
+                            list.texts("ids"),
+                            list.list("skipped").map { Skipped(it.int("line"), it.text("reason")) },
                         )
                     },
             )
@@ -245,7 +266,7 @@ class SheetStub(
 ) : SheetReads {
     val writes = mutableListOf<Pair<List<SheetRowInput>, String?>>()
     var reads = 0
-    val imports = mutableListOf<String>()
+    val imports = mutableListOf<SheetImportBody>()
     val created = mutableListOf<List<SheetRowInput>>()
     val deleted = mutableListOf<String>()
     var offline = false
@@ -315,14 +336,18 @@ class SheetStub(
         return sheetDetail(rows, id, stamp = SheetClock.later(current.updatedAt, 1)).also { detail = it }
     }
 
+    /** The answer set, else the refusal set; an answer of no player is refused as the API refuses it (400, code
+     * invalid, the body's sentence) and the sheet is left as it was. */
     override suspend fun import(
         id: String,
-        csv: String,
+        body: SheetImportBody,
     ): SheetImportResult {
         reach()
-        imports += csv
+        imports += body
         importRefusal?.let { throw it }
-        val answer = importAnswer ?: SheetImportAnswer(0, emptyList(), emptyList())
+        val answer =
+            importAnswer?.takeIf { it.imported > 0 }
+                ?: throw ApiFailure(BAD_REQUEST, "invalid", "Some of that did not check out", mapOf("body" to EMPTY_READ))
         val sheet = sheetDetail(answer.rows, id, stamp = SheetClock.now.plusSeconds(IMPORT_SECONDS).toString())
         detail = sheet
         return SheetImportResult(answer.imported, answer.skipped, sheet)
@@ -349,12 +374,15 @@ class SheetStub(
         return exportFile.second
     }
 
-    private companion object {
-        const val NOT_FOUND = 404
-        const val CONFLICT = 409
-        const val MINUTE = 60L
-        const val CONFLICT_SECONDS = 30L
-        const val IMPORT_SECONDS = 5L
-        const val EXPORT_ID = "6f1d1c52-2626-4a26-9a26-000000000e01"
+    companion object {
+        /** The API's refusal of a body that reads to no player (api/internal/sheets/handler.go emptyReadSentence). */
+        const val EMPTY_READ = "No player read, so your sheet is as it was."
+        private const val BAD_REQUEST = 400
+        private const val NOT_FOUND = 404
+        private const val CONFLICT = 409
+        private const val MINUTE = 60L
+        private const val CONFLICT_SECONDS = 30L
+        private const val IMPORT_SECONDS = 5L
+        private const val EXPORT_ID = "6f1d1c52-2626-4a26-9a26-000000000e01"
     }
 }

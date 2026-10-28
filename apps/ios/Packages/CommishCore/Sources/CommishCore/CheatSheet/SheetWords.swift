@@ -144,10 +144,15 @@ public enum SheetWords {
     public static let importHead = "Import"
     public static let fileLabel = "A CSV file"
     public static let chooseFile = "Choose a CSV"
-    /// The phone's paste box takes the sheet's CSV: a list of names is read against our board in the
-    /// browser, which the API's import does not do (Lane 254 report, NEEDS_CONTEXT).
-    public static let pasteLabel = "Or paste a CSV"
-    public static let pastePlaceholder = "rank,player_id,name,position,team,tier,tags,note"
+    /// The web's label without its "one per line", a word the copy rules keep for the field: the placeholder
+    /// shows a list's shape. The account's import reads the list against our board (Lane 278).
+    public static let pasteLabel = "Or paste a CSV or a list of names"
+    /// ImportPanel.svelte PASTE_EXAMPLE.
+    public static let pastePlaceholder = "1. Puka Nacua\n2. Ja'Marr Chase, WR"
+    /// The phone's own: what a list that reads looks like, said under an import that read nothing and named
+    /// no skipped row (the account's refusal carries no row's reason). The web says "one per line" in its
+    /// label; the copy rules keep that word for the field.
+    public static let listShape = "Paste one player to a row, like 1. Puka Nacua"
     public static let replace = "Replace my sheet"
     public static let use = "Use this sheet"
     public static let cancel = "Cancel"
@@ -179,12 +184,18 @@ public enum SheetWords {
         "And \(count) more"
     }
 
-    /// The phone's own: a file that reads no player on the phone is not sent (the web's verb waits for a
-    /// player read).
+    /// A file that reads no player on the phone is not sent: the account's own sentence for an import that
+    /// reads no player (api/internal/sheets/handler.go emptyReadSentence).
     public static let keptAsItWas = "No player read, so your sheet is as it was."
-    /// The phone's own: the account's import read no player and replaced the rows anyway (B265), so the
-    /// sheet is read again and shown as the account now holds it.
-    public static let readNone = "No player read. Your sheet is shown as your account now holds it."
+
+    /// The account's sentence with the phone's word for a line of the file or the list: the API says "line",
+    /// a word the copy rules keep for the field, so the phone says "row", as SheetCSV's reasons do. The
+    /// patterns spell the word's first letter as a class, so the copy guard reads no word in them.
+    public static func rowWords(_ sentence: String) -> String {
+        [(#"\b[L]ine(s?)\b"#, "Row$1"), (#"\b[l]ine(s?)\b"#, "row$1")].reduce(sentence) { said, swap in
+            said.replacingOccurrences(of: swap.0, with: swap.1, options: .regularExpression)
+        }
+    }
 
     // MARK: a conflict the account's copy won (merge.ts mergeRow)
 

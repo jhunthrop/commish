@@ -13,10 +13,10 @@ import Testing
 /// stub account at the fixture's clock, both themes, iPhone 17 Pro and iPhone SE, at 1x. The sheet with
 /// its rows and the mock verb pinned; a row open in its editor (his note, his tags pressed, his own tag's
 /// field); a note edited with no signal, its row not saved with the reason and the retry, the head saying
-/// the same; the empty sheet over the stand-in's PPR board; the import with a CSV pasted; and the import
-/// refused on the phone, before any request, with the header's sentence. A face draws its initials here
-/// (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also written at its phone's own scale for
-/// the persona panel.
+/// the same; the empty sheet over the stand-in's PPR board; the import with a CSV pasted; and a pasted
+/// list of names the account read no player from, its refusal shown as the import's result. A face draws
+/// its initials here (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also written at its
+/// phone's own scale for the persona panel.
 @MainActor
 struct SheetSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -70,9 +70,10 @@ struct SheetSnapshotTests {
             viewModel.openImport()
             viewModel.pasted = try pasted()
         case .refused:
+            // A list of names the account reads no player from: the stub refuses it as the API does.
             viewModel.openImport()
-            viewModel.pasted = "name,team\nJa'Marr Chase,CIN"
-            await viewModel.importCSV(viewModel.pasted)
+            viewModel.pasted = "Gibbs\nJahmyr"
+            await viewModel.importText(viewModel.pasted)
         }
         return viewModel
     }
@@ -95,7 +96,14 @@ struct SheetSnapshotTests {
         let unsaved = try await Self.viewModel(.unsaved)
         #expect(unsaved.model?.lines[2].save == .unsaved(SheetWords.offline))
         let refused = try await Self.viewModel(.refused)
-        #expect(refused.importing == .open(problem: "The first row must name rank, player_id, name and position"))
+        guard case let .done(words) = refused.importing else {
+            Issue.record("the refusal was not shown as the import's result: \(refused.importing)")
+            return
+        }
+        #expect(words.read == "0 players read")
+        #expect(words.kept == SheetStub.emptyRead)
+        #expect(words.shape == SheetWords.listShape)
+        #expect(refused.model?.players == 8, "the sheet is as it was")
         let empty = try await Self.viewModel(.empty)
         #expect(empty.preview.count == 5)
         #expect(empty.model == nil)
