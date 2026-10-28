@@ -2,18 +2,22 @@
 // them, the run's own files byte for byte, and its designations held to the index. Run with
 // `node --test shared/scripts/*.test.ts`.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
+  BUILD_RUN_FIXTURE,
   PPR_FORMAT,
   RUN_FIXTURE,
+  buildRunPaths,
   heldToIndex,
   pageIds,
   runFiles,
   withReach,
 } from "./export-run.ts";
 import { REPOSITORY } from "./generated.ts";
+import { buildReads } from "../../web/src/lib/run/reads.ts";
+import { RUN_PATHS, manifestSchema } from "../../web/src/lib/run/schema.ts";
 
 const RUN_ID = "2026-10-21T12-ros";
 const CONTRACT = join(
@@ -152,4 +156,52 @@ void test("a capture held to the index keeps its stamps and drops every other pl
     ["a", "b"],
     "the capture is not changed",
   );
+});
+
+const BUILD_RUN = (path: string): string =>
+  join(REPOSITORY, BUILD_RUN_FIXTURE, path);
+const buildRunFile = (path: string): string =>
+  readFileSync(BUILD_RUN(path), "utf8");
+
+void test("the build run carries every file a build reads of its run (Lane 252)", () => {
+  const { runId } = JSON.parse(buildRunFile("runs/latest.json")) as {
+    runId: string;
+  };
+  const at = (path: string): string => `runs/${runId}/${path}`;
+  const { formats } = manifestSchema.parse(
+    JSON.parse(buildRunFile(at(RUN_PATHS.manifest))),
+  );
+  const pages = pageIds(
+    JSON.parse(buildRunFile(at(RUN_PATHS.index))) as unknown[],
+  );
+  assert.ok(formats.length > 1, "the build run lists more than one format");
+  for (const path of buildReads(formats, pages)) {
+    assert.ok(existsSync(BUILD_RUN(at(path))), `the build run lacks ${path}`);
+  }
+  assert.ok(existsSync(BUILD_RUN(at(RUN_PATHS.designations))));
+});
+
+void test("the build run holds every file of the fixture run byte for byte, and adds only boards", () => {
+  const files = runFiles(RUN_ID, PLAYERS).map((f) => f.path);
+  for (const path of files) {
+    assert.equal(buildRunFile(path), fixture(path), path);
+  }
+  const copied = buildReads(
+    manifestSchema.parse(JSON.parse(fixture(`runs/${RUN_ID}/manifest.json`)))
+      .formats,
+    PLAYERS,
+  ).filter((path) => path !== RUN_PATHS.manifest);
+  const paths = buildRunPaths(RUN_ID, copied);
+  const added = paths.filter((path) => !files.includes(path));
+  assert.ok(added.length > 0);
+  for (const path of added) {
+    assert.match(path, /\/boards\//, path);
+    assert.equal(
+      buildRunFile(path),
+      readFileSync(join(CONTRACT, path.replace(`runs/${RUN_ID}/`, "")), "utf8"),
+      path,
+    );
+  }
+  const readme = buildRunFile("README.md");
+  for (const path of paths) assert.ok(readme.includes(path), path);
 });

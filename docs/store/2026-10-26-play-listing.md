@@ -13,9 +13,9 @@ Limits were read from Google's help pages on 2026-10-26 (sources at the foot). C
 | App name | 30 characters | `Commish: Fantasy Football` (25) | The app's name (`apps/android/app/src/main/res/values/strings.xml` `app_name`) plus the category words a search reads |
 | Short description | 80 characters | `The lineup to start, your best waiver add and the trades that help both teams.` (78) | The site's in-season sentence, `IN_SEASON_TOOLS_LINE` in `web/src/lib/league/hosts.ts` |
 | Full description | 4000 characters | The text in §1.1 (1,550 characters) | The free page's entries (`web/src/lib/pass/words.ts`), the page descriptions (`web/src/lib/site/head-words.ts`), the platform order (`LEAGUE_HOSTS`) |
-| App icon | 512 x 512, 32-bit PNG with alpha, at most 1024 KB | `web/static/icons/icon-512.png` re-saved as RGBA (it is 512 x 512 RGB today) | The web's icon, the same whistle as the app's launcher (`ic_launcher_foreground.xml`) |
-| Feature graphic | 1024 x 500, JPEG or 24-bit PNG, no alpha | **Missing**, see §6 | Required to publish |
-| Phone screenshots | 2 to 8. JPEG or 24-bit PNG, no alpha. Each side 320 to 3840 px, long side at most twice the short | 8 portrait at 1080 x 1920 (9:16), captions in §1.2 | 4 or more at 1080 px or wider make the app eligible for promotion |
+| App icon | 512 x 512, 32-bit PNG with alpha, at most 1024 KB | `docs/store/play-graphics/icon-512.png`: `web/static/icons/icon-512.png` re-saved as RGBA (Lane 255) | The web's icon, the same whistle as the app's launcher (`ic_launcher_foreground.xml`) |
+| Feature graphic | 1024 x 500, JPEG or 24-bit PNG, no alpha | `docs/store/play-graphics/feature-graphic.png` (Lane 255) | Required to publish |
+| Phone screenshots | 2 to 8. JPEG or 24-bit PNG, no alpha. Each side 320 to 3840 px, long side at most twice the short | 8 portrait at 1080 x 1920 (9:16), captions in §1.2: `docs/store/play-graphics/phone-1-lineup.png` to `phone-8-player-page.png` (Lane 255) | 4 or more at 1080 px or wider make the app eligible for promotion |
 | 7-inch tablet screenshots | Optional. If given, at least 4, each side 1,080 to 7,680 px, 16:9 or 9:16 | None | The spec §2: tablets are not a distinct layout in release one |
 | 10-inch tablet screenshots | Same as 7-inch | None | As above |
 | Preview video | Optional, one YouTube URL | None | Not in release one |
@@ -170,7 +170,7 @@ Play requires both an in-app path (or an in-app link to the web resource) and a 
 ## 5. Release tracks and the founder's device
 
 - Internal track: live (first CI upload 2026-10-26, run 40254247245). The organization account is exempt from the 20-tester closed-test rule.
-- Production: needs §1 to §4 complete and the feature graphic and screenshots (§6); §4.3 is closed (Lane 237).
+- Production: needs §1 to §4 complete; the feature graphic, screenshots and icon are drawn (§6, Lane 255) and §4.3 is closed (Lane 237).
 - Countries: the United States only (F7, resolved 2026-10-26). No EU trader declaration.
 - The organization address on the listing stays as the payments profile shows it (F6, resolved 2026-10-26).
 - The founder checks the listing and the app on the Mac's emulator (a Play Store AVD signed into his Google account for the internal track), never on a phone.
@@ -179,10 +179,10 @@ Play requires both an in-app path (or an in-app link to the web resource) and a 
 
 | Asset | Size | Exists | Where |
 | --- | --- | --- | --- |
-| App icon | 512 x 512 PNG, 32-bit with alpha | Nearly: `web/static/icons/icon-512.png` is 512 x 512 RGB, re-save with an alpha channel | `web/static/icons/` |
+| App icon | 512 x 512 PNG, 32-bit with alpha | Yes (Lane 255): the web's icon re-saved with an alpha channel | `docs/store/play-graphics/icon-512.png` |
 | Launcher icon | Adaptive vector | Yes | `apps/android/app/src/main/res/drawable/ic_launcher_foreground.xml`, `mipmap-anydpi-v26/ic_launcher.xml` |
-| Feature graphic | 1024 x 500, JPEG or 24-bit PNG, no alpha | **Missing** | To draw: the whistle and "Commish" on the dark tokens background, no caption text needed |
-| Phone screenshots | 8 at 1080 x 1920, no alpha | **Missing** | The Paparazzi snapshots (`apps/android/feature/*/src/test/snapshots/images`) are 720 x 960 and 822 x 1526 RGBA test renders, not store shots. Render at 1080 x 1920 from fixtures, flatten alpha, add §1.2 captions |
+| Feature graphic | 1024 x 500, JPEG or 24-bit PNG, no alpha | Yes (Lane 255) | `docs/store/play-graphics/feature-graphic.png`: the whistle and "Commish" on the dark page colour, drawn by the app's `Mark` |
+| Phone screenshots | 8 at 1080 x 1920, no alpha | Yes (Lane 255) | `docs/store/play-graphics/phone-*.png`: the app's own screens over the fixtures (the league's names replaced), the §1.2 captions drawn above, 24-bit RGB. Redraw with `node apps/android/scripts/store-graphics.ts`; the folder's README lists each file |
 | Tablet screenshots | 4 or more at 1,080 to 7,680 px | Not needed | No tablet layout in release one |
 | Preview video | YouTube URL | Not needed | |
 

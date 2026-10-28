@@ -12,6 +12,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runReach } from "../../web/src/lib/run/reach.ts";
+import { buildReads } from "../../web/src/lib/run/reads.ts";
 import {
   RUN_PATHS,
   manifestSchema,
@@ -29,6 +30,11 @@ import {
 const SCRIPT = "shared/scripts/export-run.ts";
 /** The fixture run's folder: the bucket's layout, `runs/latest.json` and `runs/<runId>/`. */
 export const RUN_FIXTURE = "shared/fixtures/run";
+/** The branch build's run (Lane 252, B259): the same run with every file a build reads
+ * (web/src/lib/run/reads.ts), every format's board among them, so a branch builds and measures the
+ * site with no secret. Apart from RUN_FIXTURE, whose one board the apps' tests read as a run that
+ * lacks the other formats. */
+export const BUILD_RUN_FIXTURE = "shared/fixtures/build-run";
 const RUN_IDS = "web/scripts/inseason-fixture/run-ids.ts";
 const CONTRACT_RUNS = "research/nightly/contract/fixture/runs";
 const DESIGNATIONS = "web/scripts/standin-designations.json";
@@ -215,6 +221,37 @@ ${rows.join("\n")}
 `;
 }
 
+/** The build run's files under its root: the pointer, the manifest, every other read the build makes
+ * of the run and the designations. */
+export function buildRunPaths(
+  runId: string,
+  copied: readonly string[],
+): string[] {
+  return [
+    "runs/latest.json",
+    ...[RUN_PATHS.manifest, ...copied, RUN_PATHS.designations].map(
+      (path) => `runs/${runId}/${path}`,
+    ),
+  ];
+}
+
+/** The build run's README: what it is and why it is apart from the apps' fixture run. */
+function buildReadme(paths: readonly string[], runId: string): string {
+  return `# The build run
+
+${generatedBy(SCRIPT, `${CONTRACT_RUNS}/${runId} and ${DESIGNATIONS}`)}
+
+The nightly's contract fixture run \`${runId}\` as the bucket holds it, with every file a build of the
+site reads (web/src/lib/run/reads.ts): every format's board, the index, every player's page, the ADP,
+the record, the clubs and the schedule byte for byte, the manifest with its season reach and the
+designations as \`shared/fixtures/run\` carries them. A branch's web checks build the site from it and
+measure its script bytes with no secret (\`.github/workflows/web.yml\`, Lane 252). It is test data, never
+served. \`shared/fixtures/run\` stays the apps' run with the PPR board alone.
+
+${paths.map((path) => `- \`${path}\``).join("\n")}
+`;
+}
+
 export async function generate(): Promise<Outputs> {
   const runId = await contractRunId();
   const source = (path: string): string => `${CONTRACT_RUNS}/${runId}/${path}`;
@@ -223,30 +260,48 @@ export async function generate(): Promise<Outputs> {
   }[];
   const players = pageIds(index);
   const capture = JSON.parse(await text(DESIGNATIONS)) as Capture;
-  const designations = heldToIndex(
-    capture,
-    new Set(index.map((entry) => entry.id)),
-  );
-  const copied = await Promise.all(
-    copiedFiles(players).map(async (path): Promise<[string, string]> => [
-      `${RUN_FIXTURE}/runs/${runId}/${path}`,
-      await text(source(path)),
-    ]),
-  );
+  const designations = `${JSON.stringify(
+    heldToIndex(capture, new Set(index.map((entry) => entry.id))),
+  )}\n`;
+  const copy = (root: string, paths: readonly string[]) =>
+    Promise.all(
+      paths.map(async (path): Promise<[string, string]> => [
+        `${root}/runs/${runId}/${path}`,
+        await text(source(path)),
+      ]),
+    );
   const fromRun = (path: string): Promise<string> => text(source(path));
+  const runManifest = await fromRun(RUN_PATHS.manifest);
   const manifest = withReach(
-    await fromRun(RUN_PATHS.manifest),
+    runManifest,
     await seasonReachOf(fromRun, players),
   );
+  const { formats } = manifestSchema.parse(JSON.parse(runManifest));
+  const builtFrom = buildReads(formats, players).filter(
+    (path) => path !== RUN_PATHS.manifest,
+  );
+  const tree = async (
+    root: string,
+    copied: readonly string[],
+    readmeText: string,
+  ): Promise<[string, string][]> => [
+    [`${root}/runs/latest.json`, `${JSON.stringify({ runId })}\n`],
+    [`${root}/runs/${runId}/${RUN_PATHS.manifest}`, manifest],
+    ...(await copy(root, copied)),
+    [`${root}/runs/${runId}/${RUN_PATHS.designations}`, designations],
+    [`${root}/README.md`, readmeText],
+  ];
   return new Map([
-    [`${RUN_FIXTURE}/runs/latest.json`, `${JSON.stringify({ runId })}\n`],
-    [`${RUN_FIXTURE}/runs/${runId}/${RUN_PATHS.manifest}`, manifest],
-    ...copied,
-    [
-      `${RUN_FIXTURE}/runs/${runId}/designations.json`,
-      `${JSON.stringify(designations)}\n`,
-    ],
-    [`${RUN_FIXTURE}/README.md`, readme(runFiles(runId, players), runId)],
+    ...(await tree(
+      RUN_FIXTURE,
+      copiedFiles(players),
+      readme(runFiles(runId, players), runId),
+    )),
+    ...(await tree(
+      BUILD_RUN_FIXTURE,
+      builtFrom,
+      buildReadme(buildRunPaths(runId, builtFrom), runId),
+    )),
   ]);
 }
 

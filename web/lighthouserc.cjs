@@ -3,7 +3,7 @@
 // format), the first player in the run's index (our top-ranked player), and the record. Read after
 // the build.
 const { readFileSync } = require('node:fs');
-const { ORIGIN, PAINT_HOLDING_OFF } = require('./lighthouse-shared.cjs');
+const { ORIGIN, PAINT_HOLDING_OFF, SCRIPT_BUDGETS } = require('./lighthouse-shared.cjs');
 
 const INDEX = '.svelte-kit/cloudflare/data/index.json';
 
@@ -48,7 +48,7 @@ module.exports = {
 						'resource-summary:script:size': [
 							'error',
 							{
-								maxNumericValue: 73728
+								maxNumericValue: SCRIPT_BUDGETS.reading
 							}
 						],
 						'cumulative-layout-shift': [
@@ -72,7 +72,7 @@ module.exports = {
 						'resource-summary:script:size': [
 							'error',
 							{
-								maxNumericValue: 184320
+								maxNumericValue: SCRIPT_BUDGETS.tool
 							}
 						],
 						'cumulative-layout-shift': [

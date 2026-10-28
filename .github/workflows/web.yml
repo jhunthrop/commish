@@ -5,9 +5,10 @@
 # The custom domain route is added at cutover (spec §10), not here.
 #
 # A pull request, or a dispatch on any branch but main, runs only the `checks` job: types, lint, unit
-# tests and the shared-sources check. It builds nothing and holds no secret, because a build reads the
-# run from R2 and R2's keys derive from the Cloudflare token. Only a run on main reaches
-# `build-measure-deploy`, the one job that names the token (Lane 251, B258).
+# tests, the shared-sources check, and the build and its script bytes from the committed build run
+# (shared/fixtures/build-run, Lane 252, B259). It holds no secret and never reads R2, whose keys
+# derive from the Cloudflare token. Only a run on main reaches `build-measure-deploy`, the one job
+# that names the token (Lane 251, B258).
 name: web
 
 on:
@@ -63,8 +64,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # The committed fixture run: enough for the type and test gates, which read the run's schema.
-      PUBLIC_RUN_BASE_URL: ../shared/fixtures/run
+      # The committed build run: every file a build reads (web/src/lib/run/reads.ts), every format's
+      # board among them, from the nightly's contract fixture. Test data, never served.
+      PUBLIC_RUN_BASE_URL: ../shared/fixtures/build-run
     steps:
       - uses: actions/checkout@v4
 
@@ -88,6 +90,26 @@ jobs:
 
       - name: Shared sources match their generators
         run: npm run check:shared
+
+      - name: Build every page from the build run, timed
+        # The main job's build, from the committed run in place of R2; the request API and the apps'
+        # link claims stay empty, which claims no app.
+        run: |
+          start=$(date +%s)
+          npm run build
+          seconds=$(( $(date +%s) - start ))
+          pages=$(find .svelte-kit/cloudflare -name '*.html' | wc -l | tr -d ' ')
+          echo "Built ${pages} pages from the build run in ${seconds} s (budget ${BUILD_BUDGET_SECONDS} s)." | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$seconds" -gt "$BUILD_BUDGET_SECONDS" ]; then
+            echo "::error::The build took ${seconds} s, over the ${BUILD_BUDGET_SECONDS} s budget."
+            exit 1
+          fi
+
+      - name: Script bytes on load, held to the Lighthouse budgets
+        # pipefail, so a page over its budget fails the step through the tee.
+        run: |
+          set -o pipefail
+          node scripts/script-bytes.ts | tee -a "$GITHUB_STEP_SUMMARY"
 
   # Main only: the build reads the run from R2 with keys derived from the Cloudflare token, then
   # deploys and purges with it. A branch never reaches this job.

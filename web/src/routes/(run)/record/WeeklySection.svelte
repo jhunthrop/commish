@@ -26,18 +26,7 @@
 		type RecordFigure,
 		type RecordSource
 	} from '#lib/run/record.ts';
-	import {
-		honestWords,
-		leagueBasis,
-		leagueRankingRows,
-		leagueSentenceWeeks,
-		leagueToDate,
-		pageLineup,
-		shownRecord,
-		weekSentence,
-		type LeagueRecord,
-		type PlayersByWeek
-	} from '#lib/run/record-league.ts';
+	import type { LeagueView } from '#lib/run/record-league.ts';
 	import {
 		RECORDS_WORDS,
 		beforeChips,
@@ -65,29 +54,20 @@
 		fromWeek: number | null;
 		unplayed: readonly number[];
 		underway: readonly number[];
-		leagueRecord: LeagueRecord | null;
-		players: PlayersByWeek;
+		/** A selected league's record in its lineup, null at rest: the run's own record as written. */
+		league: LeagueView | null;
 		/** The section's head and what it grades; null for a run's own record, drawn as before. */
 		head: { title: string; what: string } | null;
 		/** The weekly record's next week to grade, which its bug names before a week is graded. */
 		next: NextGrade | null;
 	}
 
-	let {
-		record: runRecord,
-		fromWeek,
-		unplayed,
-		underway,
-		leagueRecord,
-		players,
-		head,
-		next
-	}: Props = $props();
+	let { record: runRecord, fromWeek, unplayed, underway, league, head, next }: Props = $props();
 
-	/** The one lineup every starters figure and sentence here reads (Lane 93 fix round 1). */
-	const lineup = $derived(pageLineup(runRecord, leagueRecord, players));
-	const record = $derived(shownRecord(runRecord, players, lineup));
-	const honest = $derived(honestWords(runRecord, record, lineup));
+	/** Every starters figure and sentence here reads the league's one lineup once it is selected
+	 * (Lane 93 fix round 1), the run's own record and honest sentence at rest. */
+	const record = $derived(league?.record ?? runRecord);
+	const honest = $derived(league === null ? runRecord.honest : league.honest);
 	/** The weekly record before a week is graded says the week and when it grades, no figure (C04). */
 	const pending = $derived(head === null ? null : weeklyPending(record, next));
 	const headline = $derived(recordHeadline(record, unplayed));
@@ -131,16 +111,13 @@
 	const beside = $derived(sources.filter((source) => source !== 'ours'));
 	const spans = $derived(recordStatusSpans(sources.length));
 
-	const leagueRows = $derived(leagueRecord === null ? [] : leagueRankingRows(leagueRecord));
-	const leagueSentences = $derived(leagueRecord === null ? [] : leagueSentenceWeeks(leagueRecord));
-	const leagueSaid = $derived(leagueToDate(leagueRows));
 	/** The weekly record's basis with its desk-only parts (Lane 131); a run's own record before Lane
 	 * 114 says each of its sentences at both widths. */
 	const basis = $derived.by(() => {
-		const league = leagueRecord === null ? null : leagueBasis(leagueRecord, lineup);
+		const said = league?.basis ?? null;
 		return head === null
-			? recordBasis(record, league).map((text) => ({ text, phone: true }))
-			: weeklyBasis(record, league);
+			? recordBasis(record, said).map((text) => ({ text, phone: true }))
+			: weeklyBasis(record, said);
 	});
 
 	const capitalized = (words: string): string =>
@@ -327,10 +304,10 @@
 		<RecordChart {series} weeks={chartWeeks(record)} />
 	{/if}
 
-	{#if leagueRecord !== null && (leagueRows.length > 0 || leagueSentences.length > 0)}
-		<section class="league" aria-label={RECORDS_WORDS.league(hostWords(leagueRecord.host))}>
-			<h3 class="league-head">{RECORDS_WORDS.league(hostWords(leagueRecord.host))}</h3>
-			{#if leagueRows.length > 0}
+	{#if league !== null && (league.rows.length > 0 || league.sentences.length > 0)}
+		<section class="league" aria-label={RECORDS_WORDS.league(hostWords(league.host))}>
+			<h3 class="league-head">{RECORDS_WORDS.league(hostWords(league.host))}</h3>
+			{#if league.rows.length > 0}
 				<table class="league-weeks">
 					<thead>
 						<tr class="cols">
@@ -347,7 +324,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each leagueRows as row (row.week)}
+						{#each league.rows as row (row.week)}
 							<tr>
 								<td class="wk">{RECORD_BOX.week} {row.week}</td>
 								<td class="n plc">{row.players}</td>
@@ -365,8 +342,8 @@
 				</table>
 			{/if}
 			<ul>
-				{#if leagueSaid}<li>{leagueSaid}</li>{/if}
-				{#each leagueSentences as week (week.week)}<li>{weekSentence(week)}</li>{/each}
+				{#if league.said}<li>{league.said}</li>{/if}
+				{#each league.sentences as week (week.week)}<li>{week.text}</li>{/each}
 			</ul>
 		</section>
 	{/if}

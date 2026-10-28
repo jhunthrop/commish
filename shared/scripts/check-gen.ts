@@ -27,7 +27,11 @@ const GENERATED_FOLDERS = [
 	'shared/fixtures/record'
 ];
 /** Folders whose every file, at any depth, a generator writes: the fixture run's bucket layout. */
-const GENERATED_TREES = ['shared/fixtures/run', 'shared/fixtures/one-value-run'];
+const GENERATED_TREES = [
+	'shared/fixtures/run',
+	'shared/fixtures/build-run',
+	'shared/fixtures/one-value-run'
+];
 
 export interface Drift {
 	path: string;
