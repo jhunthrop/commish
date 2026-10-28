@@ -36,7 +36,7 @@ import os
 from collections import deque
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import datetime, time
+from datetime import UTC, datetime, time
 from typing import Final
 
 import httpx
@@ -92,7 +92,7 @@ NIGHTLY_BUDGET_USD: Final = 2.50
 # or was demoted for a shared sentence; one still unwritten is asked again on the next nightly.
 ROLLOVER_ROUNDS: Final = 3
 HOURLY_BUDGET_USD: Final = 0.05
-HOURLY_DAY_USD: Final = 0.60
+HOURLY_DAY_USD: Final = 1.50  # 0.60 before the game-day status passes (Lane 263): headroom over $0.93 of waves
 # The heaviest prompt a week read's ask carries (a correction with its ledger and every line's stamp), for a
 # read's worst case against what is left of the budget. Measured on Lane 117's replay of 40 production
 # sheets of week 7 after the four-rule prompt: 8,506 prompt tokens at 17,643 characters, the fewest
@@ -341,17 +341,49 @@ def _budget_usd(engine: Engine, now: datetime, hourly: bool) -> float:
 
 
 def _due(night: _Night, now: datetime, hourly: bool) -> list[tuple[WeekSheet, str]]:
-    """Every board-week read the cadence says is due, in board order."""
-    return [
+    """Every board-week read the cadence says is due, in board order; an hourly pass (the game-day status
+    passes among them) soonest kickoff first, so when its budget stops the reads the 13:00 starters are written
+    before the 16:25 ones (Lane 263). Stable: board order within a kickoff."""
+    due = [
         (sheet, reason)
         for sheet in night.sheets
         if (reason := due_reason(sheet, night.stored.get((sheet.player_id, sheet.week)), now, hourly=hourly))
         is not None
     ]
+    return sorted(due, key=lambda item: _kickoff_of(item[0])) if hourly else due
 
 
-def run_week_read_step(
-    engine: Engine, now: datetime, log: Log, facts: FactsPassMemo, *, hourly: bool = False
+def _kickoff_of(sheet: WeekSheet) -> datetime:
+    return datetime.max.replace(tzinfo=UTC) if sheet.game is None else sheet.game.kickoff
+
+
+def left_unread(due: Sequence[tuple[WeekSheet, str]], stopped: int) -> str | None:
+    """What the budget left of an hourly pass's reads: how many, and the soonest kickoff among them (the reads
+    stopped are the tail of the kickoff-ordered `due`), else None."""
+    stopped = min(stopped, len(due))
+    if stopped <= 0:
+        return None
+    left = due[len(due) - stopped :]
+    soonest = min(_kickoff_of(sheet) for sheet, _ in left)
+    return f"{len(left)} reads left unread, the next kickoff among them {soonest.astimezone(CENTRAL):%a %H:%M} Central"
+
+
+# The line the alert "Research game-day reads left unread" matches (`infra/research-alerts.sh`; a test holds the two).
+WARNING_MARKER: Final = f"{STEP} WARNING:"
+
+
+def _warn_spent_day(engine: Engine, now: datetime, log: Log, facts: FactsPassMemo) -> None:
+    """At a game-day window's last pass with the day's dollars spent, nothing was written: every due read is left."""
+    night = _read_night(engine, now, facts)
+    if night is None or not night.rollover.ready:
+        return
+    due = _due(night, now, True)
+    if (left := left_unread(due, len(due))) is not None:
+        log(f"{WARNING_MARKER} {left} at the game-day window's last pass, the day's hourly dollars spent")
+
+
+def run_week_read_step(  # noqa: PLR0913 - the pass's parts
+    engine: Engine, now: datetime, log: Log, facts: FactsPassMemo, *, hourly: bool = False, last_pass: bool = False
 ) -> StepRecord:
     """The pass's record: what was due, written, demoted and spent; skipped by name without the key, before the
     board week's roll-over is due, and for an hourly pass once the day's hourly dollars are spent."""
@@ -361,6 +393,8 @@ def run_week_read_step(
         return StepRecord(STEP, "skipped", f"{CAPSULE_CONFIG.gateway.api_key_variable} is not set, nothing written")
     usd = _budget_usd(engine, now, hourly)
     if usd <= 0:
+        if hourly and last_pass:
+            _warn_spent_day(engine, now, log, facts)
         return StepRecord(STEP, "skipped", f"the hourly passes' ${HOURLY_DAY_USD:.2f} for the day is spent")
     night = _read_night(engine, now, facts)
     if night is None:
@@ -390,5 +424,9 @@ def run_week_read_step(
         # Whatever the pass spent is on the day's ledger even when it raised (the re-review's F6).
         record_spend(engine, now, mode, spend, budget)
     line = f"{head}, {len(night.sheets)} board players with a week {night.board_week} ahead, {budget.line()}; {spend.line()}"
+    if hourly and (left := left_unread(due, spend.budget_stopped)) is not None:
+        line += f"; {left}"
+        if last_pass:
+            log(f"{WARNING_MARKER} {left} at the game-day window's last pass")
     log(f"{STEP}: {line}")
     return StepRecord(STEP, "ran", line)

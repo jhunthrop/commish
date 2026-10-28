@@ -16,7 +16,7 @@ whose designation or headlines moved) is a capsule concern and lands with the ca
 
 import hashlib
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time
 from typing import Final, Literal
 from zoneinfo import ZoneInfo
@@ -43,6 +43,8 @@ Status = Literal["captured", "unchanged", "fresh", "off-cadence", "budget-refuse
 
 _GAME_DAYS_UTC: Final = (0, 1, 4, 5, 6)  # JavaScript's getUTCDay: Sunday 0, Monday 1, Thursday to Saturday.
 CAPTURE_HARVEST_REQUEST_BUDGET: Final = 10
+# A game-day status pass asks the two status feeds one request each (Lane 263), and never more.
+CAPTURE_STATUS_REQUEST_BUDGET: Final = 2
 # The game lines feed, which `tank01.lines` reads into the `tank01_lines` source.
 BETTING_ODDS_SOURCE: Final = "tank01_betting_odds"
 # The provider dates a game by its Eastern day.
@@ -150,6 +152,17 @@ CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
 HARVEST_FEED_SOURCES: Final = frozenset(
     {"tank01_injuries_by_date", "tank01_news", "tank01_depth_charts", "tank01_inactives", BETTING_ODDS_SOURCE}
 )
+
+
+# The game-day status pass's feeds (Lane 263): the injury designations and the game-day inactives, which is all a
+# status read needs; news, depth charts, odds, the projection and the player list stay with the hourly harvest.
+STATUS_FEED_SOURCES: Final = frozenset({"tank01_injuries_by_date", "tank01_inactives"})
+
+
+def status_feeds(feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS) -> list[CaptureFeed]:
+    """The status feeds, each always due: the pass is only fired in a game-day window, and `cadence_allows` reads
+    the game day on the UTC instant, where Monday 20:15 Eastern is already Tuesday (Lane 263, review H1)."""
+    return [replace(feed, cadence="daily") for feed in feeds if feed.source in STATUS_FEED_SOURCES]
 
 
 def harvest_feeds(feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS) -> list[CaptureFeed]:
@@ -397,6 +410,13 @@ def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: dateti
         game_dates=stored_week_game_dates(conn, season, fired_at),
     )
     return capture_once(conn, client, capture, FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET))
+
+
+def run_capture_status(conn: Connection, client: Tank01Client, fired_at: datetime, season: int) -> CaptureResult:
+    """The game-day status capture (Lane 263): the injury designations and the inactives, a two-request ceiling,
+    no freshness keys. Run every 15 minutes in the game-day windows (`infra/research-schedule.sh`)."""
+    capture = CapturePass(fired_at, season, current_nfl_week(conn, season), feeds=status_feeds())
+    return capture_once(conn, client, capture, FixedBudget(CAPTURE_STATUS_REQUEST_BUDGET))
 
 
 # The player list's day opens at 06:00 Eastern, the harvest's first pass of the day.
