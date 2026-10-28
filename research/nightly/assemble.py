@@ -14,9 +14,7 @@ from typing import Any, Final
 from sqlalchemy import Connection, text
 
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsules_for
-from research.capsules.week.collect import published_projections
 from research.capsules.week.rollover import projection_held, published_from_week, reads_due, rollover
-from research.capsules.week.sheet import PublishedProjection
 from research.capsules.week.store import served_week_reads
 from research.errors import ResearchError
 from research.headshots.faces import our_faces
@@ -281,17 +279,9 @@ def _served_week(  # noqa: PLR0913, PLR0917 - the reads' parts
     read = read_statuses(conn, as_of, now=as_of)
     statuses = {board_id: status_word(read, board_id) for board_id, _ in ids}
     reads = served_week_reads(conn, PRODUCT_SEASON, week, sorted({uid for _, uid in ids}))
-    projections = served_projections(published_projections(conn, PRODUCT_SEASON, [week], as_of), week)
     held = projection_held(conn, PRODUCT_SEASON, week, as_of)
     state = rollover(week, games, states, published_from_week(conn, PRODUCT_SEASON, as_of), held, as_of)
-    return pages.ServedWeek(reads, statuses, as_of, projections, reads_due(state, games, held, as_of))
-
-
-def served_projections(read: Mapping[tuple[str, int], PublishedProjection], week: int) -> Mapping[str, float] | None:
-    """The board week's published projection by board id as the card prints it; None with no snapshot for
-    the week, so the reads are not judged by one (Lane 66v)."""
-    out = {player_id: p.points for (player_id, of), p in read.items() if of == week}
-    return out or None
+    return pages.ServedWeek(reads, statuses, as_of, reads_due(state, games, held, as_of))
 
 
 def _rest_source(basis: RosBasis) -> Json:

@@ -43,11 +43,10 @@ from research.tests.week_read_fixtures import WRITTEN_AT, questionable, starter
 
 _DATABASE = "parity_test_week_reads"
 # Lane 100 (B17, B44): the read quotes only the page's cells, at most three figures. The points the Bears allow
-# a game are on no cell, and the change is the card's Delta Proj, named as its change from the figure before.
+# a game are on no cell, and the published projection and its change are the card's alone (Lane 275).
 _QUESTIONABLE_READ = (
     "Bijan Robinson is Questionable on Friday's report, so whether he plays in week 6 of 2026 against Chicago is "
-    "not settled until Sunday. The published projection has him at 15.2 points, down 1.8 points from the "
-    "published figure before it. The Bears rank 9th of 32 against running backs, and the Falcons are expected "
+    "not settled until Sunday. He leads the Atlanta backfield when he plays. The Bears rank 9th of 32 against running backs, and the Falcons are expected "
     "to score 25 points. If he is active, Bijan Robinson stays in your lineup over a lesser back."
 )
 _SHARED = "The Rams lean on him every single week."
@@ -122,14 +121,14 @@ def test_the_nights_pool_lands_each_read_with_its_stamps_call_and_attempt(engine
 
 
 def test_a_read_that_keeps_quoting_a_figure_off_the_page_falls_and_the_pass_says_why(engine: Engine) -> None:
-    """Lane 66v: every draft says 18.6 where the card prints 18.4, so the read falls to its facts block and
+    """Lane 66v: every draft says 25.6 where the card prints 25.9, so the read falls to its facts block and
     the pass's line names him and the figure guard."""
-    off_page = STARTER_READ.replace("18.4 points", "18.6 points")
+    off_page = STARTER_READ.replace("25.9 PPR points", "25.6 PPR points")
     spend = WeekReadSpend()
     gateway = _gateway(lambda _request: _completion(off_page, "start"))
     _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend)
     assert spend.facts_blocks == 1 and spend.written == 0
-    assert f'Puka Nacua: failed validation: {FIGURE_OFF_PAGE}: "18.6"' in spend.line()
+    assert f'Puka Nacua: failed validation: {FIGURE_OFF_PAGE}: "25.6"' in spend.line()
 
 
 def test_a_read_the_budget_stopped_writes_nothing(engine: Engine) -> None:

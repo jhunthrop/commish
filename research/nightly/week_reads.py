@@ -9,8 +9,8 @@ Two modes on one pass (`run_week_read_step`), both on the board week alone (`col
   `NIGHTLY_BUDGET_USD`, which covers the whole board; a read that falls to its facts block (or is demoted for a
   sentence another page carries) is asked again within the pass, `ROLLOVER_ROUNDS` in all, and any still
   unwritten are named in the step line and asked again on the next nightly. After it, a nightly writes only
-  what the cadence says moved (`capsules.week.cadence`: a status, the published projection the card prints,
-  a read still unwritten, a player new to the board).
+  what the cadence says moved (`capsules.week.cadence`: a status, a read still unwritten, a player new to the
+  board; a move of the published projection leaves the read standing, Lane 275).
 - **Hourly**, after the in-season job's status capture (`research.inseason --task capture-harvest`): only
   the reads whose status moved, under `HOURLY_BUDGET_USD` a pass and `HOURLY_DAY_USD` across a Central day's
   passes (`player_week_read_runs`).
@@ -27,7 +27,7 @@ sentence shape another page carries for its week, and lands in its own transacti
 (`week_read_demotion`) over every read of the board week.
 
 Without AI_GATEWAY_API_KEY nothing is written, by name. The step is advisory: a page shows a board week's
-read only while it stands (`nightly.build.pages.week_read_json`), so a failed step is reported and never
+read whenever one is written (`nightly.build.pages.week_read_json`), so a failed step is reported and never
 holds the night's board back (`ADVISORY`, read by `nightly.run`). A rewrite that falls to its facts block
 replaces the written row, and the page then shows no week read.
 """
@@ -85,7 +85,7 @@ HOURLY: Final = "hourly"
 # at NIGHTLY_BUDGET_USD (`step_budget`, the gateway's reservation), not by this sum: before a read starts the
 # budget's check prices it at BUDGETED_CALLS_PER_READ asks at the worst (`worst_read_usd`), and a read cut by
 # the stop writes nothing and is asked again the next night. An hourly pass writes only the reads a status
-# moved (a projection move waits for the nightly, Lane 66v), held the same way at HOURLY_BUDGET_USD a pass and
+# moved, held the same way at HOURLY_BUDGET_USD a pass and
 # HOURLY_DAY_USD across a Central day's passes (the capture runs 18 times).
 NIGHTLY_BUDGET_USD: Final = 2.50
 # The asks of a read within the roll-over pass: its first, then two more for a read that fell to its facts block

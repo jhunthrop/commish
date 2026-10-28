@@ -4,9 +4,10 @@ This week's rulings and the Lane 72 review's, each a rule the validator reads:
 - No betting word in any sense: the writer's list and this read's stricter four ("line" outside football's
   own senses, "lines up" included; "favoured"; "underdog"; "spread" outside spreading the ball). No
   provider's name, no rival product, no tip.
-- The week's number is the published projection, never ours (`sheet.PROJECTION_BASIS`). A sentence naming
-  the published projection carries its figure exactly as the sheet prints it, and no other figure is put
-  on it; a read with a projection names it; nothing calls a weekly number ours (H4).
+- The week's number is the published projection, never ours (`sheet.PROJECTION_BASIS`), and the read never
+  states it (H4, inverted by Lane 275, the founder 2026-10-28): no sentence names the published projection,
+  and none states its figure, the one before it or its change, with or without a unit. The card's Wk cell
+  prints it, and a read that quoted it went stale the moment it moved. Nothing calls a weekly number ours.
 - A player the sheet says may not be started (on his bye, out, on a season-long list, Doubtful) is never
   recommended to start: the writer's own call for its read must not be "start" (`CALLS`), and a sentence
   that tells a manager to start him, in his name or a pronoun, outside a negation of its own clause,
@@ -34,10 +35,10 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
-from research.capsules.week.cells import cell_figures, misnamed, misranked
+from research.capsules.week.cells import cell_figures, misnamed, misranked, quotable_figures
 from research.capsules.week.rank_words import fits, rank_words, superlatives_in
 from research.capsules.week.report_day import report_words
-from research.capsules.week.sheet import STATUS_WORDS, WeekSheet, points_text
+from research.capsules.week.sheet import STATUS_WORDS, WeekSheet
 from research.capsules.week.start_advice import start_advice_in
 
 MIN_SENTENCES: Final = 3
@@ -81,19 +82,14 @@ _OURS: Final = re.compile(
     r"\bour (?:own )?(?:weekly )?(?:projection|number|forecast|model)s?\b|\bwe(?:'re| are)? project(?:s|ing)?\b",
     re.IGNORECASE,
 )
-_PUBLISHED: Final = re.compile(r"\bpublished\b", re.IGNORECASE)
-_NAMES_PROJECTION: Final = re.compile(r"\bpublished (?:weekly )?projection\b", re.IGNORECASE)
+# A name for the week's published projection (Lane 275): "published", "projection" or "projected", other than
+# our rest-of-season order's own words.
+_NAMES_PROJECTION: Final = re.compile(
+    r"\bpublished\b|(?<!rest-of-season )(?<!rest of season )\bprojections?\b|\bprojected\b", re.IGNORECASE
+)
 _DOES_NOT_PLAY: Final = re.compile(
     r"\bbye\b|\b(?:does not|doesn't|will not|won't|cannot|can't) play\b|\bno game\b|\bruled out\b|"
     r"\binjured reserve\b|\bsits? out\b|\bis out\b",
-    re.IGNORECASE,
-)
-# A judgment of the published projection (the re-review's F2): the read states it and never grades it
-# until a round of our weekly number passes.
-_GRADES: Final = re.compile(
-    r"\b(?:light|heavy|high|low|generous|conservative|rich|stingy|bullish|bearish|modest|aggressive|"
-    r"too|only|just|undersells?|oversells?|underrates?|overrates?|sells? him short|selling him short|"
-    r"short of|undershoots?|overshoots?|feels?|seems?|looks?|undervalu\w*|overvalu\w*)\b",
     re.IGNORECASE,
 )
 # A read that waits on his status before saying start (the re-review's F4): its call is hold.
@@ -200,8 +196,8 @@ def _stated(sentence: str, season: int) -> list[tuple[str, float, str, str]]:
 
 _NAME_AS_THE_CELL: Final = (
     "Name each figure as its cell does: his points a game are his Avg, his last game's points are Last's, a "
-    "game's points are that game's, his rest-of-season points are the Rest of season tile's, this week's are "
-    "the week's published projection (none on his bye), and the opponent's rank is Opp rank's."
+    "game's points are that game's, his rest-of-season points are the Rest of season tile's, and the opponent's "
+    "rank is Opp rank's. The week's published projection is the Wk cell's alone: never quote it."
 )
 
 
@@ -242,9 +238,9 @@ def _cell_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
                 _sentence_violation(
                     f"states {quoted}, a figure the page draws in no cell",
                     s,
-                    "Quote only a figure the page prints as a cell (the published projection and its change, the "
-                    "opponent's rank, his points a game, a game's points, his rest-of-season points, the expected "
-                    "score, the kickoff weather), named as the cell names it, or say it in words.",
+                    "Quote only a figure the page prints as a cell (the opponent's rank, his points a game, a "
+                    "game's points, his rest-of-season points, the expected score, the kickoff weather), named as "
+                    "the cell names it, or say it in words.",
                 )
             )
     count = sum(len(stated_figures(s, sheet.season)) for s in sentences)
@@ -263,80 +259,43 @@ def _paragraph_violation(text: str) -> list[str]:
 
 
 def _published_figures(sheet: WeekSheet) -> set[float]:
-    """The figures the sheet puts on the published projection: it, the one before it, and the changes."""
+    """The figures the sheet puts on the published projection that no other cell prints: it, the one before
+    it, the changes, and the figure the last read was written with (a figure another cell prints too, his last
+    game's points, is that cell's to quote)."""
     p = sheet.projection
     if p is None:
         return set()
     last = sheet.last_read
     values = [p.points, p.previous_points, sheet.projection_change, sheet.change_since_last_read]
     values.append(None if last is None else last.projection_points)
-    return {page_tenth(abs(v)) for v in values if v is not None}
+    return {page_tenth(abs(v)) for v in values if v is not None} - quotable_figures(sheet)
+
+
+_LEAVE_IT_OUT: Final = (
+    "The card's Wk cell prints the published projection: leave it, its figure and its change out of the read, "
+    "and say what you see in his status, his role, the matchup or his rate."
+)
 
 
 def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
-    out = [
-        _sentence_violation(
-            "calls a weekly number ours",
-            s,
-            "The week's number is the published projection, never ours: call it the published projection.",
-        )
-        for s in sentences
-        if _OURS.search(s)
-    ]
-    projection = sheet.projection
-    if projection is None or sheet.bye:
-        return out + [
-            _sentence_violation(
-                "names a published projection the facts do not hold", s, "There is none for this week: leave it out."
-            )
-            for s in sentences
-            if _NAMES_PROJECTION.search(s)
-        ]
-    figure, value = points_text(projection.points), page_tenth(projection.points)
-    allowed = _published_figures(sheet)
+    """H4 (Lane 275): no sentence names the published projection or states its figures; none calls a weekly
+    number ours."""
+    figures = _published_figures(sheet)
+    out = []
     for s in sentences:
-        stated = {page_tenth(v) for _, v, _, _ in _stated(s, sheet.season)}  # a rank's "of 32" is its rank's
-        if _NAMES_PROJECTION.search(s) and value not in stated:
+        if _OURS.search(s):
             out.append(
                 _sentence_violation(
-                    "names the published projection without its figure",
-                    s,
-                    f"Give its figure, {figure} points, exactly, in a sentence written for this player's week.",
+                    "calls a weekly number ours", s, "The week's number is never ours. " + _LEAVE_IT_OUT
                 )
             )
-        if _PUBLISHED.search(s) and stated - allowed:
-            other = ", ".join(sorted(points_text(v) for v in stated - allowed))
-            out.append(
-                _sentence_violation(
-                    f"puts {other} on the published projection",
-                    s,
-                    f"The published projection is {figure} points. Say other figures in a sentence of their own.",
-                )
-            )
-        grade = _GRADES.search(s) if _PUBLISHED.search(s) else None
-        if grade is not None:
-            out.append(
-                _sentence_violation(
-                    f'grades the published projection ("{grade.group(0)}")',
-                    s,
-                    "State the published projection and its figure, and never judge it: no round of our weekly "
-                    "number has passed to back a judgment. Say what you see in the matchup or his rate in a "
-                    "sentence of its own.",
-                )
-            )
-        if value in stated and not _PUBLISHED.search(s):
-            out.append(
-                _sentence_violation(
-                    f"quotes the {figure} points without saying it is published",
-                    s,
-                    f"Name it the published projection, with its {figure} points, in a sentence about this player's week.",
-                )
-            )
-    if not any(_NAMES_PROJECTION.search(s) for s in sentences):
-        out.append(
-            "The read never names the published projection for the week. Name it as the published projection, "
-            f"with its {figure} points, in a sentence of your own."
-        )
+        named = _NAMES_PROJECTION.search(s)
+        if named is not None:
+            out.append(_sentence_violation(f'names the published projection ("{named.group(0)}")', s, _LEAVE_IT_OUT))
+        stated = [raw for raw, value, _, _ in _stated(s, sheet.season) if page_tenth(value) in figures]
+        if stated:
+            quoted = ", ".join(f'"{raw}"' for raw in stated)
+            out.append(_sentence_violation(f"states the published projection's figure {quoted}", s, _LEAVE_IT_OUT))
     return out
 
 

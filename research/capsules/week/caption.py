@@ -5,9 +5,9 @@ and, for a read his status has moved past, when the new one is due.
 it stands on is not named here: the run is built once a night, so a stamp baked into it was thirteen hours old at
 the Sunday 1 pm games (Lane 222, B186); the web names the status read its own build took, and the next one
 (`web/src/lib/player/read-byline.ts`), from `designations.json` and the run's schedule. A read written
-against another status than his current one is withheld behind "His status changed since this read was
-written. A new read is due by Sun Oct 18, 1:00 am CT." (the re-review's F5): the hourly pass after the
-status capture writes it (`HOURLY_PASS_HOURS_ET`, the capture's schedule in `infra/research-schedule.sh`).
+against another status than his current one stays on the page under "His status changed since this read was
+written. A new read is due by Sun Oct 18, 1:00 am CT." (the re-review's F5; Lane 275, the founder 2026-10-28:
+"we should always show a read"): the hourly pass after the status capture writes the new one (`HOURLY_PASS_HOURS_ET`, the capture's schedule in `infra/research-schedule.sh`).
 """
 
 from datetime import datetime, time, timedelta
@@ -41,11 +41,12 @@ def next_hourly_pass(after: datetime) -> datetime:
 
 
 def status_changed_caption(as_of: datetime) -> str:
-    """The caption over the season read when his status moved past the week read, with the next write."""
+    """The caption over a week read his status has moved past, with the next write."""
     due = central_stamp(next_hourly_pass(as_of))
     return f"His status changed since this read was written. A new read is due by {due}."
 
 
-# A read whose published projection the card no longer prints (Lane 66v): withheld at the run's build, and
-# on the page once the card's live read prints another figure, the season read showing beneath it.
+# The words a web build before Lane 274 shows over a read whose published projection moved (Lane 66v). The run
+# no longer withholds such a read (Lane 275): it carries these words only for that web, and they go once no web
+# reads `movedCaption`.
 PROJECTION_MOVED_CAPTION: Final = "The published projection moved since this read was written."

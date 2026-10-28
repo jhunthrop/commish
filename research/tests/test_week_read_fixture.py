@@ -10,8 +10,8 @@ read (`HAND_WRITTEN`, written for this test and never a recording), through the 
 
 Lane 96 (B16) refuses each recording's "Tuesday's report" too, no report having been issued by the write; the
 hand-written reads name the list as the sheet does, "the Tuesday-night list". The guards that stand for the
-recorded reads: the published projection named as published and never as
-ours; no betting, trading or provider word, no rival product and no tip; the bye read says he does not play
+recorded reads: no weekly number called ours (Lane 275 refuses the published projection each recording
+names, the card's Wk cell carrying it); no betting, trading or provider word, no rival product and no tip; the bye read says he does not play
 and recommends nothing for the week; no sentence sits on two of the reads; every fact was stamped at or
 before the write; and the caption is the page's."""
 
@@ -55,7 +55,7 @@ HAND_WRITTEN: Final[dict[str, tuple[str, str]]] = {
     "Puka Nacua": (
         "Puka Nacua carries no designation on the Tuesday-night list and tops the Rams' receiver depth chart for week 6 "
         "of 2026, at home against the Cardinals. Arizona ranks 28th of 32 against receivers, and the game is "
-        "indoors under a fixed roof. The published projection has him at 23 points. Start him.",
+        "indoors under a fixed roof. He comes off 37.7 points in his last game. Start him.",
         "start",
     ),
     "Jahmyr Gibbs": (
@@ -67,7 +67,7 @@ HAND_WRITTEN: Final[dict[str, tuple[str, str]]] = {
     ),
     _LAMB: (
         "CeeDee Lamb is Questionable on the Tuesday-night list, so his Sunday night in Green Bay is not settled yet. "
-        "The published projection has him at 19.5 points in PPR scoring for week 6 of 2026. Green Bay sits 15th "
+        "He brings 22.6 PPR points a game into week 6 of 2026. Green Bay sits 15th "
         "of 32 against receivers, and he leads the Dallas depth chart ahead of George Pickens. Wait on his status "
         "before the 7:20 pm Central kickoff, and if he's cleared, he's in your lineup.",
         "hold",
@@ -156,8 +156,6 @@ def test_the_recorded_read_keeps_the_guards_that_stand(name: str) -> None:
     read = player["read"]
     assert gate_hits(read, week_name_ledger(sheet)) == []
     assert not any(rule.pattern.search(read) for rule in WEEK_NEVER_WORDS)
-    if sheet.projection is not None and not sheet.bye:
-        assert "published" in read.lower()
     assert "our projection" not in read.lower() and "our number" not in read.lower()
     assert all(datetime.fromisoformat(stamp) <= sheet.written_at for stamp in sheet.stamps().values())
 
@@ -206,14 +204,13 @@ def test_a_recorded_figure_the_card_does_not_print_is_refused() -> None:
     assert any(v.startswith(f'{FIGURE_OFF_PAGE}: "19.4", where the sheet prints 19.5') for v in result.violations)
 
 
-def test_the_cards_figure_on_a_tie_is_the_published_projection_the_rules_ask_for() -> None:
-    """Lamb's 19.45 prints 19.5 on the card: the read saying 19.5 names the published projection with its
-    figure, and no rule about the published projection is left broken."""
+def test_a_recorded_read_naming_the_published_projection_is_refused_by_name() -> None:
+    """Lane 275: Lamb's recording names the published projection with its figure, the card's Wk cell's alone;
+    at the card's 19.5 it is refused for naming it and stating its figure, never for a figure off the page."""
     sheet, player = _sheet(_LAMB)
-    read = player["read"].replace("19.4", "19.5")
-    left = week_rule_violations(read, sheet, _call(player))
-    said = ("on the published projection", "names the published projection", "without saying it is published")
-    assert not any(words in v for v in left for words in said), left
+    left = week_rule_violations(player["read"].replace("19.4", "19.5"), sheet, _call(player))
+    assert any("names the published projection" in v for v in left), left
+    assert any("states the published projection's figure" in v for v in left), left
 
 
 def test_the_bye_read_says_he_does_not_play_and_recommends_nothing_for_the_week() -> None:

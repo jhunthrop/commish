@@ -193,7 +193,7 @@ class _Writer:
         if "Puka Nacua" in who:
             if self.fail_first > 0:
                 self.fail_first -= 1
-                return _completion(STARTER_READ.replace("18.4 points", "18.6 points"), "start")
+                return _completion(STARTER_READ.replace("25.9 PPR points", "25.6 PPR points"), "start")
             return _completion(STARTER_READ, "start")
         return _completion(_QUESTIONABLE_READ, "hold")
 

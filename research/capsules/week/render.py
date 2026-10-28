@@ -15,8 +15,8 @@ from typing import Final
 from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.render_depth import slot_word
 from research.capsules.render_season import week_list
-from research.capsules.render_words import IN_OUR_RECORDS, ordinal, signed, week_of
-from research.capsules.week.cells import named_chance, shown_change
+from research.capsules.render_words import IN_OUR_RECORDS, ordinal, week_of
+from research.capsules.week.cells import named_chance
 from research.capsules.week.rank_words import rank_words
 from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import (
@@ -85,22 +85,16 @@ def _status_line(sheet: WeekSheet) -> str:
 
 
 def _projection_line(sheet: WeekSheet) -> str | None:
+    """The week's published projection, for the writer to know his week by. The read never quotes it nor its
+    change (Lane 275): the card's Wk cell prints both, and the read stands when it moves."""
     p = sheet.projection
     if p is None or sheet.bye:
         return None
-    parts = [
+    return (
         f"Published projection for {week_of(sheet.week, sheet.season)}: {points_text(p.points)} points in PPR "
-        f"scoring{_as_of(p.captured_at)}. It is a projection published for the week, not ours: call it the "
-        "published projection, with that figure."
-    ]
-    # The change is the card's Proj change cell, from 0.5 (Lane 139, C21); the figure before it is in no cell
-    # (Lane 100, B17).
-    change = shown_change(sheet.projection_change)
-    if change is not None and p.previous_points is not None:
-        parts.append(
-            f"It moved {signed(change)} points since the published figure before it{_as_of(p.previous_captured_at)}."
-        )
-    return " ".join(parts)
+        f"scoring{_as_of(p.captured_at)}. It is a projection published for the week, not ours. The card's Wk "
+        "cell prints it: never name it, its figure or its change in the read."
+    )
 
 
 def _expected_line(sheet: WeekSheet) -> str | None:

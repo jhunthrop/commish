@@ -18,7 +18,6 @@ from research.capsules.run_budget import BudgetSpentError
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.week.cadence import (
     FIRST,
-    PROJECTION_MOVED,
     STATUS_CHANGED,
     UNWRITTEN,
     due_reason,
@@ -99,7 +98,10 @@ def test_the_prompt_states_the_week_the_kickoff_and_that_the_number_is_published
     assert "45 to 70 words in all, about 60" in WEEK_RULES and "never more than 95" in WEEK_RULES
     # Lane 117 (B95): the four rules the first nightly broke most, in the writer's words.
     assert "One figure to a sentence." in WEEK_RULES
-    assert "The published projection is a cell you place inside a sentence about this player's week" in WEEK_RULES
+    # Lane 275: the read never states the published projection; the card's Wk cell prints it.
+    assert "Never state it, its figure, its change or a judgment of it" in WEEK_RULES
+    assert "Never the published projection, its figure or its change" in WEEK_RULES
+    assert "Name it once" not in WEEK_RULES and "with its figure" not in WEEK_RULES
     # Review H1 and M1: no stock projection sentence to copy, no trading word, no report name the facts never give.
     for primed in ("has him at", "the stock", "Tuesday-night"):
         assert primed not in WEEK_RULES, primed
@@ -197,7 +199,7 @@ def test_the_overrun_retry_is_one_and_only_for_the_cap() -> None:
 
 OUT_READ = (
     "Puka Nacua is Out on Friday's report, so he does not play against Arizona in week 6 of 2026. "
-    "The published projection has him at 18.4 points, but that figure does not count for a player who sits. "
+    "His 24.1 points in his last game do not count for a player who sits this week. "
     "Bench him this week and pick up a receiver who has a game."
 )
 # Plain words, no figure among them, that take a read over the 95-word cap.
@@ -325,22 +327,18 @@ def _stored(sheet_week: int = 6, **changes: object) -> StoredWeekRead:
     return replace(row, **changes)  # type: ignore[arg-type]
 
 
-def test_the_cadence_writes_a_first_read_a_status_change_and_a_projection_past_the_proj_change_threshold() -> None:
-    """Lane 256: after the roll-over a read is rewritten for a published projection that moved past the Proj
-    change tile's threshold (the page's serve rule), never for a smaller move, which rewrote the whole board
-    mid-week (330 reads on the night of 2026-10-21)."""
+def test_the_cadence_writes_a_first_read_and_a_status_change_and_a_read_stands_through_a_projection_move() -> None:
+    """Lane 275 (the founder, 2026-10-28): the read never states the published projection, so a move of it,
+    of any size, keeps the read the roll-over wrote; a first read, a status change and an unwritten read are
+    the reasons left."""
     sheet = questionable()  # the card prints 15.2
     assert due_reason(sheet, None, _NOW) == FIRST
     assert due_reason(sheet, _stored(sheet_week=5), _NOW) == FIRST
     assert due_reason(sheet, _stored(), _NOW) is None
     assert due_reason(replace(sheet, status=Status("out", REPORT)), _stored(), _NOW) == STATUS_CHANGED
-    assert due_reason(sheet, _stored(projection_points=15.7), _NOW) == PROJECTION_MOVED
-    assert due_reason(sheet, _stored(projection_points=14.7), _NOW) == PROJECTION_MOVED
-    assert due_reason(sheet, _stored(projection_points=15.6), _NOW) is None
-    assert due_reason(sheet, _stored(projection_points=15.1), _NOW) is None
-    assert due_reason(sheet, _stored(projection_points=None), _NOW) == PROJECTION_MOVED
-    # A row kept before the card's tenth was stored reads as the tenth it printed.
-    assert due_reason(sheet, _stored(projection_points=15.24), _NOW) is None
+    for then in (15.7, 14.7, 15.6, 15.1, 9.0, 22.0, None):
+        assert due_reason(sheet, _stored(projection_points=then), _NOW) is None, then
+    assert due_reason(replace(sheet, projection=None), _stored(), _NOW) is None
     assert due_reason(sheet, _stored(source="facts"), _NOW) == UNWRITTEN
 
 
@@ -352,15 +350,13 @@ def test_a_failed_read_is_retried_at_most_once_an_hour_and_three_times_a_day() -
 
 
 def test_the_hourly_pass_writes_only_a_status_that_moved() -> None:
-    """The coordinator's ruling (Lane 66v review, finding 1): the page is prerendered, so a projection move is
-    the nightly's to rewrite, never the hourly pass's."""
+    """The coordinator's ruling (Lane 66v review, finding 1): an hourly pass writes only a status change."""
     sheet = questionable()
     assert due_reason(sheet, None, _NOW, hourly=True) is None
     assert due_reason(sheet, _stored(source="facts"), _NOW, hourly=True) is None
     assert due_reason(replace(sheet, status=Status("out", REPORT)), _stored(), _NOW, hourly=True) == STATUS_CHANGED
     assert due_reason(sheet, _stored(projection_points=13.0), _NOW, hourly=True) is None
     assert due_reason(sheet, _stored(projection_points=15.8), _NOW, hourly=True) is None
-    assert due_reason(sheet, _stored(projection_points=15.8), _NOW) == PROJECTION_MOVED
 
 
 def test_a_sentence_shape_on_two_pages_keeps_its_first_carrier_in_board_order() -> None:
