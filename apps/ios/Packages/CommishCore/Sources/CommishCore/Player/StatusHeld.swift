@@ -2,8 +2,9 @@ import CommishAPI
 import Foundation
 
 /// A week read written before his designation changed (web/src/lib/player/status-held.ts, Lane 162):
-/// withheld as the run withholds a read whose status moved, behind the run's words for it, judged
-/// against the injury capture read beside the run at the screen's clock.
+/// shown under the run's words for it, the status caption over the kept read, never in place of it
+/// (Lane 274), judged against the injury capture read beside the run at the screen's clock. A read an
+/// older run nulled keeps its caption alone.
 public enum StatusHeld {
     /// The zone the read's captions are said in, as the run says them (caption.py CENTRAL).
     static let captionZone = TimeZone(identifier: "America/Chicago")!
@@ -49,8 +50,9 @@ public enum StatusHeld {
         return listed?.since.map { $0 > read.writtenAt } ?? false
     }
 
-    /// readAtStatus: his read withheld behind the status caption and the next hourly pass when his
-    /// designation changed since it was written; as the run served it otherwise, and with no capture.
+    /// readAtStatus: his read under the status caption and the next hourly pass when his designation
+    /// changed since it was written, its body and call kept; as the run served it otherwise, and with no
+    /// capture.
     public static func read(_ read: RunWeekRead, capture: RunDesignations?, player: String, now: Date) -> RunWeekRead {
         guard let capture,
               changedSince(read, capture: capture, listed: capture.players.additionalProperties[player])
@@ -59,7 +61,7 @@ public enum StatusHeld {
         }
         let due = Formatting.stampAt(nextHourlyPass(after: now), zone: captionZone)
         return RunWeekRead(
-            week: read.week, body: nil, caption: changed(due: due), status: read.status, call: nil,
+            week: read.week, body: read.body, caption: changed(due: due), status: read.status, call: read.call,
             writtenAt: read.writtenAt, factsAt: read.factsAt, projection: read.projection,
             movedCaption: read.movedCaption
         )

@@ -195,12 +195,10 @@ class PlayerSceneTest {
         assertTrue((written.card.read as SheetRead.Shown).read is ShownRead.Written)
         assertEquals(SheetVerb.Held(Words.Card.kickedOff), SheetVerb.of(PlayerSnapshotTest.Scene.WrittenMedium.offer, written.card.game))
         assertEquals(SheetRead.None(Words.Card.readNotYet), loaded(PlayerSnapshotTest.Scene.UnwrittenMedium).card.read)
-        assertEquals(
-            SheetRead.Shown(
-                ShownRead.Withheld("His status changed since this read was written. A new read is due by Sat Oct 17, 1:00 pm CT."),
-            ),
-            loaded(PlayerSnapshotTest.Scene.HeldMedium).card.read,
-        )
+        // Lane 274: the status caption goes over the kept read, never instead of it.
+        val held = (loaded(PlayerSnapshotTest.Scene.HeldMedium).card.read as SheetRead.Shown).read as ShownRead.Written
+        assertEquals("His status changed since this read was written. A new read is due by Sat Oct 17, 1:00 pm CT.", held.caption)
+        assertTrue(held.body.startsWith("Travis Etienne Jr."))
         val stale = sheetModel(PlayerSnapshotTest.Scene.StaleMedium, ODUNZE)
         assertEquals(SavedReason.Offline, (stale.state.value as SheetState.Loaded).freshness.saved)
         assertEquals("Last read Sat 12:00 pm", stale.stampWords())

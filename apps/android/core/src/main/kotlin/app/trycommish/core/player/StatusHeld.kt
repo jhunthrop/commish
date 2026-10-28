@@ -10,8 +10,9 @@ import java.time.Instant
 import java.time.ZoneId
 
 /** A week read written before his designation changed (web/src/lib/player/status-held.ts, Lane 162):
- * withheld as the run withholds a read whose status moved, behind the run's words for it, judged against
- * the injury capture read beside the run at the screen's clock. */
+ * shown under the run's words for it, the status caption over the kept read, never in place of it
+ * (Lane 274), judged against the injury capture read beside the run at the screen's clock. A read an
+ * older run nulled keeps its caption alone. */
 object StatusHeld {
     /** The zone the read's captions are said in, as the run says them (caption.py CENTRAL). */
     private val captionZone: ZoneId = ZoneId.of("America/Chicago")
@@ -50,8 +51,9 @@ object StatusHeld {
         return instantOrNull(listed?.since)?.isAfter(written) ?: false
     }
 
-    /** readAtStatus: his read withheld behind the status caption and the next hourly pass when his
-     * designation changed since it was written; as the run served it otherwise, and with no capture. */
+    /** readAtStatus: his read under the status caption and the next hourly pass when his designation
+     * changed since it was written, its body and call kept; as the run served it otherwise, and with no
+     * capture. */
     fun read(
         read: RunWeekRead,
         capture: RunDesignations?,
@@ -60,6 +62,6 @@ object StatusHeld {
     ): RunWeekRead {
         if (capture == null || !changedSince(read, capture, capture.players[player])) return read
         val due = Format.stampAt(nextHourlyPass(now), captionZone)
-        return read.copy(body = null, caption = changed(due), call = null)
+        return read.copy(caption = changed(due))
     }
 }

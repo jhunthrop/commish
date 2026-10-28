@@ -79,13 +79,18 @@ struct PlayerSheetViewModelTests {
         #expect(body.hasPrefix("Rome Odunze is questionable on Friday's report"))
     }
 
-    @Test func aReadWrittenBeforeHeWasDueBackIsHeldForHisStatus() async throws {
+    @Test func aReadWrittenBeforeHeWasDueBackStandsUnderTheStatusCaption() async throws {
         let viewModel = model(Self.etienne, clock: Fixtures.week)
         await viewModel.load()
         let (card, _) = try #require(loaded(viewModel))
-        #expect(card.read == .shown(.withheld(
-            "His status changed since this read was written. A new read is due by Sat Oct 17, 1:00 pm CT."
-        )))
+        // Lane 274: the status caption goes over the kept read, never instead of it.
+        guard case let .shown(.written(body, caption)) = card.read else {
+            Issue.record("a written read, got \(String(describing: card.read))")
+            return
+        }
+        #expect(body.hasPrefix("Travis Etienne Jr."))
+        #expect(caption == "His status changed since this read was written. "
+            + "A new read is due by Sat Oct 17, 1:00 pm CT.")
     }
 
     @Test func withNoReadWrittenThePlaceSaysSoAndAListedPlayersWeekIsHisList() async throws {

@@ -289,6 +289,12 @@ async function statusHeldCases(standin: Run): Promise<unknown[]> {
 			now: CLOCKS.week
 		},
 		{
+			name: 'an older run already nulled it: its caption alone',
+			read: { ...read, body: null, call: null },
+			capture,
+			now: CLOCKS.week
+		},
+		{
 			name: 'the run caption at Friday 10 pm Eastern',
 			read,
 			capture,

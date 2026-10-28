@@ -1,6 +1,7 @@
-/** A week read written before his designation changed (Lane 162, D01): withheld as the run withholds a
- * read whose status moved (`nightly/build/pages.py week_read_json`), behind the run's words for it.
- *
+/** A week read written before his designation changed (Lane 162, D01): shown under the run's words for it
+ * (`nightly/build/pages.py week_read_json`), the status-changed caption over the kept read, never in place
+ * of it (Lane 274, Lane 275: always show a read). A run from before Lane 275 nulled the body on a status
+ * change: that read keeps its caption alone. *
  * The run judges the read against the status it serves at its build; the injury capture beside it
  * (`designations.json`) is written again every hour (`nightly/designations.py mark_runs`), and the hourly
  * web build that follows it keeps the night's read. So a player due back this week (Lane 153: questionable
@@ -73,9 +74,10 @@ export function statusChangedSince(
 	return listed?.since != null && Date.parse(listed.since) > written;
 }
 
-/** His read as the page and the shelf are built with it at `now` (ms): withheld behind the status
- * caption and the next hourly pass when his designation changed since it was written; as the run
- * served it otherwise, and with no capture to judge it by. */
+/** His read as the page and the shelf are built with it at `now` (ms): under the status caption and the
+ * next hourly pass when his designation changed since it was written, its body and call kept (or still
+ * null where an older run nulled them); as the run served it otherwise, and with no capture to judge it
+ * by. Returns the read itself when it stands, so a caller can tell. */
 export function readAtStatus(
 	read: WeekRead,
 	capture: Designations | null,
@@ -85,10 +87,5 @@ export function readAtStatus(
 	if (capture === null || !statusChangedSince(read, capture, capture.players[playerId]))
 		return read;
 	const due = new Date(nextHourlyPass(now)).toISOString();
-	return {
-		...read,
-		body: null,
-		call: null,
-		caption: STATUS_HELD_WORDS.changed(stampAt(due, CAPTION_ZONE))
-	};
+	return { ...read, caption: STATUS_HELD_WORDS.changed(stampAt(due, CAPTION_ZONE)) };
 }

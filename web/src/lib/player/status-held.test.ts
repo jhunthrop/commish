@@ -34,16 +34,26 @@ const card = (state: CardProjection['state']): CardProjection => ({
 	state
 });
 
-void test('a read written before he became due back is withheld behind the status caption (D01)', () => {
+void test('a read written before he became due back keeps its body under the status caption (D01, Lane 274)', () => {
 	const read = readOf(ETIENNE);
 	assert.equal(read.status, 'injured_reserve');
+	assert.ok(read.body !== null);
 	assert.equal(CAPTURE.players[ETIENNE]?.returning, '2026-10-18');
 	const built = readAtStatus(read, CAPTURE, ETIENNE, BUILD);
-	assert.deepEqual(built, { ...read, body: null, call: null, caption: DUE });
-	// The page and the shelf show its caption alone before his kickoff, never the read that benches him,
-	// and from his kickoff through final the place says no read was written (Lane 160).
+	assert.deepEqual(built, { ...read, caption: DUE });
+	// The page and the shelf show the read with the status caption over it, never the caption instead.
+	const shown = { withheld: false, body: read.body, caption: DUE };
+	assert.deepEqual(shownWeekRead(built, card('upcoming')), shown);
+	assert.deepEqual(shownWeekRead(built, null), shown);
+	for (const state of ['kicked_off', 'final'] as const)
+		assert.deepEqual(shownWeekRead(built, card(state)), shown);
+});
+
+void test('a read an older run already nulled for his status keeps its caption alone (old data)', () => {
+	const nulled = { ...readOf(ETIENNE), body: null, call: null };
+	const built = readAtStatus(nulled, CAPTURE, ETIENNE, BUILD);
+	assert.deepEqual(built, { ...nulled, caption: DUE });
 	assert.deepEqual(shownWeekRead(built, card('upcoming')), { withheld: true, words: DUE });
-	assert.deepEqual(shownWeekRead(built, null), { withheld: true, words: DUE });
 	for (const state of ['kicked_off', 'final'] as const)
 		assert.deepEqual(shownWeekRead(built, card(state)), {
 			withheld: true,
@@ -91,10 +101,11 @@ void test('the same status in a run that began after the read is a change: off t
 			[ETIENNE]: { status: 'injured_reserve', seasonLong: true, since: '2026-10-14T01:00:00.000Z' }
 		}
 	} as const;
-	assert.equal(readAtStatus(read, back, ETIENNE, BUILD).body, null);
+	assert.equal(readAtStatus(read, back, ETIENNE, BUILD).caption, DUE);
+	assert.equal(readAtStatus(read, back, ETIENNE, BUILD).body, read.body);
 	// Cleared from the list since: no designation where the read says injured reserve.
 	const rest = Object.fromEntries(Object.entries(CAPTURE.players).filter(([id]) => id !== ETIENNE));
-	assert.equal(readAtStatus(read, { ...CAPTURE, players: rest }, ETIENNE, BUILD).body, null);
+	assert.equal(readAtStatus(read, { ...CAPTURE, players: rest }, ETIENNE, BUILD).caption, DUE);
 });
 
 void test('the next hourly pass follows the capture schedule, as the run says it (caption.py)', () => {
