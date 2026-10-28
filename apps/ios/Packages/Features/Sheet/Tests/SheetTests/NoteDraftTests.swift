@@ -27,6 +27,23 @@ struct NoteDraftTests {
         #expect(draft.takeWrite() == nil)
     }
 
+    @Test("blur with nothing typed re-syncs to the row's current note and writes nothing")
+    func blurResyncsUntouchedField() {
+        var draft = NoteDraft(rowNote: "old")
+        draft.follow(rowNote: "account's", focused: true)
+        #expect(draft.text == "old")
+        #expect(draft.blur(rowNote: "account's") == nil)
+        #expect(draft.text == "account's")
+        #expect(draft.takeWrite() == nil)
+    }
+
+    @Test("blur after typing returns the typed note")
+    func blurWritesTyping() {
+        var draft = NoteDraft(rowNote: "old")
+        draft.type("mine")
+        #expect(draft.blur(rowNote: "account's") == "mine")
+    }
+
     @Test("a row with no note opens empty and writes nothing")
     func noNote() {
         var draft = NoteDraft(rowNote: nil)

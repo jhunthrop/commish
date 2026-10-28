@@ -21,6 +21,16 @@ struct NoteDraft: Equatable {
         text = typed
     }
 
+    /// The field lost focus: a typed note is returned to write; otherwise the field re-syncs to the row's
+    /// current note, so a later edit never starts from stale text.
+    mutating func blur(rowNote: String?) -> String? {
+        if let typed = takeWrite() {
+            return typed
+        }
+        follow(rowNote: rowNote, focused: false)
+        return nil
+    }
+
     /// The text to write on blur or disappear: only a note the member changed, and only once.
     mutating func takeWrite() -> String? {
         guard text != synced else { return nil }

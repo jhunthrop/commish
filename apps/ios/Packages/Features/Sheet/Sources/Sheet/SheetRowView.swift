@@ -219,7 +219,7 @@ struct SheetEditorView: View {
         }
         .onChange(of: noteFocused) { _, focused in
             if !focused {
-                writeNote()
+                send(draft.blur(rowNote: line.note))
             }
         }
         .onDisappear(perform: writeNote)
@@ -262,7 +262,11 @@ struct SheetEditorView: View {
     }
 
     private func writeNote() {
-        if let typed = draft.takeWrite() {
+        send(draft.takeWrite())
+    }
+
+    private func send(_ typed: String?) {
+        if let typed {
             actions.note(line.id, typed)
         }
     }
