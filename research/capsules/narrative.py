@@ -50,7 +50,9 @@ _WORD_NUMBER: Final = re.compile(r"\d+(?:[.,]\d+)*%?")
 NAMES_KIND: Final = "names: "
 WORDS_KIND: Final = "words: "
 _WORD_MARK: Final = "x"
-_NAME_SUFFIXES: Final = frozenset({"Jr.", "Jr", "Sr.", "Sr", "II", "III", "IV", "V"})
+# A name's suffix in every form a read may write it (B276, Lane 286): with and without the period.
+NAME_SUFFIXES: Final = ("Jr.", "Jr", "Sr.", "Sr", "II", "III", "IV", "V")
+_NAME_SUFFIX_SET: Final = frozenset(NAME_SUFFIXES)
 
 
 def why_group_slot_key(group_key: str) -> str:
@@ -83,16 +85,30 @@ def held_sentences(bodies: Sequence[str], min_words: int) -> set[str]:
 
 
 def player_spellings(names: Iterable[str]) -> tuple[str, ...]:
-    """Each player's full name, his last name (the name's last word that is not a suffix) and his first name
-    ("Puka", the Lane 265 review's L1: a read that calls him by it is the same shape as one that names him)."""
+    """Each player's name as a read may write it: his full name, the name without its suffix, his last name
+    (the name's last word that is not a suffix) and his first name ("Puka", the Lane 265 review's L1: a read
+    that calls him by it is the same shape as one that names him), and the bare full and last names with every
+    suffix form when his name carries one (B276, Lane 286: "Harrison Jr." and "Marvin Harrison" are both Marvin
+    Harrison Jr.)."""
     spellings: set[str] = set()
     for name in names:
         words = name.split()
-        if not words:
+        bare = _without_suffix(words)
+        if not bare:
             continue
-        spellings.update((name, words[0]))
-        spellings.add(next((w for w in reversed(words) if w not in _NAME_SUFFIXES), words[-1]))
+        full, last = " ".join(bare), bare[-1]
+        spellings.update((name, full, bare[0], last))
+        if len(bare) < len(words):
+            spellings.update(f"{stem} {suffix}" for stem in (full, last) for suffix in NAME_SUFFIXES)
     return tuple(sorted(spellings))
+
+
+def _without_suffix(words: Sequence[str]) -> list[str]:
+    """A name's words with its trailing suffixes dropped ("Marvin Harrison Jr." to "Marvin Harrison")."""
+    end = len(words)
+    while end > 1 and words[end - 1] in _NAME_SUFFIX_SET:
+        end -= 1
+    return list(words[:end])
 
 
 def club_spellings() -> tuple[str, ...]:

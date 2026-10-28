@@ -10,8 +10,8 @@ season's (`with_season`) before the writer's rules see it. The week's rules foll
 
 Lane 62's rule binds as the read is written, on sentence shapes (the review's M4; Lane 265 on Lane 261's
 bake-off normalization): a sentence is held by two shapes (`narrative.held_shapes`), its placeholder shape
-(every player name, full or last, every club spelling, a plural's possessive among them, and every number a
-placeholder, `narrative.ShapeMasks`, six words or more) and main's word shape (every capitalised word and
+(every player name, full or last, with or without his suffix, every club spelling, a plural's possessive among
+them, and every number a placeholder, `narrative.ShapeMasks`, six words or more) and main's word shape (every capitalised word and
 number masked, four words or more), so the check is never weaker than the one before it. A sentence either
 shape puts on another page's read this week is refused here (`sentence_shapes`), the correction ask showing
 the shape; one that still lands on two pages is demoted after the night. A read is masked with the names
