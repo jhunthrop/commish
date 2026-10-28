@@ -20,9 +20,13 @@
 		tagsOf?: (boardId: string | null) => readonly string[];
 		/** Said under the bench's head when the bench is empty. */
 		noBench: string;
+		/** The block this table is on a page of many (the every-league page, Lane 257): its ids are its
+		 * own. Left out, the bench keeps the anchor the League page links to. */
+		scope?: string;
 	}
 
-	let { label, box, tagsOf = () => [], noBench }: Props = $props();
+	let { label, box, tagsOf = () => [], noBench, scope }: Props = $props();
+	const idOf = (id: string): string => (scope === undefined ? id : `${scope}-${id}`);
 
 	const COLUMNS = 11;
 	const opened = new SvelteSet<string>();
@@ -47,7 +51,7 @@
 		if (entry.why === null) return null;
 		const key = entry.row.key;
 		return {
-			id: `why-${key}`,
+			id: idOf(`why-${key}`),
 			open: opened.has(key),
 			toggle: () => {
 				if (opened.has(key)) opened.delete(key);
@@ -110,7 +114,9 @@
 		</tr>
 	</tbody>
 	<tbody>
-		<tr class="sect" id={BENCH_ANCHOR}><th colspan={COLUMNS} scope="rowgroup">{BOX.bench}</th></tr>
+		<tr class="sect" id={idOf(BENCH_ANCHOR)}
+			><th colspan={COLUMNS} scope="rowgroup">{BOX.bench}</th></tr
+		>
 		{#each box.bench as entry (entry.row.key)}
 			<BoxLine
 				row={entry.row}

@@ -92,6 +92,11 @@ const WEEK_PARTS = /[\\/]src[\\/]lib[\\/]run[\\/]board-status\./;
  * worded at build). Kept out of the shared chunk by name, so the room naming its pool never hoists them
  * onto every page. */
 const POOL_WORDS = /[\\/]src[\\/]lib[\\/]format[\\/]pool-words\./;
+/** The basis block under a box score or an order (ui/BasisBlock): the record's sections, the order's
+ * screens and the league's box screens draw it, and the front door never does. Kept out of the shared
+ * chunk by name, so the every-league Lineup (Lane 257), a fourth route that draws it, never hoists it
+ * onto every page. */
+const BASIS_PARTS = /[\\/]src[\\/]lib[\\/]ui[\\/]BasisBlock\./;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
 const SHARED_BY_ROUTES = 4;
@@ -153,6 +158,7 @@ export default defineConfig({
 								!FIGURE_WORDS.test(id) &&
 								!WEEK_PARTS.test(id) &&
 								!POOL_WORDS.test(id) &&
+								!BASIS_PARTS.test(id) &&
 								!LEAGUE_PAGE_PARTS.test(id),
 							minShareCount: SHARED_BY_ROUTES,
 							priority: 1

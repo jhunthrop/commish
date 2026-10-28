@@ -208,12 +208,14 @@ void test('a failed call says the API sentence, never a raw error, and a lost mo
 	assert.deepEqual(failedStep(offline, 'espn', 'make', href), {
 		kind: 'failed',
 		sentence: lostWords('espn'),
-		href
+		href,
+		lost: true
 	});
 	assert.deepEqual(failedStep(new TypeError('Failed to fetch'), 'espn', 'make', href), {
 		kind: 'failed',
 		sentence: lostWords('espn'),
-		href
+		href,
+		lost: true
 	});
 	const planDrop = failedStep(new TypeError('Failed to fetch'), 'espn', 'plan', href);
 	assert.ok(

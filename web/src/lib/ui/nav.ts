@@ -272,9 +272,14 @@ export const RAIL_OF_WORD_SET: Readonly<Record<WordSet, RailKey>> = {
 	season: 'in_season'
 };
 
+/** The member's every-league Lineup (Lane 257). */
+export const EVERY_LINEUP = '/league';
+
 /** Where an item goes: a league's page for the selected league, the follow page with none, every
- * other item its own page. */
-export function railHref(item: RailItem, leagueId: string | null): string {
+ * other item its own page; Lineup, off a league's page for an account with more than one league,
+ * the every-league Lineup (Lane 257). */
+export function railHref(item: RailItem, leagueId: string | null, every = false): string {
+	if (every && item.screen === 'start') return EVERY_LINEUP;
 	if (item.screen === undefined || leagueId === null) return item.href;
 	const screen = item.screen === LEAGUE_HOME ? '' : `/${item.screen}`;
 	return `/league/${encodeURIComponent(leagueId)}${screen}`;

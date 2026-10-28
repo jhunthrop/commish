@@ -16,6 +16,8 @@ declare global {
 			/** The player whose card is open over a screen, by his page's slug (Lane 113, the player
 			 * shelf). */
 			card?: string;
+			/** The block the card is open in, on a page of many (the every-league page, Lane 257). */
+			cardIn?: string;
 		}
 	}
 }
