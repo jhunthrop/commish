@@ -8,12 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -55,7 +57,9 @@ type AccountStore interface {
 	UpsertAccount(ctx context.Context, id Identity) (Account, error)
 	CreateSession(ctx context.Context, accountID uuid.UUID, tokenHash []byte, workosSID, userAgent string, now time.Time) error
 	DeleteSession(ctx context.Context, tokenHash []byte) (string, error)
-	SetHandle(ctx context.Context, id uuid.UUID, handle string) (Account, error)
+	// UpdateAccount writes the handle, when set, and runs also in the same
+	// transaction.
+	UpdateAccount(ctx context.Context, id uuid.UUID, handle *string, also func(context.Context, pgx.Tx) error) (Account, error)
 }
 
 // AppCodes mints the pairing code an app's sign-in hands back to the
@@ -88,8 +92,18 @@ type Handler struct {
 	// are still queued for the provider; a sign-in as one is refused. nil
 	// checks nothing. deletion.Store implements it.
 	Deleting DeletionQueue
-	Now      func() time.Time
-	Log      *slog.Logger
+	// Notifications writes the push settings PATCH /me carries; nil
+	// refuses them.
+	Notifications NotificationSettings
+	Now           func() time.Time
+	Log           *slog.Logger
+}
+
+// NotificationSettings writes the account's push settings (Lane 262).
+// notify.Settings implements it.
+type NotificationSettings interface {
+	CheckNotifications(u apitypes.NotificationSettingsUpdate) map[string]string
+	UpdateNotificationsIn(ctx context.Context, tx pgx.Tx, accountID uuid.UUID, u apitypes.NotificationSettingsUpdate) error
 }
 
 // DeletionQueue is the queue of deleted accounts' WorkOS users.
@@ -400,19 +414,58 @@ func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
 		return
 	}
-	if err := h.Names.Check(in.Handle); err != nil {
-		httpx.WriteInvalid(w, r, map[string]string{"handle": err.Error()})
+	if faults := h.checkUpdate(in); faults != nil {
+		httpx.WriteInvalid(w, r, faults)
 		return
 	}
-	updated, err := h.Store.SetHandle(r.Context(), a.ID, in.Handle)
+	var also func(context.Context, pgx.Tx) error
+	if in.Notifications != nil {
+		update := *in.Notifications
+		also = func(ctx context.Context, tx pgx.Tx) error {
+			return h.Notifications.UpdateNotificationsIn(ctx, tx, a.ID, update)
+		}
+	}
+	updated, err := h.Store.UpdateAccount(r.Context(), a.ID, in.Handle, also)
 	switch {
 	case errors.Is(err, ErrHandleTaken):
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "That name is taken",
 			map[string]string{"handle": "That name is taken"})
 		return
 	case err != nil:
-		httpx.WriteInternal(w, r, h.Log, "auth: set handle", err)
+		httpx.WriteInternal(w, r, h.Log, "auth: update account", err)
 		return
 	}
 	h.writeAccount(w, r, updated)
+}
+
+// Refusals of an update that changes nothing.
+const (
+	nothingToUpdate     = "Send a handle or notifications to change"
+	notificationsClosed = "Push settings cannot be changed right now"
+)
+
+// checkUpdate is every fault in the update by field, nil when it reads,
+// checked whole before anything is written, so a fault in either field
+// leaves both as they were.
+func (h *Handler) checkUpdate(in apitypes.AccountUpdate) map[string]string {
+	if in.Handle == nil && in.Notifications == nil {
+		return map[string]string{"handle": nothingToUpdate}
+	}
+	faults := map[string]string{}
+	if in.Handle != nil {
+		if err := h.Names.Check(*in.Handle); err != nil {
+			faults["handle"] = err.Error()
+		}
+	}
+	if in.Notifications != nil {
+		if h.Notifications == nil {
+			faults["notifications"] = notificationsClosed
+		} else {
+			maps.Copy(faults, h.Notifications.CheckNotifications(*in.Notifications))
+		}
+	}
+	if len(faults) == 0 {
+		return nil
+	}
+	return faults
 }

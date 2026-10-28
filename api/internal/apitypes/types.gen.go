@@ -1230,6 +1230,24 @@ func (e ProjectionScoringFormat) Valid() bool {
 	}
 }
 
+// Defines values for PushPlatform.
+const (
+	PushPlatformApns PushPlatform = "apns"
+	PushPlatformFcm  PushPlatform = "fcm"
+)
+
+// Valid indicates whether the value is a known member of the PushPlatform enum.
+func (e PushPlatform) Valid() bool {
+	switch e {
+	case PushPlatformApns:
+		return true
+	case PushPlatformFcm:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReportPickChip.
 const (
 	ReportPickChipAtAdp ReportPickChip = "at_adp"
@@ -2150,6 +2168,9 @@ type Account struct {
 	Leagues    []ContextLeague  `json:"leagues"`
 	Membership *MembershipState `json:"membership"`
 
+	// Notifications the account's push settings (Lane 262), the defaults until the member changes one; absent from an API before it, which a client reads as the defaults
+	Notifications *NotificationSettings `json:"notifications,omitempty"`
+
 	// Season the NFL season the site is in, for a visitor with no league, from the kickoffs the API reads
 	Season SiteSeason `json:"season"`
 }
@@ -2159,9 +2180,12 @@ type AccountDeletion struct {
 	Email string `json:"email"`
 }
 
-// AccountUpdate defines model for AccountUpdate.
+// AccountUpdate what changes, at least one of the two; one left out keeps its setting
 type AccountUpdate struct {
-	Handle string `json:"handle"`
+	Handle *string `json:"handle,omitempty"`
+
+	// Notifications the settings to change; one left out keeps its setting
+	Notifications *NotificationSettingsUpdate `json:"notifications,omitempty"`
 }
 
 // AttachInput defines model for AttachInput.
@@ -3795,6 +3819,49 @@ type NamedPick struct {
 	HostName string `json:"host_name"`
 }
 
+// NotificationKinds one switch per kind of push, every one on by default
+type NotificationKinds struct {
+	// StarterStatus a starter in a followed league is ruled out
+	StarterStatus bool `json:"starter_status"`
+
+	// WaiverClaims a waiver claim in a followed league resolved
+	WaiverClaims bool `json:"waiver_claims"`
+
+	// WeekReads the week's reads have landed (Thursday)
+	WeekReads bool `json:"week_reads"`
+}
+
+// NotificationKindsUpdate the switches to change; one left out keeps its setting
+type NotificationKindsUpdate struct {
+	StarterStatus *bool `json:"starter_status,omitempty"`
+	WaiverClaims  *bool `json:"waiver_claims,omitempty"`
+	WeekReads     *bool `json:"week_reads,omitempty"`
+}
+
+// NotificationSettings when pushes may arrive: never inside quiet hours in the member's own time zone (a push due then waits for the end), and only the kinds switched on. A start equal to its end is no quiet hours.
+type NotificationSettings struct {
+	// Kinds one switch per kind of push, every one on by default
+	Kinds NotificationKinds `json:"kinds"`
+
+	// QuietEnd HH:MM local, 08:00 by default
+	QuietEnd string `json:"quiet_end"`
+
+	// QuietStart HH:MM local, 23:00 by default
+	QuietStart string `json:"quiet_start"`
+
+	// TimeZone an IANA zone, America/New_York by default
+	TimeZone string `json:"time_zone"`
+}
+
+// NotificationSettingsUpdate the settings to change; one left out keeps its setting
+type NotificationSettingsUpdate struct {
+	// Kinds the switches to change; one left out keeps its setting
+	Kinds      *NotificationKindsUpdate `json:"kinds,omitempty"`
+	QuietEnd   *string                  `json:"quiet_end,omitempty"`
+	QuietStart *string                  `json:"quiet_start,omitempty"`
+	TimeZone   *string                  `json:"time_zone,omitempty"`
+}
+
 // OrderAdvice defines model for OrderAdvice.
 type OrderAdvice struct {
 	// Basis what the order and its two figures are, said once under the rows
@@ -4111,6 +4178,25 @@ type ProjectionScoring struct {
 
 // ProjectionScoringFormat defines model for ProjectionScoring.Format.
 type ProjectionScoringFormat string
+
+// PushPlatform who delivers to the device, Apple's push service or Firebase Cloud Messaging
+type PushPlatform string
+
+// PushRegistered defines model for PushRegistered.
+type PushRegistered struct {
+	// Platform who delivers to the device, Apple's push service or Firebase Cloud Messaging
+	Platform     PushPlatform `json:"platform"`
+	RegisteredAt time.Time    `json:"registered_at"`
+}
+
+// PushRegistration defines model for PushRegistration.
+type PushRegistration struct {
+	// Platform who delivers to the device, Apple's push service or Firebase Cloud Messaging
+	Platform PushPlatform `json:"platform"`
+
+	// Token the platform's token for this install, an APNs device token in hex or an FCM registration token
+	Token string `json:"token"`
+}
 
 // Redirect defines model for Redirect.
 type Redirect struct {
@@ -5570,6 +5656,12 @@ type SiteSeason struct {
 // SiteSeasonPhase defines model for SiteSeason.Phase.
 type SiteSeasonPhase string
 
+// StarterStatusAccepted defines model for StarterStatusAccepted.
+type StarterStatusAccepted struct {
+	// RequestedAt when the run was requested
+	RequestedAt time.Time `json:"requested_at"`
+}
+
 // StatusRead the injury capture a board's statuses come from, absent when none was read
 type StatusRead struct {
 	// AsOf the capture's stamp, when the list last changed (an unchanged list is not stored again)
@@ -6741,6 +6833,9 @@ type CreateCompanionJSONRequestBody = CompanionCreate
 
 // PairDeviceJSONRequestBody defines body for PairDevice for application/json ContentType.
 type PairDeviceJSONRequestBody = PairInput
+
+// RegisterPushJSONRequestBody defines body for RegisterPush for application/json ContentType.
+type RegisterPushJSONRequestBody = PushRegistration
 
 // ConnectESPNJSONRequestBody defines body for ConnectESPN for application/json ContentType.
 type ConnectESPNJSONRequestBody = ESPNConnectInput

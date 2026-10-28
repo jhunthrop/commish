@@ -34,6 +34,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/metrics"
 	"github.com/jhunthrop/commish/api/internal/mocks"
 	"github.com/jhunthrop/commish/api/internal/names"
+	"github.com/jhunthrop/commish/api/internal/notify"
 	"github.com/jhunthrop/commish/api/internal/runs"
 	"github.com/jhunthrop/commish/api/internal/season"
 	"github.com/jhunthrop/commish/api/internal/server"
@@ -137,8 +138,13 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	// The site's season reads the board's schedule, kept an hour: one
 	// source for /me, GET /season, the leagues' phases and Sleeper's week.
 	site := &season.Site{Facts: draftBoards.Schedule, Now: now, Log: log}
+	// Push (Lane 262): the outbox, the members' settings /me carries, and
+	// the app registrations on their devices.
+	notifyStore := &notify.Store{Pool: pool}
+	pushSettings := &notify.Settings{Store: notifyStore}
 	viewer := &account.Viewer{
-		Entitlements: ents, Leagues: &leaguesync.Store{Pool: pool, Now: now, Season: site}, Season: site, Now: now,
+		Entitlements: ents, Leagues: &leaguesync.Store{Pool: pool, Now: now, Season: site}, Season: site,
+		Notifications: pushSettings, Now: now,
 	}
 	gate := &leagues.Gate{Entitlements: ents, Now: now, Log: log}
 	leagueStore := &leagues.Store{Pool: pool}
@@ -146,7 +152,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 
 	idp := auth.NewWorkOS(cfg.WorkOS.APIKey, cfg.WorkOS.ClientID, cfg.WorkOS.RedirectURI)
 	deviceService := &devices.Service{
-		Store: deviceStore, Tokens: bearer, CodeKey: codeKey, Now: now, Log: log,
+		Store: deviceStore, Push: deviceStore, Tokens: bearer, CodeKey: codeKey, Now: now, Log: log,
 		IdP: idp, SignedOutURL: cfg.HTTP.PublicBaseURL + auth.SignedOutPath,
 	}
 	// The deleted accounts' WorkOS users still queued (Lane 233): the delete
@@ -156,7 +162,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		Store: authStore, Sessions: sessions, Viewer: viewer, Names: nameFilter, StateSealer: stateSealer,
 		IdP:           idp,
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, TrustedHops: cfg.HTTP.TrustedProxyHops, Now: now, Log: log,
-		Anon: anon, Claimer: mockStore, AppCodes: deviceService, Deleting: deletionStore,
+		Anon: anon, Claimer: mockStore, AppCodes: deviceService, Deleting: deletionStore, Notifications: pushSettings,
 	}
 	sale := &season.Sale{Schedule: draftBoards.Schedule, Log: log}
 	billingService := &billing.Service{
@@ -219,6 +225,14 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 
 	// A member deletes their own account (Lane 233): their live lobby seats
 	// given up, every row in one transaction, then the sign-in user.
+	// The hourly capture's request for the starter status pushes (Lane
+	// 262): verified, recorded and answered 202; the api-notify job runs
+	// the producer.
+	internal := &notify.Internal{
+		Verifier: notify.GoogleIdentity{Audience: cfg.HTTP.APIBaseURL}, Callers: cfg.Push.InternalCallers,
+		Requests: notifyStore, Now: now, Log: log,
+	}
+
 	deleter := &deletion.Service{
 		Accounts: deletionStore, Rooms: lobbies.Store, Users: idp, Objects: exportHandler.Objects,
 		Cookies: sessions, Now: now, Log: log,
@@ -239,6 +253,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		lobbies.Routes(),
 		companions.Routes(),
 		deviceService.Routes(),
+		internal.Routes(),
 		leagueSync.Routes(),
 		inSeason.Routes(),
 		moves.Routes(),

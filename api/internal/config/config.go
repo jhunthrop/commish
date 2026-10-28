@@ -203,6 +203,8 @@ type API struct {
 	// holds every feature and checkout stays shut whatever the Stripe
 	// keys; 0, the default, is none.
 	FreeSeason int
+	// Push is push delivery and the internal routes (Lane 262).
+	Push Push
 }
 
 // Room is cmd/room's whole configuration.
@@ -567,6 +569,7 @@ func LoadAPI(get Getenv) (API, error) {
 	c.Dev = l.dev(c.Env)
 	c.AllowedHosts = l.allowedHosts(c.HTTP.APIBaseURL, c.Env)
 	c.FreeSeason = l.freeSeason()
+	c.Push = l.push()
 	return c, l.err()
 }
 
