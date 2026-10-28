@@ -16,6 +16,7 @@ import type {
 	AdpSource,
 	Capsule,
 	Club,
+	ReadsDue,
 	WeekRead,
 	Designations,
 	Format,
@@ -162,6 +163,8 @@ export interface PlayerPage {
 	basisTiles: BasisTile[];
 	/** The week-ahead read (Lane 72), null until the nightly writes his. */
 	weekRead: WeekRead | null;
+	/** The night the coming week's reads are written, while they are not (Lane 256); null otherwise. */
+	weekReadsDue: ReadsDue | null;
 	/** Each week's last kickoff on the run's schedule, after which its lineup can no longer be set
 	 * (Lane 100, B64). */
 	lastKickoffs: Record<number, string>;
@@ -190,6 +193,7 @@ interface PageSource {
 	priorSeasons: PriorSeason[];
 	capsule: Capsule | null;
 	weekRead: WeekRead | null;
+	weekReadsDue: ReadsDue | null;
 	lastGameClub: Player['lastGameClub'];
 	copyOf: PlayerPage['copyOf'];
 }
@@ -209,6 +213,7 @@ function sourceOf(read: PlayerRead): PageSource {
 			priorSeasons: [],
 			capsule: null,
 			weekRead: null,
+			weekReadsDue: null,
 			lastGameClub: null,
 			copyOf: null
 		};
@@ -218,6 +223,7 @@ function sourceOf(read: PlayerRead): PageSource {
 		...player,
 		priorSeasons: player.priorSeasons ?? [],
 		weekRead: player.weekRead ?? null,
+		weekReadsDue: player.weekReadsDue ?? null,
 		lastGameClub: player.lastGameClub ?? null,
 		copyOf: read.kind === 'copy' ? read.from : null
 	};
@@ -477,6 +483,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 						slate.slates,
 						now
 					),
+		weekReadsDue: loaded.weekReadsDue,
 		lastKickoffs,
 		copyOf: loaded.copyOf,
 		unwritten: unwrittenByFormat({

@@ -8,7 +8,7 @@
  * each rounded once there: this only compares them. */
 import type { components } from '#lib/api/types.ts';
 import type { GameHead } from '#lib/league/box/kickoff.ts';
-import type { WeekRead } from '#lib/run/schema.ts';
+import type { ReadsDue, WeekRead } from '#lib/run/schema.ts';
 import { CARD, projectionMoved } from './card.ts';
 
 /** His game's state at the screen's clock, by the screen's one rule (kickoff.ts lineState), null for
@@ -72,7 +72,9 @@ export function shownWeekRead(read: WeekRead, card: CardProjection | null): Show
 }
 
 /** The read's place when the run holds no read for him: his next game while it is still to come,
- * never "next" for a game under way or final (Lane 158). */
-export function noReadWords(state: ReadGameState): string {
-	return underway(state) ? CARD.readNotWritten : CARD.readNotYet;
+ * never "next" for a game under way or final (Lane 158); while the coming week's reads are not yet
+ * written, the night they are (Lane 256, the run's `weekReadsDue`). */
+export function noReadWords(state: ReadGameState, due: ReadsDue | null): string {
+	if (underway(state)) return CARD.readNotWritten;
+	return due === null ? CARD.readNotYet : CARD.readsDue(due.week, due.night);
 }

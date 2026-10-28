@@ -4,6 +4,7 @@ import app.trycommish.api.CommishJson
 import app.trycommish.api.decodeEnvelope
 import app.trycommish.api.models.RunDesignations
 import app.trycommish.api.models.RunManifestAnswer
+import app.trycommish.api.models.RunReadsDue
 import app.trycommish.api.models.RunWeekRead
 import app.trycommish.core.board.RunFixture
 import app.trycommish.core.start.GameRead
@@ -104,7 +105,8 @@ class PlayerSheetParityTest {
     @Test
     fun `with no read the place names his next game only while it is to come`() {
         SheetParity.cases("noRead").forEach { test ->
-            assertEquals(test.string("words"), WeekReads.noRead(SheetParity.state(test.text("state"))), test.text("state"))
+            val due = test.obj("due")?.let { CommishJson.decodeFromJsonElement(RunReadsDue.serializer(), it) }
+            assertEquals(test.string("words"), WeekReads.noRead(SheetParity.state(test.text("state")), due), "${test.text("state")} $due")
         }
     }
 

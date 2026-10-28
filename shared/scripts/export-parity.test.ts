@@ -211,13 +211,23 @@ void test("the player sheet's parity: every held read, each sheet player at each
 		parity.weekRead.some((c) => !c.shown.withheld),
 		'a read that stands'
 	);
+	const notWritten = 'Our read for this game was not written.';
 	assert.deepEqual(
 		parity.noRead.map((c) => c.words),
 		[
 			'Our read for his next game is not written yet.',
 			'Our read for his next game is not written yet.',
-			'Our read for this game was not written.',
-			'Our read for this game was not written.'
+			notWritten,
+			notWritten,
+			// Lane 256: until the week rolls over, the night the run names.
+			'Our reads for week 8 are written Tuesday night.',
+			'Our reads for week 8 are written Tuesday night.',
+			notWritten,
+			notWritten,
+			'Our reads for week 9 are written Wednesday night.',
+			'Our reads for week 9 are written Wednesday night.',
+			notWritten,
+			notWritten
 		]
 	);
 	assert.ok(

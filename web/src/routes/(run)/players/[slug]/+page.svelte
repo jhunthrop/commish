@@ -373,7 +373,9 @@
 				<!-- In season the read is one paragraph, the week's (Lane 100, B44): the season read and its
 				     drafted-for numbers are the draft's, shown before the first kickoff only. -->
 				{#if page.underway}
-					{#if !weekRead}<p class="unwritten">{noReadWords(live?.projection.state ?? null)}</p>{/if}
+					{#if !weekRead}<p class="unwritten">
+							{noReadWords(live?.projection.state ?? null, page.weekReadsDue)}
+						</p>{/if}
 				{:else if page.capsule}
 					<Capsule body={page.capsule.body} byline={page.card.readStamp} pulls={readPulls} />
 				{:else}

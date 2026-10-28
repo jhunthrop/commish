@@ -28,6 +28,7 @@ export type CardData = Pick<
 	| 'status'
 	| 'card'
 	| 'weekRead'
+	| 'weekReadsDue'
 	| 'lastKickoffs'
 > &
 	CardLead & { lines: CardLead[] };
@@ -43,7 +44,19 @@ function leadOf(line: CardLead): CardLead {
 
 /** His page's build cut to the card's top, as /data/cards/<slug>.json serves it. */
 export function cardData(page: PlayerPage): CardData {
-	const { id, slug, name, position, team, headshot, clubName, status, card, weekRead } = page;
+	const {
+		id,
+		slug,
+		name,
+		position,
+		team,
+		headshot,
+		clubName,
+		status,
+		card,
+		weekRead,
+		weekReadsDue
+	} = page;
 	return {
 		id,
 		slug,
@@ -55,6 +68,7 @@ export function cardData(page: PlayerPage): CardData {
 		status,
 		card,
 		weekRead,
+		weekReadsDue,
 		lastKickoffs: page.lastKickoffs,
 		...leadOf(page),
 		lines: page.lines.map(leadOf)

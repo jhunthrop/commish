@@ -1070,13 +1070,13 @@ void test('once his game is final the read stands', () => {
 });
 
 void test('with no read at all the place says it is not written, "next" only for a game to come', () => {
-	assert.equal(noReadWords(card(week(), null, NOW).projection.state), CARD.readNotYet);
+	assert.equal(noReadWords(card(week(), null, NOW).projection.state, null), CARD.readNotYet);
 	for (const now of [KICKED_OFF, FINAL]) {
-		const words = noReadWords(card(week(), null, now).projection.state);
+		const words = noReadWords(card(week(), null, now).projection.state, null);
 		assert.equal(words, CARD.readNotWritten);
 		assert.ok(!/\bnext\b/u.test(words), words);
 	}
-	for (const words of [CARD.readNotYet, CARD.readNotWritten])
+	for (const words of [CARD.readNotYet, CARD.readNotWritten, CARD.readsDue(8, 'Tuesday')])
 		assert.equal(BANNED.exec(words), null, words);
 });
 

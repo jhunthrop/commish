@@ -163,6 +163,10 @@ export const CARD = {
 	ourRead: 'Our read',
 	/** In season, the read's place while no week read stands for him (Lane 100, B44). */
 	readNotYet: 'Our read for his next game is not written yet.',
+	/** The same place while the coming week's reads are not yet written (Lane 256): every board player's
+	 * read is written in one pass when the week rolls over, on the night the run names. */
+	readsDue: (week: number, night: string): string =>
+		`Our reads for week ${String(week)} are written ${night} night.`,
 	/** The same place once his game has kicked off or is final (Lane 158): never "next" for it. */
 	readNotWritten: 'Our read for this game was not written.',
 	/** The Proj of the week after his bye once its capture time has passed with none read. */

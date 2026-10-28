@@ -32,6 +32,7 @@ struct PlayerSheetParityTests {
 
     struct NoRead: Decodable {
         let state: String?
+        let due: RunReadsDue?
         let words: String
     }
 
@@ -146,7 +147,10 @@ struct PlayerSheetParityTests {
 
     @Test func withNoReadThePlaceNamesHisNextGameOnlyWhileItIsToCome() {
         for test in Self.parity.noRead {
-            #expect(WeekReads.noRead(Self.state(test.state)) == test.words, "\(test.state ?? "none")")
+            #expect(
+                WeekReads.noRead(Self.state(test.state), due: test.due) == test.words,
+                "\(test.state ?? "none") \(test.due.map { "week \($0.week)" } ?? "no roll-over due")"
+            )
         }
     }
 
