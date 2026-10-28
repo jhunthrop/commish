@@ -48,6 +48,19 @@ public enum OneValueFixture {
         return answer
     }
 
+    /// The answer, still uncut, that no longer returns one player the run holds, its statuses read from
+    /// the hourly capture checked at `statusRead`, after the run's (Lane 280, B257): the Board draws him
+    /// from the run, counts him once, and dates its status column by the order's capture.
+    public static func omitting(_ id: String, in answer: OrderAdvice) -> OrderAdvice {
+        var answer = answer
+        answer.rows = answer.rows.filter { $0.line.player.boardId != id }
+        answer.total = answer.rows.count
+        answer.statusRead = .init(value1: .init(
+            asOf: statusRead.addingTimeInterval(-3 * 3600), checkedAt: statusRead, source: "fixture"
+        ))
+        return answer
+    }
+
     /// The answer with one player's row holding no figure (a player with no projection), with the
     /// week's or the list's `status`, or none.
     public static func unvalued(
@@ -113,16 +126,21 @@ public struct StubOneValueWeeks: PlayerWeekAPI {
 /// rows whose name or club holds the letters, any case, accents aside, each keeping his place; then the
 /// read's limit, `total` counting the rows before it; every read failing with no signal while `offline`.
 /// `listing` names a player the whole read answers put on injured reserve after the nightly, as the
-/// API answers him (OneValueFixture.listing).
+/// API answers him (OneValueFixture.listing); `omitting` a player the whole read no longer returns, its
+/// statuses from a newer capture (OneValueFixture.omitting).
 public struct StubOrderSearch: RankingsAPI {
     public let clock: String
     public let offline: Bool
     public let listing: String?
+    public let omitting: String?
 
-    public init(clock: String = OneValueFixture.clock, offline: Bool = false, listing: String? = nil) {
+    public init(
+        clock: String = OneValueFixture.clock, offline: Bool = false, listing: String? = nil, omitting: String? = nil
+    ) {
         self.clock = clock
         self.offline = offline
         self.listing = listing
+        self.omitting = omitting
     }
 
     public func order(_ query: OrderQuery) async throws -> OrderAdvice {
@@ -133,13 +151,16 @@ public struct StubOrderSearch: RankingsAPI {
         if let listing, !query.byesLast {
             answer = OneValueFixture.listing(listing, in: answer)
         }
+        if let omitting, !query.byesLast {
+            answer = OneValueFixture.omitting(omitting, in: answer)
+        }
         if let search = query.search.map(Self.folded) {
             answer.rows = answer.rows.filter { row in
                 Self.folded(row.line.player.name).contains(search) || Self.folded(row.line.player.team).contains(search)
             }
             answer.total = answer.rows.count
         }
-        answer.rows = Array(answer.rows.prefix(query.limit))
+        answer.rows = Array(answer.rows.dropFirst(query.offset).prefix(query.limit))
         return answer
     }
 

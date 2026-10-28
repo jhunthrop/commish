@@ -756,6 +756,13 @@ paths:
           enum:
             - free
             - yours
+      - name: offset
+        in: query
+        required: false
+        description: "skip this many of the view's rows before the limit (Lane 280): an app reads the whole order a page at a time, each row keeping its place and total unchanged; 0 without it, and a view past its end answers no rows"
+        schema:
+          type: integer
+          minimum: 0
     get:
       tags:
         - league-sync
@@ -2635,6 +2642,13 @@ paths:
           type: string
           enum:
             - last
+      - name: offset
+        in: query
+        required: false
+        description: "skip this many of the view's rows before the limit (Lane 280): an app reads the whole order a page at a time, each row keeping its place and total unchanged; 0 without it, and a view past its end answers no rows"
+        schema:
+          type: integer
+          minimum: 0
     get:
       tags:
         - league-sync
@@ -10102,6 +10116,10 @@ components:
           format: date-time
           nullable: true
           description: when the week's published projection was read, null when none is stored
+        status_read:
+          allOf:
+            - $ref: "#/components/schemas/StatusRead"
+          description: the injury capture the rows' statuses come from (Lane 280, B257), the hourly cache the order read, so a screen that draws the run's rows with the order's statuses dates its status column by the newer of the two; absent when no capture was read, and from an older answer
         projection_scoring:
           $ref: "#/components/schemas/ProjectionScoring"
         rank_by:

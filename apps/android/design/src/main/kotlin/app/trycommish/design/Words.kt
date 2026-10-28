@@ -221,7 +221,7 @@ object Words {
         const val copy = "Copy the lineup"
         const val set = "Your lineup is set"
         const val sit = "Sit"
-        const val pastWeeks = "Past weeks of our order, on Our record"
+        const val pastWeeks = "Past weeks of our order"
         const val copied = "Copied."
         const val setItOn = "Set it on"
         const val copyFailed = "This browser would not copy it."
@@ -301,6 +301,14 @@ object Words {
         const val suspended = "Susp"
         const val pup = "PUP"
         const val nfi = "NFI"
+    }
+
+    object Capture {
+        const val status = "Status"
+        const val read = "read"
+        const val asOf = "as of"
+        const val today = "today"
+        const val old = "over 36 hours ago"
     }
 
     object Figure {
@@ -965,7 +973,7 @@ object Words {
     }
 
     object LiveOrder {
-
+        const val fromRun = "from our board, not in our order right now"
     }
 
     object ClubOrder {

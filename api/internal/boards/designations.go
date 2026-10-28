@@ -16,6 +16,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/season"
 )
 
@@ -520,6 +521,24 @@ func Newest(designations map[string]Designation) time.Time {
 		}
 	}
 	return at
+}
+
+// StatusRead is the capture the designations come from, nil with none:
+// its stamp (Newest), its feed and the capture job's last check. The
+// board route and the order both say it (Lane 280, B257).
+func StatusRead(designations map[string]Designation) *apitypes.StatusRead {
+	if len(designations) == 0 {
+		return nil
+	}
+	read := &apitypes.StatusRead{AsOf: Newest(designations)}
+	for _, d := range designations {
+		// One capture: every designation carries its source and its check.
+		read.Source = d.Source
+		if d.CheckedAt != nil && (read.CheckedAt == nil || d.CheckedAt.After(*read.CheckedAt)) {
+			read.CheckedAt = d.CheckedAt
+		}
+	}
+	return read
 }
 
 // WithSince is the designations with each one's run start as Listed, and

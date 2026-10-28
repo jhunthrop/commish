@@ -4,10 +4,13 @@ import { test } from 'node:test';
 import type { BasisPart } from './board-basis.ts';
 import { inSeasonStamp } from '#lib/front/live-board.ts';
 import {
+	LIVE_ORDER_WORDS,
 	basisAtClock,
 	inScoring,
 	liveBasis,
+	liveCapture,
 	livePlaces,
+	omittedFromRun,
 	placedAt,
 	placedPair
 } from './live-order.ts';
@@ -119,4 +122,36 @@ void test("a page says the run's time on the run's rows and the order's lead on 
 	assert.deepEqual(basisAtClock([], lead, stamp), [lead]);
 	// Before the season no stamp is said.
 	assert.equal(inSeasonStamp({ refreshedAt: '2026-09-01T05:00:00.000Z' }, 'America/Chicago'), null);
+});
+
+void test('the run’s players an uncut order omits are counted once, only when there are any (Lane 280)', () => {
+	assert.equal(LIVE_ORDER_WORDS.fromRunLine(0), null);
+	assert.equal(
+		LIVE_ORDER_WORDS.fromRunLine(1),
+		'1 player from our board, not in our order right now.'
+	);
+	assert.equal(
+		LIVE_ORDER_WORDS.fromRunLine(3),
+		'3 players from our board, not in our order right now.'
+	);
+});
+
+void test('the answer’s status read is its capture, none from an older answer (Lane 280)', () => {
+	const at = '2026-10-22T14:05:00.000Z';
+	const read = { as_of: '2026-10-22T13:00:00.000Z', checked_at: at, source: 'feed' };
+	const answer = { status_read: read } as unknown as Parameters<typeof liveCapture>[0];
+	assert.deepEqual(liveCapture(answer), { readAt: read.as_of, checkedAt: at });
+	assert.equal(liveCapture({} as unknown as Parameters<typeof liveCapture>[0]), null);
+});
+
+void test('an uncut answer’s omissions are the run’s to draw, a cut answer’s are its limit’s (Lane 280)', () => {
+	type Answer = Parameters<typeof omittedFromRun>[1];
+	const answer = (ids: string[], total: number): Answer =>
+		({
+			rows: ids.map((id) => ({ line: { player: { board_id: id } } })),
+			total
+		}) as unknown as Answer;
+	assert.deepEqual(omittedFromRun(['a', 'b', 'c', 'd'], answer(['c', 'a', 'x'], 3)), ['b', 'd']);
+	assert.deepEqual(omittedFromRun(['a', 'b'], answer(['b', 'a'], 2)), []);
+	assert.deepEqual(omittedFromRun(['a', 'b', 'c'], answer(['a'], 40)), [], 'cut');
 });

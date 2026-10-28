@@ -10,6 +10,8 @@ import type { components } from '#lib/api/types.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
 import type { BasisPart } from './board-basis.ts';
 import { overallOf } from '#lib/order/overall.ts';
+import type { CaptureStamp } from '#lib/format/designation.ts';
+import { plural } from '#lib/format/number.ts';
 import { leadOf } from './held-places.ts';
 import type { PlayerFormat, PlayerStatus } from './schema.ts';
 
@@ -19,12 +21,40 @@ type OrderRow = components['schemas']['OrderRow'];
 /** The largest view of the order the API answers (api inseason MaxOrderRows). */
 export const ORDER_MAX_ROWS = 400;
 
+/** After the count of our board's players an uncut order omits, drawn from the board (Lane 280,
+ * B257), in the screen's own words: "our board" and "our order". */
+const FROM_RUN = 'from our board, not in our order right now';
+
 /** A page's words about the order it draws (Lane 224 review M2): when one read of the order reaches
  * fewer players than the board ranks, how many of them the page draws. */
 export const LIVE_ORDER_WORDS = {
 	reach: (shown: number, total: number): string =>
-		`The first ${String(shown)} of the ${String(total)} players on our board, in our order.`
+		`The first ${String(shown)} of the ${String(total)} players on our board, in our order.`,
+	fromRun: FROM_RUN,
+	/** "2 players from our board, not in our order right now.", said once and only when there are any. */
+	fromRunLine: (count: number): string | null =>
+		count > 0 ? `${plural(count, 'player', 'players')} ${FROM_RUN}.` : null
 } as const;
+
+/** The capture the answer's statuses come from (its status_read), null when it names none or is an
+ * older answer without it (Lane 280, B257). */
+export function liveCapture(answer: OrderAdvice): CaptureStamp | null {
+	const read = answer.status_read;
+	return read === undefined ? null : { readAt: read.as_of, checkedAt: read.checked_at };
+}
+
+/** The run's players, in the run's order, that an uncut answer does not return (Lane 280, B257): a
+ * screen drawing the run's rows at the order's clock draws them from the run and counts them once
+ * (fromRunLine), never drops them. A cut answer (it holds more players than it returned) omits by its
+ * limit, not by the order, so none are counted and the reach says the cut. */
+export function omittedFromRun(
+	runIds: readonly string[],
+	answer: Pick<OrderAdvice, 'rows' | 'total'>
+): string[] {
+	if (answer.total > answer.rows.length) return [];
+	const returned = new Set(answer.rows.map((row) => row.line.player.board_id));
+	return runIds.filter((id) => !returned.has(id));
+}
 
 /** A player's place in the order at the read's clock. */
 export interface LivePlace {
