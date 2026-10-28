@@ -109,6 +109,38 @@ func (s *Store) SetHandle(ctx context.Context, id uuid.UUID, handle string) (Acc
 	return a, nil
 }
 
+// UpdateAccount is PATCH /me's write in one transaction (Lane 262 review
+// L4): the handle when one is sent, then also (the push settings) in the
+// same transaction, so neither lands without the other.
+func (s *Store) UpdateAccount(ctx context.Context, id uuid.UUID, handle *string, also func(context.Context, pgx.Tx) error) (Account, error) {
+	var a Account
+	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		var err error
+		if handle != nil {
+			a, err = scanAccount(tx.QueryRow(ctx, `update app.accounts a set handle = $2 where a.id = $1 returning `+accountColumns, id, *handle))
+		} else {
+			a, err = scanAccount(tx.QueryRow(ctx, `select `+accountColumns+` from app.accounts a where a.id = $1`, id))
+		}
+		if err != nil {
+			return err
+		}
+		if also != nil {
+			return also(ctx, tx)
+		}
+		return nil
+	})
+	var pgErr *pgconn.PgError
+	switch {
+	case errors.As(err, &pgErr) && pgErr.Code == "23505":
+		return Account{}, ErrHandleTaken
+	case errors.Is(err, pgx.ErrNoRows):
+		return Account{}, ErrNoAccount
+	case err != nil:
+		return Account{}, fmt.Errorf("auth: update account %s: %w", id, err)
+	}
+	return a, nil
+}
+
 // CreateSession stores a new session under its token's hash.
 func (s *Store) CreateSession(ctx context.Context, accountID uuid.UUID, tokenHash []byte, workosSID, userAgent string, now time.Time) error {
 	if _, err := s.Pool.Exec(ctx, `

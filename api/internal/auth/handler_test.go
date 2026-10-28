@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -89,7 +90,12 @@ func (m *memAccounts) CreateSession(_ context.Context, _ uuid.UUID, _ []byte, si
 
 func (m *memAccounts) DeleteSession(context.Context, []byte) (string, error) { return "", nil }
 
-func (m *memAccounts) SetHandle(context.Context, uuid.UUID, string) (auth.Account, error) {
+func (m *memAccounts) UpdateAccount(ctx context.Context, _ uuid.UUID, _ *string, also func(context.Context, pgx.Tx) error) (auth.Account, error) {
+	if also != nil {
+		if err := also(ctx, nil); err != nil {
+			return auth.Account{}, err
+		}
+	}
 	return m.acct, nil
 }
 

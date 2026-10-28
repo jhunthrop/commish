@@ -77,7 +77,10 @@ type LogoutURLs interface {
 
 // Service serves the device routes.
 type Service struct {
-	Store  Repository
+	Store Repository
+	// Push is an app's push registration (Lane 262); *Store implements
+	// both.
+	Push   PushRepository
 	Tokens Minter
 	// CodeKey keys the pairing codes' stored hashes (PurposeCodes).
 	CodeKey []byte
@@ -91,14 +94,14 @@ type Service struct {
 
 // Routes is every route this package serves.
 func (s *Service) Routes() []httpx.Route {
-	return []httpx.Route{
+	return append([]httpx.Route{
 		{Method: http.MethodPost, Path: "/devices/codes", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitCodePerMinute), Handler: s.code},
 		{Method: http.MethodPost, Path: "/devices/pair", Access: httpx.Public, Limit: httpx.PerMinute(limitPairPerMinute), Handler: s.pair},
 		{Method: http.MethodGet, Path: "/devices", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitReadPerMinute), Handler: s.list},
 		{Method: http.MethodDelete, Path: "/devices/{id}", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitRevokePerMinute), Handler: s.revoke},
 		{Method: http.MethodGet, Path: "/devices/me", Access: httpx.Device, Scope: string(auth.ScopeLeagueWrite),
 			Limit: httpx.PerMinute(limitReadPerMinute), Handler: s.me},
-	}
+	}, s.pushRoutes()...)
 }
 
 // issue stores a fresh code under its binding on the account, replacing

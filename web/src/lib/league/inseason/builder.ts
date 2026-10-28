@@ -7,14 +7,7 @@ import { fixed } from '#lib/format/number.ts';
 import { listWords } from '#lib/format/list.ts';
 import { onReserve, type BoxRow } from '../box/box.ts';
 import { stripMark } from '../box/strip.ts';
-import {
-	finderRows,
-	gainWord,
-	offerText,
-	shortSide,
-	TRADES,
-	worthProposing
-} from '../box/trades.ts';
+import { finderRows, gainWord, offerText, shortSide, worthProposing } from '../box/trades.ts';
 import type { PlayerLine, TradeCheck, TradeCheckInput, TradeRow, TradeTeam } from './api.ts';
 import { GAIN_DECIMALS, gainAmount, perGameWords, teamAside } from './words.ts';
 
@@ -167,20 +160,28 @@ export interface Preset {
 	team: TradeTeam;
 	row: TradeRow;
 	picks: Picks;
-	/** The trade the decision line proposes (worthProposing's first): the screen opens on its team. */
+	/** Our best trade (worthProposing's first): the screen opens on its team. */
 	lead: boolean;
-	/** "Best" over the lead when there is more than one idea, as a strip marks its lead; null on the
-	 * rest, and on every idea when the decision proposes none. */
+	/** "Best" before the lead when there is more than one idea, as a strip marks its lead; null on the
+	 * rest, and on every idea when no trade helps both lineups. */
 	mark: string | null;
 	/** "Rodgers for Skattebo and Strong". */
 	deal: string;
-	/** "+5.7 a week for your lineup, +0.7 for theirs". */
+	/** Each lineup's gain a week, in the card's one line: "+5.7 yours, +0.7 theirs". */
 	gains: string;
+}
+
+/** How many ideas the row shows before its "N more" (Lane 268): the best three. */
+export const IDEAS_SHOWN = 3;
+
+/** The ideas row's control that shows the rest in place: "4 more". */
+export function moreWords(hidden: number): string {
+	return `${String(hidden)} more`;
 }
 
 /** Our ideas: the finder's best trade with each team, in the finder's order (the trades the other
  * team gains from first, each by your gain), each one whose players can all be ticked. The lead is
- * the trade the decision line proposes, so Best and the opening team agree with it (review L1). */
+ * our best trade (worthProposing's first), so Best and the opening team agree (review L1). */
 export function presetsFrom(teams: readonly TradeTeam[]): Preset[] {
 	const proposed = worthProposing(teams)[0]?.key ?? null;
 	const loadable = finderRows(teams, false).flatMap((entry) => {
@@ -195,13 +196,12 @@ export function presetsFrom(teams: readonly TradeTeam[]): Preset[] {
 		lead: entry.key === proposed,
 		mark: entry.key === proposed ? stripMark(i, loadable.length) : null,
 		deal: `${shortSide(entry.row.give)} for ${shortSide(entry.row.get)}`,
-		gains: `${gainWord(entry.row.my_gain)} ${TRADES.aWeekForYou}, ${gainWord(entry.row.their_gain)} ${TRADES.forTheirs}`
+		gains: `${gainWord(entry.row.my_gain)} ${ANALYZER_LINES.yours}, ${gainWord(entry.row.their_gain)} ${ANALYZER_LINES.theirs}`
 	}));
 }
 
-/** The picks the screen opens with: the team of the trade the decision proposes and nothing ticked,
- * so the member's own idea is a tick a player; no team when the decision proposes none, the member's
- * roster alone. */
+/** The picks the screen opens with: the team of our best trade and nothing ticked, so the member's
+ * own idea is a tick a player; no team when no trade helps both lineups, the member's roster alone. */
 export function openingPicks(presets: readonly Preset[]): Picks {
 	return { team: presets.find((p) => p.lead)?.team.roster_id ?? null, give: [], get: [] };
 }
@@ -266,8 +266,15 @@ export function shareText(team: Pick<TradeTeam, 'name'>, check: Pick<TradeCheck,
 
 /** The screen's own words the apps do not draw yet (Lane 260; the apps follow from this screen). */
 export const ANALYZER_LINES = {
-	/** Over the presets: the finder's trades, one tap each to load. */
-	ideas: 'Our ideas',
+	/** Over the presets: the finder's best trade with each team in this league, one tap each to load
+	 * (Lane 268: "by team", so the row reads as the league's teams, not leagues). */
+	ideas: 'Our ideas, by team',
+	/** An idea's two gains a week: "+5.7 yours, +0.7 theirs". */
+	yours: 'yours',
+	theirs: 'theirs',
+	/** The verdict's head over the sides' names, for a screen reader. */
+	team: 'Team',
+
 	/** The verb that copies the built trade as text. */
 	share: 'Share',
 	shared: 'Copied the trade as text.',

@@ -20,6 +20,7 @@ import {
 	type DesignationStatus
 } from '#lib/format/designation.ts';
 import type { StatusView } from '#lib/run/status-view.ts';
+import { returningShort } from '../inseason/short-status.ts';
 import { POSITIONS, type Position } from '#lib/types/player.ts';
 import { GAME_STATE_WORDS, halves, PRECIPITATION_NAMED_FROM } from '#lib/format/game-facts.ts';
 import { fixed, ordinal, signed } from '#lib/format/number.ts';
@@ -271,6 +272,15 @@ export function statusOf(
 			: returning !== null
 				? returningMark(returning)
 				: (carriedMark(designation, zone) ?? designationWord(status)),
+		// The tight row's chip (Lane 268): the box-score letters, his return day's weekday, or nothing
+		// where the position pill already says the list ("RB IR").
+		short: seasonLong
+			? returning !== null
+				? returningShort(returning, false)
+				: null
+			: returning !== null
+				? returningShort(returning, true)
+				: rankWord(status),
 		sits: sitsHim(status),
 		line: null,
 		...(status === 'questionable' ? { question: true as const } : {})

@@ -115,6 +115,8 @@ extension APIClient: SheetsAPI {
             throw try Self.refusal(answer.body.json)
         case let .notFound(answer):
             throw try Self.refusal(answer.body.json)
+        case let .serviceUnavailable(answer):
+            throw try Self.refusal(answer.body.json)
         case let .undocumented(status, _):
             throw APIError.status(status)
         }

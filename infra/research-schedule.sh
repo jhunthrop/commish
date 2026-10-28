@@ -33,6 +33,7 @@ SCHEDULE=(
   "research-status-mon-kickoff|15 20 * 1,2,9-12 1|America/New_York|inseason-status|The game-day status capture (Lane 263), Monday 20:15 ET, the night game's kickoff"
   "research-headshots-august|0 4 * 8 *|America/New_York|headshots|Our headshot copies (research.headshots sync), daily in August, 04:00 ET"
   "research-headshots-weekly|0 4 * 1,2,9-12 3|America/New_York|headshots|Our headshot copies (research.headshots sync), weekly in season, Wednesday 04:00 ET"
+  "api-notify|* * * 1,2,9-12 *|America/New_York|api-notify|The push outbox drained (api notify, Lane 262), every minute in season; api.yml grants research-runtime run.invoker on it"
 )
 
 target_uri() {

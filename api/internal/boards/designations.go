@@ -147,11 +147,7 @@ func (s *PGSource) newestCapture(ctx context.Context, source string) (out map[st
 			lastErr = err
 			continue
 		}
-		out = make(map[string]Designation, len(c.entries))
-		for id, e := range c.entries {
-			out[id] = Designation{Code: e.code, Note: e.note, AsOf: c.at.UTC(), Source: source}
-		}
-		return out, i == 0, true, nil
+		return designationsOf(source, c), i == 0, true, nil
 	}
 	tried := min(len(captures), capturesTried)
 	return nil, false, true, fmt.Errorf("boards: none of the %d newest injury captures %s reads: %w", tried, source, lastErr)
@@ -160,14 +156,26 @@ func (s *PGSource) newestCapture(ctx context.Context, source string) (out map[st
 // captures is the source's newest n captures, newest first, each parsed,
 // at or before before when it is set.
 func (s *PGSource) captures(ctx context.Context, source string, n int, before time.Time) ([]capture, error) {
+	return s.capturesWhere(ctx, source, n, "($4::timestamptz is null or captured_at <= $4)", before)
+}
+
+// capturesAfter is the source's captures stored after after, newest
+// first, at most n.
+func (s *PGSource) capturesAfter(ctx context.Context, source string, n int, after time.Time) ([]capture, error) {
+	return s.capturesWhere(ctx, source, n, "captured_at > $4", after)
+}
+
+// capturesWhere is the source's newest n captures meeting bound (on $4,
+// at; the zero time is null), newest first, each parsed.
+func (s *PGSource) capturesWhere(ctx context.Context, source string, n int, bound string, at time.Time) ([]capture, error) {
 	query := `select case when octet_length(payload::text) <= $2 then payload end, captured_at
-		from ` + s.table("capture_snapshots") + ` where source = $1 and ($4::timestamptz is null or captured_at <= $4)
+		from ` + s.table("capture_snapshots") + ` where source = $1 and ` + bound + `
 		order by captured_at desc limit $3`
-	var at any
-	if !before.IsZero() {
-		at = before
+	var param any
+	if !at.IsZero() {
+		param = at
 	}
-	rows, err := s.Pool.Query(ctx, query, source, maxCaptureBytes, n, at)
+	rows, err := s.Pool.Query(ctx, query, source, maxCaptureBytes, n, param)
 	if err != nil {
 		return nil, fmt.Errorf("boards: read injury capture %s: %w", source, err)
 	}

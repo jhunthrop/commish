@@ -34,7 +34,16 @@ type Viewer struct {
 	// Season answers the site's season (*season.Site). Nil answers
 	// unwired, saying so.
 	Season Season
-	Now    func() time.Time
+	// Notifications answers the account's push settings (notify.Settings,
+	// Lane 262). Nil leaves them off the answer, which a client reads as
+	// the defaults.
+	Notifications Notifications
+	Now           func() time.Time
+}
+
+// Notifications is the push settings source.
+type Notifications interface {
+	Notifications(ctx context.Context, accountID uuid.UUID) (apitypes.NotificationSettings, error)
 }
 
 // Season is the site's season source. *season.Site implements it.
@@ -80,10 +89,19 @@ func (v *Viewer) View(ctx context.Context, a auth.Account) (apitypes.Account, er
 			return apitypes.Account{}, fmt.Errorf("account: view %s: %w", a.ID, err)
 		}
 	}
+	var notifications *apitypes.NotificationSettings
+	if v.Notifications != nil {
+		settings, err := v.Notifications.Notifications(ctx, a.ID)
+		if err != nil {
+			return apitypes.Account{}, fmt.Errorf("account: view %s: %w", a.ID, err)
+		}
+		notifications = &settings
+	}
 	return apitypes.Account{
 		Id: a.ID, Email: a.Email, FirstName: a.FirstName, LastName: a.LastName, Handle: a.Handle,
 		Features: features, DraftPass: passView(pass), Membership: membershipView(membership),
-		League: leagues.League, Leagues: leagues.Leagues, Format: leagues.Format, Season: siteSeason(ctx, v.Season), CreatedAt: a.CreatedAt,
+		League: leagues.League, Leagues: leagues.Leagues, Format: leagues.Format, Season: siteSeason(ctx, v.Season),
+		Notifications: notifications, CreatedAt: a.CreatedAt,
 	}, nil
 }
 
