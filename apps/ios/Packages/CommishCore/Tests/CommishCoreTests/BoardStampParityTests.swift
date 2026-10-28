@@ -48,7 +48,13 @@ struct BoardStampParityTests {
 
     @Test func theStatusColumnsStampIsTheNewerCaptureAsTheWebsIs() throws {
         let zone = try #require(TimeZone(identifier: Self.parity.zone))
-        #expect(Self.parity.liveStamps.map(\.name) == ["run-only", "live-newer", "live-newer-unchecked", "live-older"])
+        #expect(Self.parity.liveStamps.map(\.name) == [
+            "run-only",
+            "live-newer",
+            "live-newer-unchecked",
+            "live-newer-earlier-day",
+            "live-older",
+        ])
         for item in Self.parity.liveStamps {
             let run = try Self.stamp(item.run)
             let live = try item.live.map(Self.stamp)

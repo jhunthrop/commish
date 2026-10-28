@@ -160,7 +160,7 @@ public struct StubOrderSearch: RankingsAPI {
             }
             answer.total = answer.rows.count
         }
-        answer.rows = Array(answer.rows.prefix(query.limit))
+        answer.rows = Array(answer.rows.dropFirst(query.offset).prefix(query.limit))
         return answer
     }
 

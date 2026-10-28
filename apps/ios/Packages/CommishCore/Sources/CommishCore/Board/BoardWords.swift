@@ -102,11 +102,17 @@ public struct BoardWords: Equatable, Sendable {
 
     /// The capture the statuses come from in the few words a board's basis has room for
     /// (designation.ts captureShort): "Status read Oct 16.", "as of" its last change with no check,
-    /// and past a day and a half how old it is.
+    /// the hour on the member's own day ("Status read today 9:15 am CT."), and past a day and a half
+    /// how old it is.
     public static func capture(asOf: Date, checkedAt: Date?, now: Date, zone: TimeZone) -> String {
         let last = checkedAt ?? asOf
-        let when = checkedAt.map { "\(Words.Capture.read) \(Formatting.shortDay($0, zone: zone))" }
-            ?? "\(Words.Capture.asOf) \(Formatting.shortDay(asOf, zone: zone))"
+        // On the member's own day the hour tells this hour's capture from last night's (Lane 280).
+        let day = { (date: Date) in
+            Formatting.sameDay(date, now, zone: zone)
+                ? "\(Words.Capture.today) \(Formatting.timeOfDay(date, zone: zone)) \(Formatting.zoneShort(zone))"
+                : Formatting.shortDay(date, zone: zone)
+        }
+        let when = checkedAt.map { "\(Words.Capture.read) \(day($0))" } ?? "\(Words.Capture.asOf) \(day(asOf))"
         let old = now.timeIntervalSince(last) > captureBehind ? ", \(Words.Capture.old)" : ""
         return "\(Words.Capture.status) \(when)\(old)."
     }

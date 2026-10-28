@@ -109,21 +109,40 @@ public struct OrderReader: Sendable {
     let api: any RankingsAPI
     let clock: any Clock
     let memo: OrderMemo
+    /// The rows one page asks for, the API's most (`OrderQuery.maxLimit`); a test pages smaller.
+    let pageSize: Int
 
-    public init(api: any RankingsAPI, clock: any Clock, memo: OrderMemo) {
+    public init(api: any RankingsAPI, clock: any Clock, memo: OrderMemo, pageSize: Int = OrderQuery.maxLimit) {
         self.api = api
         self.clock = clock
         self.memo = memo
+        self.pageSize = pageSize
     }
 
     /// The in-season pages' read for `search` (letters of a name or a club), every player with none:
-    /// every position, the API's most rows, the byes in their places.
-    public static func query(search: String?) -> OrderQuery {
-        OrderQuery(position: nil, search: search, limit: OrderQuery.maxLimit, byesLast: false)
+    /// every position, a page of `limit` rows from `offset`, the byes in their places.
+    public static func query(search: String?, limit: Int = OrderQuery.maxLimit, offset: Int = 0) -> OrderQuery {
+        OrderQuery(position: nil, search: search, limit: limit, byesLast: false, offset: offset)
     }
 
+    /// The whole order (Lane 280): its first page, then the next from where the last ended until the
+    /// answer holds every row its total counts, merged to one answer, so an uncut answer is the normal
+    /// state and a player the order omits is drawn from the run. A later page that fails, or adds no
+    /// row, stops the reading: the answer stays cut and the screen says its reach, as before.
     public func read(search: String? = nil) async throws -> OrderAtClock {
-        try await read(Self.query(search: search))
+        let first = try await read(Self.query(search: search, limit: pageSize))
+        var pages = [first]
+        var read = first.answer.rows.count
+        while read < first.answer.total {
+            guard let next = try? await self.read(Self.query(search: search, limit: pageSize, offset: read)),
+                  !next.answer.rows.isEmpty
+            else {
+                break
+            }
+            pages.append(next)
+            read += next.answer.rows.count
+        }
+        return OrderAtClock.merged(pages) ?? first
     }
 
     /// Any read of the order through the share: the Rankings' chips, searches and Show more.

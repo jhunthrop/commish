@@ -201,7 +201,7 @@ struct BoardSnapshotTests {
         #expect(model.atClock)
         #expect(model.rows.last?.id == Self.missing, "the foot draws him, from the run")
         #expect(model.basis.last == LiveOrderWords.fromRun(1))
-        #expect(model.basis.contains("Status read Oct 18."), "\(model.basis)")
+        #expect(model.basis.contains("Status read today 1:00 pm CT."), "\(model.basis)")
     }
 
     @Test func theStaleSceneSaysWhyItsBoardShows() async throws {

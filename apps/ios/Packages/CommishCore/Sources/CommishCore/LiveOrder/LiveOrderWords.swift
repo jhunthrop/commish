@@ -38,7 +38,7 @@ public enum LiveOrderWords {
     }
 
     /// live-order.ts LIVE_ORDER_WORDS.fromRunLine (Lane 280, B257): the run's players an uncut order
-    /// omits, counted once, "2 players from the run, not in the live order."; nil with none.
+    /// omits, counted once, "2 players from our board, not in our order right now."; nil with none.
     public static func fromRun(_ count: Int) -> String? {
         count > 0 ? "\(Formatting.plural(count, "player", "players")) \(Words.LiveOrder.fromRun)." : nil
     }

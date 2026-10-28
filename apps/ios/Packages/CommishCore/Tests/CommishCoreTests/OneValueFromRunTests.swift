@@ -35,7 +35,7 @@ struct OneValueFromRunTests {
         var newer = whole.answer
         newer.statusRead = try Self.read(asOf: "2026-10-18T15:00:00Z", checkedAt: "2026-10-18T18:00:00Z")
         let live = try board(newer)
-        #expect(live.basis.contains("Status read Oct 18."), "\(live.basis)")
+        #expect(live.basis.contains("Status read today 1:00 pm CT."), "\(live.basis)")
         #expect(!live.basis.contains(Self.runCapture))
         var older = whole.answer
         older.statusRead = try Self.read(asOf: "2026-10-12T15:00:00Z", checkedAt: "2026-10-13T15:00:00Z")
@@ -55,6 +55,37 @@ struct OneValueFromRunTests {
         #expect(model.rows.last?.projected == Words.Box.none, "no figure of either clock")
         #expect(model.basis.last == LiveOrderWords.fromRun(1))
         #expect(try !board(Reads.order().answer).basis.contains { $0.contains(Words.LiveOrder.fromRun) })
+    }
+
+    /// The fixture's order failing every page after the first.
+    struct FirstPageOnly: RankingsAPI {
+        let search = StubOrderSearch()
+
+        func order(_ query: OrderQuery) async throws -> OrderAdvice {
+            guard query.offset == 0 else {
+                throw URLError(.notConnectedToInternet)
+            }
+            return try await search.order(query)
+        }
+
+        func weekOrder(position: WeekOrderPosition) async throws -> WeekOrderAdvice {
+            try await search.weekOrder(position: position)
+        }
+    }
+
+    @Test func theReaderPagesTheWholeOrderIntoOneUncutAnswerAndAFailedPageLeavesItCut() async throws {
+        let whole = try Reads.order()
+        let page = 50
+        let paged = try await OrderReader(
+            api: StubOrderSearch(), clock: FixedClock(Reads.now), memo: OrderMemo(), pageSize: page
+        ).read()
+        #expect(paged.answer.rows.map(\.line.player.boardId) == whole.answer.rows.map(\.line.player.boardId))
+        #expect(!LiveOrder.cut(paged.answer), "every page read: the merged answer is uncut")
+        let first = try await OrderReader(
+            api: FirstPageOnly(), clock: FixedClock(Reads.now), memo: OrderMemo(), pageSize: page
+        ).read()
+        #expect(first.answer.rows.count == page)
+        #expect(LiveOrder.cut(first.answer), "a later page that fails leaves the first, cut")
     }
 
     @Test func aCutAnswerKeepsItsReachAndCountsNoneFromTheRun() throws {
