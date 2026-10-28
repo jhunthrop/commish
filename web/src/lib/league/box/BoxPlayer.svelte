@@ -81,8 +81,9 @@
 	/** The screen's player shelf (Lane 113): his name opens his card over the screen, his page
 	 * stays the link's for a new tab. Undefined where no screen holds one. */
 	const shelf = shelfOpener();
-	/** His tags as the chips draw them: Held when the sheet's own tags are not in, else the tags. */
-	/** The tight row's pill rank, as StatusPill reckons it (a season-long list's word in his rank). */
+	/** The tight row's pill rank, StatusPill's own rule (a season-long list's word in his rank); the
+	 * tight row draws the pill and its short chip itself to keep the shared chip's bytes off every
+	 * page (Lane 268), so a change to StatusPill's rank rule is made here too. */
 	const tightRank = $derived(
 		row.pill === null
 			? undefined
@@ -90,6 +91,7 @@
 				? (row.status?.rank ?? undefined)
 				: pillRank(row.status, row.pill.rank)
 	);
+	/** His tags as the chips draw them: Held when the sheet's own tags are not in, else the tags. */
 	const tagLabels = $derived(
 		row.held && tags.length === 0 ? [HELD] : tagMarks(tags).map((mark) => mark.label)
 	);
@@ -265,6 +267,12 @@
 
 	.tight .club {
 		flex-wrap: nowrap;
+		white-space: nowrap;
+	}
+
+	/* The short chip keeps one line, never wrapped inside itself as a long chip may (Lane 268). */
+	.tight .club .status-chip {
+		height: 20px;
 		white-space: nowrap;
 	}
 

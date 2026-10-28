@@ -10,6 +10,7 @@ import {
 	captureShort,
 	designationMark,
 	designationWord,
+	returningShort,
 	rankWord,
 	seasonLongLine,
 	seasonLongMark,
@@ -116,4 +117,9 @@ void test('no line carries an em-dash or a semicolon', () => {
 		captureLine({ readAt: LISTED, checkedAt: null }, SOON + CAPTURE_BEHIND_MS, CENTRAL)
 	];
 	for (const line of lines) assert.doesNotMatch(line, bannedPattern(), line);
+});
+
+void test("a tight row's return word: the weekday this week, the day for a list's later return (Lane 268)", () => {
+	assert.equal(returningShort('2026-10-18', true), 'Back Sun');
+	assert.equal(returningShort('2026-11-08', false), 'Back Nov 8');
 });

@@ -9,9 +9,9 @@
 	import { rosterOrder, TRADES } from './trades.ts';
 
 	/** One roster of the trade builder as a box score (Lane 66g; the Lineup's rows since Lane 268,
-	 * BoxLine's tight row): the team over the columns (a tick, the player with his position and our rank under his name (Lane
-	 * 260), his game, Proj, Opp rank, Avg, Last, Rest of season), each row a tap that picks him for the
-	 * trade, at the Lineup table's row height and type. */
+	 * BoxLine's tight row): the team over the columns (a tick, the player with his position and our
+	 * rank under his name (Lane 260), his game, Proj, Opp rank, Avg, Last, Rest of season), each row a
+	 * tap that picks him for the trade, at the Lineup table's row height and type. */
 	interface Props {
 		team: string;
 		mine?: boolean;

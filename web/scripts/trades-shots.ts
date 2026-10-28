@@ -183,6 +183,36 @@ async function cutText(page: Page): Promise<string[]> {
 	);
 }
 
+/** The status chip's one line (Lane 268 fix round 2): a chip taller than this wrapped inside itself. */
+const CHIP_HEIGHT = 20;
+/** A phone's tallest roster row: his name, then his club, pill, short status and game, the game on a
+ * third short line where the second has no room for it. */
+const PHONE_ROW_MAX = 68;
+
+/** The status chips drawn taller than one line. */
+async function wrappedChips(page: Page): Promise<string[]> {
+	return page.evaluate(
+		(height) =>
+			[...document.querySelectorAll<HTMLElement>('main table.box .status-chip')]
+				.filter((el) => el.offsetParent !== null)
+				.filter((el) => Math.round(el.getBoundingClientRect().height) > height)
+				.map((el) => el.innerText.trim()),
+		CHIP_HEIGHT
+	);
+}
+
+/** The phone's roster rows taller than PHONE_ROW_MAX. */
+async function tallPhoneRows(page: Page): Promise<string[]> {
+	return page.evaluate(
+		(max) =>
+			[...document.querySelectorAll<HTMLElement>('main table.box tbody tr')]
+				.filter((row) => row.offsetParent !== null)
+				.filter((row) => Math.round(row.getBoundingClientRect().height) > max)
+				.map((row) => String(Math.round(row.getBoundingClientRect().height))),
+		PHONE_ROW_MAX
+	);
+}
+
 /** The roster rows at a desk whose height is not the Lineup's. */
 async function offHeightRows(page: Page): Promise<string[]> {
 	return page.evaluate(
@@ -263,6 +293,15 @@ for (const theme of THEMES) {
 		}
 		const cut = await cutText(page);
 		check(cut.length === 0, `${where}: cut text ${cut.join(' | ')}`);
+		const wrapped = await wrappedChips(page);
+		check(wrapped.length === 0, `${where}: chips on more than one line ${wrapped.join(' | ')}`);
+		if (width <= STACKS_AT) {
+			const tall = await tallPhoneRows(page);
+			check(
+				tall.length === 0,
+				`${where}: rows over ${String(PHONE_ROW_MAX)}px: ${tall.join(', ')}`
+			);
+		}
 		await page.screenshot({
 			path: new URL(`trades-${theme}-${String(width)}-open-window.png`, out).pathname
 		});
