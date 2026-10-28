@@ -172,7 +172,7 @@ func (s *Store) List(ctx context.Context, accountID uuid.UUID) ([]Device, error)
 }
 
 // Revoke ends one of the account's devices; its token opens nothing from
-// the next request on. It answers the WorkOS session the device's
+// the next request on, and its push token goes with it. It answers the WorkOS session the device's
 // sign-in began, empty when it has none (the extension, or an app paired
 // before Lane 225), and clears it from the row in the same statement: a
 // revoked device keeps no WorkOS session id.
@@ -181,7 +181,8 @@ func (s *Store) Revoke(ctx context.Context, accountID, id uuid.UUID, now time.Ti
 	err := s.Pool.QueryRow(ctx, `with live as (
 			select id, workos_session_id from app.devices
 			where id = $1 and account_id = $2 and revoked_at is null for update)
-		update app.devices d set revoked_at = $3, workos_session_id = null
+		update app.devices d set revoked_at = $3, workos_session_id = null,
+			push_platform = null, push_token = null, push_registered_at = null
 		from live where d.id = live.id
 		returning live.workos_session_id`,
 		id, accountID, now).Scan(&workosSID)
@@ -264,4 +265,47 @@ func (s *Store) SweepCodes(ctx context.Context, now time.Time) (int64, error) {
 		return 0, fmt.Errorf("devices: sweep codes: %w", err)
 	}
 	return tag.RowsAffected(), nil
+}
+
+// PutPush registers a push token on one of the account's live app
+// devices, replacing its earlier one, and answers when. A token belongs
+// to one device: any other device holding it lets it go in the same
+// transaction (the app reinstalled and signed in again, or signed in as
+// another member on the same phone).
+func (s *Store) PutPush(ctx context.Context, accountID, id uuid.UUID, platform, token string, now time.Time) (time.Time, error) {
+	var at time.Time
+	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `update app.devices set push_platform = null, push_token = null, push_registered_at = null
+			where push_platform = $1 and push_token = $2 and id <> $3`, platform, token, id); err != nil {
+			return err
+		}
+		err := tx.QueryRow(ctx, `update app.devices set push_platform = $3, push_token = $4, push_registered_at = $5
+			where id = $1 and account_id = $2 and revoked_at is null and kind <> 'extension'
+			returning push_registered_at`, id, accountID, platform, token, now).Scan(&at)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	})
+	if errors.Is(err, ErrNotFound) {
+		return time.Time{}, err
+	}
+	if err != nil {
+		return time.Time{}, fmt.Errorf("devices: put push %s: %w", id, err)
+	}
+	return at, nil
+}
+
+// DeletePush removes the push token of one of the account's live
+// devices, if it holds one.
+func (s *Store) DeletePush(ctx context.Context, accountID, id uuid.UUID) error {
+	tag, err := s.Pool.Exec(ctx, `update app.devices set push_platform = null, push_token = null, push_registered_at = null
+		where id = $1 and account_id = $2 and revoked_at is null`, id, accountID)
+	if err != nil {
+		return fmt.Errorf("devices: delete push %s: %w", id, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

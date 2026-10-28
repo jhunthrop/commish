@@ -96,7 +96,7 @@ func newHarness(t *testing.T) (harness, auth.Account, auth.Account) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := &Service{Store: store, Tokens: bearer, CodeKey: codeKey, Now: c.Now, Log: quiet()}
+	svc := &Service{Store: store, Push: store, Tokens: bearer, CodeKey: codeKey, Now: c.Now, Log: quiet()}
 	ok := func(w http.ResponseWriter, r *http.Request) { httpx.WriteOK(w, r, 200, nil) }
 	routes := append(svc.Routes(),
 		httpx.Route{Method: http.MethodGet, Path: sessionRoute, Access: httpx.SignedIn, Limit: httpx.PerMinute(60), Handler: ok},

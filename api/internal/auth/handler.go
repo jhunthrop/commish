@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -88,8 +89,18 @@ type Handler struct {
 	// are still queued for the provider; a sign-in as one is refused. nil
 	// checks nothing. deletion.Store implements it.
 	Deleting DeletionQueue
-	Now      func() time.Time
-	Log      *slog.Logger
+	// Notifications writes the push settings PATCH /me carries; nil
+	// refuses them.
+	Notifications NotificationSettings
+	Now           func() time.Time
+	Log           *slog.Logger
+}
+
+// NotificationSettings writes the account's push settings (Lane 262).
+// notify.Settings implements it.
+type NotificationSettings interface {
+	CheckNotifications(u apitypes.NotificationSettingsUpdate) map[string]string
+	UpdateNotifications(ctx context.Context, accountID uuid.UUID, u apitypes.NotificationSettingsUpdate) error
 }
 
 // DeletionQueue is the queue of deleted accounts' WorkOS users.
@@ -400,19 +411,60 @@ func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
 		return
 	}
-	if err := h.Names.Check(in.Handle); err != nil {
-		httpx.WriteInvalid(w, r, map[string]string{"handle": err.Error()})
+	if faults := h.checkUpdate(in); faults != nil {
+		httpx.WriteInvalid(w, r, faults)
 		return
 	}
-	updated, err := h.Store.SetHandle(r.Context(), a.ID, in.Handle)
-	switch {
-	case errors.Is(err, ErrHandleTaken):
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "That name is taken",
-			map[string]string{"handle": "That name is taken"})
-		return
-	case err != nil:
-		httpx.WriteInternal(w, r, h.Log, "auth: set handle", err)
-		return
+	if in.Handle != nil {
+		updated, err := h.Store.SetHandle(r.Context(), a.ID, *in.Handle)
+		switch {
+		case errors.Is(err, ErrHandleTaken):
+			httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "That name is taken",
+				map[string]string{"handle": "That name is taken"})
+			return
+		case err != nil:
+			httpx.WriteInternal(w, r, h.Log, "auth: set handle", err)
+			return
+		}
+		a = updated
 	}
-	h.writeAccount(w, r, updated)
+	if in.Notifications != nil {
+		if err := h.Notifications.UpdateNotifications(r.Context(), a.ID, *in.Notifications); err != nil {
+			httpx.WriteInternal(w, r, h.Log, "auth: set notifications", err)
+			return
+		}
+	}
+	h.writeAccount(w, r, a)
+}
+
+// Refusals of an update that changes nothing.
+const (
+	nothingToUpdate     = "Send a handle or notifications to change"
+	notificationsClosed = "Push settings cannot be changed right now"
+)
+
+// checkUpdate is every fault in the update by field, nil when it reads,
+// checked whole before anything is written, so a fault in either field
+// leaves both as they were.
+func (h *Handler) checkUpdate(in apitypes.AccountUpdate) map[string]string {
+	if in.Handle == nil && in.Notifications == nil {
+		return map[string]string{"handle": nothingToUpdate}
+	}
+	faults := map[string]string{}
+	if in.Handle != nil {
+		if err := h.Names.Check(*in.Handle); err != nil {
+			faults["handle"] = err.Error()
+		}
+	}
+	if in.Notifications != nil {
+		if h.Notifications == nil {
+			faults["notifications"] = notificationsClosed
+		} else {
+			maps.Copy(faults, h.Notifications.CheckNotifications(*in.Notifications))
+		}
+	}
+	if len(faults) == 0 {
+		return nil
+	}
+	return faults
 }

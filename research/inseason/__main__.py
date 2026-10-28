@@ -69,6 +69,7 @@ from research.db.url import database_url_from_env
 from research.errors import ResearchError
 from research.inseason import usage_steps
 from research.inseason.game_voids import VOID_COMMAND, VoidRequest, record_void
+from research.inseason.push_notify import notify_starter_status
 from research.inseason.season_of import (
     calendar_season,
     out_of_window_reason,
@@ -272,7 +273,10 @@ def _capture_harvest(now: datetime) -> bool:
     market = _touchdown_market(now, season)
     charts = _slot_depth_charts(now, season)
     _week_reads(now)
-    return not failed and dated_ok and facts_ok and status.ok and returns_ok and parsed and market and charts
+    # The API queues the starter status pushes from the captures just committed (Lane 262).
+    pushed, push_line = notify_starter_status()
+    _line(push_line)
+    return not failed and dated_ok and facts_ok and status.ok and returns_ok and parsed and market and charts and pushed
 
 
 def _capture_status(now: datetime) -> bool:

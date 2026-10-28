@@ -1700,6 +1700,43 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/devices/{id}/push': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		get?: never;
+		/** An app registers its push token on its own device (Lane 262, spec §5.3): APNs for iOS, FCM for Android (or an iOS app that registers through FCM). Only the app asking, by its own device token (the session scope) and its own id; any other id is 404, the extension's token 403 (it lacks the session scope), a browser session 401. A token belongs to one device: registering moves it here from any other, and registering again replaces the device's earlier token; unpairing the device removes it. 30 a minute a device. */
+		put: operations['registerPush'];
+		post?: never;
+		/** The app's own device stops receiving pushes: its token is removed. Answered data null whether a token was registered or not. The same rules as PUT for whose device it is. */
+		delete: operations['removePush'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/internal/notifications/starter-status': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** The starter status producer (Lane 262): the hourly capture calls it after each pass with its Google identity. The API compares the two newest injury captures that read and, for each player whose status changed (out, doubtful, cleared of a week's designation, injured reserve, activated from a season-long list), queues one push for every account with a registered device and the kind switched on whose followed league starts him. One row per account, player and change: a call again adds nothing. Nothing sends here; the notify job delivers. A Google-signed identity token for the API's own URL, from a caller on INTERNAL_CALLERS; anything else is 401. 6 a minute. */
+		post: operations['produceStarterStatus'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/hosts': {
 		parameters: {
 			query?: never;
@@ -2028,6 +2065,8 @@ export interface components {
 			features: components['schemas']['Feature'][];
 			draft_pass: components['schemas']['DraftPassState'] | null;
 			membership: components['schemas']['MembershipState'] | null;
+			/** @description the account's push settings (Lane 262), the defaults until the member changes one; absent from an API before it, which a client reads as the defaults */
+			notifications?: components['schemas']['NotificationSettings'];
 			/** Format: date-time */
 			created_at: string;
 		};
@@ -2055,8 +2094,10 @@ export interface components {
 			current_period_end: string | null;
 			cancel_at_period_end: boolean | null;
 		};
+		/** @description what changes, at least one of the two; one left out keeps its setting */
 		AccountUpdate: {
-			handle: string;
+			handle?: string;
+			notifications?: components['schemas']['NotificationSettingsUpdate'];
 		};
 		/** @description The member's confirmation that the account goes: the email they sign in with, typed by hand, compared without regard to case or the spaces around it. */
 		AccountDeletion: {
@@ -5286,6 +5327,64 @@ export interface components {
 			device: components['schemas']['Device'];
 		};
 		/**
+		 * @description who delivers to the device, Apple's push service or Firebase Cloud Messaging
+		 * @enum {string}
+		 */
+		PushPlatform: 'apns' | 'fcm';
+		PushRegistration: {
+			platform: components['schemas']['PushPlatform'];
+			/** @description the platform's token for this install, an APNs device token in hex or an FCM registration token */
+			token: string;
+		};
+		PushRegistered: {
+			platform: components['schemas']['PushPlatform'];
+			/** Format: date-time */
+			registered_at: string;
+		};
+		StarterStatusProduced: {
+			/** @description the players whose status changed between the two newest captures */
+			changes: number;
+			/** @description the pushes queued now */
+			queued: number;
+			/**
+			 * Format: date-time
+			 * @description the newer capture compared, null when fewer than two captures read or the newer is too old
+			 */
+			newer_at: string | null;
+		};
+		/** @description one switch per kind of push, every one on by default */
+		NotificationKinds: {
+			/** @description a starter in a followed league is ruled out */
+			starter_status: boolean;
+			/** @description the week's reads have landed (Thursday) */
+			week_reads: boolean;
+			/** @description a waiver claim in a followed league resolved */
+			waiver_claims: boolean;
+		};
+		/** @description the switches to change; one left out keeps its setting */
+		NotificationKindsUpdate: {
+			starter_status?: boolean;
+			week_reads?: boolean;
+			waiver_claims?: boolean;
+		};
+		/** @description when pushes may arrive: never inside quiet hours in the member's own time zone (a push due then waits for the end), and only the kinds switched on. A start equal to its end is no quiet hours. */
+		NotificationSettings: {
+			/** @description an IANA zone, America/New_York by default */
+			time_zone: string;
+			/** @description HH:MM local, 23:00 by default */
+			quiet_start: string;
+			/** @description HH:MM local, 08:00 by default */
+			quiet_end: string;
+			kinds: components['schemas']['NotificationKinds'];
+		};
+		/** @description the settings to change; one left out keeps its setting */
+		NotificationSettingsUpdate: {
+			time_zone?: string;
+			quiet_start?: string;
+			quiet_end?: string;
+			kinds?: components['schemas']['NotificationKindsUpdate'];
+		};
+		/**
 		 * @description a host the member connects their own account on, named as a mechanism
 		 * @enum {string}
 		 */
@@ -8470,6 +8569,74 @@ export interface operations {
 				};
 			};
 			404: components['responses']['ErrorResponse'];
+		};
+	};
+	registerPush: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['PushRegistration'];
+			};
+		};
+		responses: {
+			/** @description registered */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['PushRegistered'];
+					};
+				};
+			};
+			400: components['responses']['ErrorResponse'];
+			401: components['responses']['ErrorResponse'];
+			403: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+		};
+	};
+	removePush: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				id: components['parameters']['ID'];
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['EmptyResponse'];
+			401: components['responses']['ErrorResponse'];
+			403: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+		};
+	};
+	produceStarterStatus: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description what was queued */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['StarterStatusProduced'];
+					};
+				};
+			};
+			401: components['responses']['ErrorResponse'];
 		};
 	};
 	listHostConnections: {

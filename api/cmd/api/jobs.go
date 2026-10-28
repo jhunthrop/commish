@@ -53,6 +53,9 @@ func jobTable() map[string]job {
 		// espn-week-reads runs Wednesday evening and Thursday afternoon: every
 		// attached ESPN league's projection and points (espnweekjob.go).
 		"espn-week-reads": runESPNWeekReads,
+		// notify runs every minute in season (Lane 262): the push outbox
+		// drained to FCM and APNs (notifyjob.go).
+		"notify": runNotify,
 		// yahoo-probe runs by hand once (Lane 130): the shapes of Yahoo's
 		// rank, week stats and projected points answers (yahooprobejob.go).
 		"yahoo-probe": runYahooProbe,

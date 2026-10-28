@@ -147,11 +147,7 @@ func (s *PGSource) newestCapture(ctx context.Context, source string) (out map[st
 			lastErr = err
 			continue
 		}
-		out = make(map[string]Designation, len(c.entries))
-		for id, e := range c.entries {
-			out[id] = Designation{Code: e.code, Note: e.note, AsOf: c.at.UTC(), Source: source}
-		}
-		return out, i == 0, true, nil
+		return designationsOf(source, c), i == 0, true, nil
 	}
 	tried := min(len(captures), capturesTried)
 	return nil, false, true, fmt.Errorf("boards: none of the %d newest injury captures %s reads: %w", tried, source, lastErr)

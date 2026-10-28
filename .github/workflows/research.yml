@@ -304,6 +304,10 @@ jobs:
         env:
           RUNTIME_SA: research-runtime@trycommish.iam.gserviceaccount.com
           ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          # The API the hourly capture asks to queue the starter status pushes (Lane 262), with the job's own
+          # identity token; the repository variable is unset until the API serving the route has deployed, and
+          # unset the call is skipped (research/inseason/push_notify.py).
+          COMMISH_API_URL: ${{ vars.COMMISH_API_URL }}
         run: |
           db="RESEARCH_DATABASE_URL=RESEARCH_DATABASE_URL:latest"
           nightly="$db,AI_GATEWAY_API_KEY=AI_GATEWAY_API_KEY:latest,CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest"
@@ -314,7 +318,7 @@ jobs:
             sql=()
             case "$3" in *RESEARCH_DATABASE_URL=*) sql=(--set-cloudsql-instances "$CLOUDSQL_INSTANCE") ;; esac
             gcloud run jobs deploy "$1" --image "$IMAGE" --region "$REGION" --service-account "$RUNTIME_SA" \
-              --args "$2" --set-secrets "$3" --set-env-vars "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT_ID" "${sql[@]}" \
+              --args "$2" --set-secrets "$3" --set-env-vars "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT_ID,COMMISH_API_URL=$COMMISH_API_URL" "${sql[@]}" \
               --cpu "$4" --memory "$5" --task-timeout "$6" --max-retries 0 --quiet
             gcloud run jobs add-iam-policy-binding "$1" --region "$REGION" \
               --member "serviceAccount:$RUNTIME_SA" --role roles/run.invoker --quiet

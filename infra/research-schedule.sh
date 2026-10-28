@@ -14,7 +14,9 @@ REGION="us-east1"
 CALLER="research-runtime@trycommish.iam.gserviceaccount.com"
 GCLOUD="${GCLOUD:-gcloud}"
 
-# scheduler job | cron | time zone | Cloud Run Job | description
+# scheduler job | cron | time zone | Cloud Run Job | description [| caller]
+# The caller is research-runtime unless a sixth field names another: the api's jobs are run by the
+# deployer, as the hand-made api schedules are (infra/README.md).
 # The weekly pass fires September through February only: it takes its season from the stored
 # schedule, and a date no schedule places fails the pass (research/inseason/season_of.py), so an
 # offseason firing would only be a failure email.
@@ -33,6 +35,7 @@ SCHEDULE=(
   "research-status-mon-kickoff|15 20 * 1,2,9-12 1|America/New_York|inseason-status|The game-day status capture (Lane 263), Monday 20:15 ET, the night game's kickoff"
   "research-headshots-august|0 4 * 8 *|America/New_York|headshots|Our headshot copies (research.headshots sync), daily in August, 04:00 ET"
   "research-headshots-weekly|0 4 * 1,2,9-12 3|America/New_York|headshots|Our headshot copies (research.headshots sync), weekly in season, Wednesday 04:00 ET"
+  "api-notify|* * * 1,2,9-12 *|America/New_York|api-notify|The push outbox drained (api notify, Lane 262), every minute in season|deployer@trycommish.iam.gserviceaccount.com"
 )
 
 target_uri() {
@@ -52,13 +55,13 @@ verify_one() {
 }
 
 apply_one() {
-  local name="$1" cron="$2" zone="$3" run_job="$4" description="$5" verb="create"
+  local name="$1" cron="$2" zone="$3" run_job="$4" description="$5" caller="${6:-${CALLER}}" verb="create"
   if "${GCLOUD}" scheduler jobs describe "${name}" --project "${PROJECT}" --location "${REGION}" >/dev/null 2>&1; then
     verb="update"
   fi
   "${GCLOUD}" scheduler jobs "${verb}" http "${name}" --project "${PROJECT}" --location "${REGION}" \
     --schedule "${cron}" --time-zone "${zone}" --http-method POST --uri "$(target_uri "${run_job}")" \
-    --oauth-service-account-email "${CALLER}" --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform" \
+    --oauth-service-account-email "${caller}" --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform" \
     --attempt-deadline 30s --max-retry-attempts 0 --description "${description}" --quiet >/dev/null
   if [[ "${verb}" == "create" ]]; then
     "${GCLOUD}" scheduler jobs pause "${name}" --project "${PROJECT}" --location "${REGION}" --quiet >/dev/null
@@ -67,11 +70,11 @@ apply_one() {
 }
 
 main() {
-  local command="${1:-verify}" entry name cron zone run_job description failed=0
+  local command="${1:-verify}" entry name cron zone run_job description caller failed=0
   for entry in "${SCHEDULE[@]}"; do
-    IFS='|' read -r name cron zone run_job description <<<"${entry}"
+    IFS='|' read -r name cron zone run_job description caller <<<"${entry}"
     case "${command}" in
-      apply) apply_one "${name}" "${cron}" "${zone}" "${run_job}" "${description}" || failed=1 ;;
+      apply) apply_one "${name}" "${cron}" "${zone}" "${run_job}" "${description}" "${caller}" || failed=1 ;;
       verify) verify_one "${name}" "${run_job}" || failed=1 ;;
       *) echo "usage: $0 apply|verify" >&2; exit 2 ;;
     esac
