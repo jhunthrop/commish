@@ -494,6 +494,11 @@ public enum Words {
         public static let basis = "His figures are the board's. His game log and our read of him are not written yet."
     }
 
+    public enum StatusHeld {
+        public static let changedLead = "His status changed since this read was written."
+        public static let dueBy = "A new read is due by"
+    }
+
     public enum WeekTile {
         public static let published = "published projection"
         public static let sinceEarlier = "since the earlier read"
@@ -502,7 +507,7 @@ public enum Words {
         public static let underShownRead = "Moved under 0.5 since our read was written"
         public static let notInRead = "Not in our read"
         public static let changePart = "Proj change is its move since the earlier read, shown from 0.5."
-        public static let changePartRead = "Proj change is its move since our read was written, shown from 0.5. The read is withheld from the same move."
+        public static let changePartRead = "Proj change is its move since our read was written, shown from 0.5."
     }
 
     public enum PlayerPage {

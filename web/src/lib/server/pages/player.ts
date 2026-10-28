@@ -53,7 +53,7 @@ import {
 import { unwrittenByFormat } from './player-unwritten.ts';
 import { playerHead } from './head.ts';
 import type { HeadMarkup } from '#lib/site/head.ts';
-import { lastRead, readAtStatus } from '#lib/player/status-held.ts';
+import { lastRead, statusCaption } from '#lib/player/status-held.ts';
 import { scheduleKickoffs, standingByline } from '#lib/player/read-byline.ts';
 import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
 import {
@@ -359,6 +359,19 @@ function servedRead(
 	return { ...read, caption: standingByline(read, statusRead, scheduleKickoffs(slates), now) };
 }
 
+/** His read as the page builds it: under the status caption when his designation moved since it was
+ * written (status-held.ts statusCaption), else with the standing byline. */
+function weekReadAt(
+	read: WeekRead,
+	capture: Designations | null,
+	playerId: string,
+	slates: readonly Slate[],
+	now: number
+): WeekRead {
+	const caption = statusCaption(read, capture, playerId, now);
+	return caption === null ? servedRead(read, capture, slates, now) : { ...read, caption };
+}
+
 /** Each week's last kickoff across the run's schedule. */
 async function lastKickoffsOf(): Promise<Record<number, string>> {
 	const last: Record<number, string> = {};
@@ -472,17 +485,12 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		restTile: lead.restTile,
 		restParts: lead.restParts,
 		basisTiles: lead.basisTiles,
-		// A read his designation moved past since it was written is withheld on the page and the shelf
-		// alike (Lane 162, D01).
+		// A read his designation moved past since it was written keeps its body under the status caption
+		// on the page and the shelf alike (Lane 162, D01; Lane 274).
 		weekRead:
 			loaded.weekRead === null
 				? null
-				: servedRead(
-						readAtStatus(loaded.weekRead, capture, entry.id, now),
-						capture,
-						slate.slates,
-						now
-					),
+				: weekReadAt(loaded.weekRead, capture, entry.id, slate.slates, now),
 		weekReadsDue: loaded.weekReadsDue,
 		lastKickoffs,
 		copyOf: loaded.copyOf,

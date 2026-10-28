@@ -1,0 +1,7 @@
+{
+	"changedLead": "His status changed since this read was written.",
+	"dueBy": "A new read is due by",
+	"functions": [
+		"changed"
+	]
+}

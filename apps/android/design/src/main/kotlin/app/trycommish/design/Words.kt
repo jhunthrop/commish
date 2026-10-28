@@ -496,6 +496,11 @@ object Words {
         const val basis = "His figures are the board's. His game log and our read of him are not written yet."
     }
 
+    object StatusHeld {
+        const val changedLead = "His status changed since this read was written."
+        const val dueBy = "A new read is due by"
+    }
+
     object WeekTile {
         const val published = "published projection"
         const val sinceEarlier = "since the earlier read"
@@ -504,7 +509,7 @@ object Words {
         const val underShownRead = "Moved under 0.5 since our read was written"
         const val notInRead = "Not in our read"
         const val changePart = "Proj change is its move since the earlier read, shown from 0.5."
-        const val changePartRead = "Proj change is its move since our read was written, shown from 0.5. The read is withheld from the same move."
+        const val changePartRead = "Proj change is its move since our read was written, shown from 0.5."
     }
 
     object PlayerPage {

@@ -358,6 +358,12 @@ export const TABLES: readonly TableSource[] = [
     json: "shared/words/player-held.json",
   },
   {
+    name: "StatusHeld",
+    module: "web/src/lib/player/status-words.ts",
+    picks: ["STATUS_HELD_WORDS"],
+    json: "shared/words/player-status-held.json",
+  },
+  {
     name: "WeekTile",
     module: "web/src/lib/player/week-words.ts",
     picks: ["WEEK_TILE"],

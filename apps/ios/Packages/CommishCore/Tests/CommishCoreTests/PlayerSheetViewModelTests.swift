@@ -70,16 +70,27 @@ struct PlayerSheetViewModelTests {
         #expect(card.status?.mark == "Questionable")
         #expect(card.cell?.when == "Sun 12:00 pm CT")
         #expect(card.tiles.map(\.value) == ["11.0", "199.2", "12th", "9.3", "5.0", "\u{2212}1.4"])
-        #expect(card.read == .shown(.withheld("The published projection moved since this read was written.")))
+        // The projection moved since the read was written: the change tile says so and the read stands
+        // (Lane 274).
+        guard case let .shown(.written(body, _)) = card.read else {
+            Issue.record("a written read, got \(String(describing: card.read))")
+            return
+        }
+        #expect(body.hasPrefix("Rome Odunze is questionable on Friday's report"))
     }
 
-    @Test func aReadWrittenBeforeHeWasDueBackIsHeldForHisStatus() async throws {
+    @Test func aReadWrittenBeforeHeWasDueBackStandsUnderTheStatusCaption() async throws {
         let viewModel = model(Self.etienne, clock: Fixtures.week)
         await viewModel.load()
         let (card, _) = try #require(loaded(viewModel))
-        #expect(card.read == .shown(.withheld(
-            "His status changed since this read was written. A new read is due by Sat Oct 17, 1:00 pm CT."
-        )))
+        // Lane 274: the status caption goes over the kept read, never instead of it.
+        guard case let .shown(.written(body, caption)) = card.read else {
+            Issue.record("a written read, got \(String(describing: card.read))")
+            return
+        }
+        #expect(body.hasPrefix("Travis Etienne Jr."))
+        #expect(caption == "His status changed since this read was written. "
+            + "A new read is due by Sat Oct 17, 1:00 pm CT.")
     }
 
     @Test func withNoReadWrittenThePlaceSaysSoAndAListedPlayersWeekIsHisList() async throws {

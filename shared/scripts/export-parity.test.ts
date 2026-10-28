@@ -195,7 +195,7 @@ void test("the player sheet's parity: every held read, each sheet player at each
 		statusHeld: { built: { body: string | null } }[];
 		sheets: {
 			player: string;
-			read: { written: boolean; withheld?: boolean; words?: string };
+			read: { written: boolean; withheld?: boolean; words?: string; caption?: string };
 			tiles: { label: string; value: string }[];
 		}[];
 		pages: { run: string; underway: boolean; words: { drafters: string } }[];
@@ -242,7 +242,7 @@ void test("the player sheet's parity: every held read, each sheet player at each
 	);
 	assert.ok(
 		parity.statusHeld.some((c) => c.built.body === null),
-		'a read held for his status'
+		'a read an older run nulled for his status'
 	);
 	assert.ok(
 		parity.statusHeld.some((c) => c.built.body !== null),
@@ -262,9 +262,14 @@ void test("the player sheet's parity: every held read, each sheet player at each
 		reads.some((r) => !r.written),
 		'a sheet with no read written'
 	);
+	// Lane 274: the status caption goes over the kept read, never instead of it.
 	assert.ok(
-		reads.some((r) => r.words?.startsWith('His status changed since this read was written.')),
-		'a sheet held for his status'
+		reads.some(
+			(r) =>
+				r.withheld === false &&
+				r.caption?.startsWith('His status changed since this read was written.') === true
+		),
+		'a sheet read under the status caption'
 	);
 	assert.ok(
 		parity.sheets.every((c) => c.tiles.length === 6),

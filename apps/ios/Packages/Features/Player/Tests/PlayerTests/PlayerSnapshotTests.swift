@@ -227,9 +227,12 @@ struct PlayerSnapshotTests {
             case .unwrittenMedium:
                 #expect(card.read == .none("Our read for his next game is not written yet."))
             case .heldMedium:
-                #expect(card.read == .shown(.withheld(
-                    "His status changed since this read was written. A new read is due by Sat Oct 17, 1:00 pm CT."
-                )))
+                guard case let .shown(.written(_, caption)) = card.read else {
+                    Issue.record("a read under the status caption, got \(String(describing: card.read))")
+                    continue
+                }
+                #expect(caption == "His status changed since this read was written. "
+                    + "A new read is due by Sat Oct 17, 1:00 pm CT.")
             default:
                 #expect(freshness.saved == .offline)
                 #expect(viewModel.stampWords == "Last read Sat 12:00 pm")

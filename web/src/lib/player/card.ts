@@ -50,16 +50,16 @@ export interface CardHead {
 }
 
 /** The smallest move of the week's published projection a page counts (Lane 139, C21; Lane 162, D04): the
- * Proj change tile shows none under it, and a week read written at a figure the card prints within it
- * stands. The writer's cells and the run's serve rule hold the same (`capsules/week/cells.py
- * SHOWN_CHANGE_FROM`). */
+ * Proj change tile shows none under it. The writer's cells and the run's rewrite rule hold the same
+ * (`capsules/week/cells.py SHOWN_CHANGE_FROM`). The page never withholds a read for a move (Lane 274): a
+ * read is about the matchup, and the tile says the move beside it. */
 export const SHOWN_CHANGE_FROM = 0.5;
 
 /** Tenths in a point, the precision the API and the run print. */
 const TENTHS_IN_POINT = 10;
 
-/** The projection's move as the page says it, one fact for the Proj change tile, the moved caption and the
- * run's serve rule (Lane 162, D04 fix round 1): `change` is the signed move in points (null with no
+/** The projection's move as the page says it, one fact for the Proj change tile and the run's rewrite rule
+ * (Lane 162, D04 fix round 1): `change` is the signed move in points (null with no
  * figures to subtract), `crosses` whether it reaches SHOWN_CHANGE_FROM, `basis` what it is measured from. */
 export interface ProjectionMove {
 	change: number | null;
@@ -88,11 +88,6 @@ export function projectionMove(
 
 function crossesShown(tenths: number): boolean {
 	return Math.abs(tenths) >= SHOWN_CHANGE_FROM * TENTHS_IN_POINT;
-}
-
-/** Whether the read's quoted figure has moved past the threshold: the withhold's question. */
-export function projectionMoved(now: number | null, quoted: number | null): boolean {
-	return projectionMove(now, quoted, null).crosses;
 }
 
 /** A number not held. */

@@ -55,7 +55,7 @@ sealed interface QuotedProjection {
     }
 }
 
-/** The projection's move, one fact for the Proj change tile, the moved caption and the run's serve rule
+/** The projection's move, one fact for the Proj change tile and the run's rewrite rule
  * (card.ts ProjectionMove): its signed change (null with no figures to subtract), whether it reaches the
  * shown threshold, and what it is measured from. */
 data class ProjectionMove(
@@ -102,27 +102,25 @@ data class ProjectionMove(
 /** week-read.ts: the read beside the card's live projection, and the place's words when none stands. */
 object WeekReads {
     /** shownWeekRead: a read the run withheld keeps its caption while his game is to come and says it was
-     * not written once his game is under way; a read the card's projection has moved past by the shown
-     * threshold is withheld behind the run's moved caption; otherwise it stands. */
+     * not written once his game is under way; a written read stands through any move of the published
+     * projection (Lane 274). */
     fun shown(
         read: RunWeekRead,
         card: CardProjection?,
     ): ShownRead {
         val body = read.body ?: return ShownRead.Withheld(withheldWords(read, card))
-        val moved = read.movedCaption
-        if (movedPastRead(read, card) && moved != null) return ShownRead.Withheld(moved)
-        return ShownRead.Written(body, read.caption)
+        return ShownRead.Written(body, shownCaption(read, card))
     }
 
-    /** movedPastRead: the one test the read's withhold and the Wk tile's quote share. */
-    internal fun movedPastRead(
+    /** shownCaption: a status caption says its lead alone once his game for the read's week is under way,
+     * as no new read comes for a game being played (Lane 274 review M2). */
+    private fun shownCaption(
         read: RunWeekRead,
         card: CardProjection?,
-    ): Boolean {
-        if (read.body == null || card == null || !card.ppr || card.week != read.week || underway(card.state)) return false
-        val quoted = QuotedProjection.of(read)
-        if (quoted == QuotedProjection.NotNamed || read.movedCaption == null) return false
-        return ProjectionMove.of(card.points, quoted, null).crosses
+    ): String {
+        val played = card?.week == read.week && underway(card.state)
+        val lead = Words.StatusHeld.changedLead
+        return if (played && read.caption.startsWith(lead)) lead else read.caption
     }
 
     /** noReadWords: his next game while it is to come, never "next" for one under way or final; while the

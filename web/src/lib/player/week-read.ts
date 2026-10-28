@@ -1,8 +1,7 @@
-/** The week-ahead read beside the card (Lane 66v). The read quotes the published projection it was
- * written with, in PPR, as the card prints it (the run's `projection`); while his game is still to come
- * and the week's published projection has moved from it by the Proj change tile's threshold (card.ts
- * projectionMoved, Lane 162), the read is withheld behind the run's words for it (`movedCaption`). From kickoff through final the read written for the week stands whatever the
- * card prints (Lane 158), and a read the run withheld says it was not written for this game (Lane 160).
+/** The week-ahead read beside the card (Lane 66v). The read stands whatever the week's published
+ * projection does since it was written (Lane 274, founder ruling: projections move on every fantasy site
+ * without the read changing); the Proj change tile says the move and the Wk tile the figure at the read.
+ * A read the run withheld says it was not written for this game once that game is under way (Lane 160).
  * A withheld read is its caption alone, never under the not-written line, which
  * is said only when the run holds no read for him (Lane 158). The figures are the run's and the API's,
  * each rounded once there: this only compares them. */
@@ -10,7 +9,8 @@ import type { components } from '#lib/api/types.ts';
 import type { GameHead } from '#lib/league/box/kickoff.ts';
 import { weekdayWord } from '#lib/format/date.ts';
 import type { ReadsDue, WeekRead } from '#lib/run/schema.ts';
-import { CARD, projectionMoved } from './card.ts';
+import { CARD } from './card.ts';
+import { STATUS_HELD_WORDS, isStatusCaption } from './status-words.ts';
 
 /** A nightly in the small hours belongs to the night before: its night is the Eastern day this long
  * before it (research capsules/week/rollover.py NIGHT_RUNS_PAST_MIDNIGHT, ported to both apps). */
@@ -39,7 +39,7 @@ export function weekReadLabel(read: Pick<WeekRead, 'week'>): string {
 	return `Our read for week ${String(read.week)}`;
 }
 
-/** His game has kicked off or is final: the read written for the week stands. */
+/** His game has kicked off or is final: a withheld read's due time has passed. */
 function underway(state: ReadGameState): boolean {
 	return state === 'kicked_off' || state === 'final';
 }
@@ -50,30 +50,20 @@ function withheldWords(read: WeekRead, card: CardProjection | null): string {
 	return card?.week === read.week && underway(card.state) ? CARD.readNotWritten : read.caption;
 }
 
-/** Whether the page withholds the read for the card's projection having moved (Lane 165 fix round 1,
- * M2): the one test shownWeekRead and the Wk tile's "Proj at the read" share. A read the run withheld,
- * or one from before the moved caption, is never withheld here. */
-export function movedPastRead(
-	read: Pick<WeekRead, 'body' | 'projection' | 'movedCaption' | 'week'>,
-	card: CardProjection | null
-): boolean {
-	if (read.body === null || card?.scoring !== 'ppr' || card.week !== read.week) return false;
-	if (underway(card.state)) return false;
-	if (read.projection === undefined || read.movedCaption === undefined) return false;
-	return projectionMoved(card.points, read.projection);
-}
-
 /** The read as the page shows it beside the card's live projection (null until the card has read). */
 export function shownWeekRead(read: WeekRead, card: CardProjection | null): ShownRead {
 	// A read the run already withheld keeps the run's caption (a status change says when the new one is
 	// due) while his game is to come; from kickoff through final that due time has passed, so the place
 	// says no read was written for this game (Lane 160, B140).
 	if (read.body === null) return { withheld: true, words: withheldWords(read, card) };
-	const built = { withheld: false, body: read.body, caption: read.caption } as const;
-	// One threshold with the Proj change tile (Lane 162, D04): a move under it shows the read.
-	return movedPastRead(read, card) && read.movedCaption !== undefined
-		? { withheld: true, words: read.movedCaption }
-		: built;
+	return { withheld: false, body: read.body, caption: shownCaption(read, card) };
+}
+
+/** A written read's caption at the card's clock: a status caption says its lead alone once his game for
+ * the read's week is under way, as no new read comes for a game being played (Lane 274 review M2). */
+function shownCaption(read: WeekRead, card: CardProjection | null): string {
+	const played = card?.week === read.week && underway(card.state);
+	return played && isStatusCaption(read.caption) ? STATUS_HELD_WORDS.changedLead : read.caption;
 }
 
 /** The night a nightly at `at` belongs to, on the Eastern clock: "Tuesday" for Wednesday 05:30 UTC. */

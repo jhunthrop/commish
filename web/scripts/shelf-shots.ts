@@ -9,10 +9,10 @@
 // reopens it and the close button then clears the address. A player with a written read, opened from
 // the address on Players, shows the read in the UI face at the rows' body size (Lane 126). The Lineup's
 // IR case (Lane 128) opens a player on injured reserve: no rank on his row, "QB IR" on the shelf. It prints each screen's script on load,
-// gzipped, before any tap (the shelf's script waits for the first). Lane 158: a player whose read
-// quotes a projection the card does not print shows the moved caption alone before his kickoff, never
-// under "not written yet"; with SHELF_IN_PLAY=1 the case runs alone on the fixture's Sunday clock
-// (FIXTURE_SUNDAY_CLOCK, his noon game under way), where the read written for the week is shown.
+// gzipped, before any tap (the shelf's script waits for the first). Lane 274: a player whose read
+// quotes a projection the card does not print shows the read before his kickoff, never the moved caption
+// or "not written yet"; with SHELF_IN_PLAY=1 the case runs alone on the fixture's Sunday clock
+// (FIXTURE_SUNDAY_CLOCK, his noon game under way), where the read written for the week is shown too.
 // Lane 160 (B140): CeeDee Lamb's read the run withheld for his status says its due time alone before his
 // Sunday night kickoff; with SHELF_AFTER_GAMES=1 the case runs alone on the fixture's Monday clock
 // (FIXTURE_MONDAY_CLOCK, his game final), where it says the read for this game was not written.
@@ -440,7 +440,8 @@ const RETURN_CASE = {
 	slug: 'travis-etienne-jr',
 	chip: 'Due back Sun Oct 18',
 	listed: onListWords('IR'),
-	withheld: 'His status changed since this read was written.'
+	statusCaption: 'His status changed since this read was written.',
+	body: 'does not play'
 };
 // Shot on the week's clock alone, as the IR case: the in-play and after-games cases run their read alone.
 for (const screen of SCREENS.filter((s) => s.name === 'lineup' || s.name === 'players')) {
@@ -467,10 +468,11 @@ for (const screen of SCREENS.filter((s) => s.name === 'lineup' || s.name === 'pl
 					.count();
 				if (listed > 0)
 					faults.push(`${label}: ${String(listed)} tiles say "${RETURN_CASE.listed}"`);
-				// His read, written while he was on IR, is withheld behind the status caption (Lane 162, D01).
+				// His read, written while he was on IR, stands under the status caption (Lane 162, D01; Lane
+				// 274): the caption over the read, never in place of it.
 				const shelfText = await shelf(page).innerText();
-				if (!shelfText.includes(RETURN_CASE.withheld) || shelfText.includes('does not play'))
-					faults.push(`${label}: his read is not withheld: "${shelfText}"`);
+				if (!shelfText.includes(RETURN_CASE.statusCaption) || !shelfText.includes(RETURN_CASE.body))
+					faults.push(`${label}: his read is not under the status caption: "${shelfText}"`);
 				await page.screenshot({
 					path: new URL(`shelf-${screen.name}-returning-${theme}-${String(size.width)}.png`, out)
 						.pathname
@@ -504,7 +506,7 @@ const READ_CASES: readonly ReadCase[] = AFTER_GAMES
 		? [{ slug: 'rome-odunze', shot: 'read-in-play', shown: true }]
 		: [
 				{ slug: 'puka-nacua', shot: 'read', shown: true },
-				{ slug: 'rome-odunze', shot: 'read-moved', shown: false, says: MOVED },
+				{ slug: 'rome-odunze', shot: 'read-moved', shown: true },
 				{ slug: 'ceedee-lamb', shot: 'read-withheld', shown: false, says: DUE }
 			];
 
