@@ -45,6 +45,19 @@ func FormatFor(preset apitypes.ScoringPreset) Format {
 	}
 }
 
+// FormatForBoard is the stored board a sheet's format reads: the board of
+// its scoring where there is one, else the PPR board (as FormatFor).
+func FormatForBoard(f apitypes.BoardFormat) Format {
+	switch f {
+	case apitypes.BoardFormatHalfPpr:
+		return FormatFor(apitypes.ScoringPresetHalfPpr)
+	case apitypes.BoardFormatStandard:
+		return FormatFor(apitypes.ScoringPresetStandard)
+	default:
+		return FormatFor(apitypes.ScoringPresetPpr)
+	}
+}
+
 // FormatOfSource is the stored format a board source names
 // (<prefix>_<format>_12), false for one that names none.
 func FormatOfSource(source string) (Format, bool) {

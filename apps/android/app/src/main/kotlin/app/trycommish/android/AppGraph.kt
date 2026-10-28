@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.util.Log
 import app.trycommish.api.Transport
+import app.trycommish.api.models.BoardFormat
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.LeagueSettings
 import app.trycommish.core.Cache
@@ -74,6 +75,10 @@ import app.trycommish.core.reference.ReferenceReads
 import app.trycommish.core.reference.RunScreenViewModel
 import app.trycommish.core.reference.ScheduleModel
 import app.trycommish.core.room.phoneRoomConnector
+import app.trycommish.core.sheet.ApiSheetReads
+import app.trycommish.core.sheet.SheetDeps
+import app.trycommish.core.sheet.SheetReads
+import app.trycommish.core.sheet.SheetViewModel
 import app.trycommish.core.shell.AccountReads
 import app.trycommish.core.shell.ApiAccountReads
 import app.trycommish.core.shell.FollowedLeague
@@ -106,6 +111,7 @@ import java.time.ZoneId
 private const val TAG = "Commish"
 private const val CLIP_LABEL = "Lineup"
 private const val LOBBY_PREFS = "commish_lobby"
+private const val SHEET_EXPORTS = "sheet-exports"
 
 /**
  * The app's graph, built by hand (no DI framework, spec §6.2): one session, one transport, one cache,
@@ -139,6 +145,14 @@ class AppGraph(
     private val accountScreen: AccountScreenReads = ApiAccountScreenReads(transport)
     private val companions: CompanionReads = ApiCompanionReads(transport)
     private val mocks: MockReads = ApiMockReads(transport)
+    private val sheets: SheetReads = ApiSheetReads(transport)
+
+    /** Where an export's file waits for the share sheet (res/xml/sheet_exports.xml names it). */
+    private val sheetExports = context.cacheDir.resolve(SHEET_EXPORTS)
+
+    /** The cheat sheet, an empty one started in `format`; an export written to the share sheet's folder. */
+    fun sheetViewModel(format: BoardFormat): SheetViewModel =
+        SheetViewModel(SheetDeps(sheets, runs, cache, clock, zone, sheetExports), format, sessionEnd)
 
     /** A debug build started with the CommishCompanionReplay extra follows the API's recorded draft from the
      * companion's start page (the web's /companion/new?replay=1, COMPANION_REPLAY on a development API, refused

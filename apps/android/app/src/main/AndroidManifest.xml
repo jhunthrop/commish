@@ -57,6 +57,17 @@
                 <data android:pathPrefix="/mock/share/" />
             </intent-filter>
         </activity>
+
+        <!-- The cheat sheet's export, handed to the share sheet (Lane 267): the one folder it is written to. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.exports"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/sheet_exports" />
+        </provider>
     </application>
 
     <!-- Custom Tabs: the browsers that can open the sign-in. -->

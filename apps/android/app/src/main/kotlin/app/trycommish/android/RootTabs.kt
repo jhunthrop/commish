@@ -77,7 +77,19 @@ internal val SHELL_PAGES: List<String> = PAGES.map { it.page }
 
 /** The tabs drawn by their own screens; the rest show their name until their lane lands. */
 private val LIVE_PAGES =
-    setOf(LEAGUE_PAGE, LINEUP_PAGE, MATCHUP_PAGE, WAIVERS_PAGE, TRADES_PAGE, BOARD_PAGE, PLAYERS_PAGE, RECORD_PAGE, ADVISOR_PAGE, MOCK_PAGE)
+    setOf(
+        LEAGUE_PAGE,
+        LINEUP_PAGE,
+        MATCHUP_PAGE,
+        WAIVERS_PAGE,
+        TRADES_PAGE,
+        BOARD_PAGE,
+        PLAYERS_PAGE,
+        RECORD_PAGE,
+        ADVISOR_PAGE,
+        MOCK_PAGE,
+        SHEET_PAGE,
+    )
 
 /** The run pages the bar opens: the order's (Rankings in season, Players before and after it) and Our
  * record. */
@@ -127,8 +139,8 @@ private object Routes {
  * season (Rail.generated.kt), a back stack per tab, and the one player sheet over all of it. Choosing
  * a league shows it, writes it to the site, and opens its home: the League tab where the bar has one,
  * else the home pushed on the tab in view (B149). League, Lineup, Matchup, Waivers, Trades and the board (the
- * Board item, and Rest of season in season with no league), Rankings (the Players page) and Our record are
- * live, and the search opens Rankings with its letters; the rest show their name.
+ * Board item, and Rest of season in season with no league), Rankings (the Players page), Our record and
+ * the Cheat sheet are live, and the search opens Rankings with its letters; the rest show their name.
  * A home's Open Lineup opens the Lineup tab for the league shown, else the lineup on the site.
  */
 @Composable
@@ -445,6 +457,8 @@ private fun Pages(
         }
         composable(PLAYERS_PAGE) { RankingsTab(graph, state, query = "") }
         composable(RECORD_PAGE) { RecordTab(graph) }
+        // The sheet's pinned verb opens a mock's setup on the league shown, as the iOS Sheet's does.
+        composable(SHEET_PAGE) { SheetTab(graph, state) { openMock(selected?.settingsLeagueId) } }
         companion(graph, verbs.push)
         mock(graph, state, verbs.openRoom, verbs.lobby)
         PAGES.filter { it.page !in LIVE_PAGES }.forEach { item ->

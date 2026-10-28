@@ -161,9 +161,9 @@ function railList(rail: readonly RailEntry[]): string {
 /** The rail keys railOfKey reads: each phase, and the playoffs with the wire still open. */
 const RAIL_KEYS = [...LEAGUE_PHASES, 'playoffs_waivers'] as const;
 
-/** The top bar's and the player sheet's glyphs from the web's icon set: the league switch's mark and
- * chevron, the search, the close. */
-const SHELL_ICONS: readonly IconName[] = ['league', 'chevron', 'search', 'close'];
+/** The top bar's, the player sheet's and the cheat sheet's glyphs from the web's icon set: the league
+ * switch's mark and chevron, the search, the close, and a sheet row's tag count and note. */
+const SHELL_ICONS: readonly IconName[] = ['league', 'chevron', 'search', 'close', 'tag', 'note'];
 
 /** The site's own seasons (GET /me's season.phase), each read with no league followed. */
 const SITE_PHASES: readonly SitePhase[] = ['preseason', 'in_season', 'playoffs', 'offseason'];

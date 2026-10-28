@@ -708,7 +708,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Replaces the rows from a CSV in the export's columns (rank, player_id, name, position, team, tier, tags, note). rank and player_id and name and position are required. tags holds up to four tags separated by commas, bars or semicolons, and a header named tag is read as tags. Rows are ordered by rank. */
+		/** Replaces the rows from a CSV in the export's columns (rank, player_id, name, position, team, tier, tags, note). rank and player_id and name and position are required. tags holds up to four tags separated by commas, bars or semicolons, and a header named tag is read as tags. Rows are ordered by rank. A body whose first line does not name player_id is read as a names list instead, one player a line in the drafter's order ("1. Puka Nacua", "Ja'Marr Chase, WR", "Bills D/ST"), matched against the board of the sheet's format: a name is taken only when it is unmistakable, and each line not taken is skipped with its reason. A body that reads to no player is refused with 400 and the sheet is left as it was. */
 		post: operations['importSheet'];
 		delete?: never;
 		options?: never;
@@ -6607,6 +6607,7 @@ export interface operations {
 		requestBody: {
 			content: {
 				'text/csv': string;
+				'text/plain': string;
 			};
 		};
 		responses: {
@@ -6621,6 +6622,7 @@ export interface operations {
 			};
 			400: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
 		};
 	};
 	exportSheet: {
