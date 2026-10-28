@@ -37,6 +37,7 @@
 	import TagChip from './TagChip.svelte';
 	import TierChip from './TierChip.svelte';
 	import type { TagMark } from './tag.ts';
+	import { SHEET } from '#lib/sheet/words.ts';
 
 	interface Props {
 		id: string;
@@ -147,7 +148,7 @@
 						>
 					{/if}
 					{#if note}
-						<span class="glyph" role="img" aria-label="Has a note"
+						<span class="glyph" role="img" aria-label={SHEET.hasNote}
 							><Icon name="note" size={14} /></span
 						>
 					{/if}

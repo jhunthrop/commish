@@ -8,6 +8,7 @@
 	import type { SheetRow } from './model.ts';
 	import type { TagToggle } from './store.svelte.ts';
 	import { FIXED_TAGS, canonicalTag, hasTag, tagLabel, tagProblem } from './tags.ts';
+	import { SHEET } from './words.ts';
 
 	interface Props {
 		row: SheetRow;
@@ -62,7 +63,7 @@
 		multiline
 		rows={2}
 		maxlength={SHEET_LIMITS.note}
-		placeholder="Your note"
+		placeholder={SHEET.notePlaceholder}
 		bind:value={note}
 		oninput={onnote}
 		autofocus
@@ -79,23 +80,23 @@
 		{#if !full}
 			<div class="own">
 				<Field
-					label="Your own tag"
+					label={SHEET.ownTagPlaceholder}
 					hideLabel
-					placeholder="Your own tag"
+					placeholder={SHEET.ownTagPlaceholder}
 					maxlength={SHEET_LIMITS.tagLength}
 					bind:value={newTag}
 					onkeydown={onTagKey}
 				/>
-				<Quiet size="sm" onclick={addOwn}>Add tag</Quiet>
+				<Quiet size="sm" onclick={addOwn}>{SHEET.addTag}</Quiet>
 			</div>
 		{/if}
 		{#if tagError}<p class="error" role="alert">{tagError}</p>{/if}
 	</div>
 	<div class="actions">
 		{#if canStartTier && !startsTier}
-			<Quiet size="sm" onclick={onstarttier}>Start a tier here</Quiet>
+			<Quiet size="sm" onclick={onstarttier}>{SHEET.startTier}</Quiet>
 		{/if}
-		<Quiet size="sm" onclick={onremove}>Take off my sheet</Quiet>
+		<Quiet size="sm" onclick={onremove}>{SHEET.remove}</Quiet>
 	</div>
 </div>
 
