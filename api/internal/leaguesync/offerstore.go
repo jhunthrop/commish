@@ -3,7 +3,9 @@ package leaguesync
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +15,82 @@ import (
 // maxOffersKept bounds the offers one read keeps: a member is offered a
 // handful at most.
 const maxOffersKept = 50
+
+// OfferReadsKept is how long the offers archive keeps a read (Lane 285,
+// B278). The archive is the member's own record of what the host offered,
+// kept to answer "what was I offered and when" about the current season's
+// trades; an offer lapses on the host within days (ESPN and Yahoo expire
+// a proposal in two to seven, MyFantasyLeague's run to the trade
+// deadline), so thirty days covers an offer's whole life with margin and
+// no read older than that is about an offer still open. The daily sweep
+// job prunes past it (PruneOfferReads), so a link no longer read (detached
+// or disconnected) is pruned too, which a prune riding the capture would
+// never reach.
+const OfferReadsKept = 30 * 24 * time.Hour
+
+// ErrOffersNotKept is a read the store refused because its link was
+// detached or its host disconnected while the read was in flight: the
+// retire that went with that already holds, so the read writes nothing.
+var ErrOffersNotKept = errors.New("leaguesync: the link is detached or its host disconnected")
+
+// lockOffers takes the link's offers lock for the transaction, so a read
+// being kept and a retire never interleave.
+func lockOffers(ctx context.Context, tx pgx.Tx, link uuid.UUID) error {
+	_, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext('host_offers:' || $1::text))`, link)
+	return err
+}
+
+// retireOffers retires the current claim of each link (Lane 285, B278):
+// for a link that holds offers, an empty read appended to the archive
+// (the retire, recorded) and its offers deleted, in the caller's
+// transaction. Locks are taken in id order, so two retires never wait on
+// each other in a cycle (a read being kept holds one link's lock only).
+func retireOffers(ctx context.Context, tx pgx.Tx, links []uuid.UUID) error {
+	ids := slices.Clone(links)
+	slices.SortFunc(ids, func(a, b uuid.UUID) int { return slices.Compare(a[:], b[:]) })
+	ids = slices.Compact(ids)
+	for _, id := range ids {
+		if err := lockOffers(ctx, tx, id); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(ctx, `insert into app.host_offer_reads (link_id, account_id, read_at, offers)
+		select link_id, account_id, now(), '[]'::jsonb from app.host_offers where link_id = any($1)
+		group by link_id, account_id`, ids); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `delete from app.host_offers where link_id = any($1)`, ids)
+	return err
+}
+
+// RetireHostOffers is hosts.Store's OnDelete: a disconnect retires the
+// offers of every link the account has on the host in the disconnect's
+// own transaction, so they stop being answered at once rather than when
+// the last good read ages out (inseason.OfferKeptFor).
+func RetireHostOffers(ctx context.Context, tx pgx.Tx, accountID uuid.UUID, host string) error {
+	rows, err := tx.Query(ctx, `select id from app.league_links where account_id = $1 and host = $2`, accountID, host)
+	if err != nil {
+		return fmt.Errorf("leaguesync: retire offers %s: %w", host, err)
+	}
+	links, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return fmt.Errorf("leaguesync: retire offers %s: %w", host, err)
+	}
+	if err := retireOffers(ctx, tx, links); err != nil {
+		return fmt.Errorf("leaguesync: retire offers %s: %w", host, err)
+	}
+	return nil
+}
+
+// PruneOfferReads deletes the archived offer reads older than before, the
+// sweep job's step (OfferReadsKept), and says how many went.
+func (s *Store) PruneOfferReads(ctx context.Context, before time.Time) (int64, error) {
+	tag, err := s.Pool.Exec(ctx, `delete from app.host_offer_reads where read_at < $1`, before)
+	if err != nil {
+		return 0, fmt.Errorf("leaguesync: prune offer reads: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
 
 // HeldOffer is an offer as the last good read of its link found it, and
 // when that read was.
@@ -26,7 +104,10 @@ type HeldOffer struct {
 // longer holds leaves with it, and the read appended to the archive when
 // it differs from the read before (an unchanged read is not archived
 // again, so the archive grows with the offers, not with the reads). An
-// empty read is a good read: it retires every offer the link held.
+// empty read is a good read: it retires every offer the link held. A read
+// whose link was detached or whose host connection was deleted while it
+// was in flight is refused (ErrOffersNotKept), so it never undoes the
+// retire that went with them.
 func (s *Store) PutOffers(ctx context.Context, link Link, offers []Offer, at time.Time) error {
 	if len(offers) > maxOffersKept {
 		offers = offers[:maxOffersKept]
@@ -41,8 +122,17 @@ func (s *Store) PutOffers(ctx context.Context, link Link, offers []Offer, at tim
 		return fmt.Errorf("leaguesync: encode offers: %w", err)
 	}
 	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext('host_offers:' || $1::text))`, link.ID); err != nil {
+		if err := lockOffers(ctx, tx, link.ID); err != nil {
 			return err
+		}
+		var live bool
+		if err := tx.QueryRow(ctx, `select exists (select 1 from app.league_links l
+			join app.host_connections c on c.account_id = l.account_id and c.host = l.host
+			where l.id = $1 and l.detached_at is null)`, link.ID).Scan(&live); err != nil {
+			return err
+		}
+		if !live {
+			return ErrOffersNotKept
 		}
 		if _, err := tx.Exec(ctx, `insert into app.host_offer_reads (link_id, account_id, read_at, offers)
 			select $1, $2, $3, $4::jsonb
@@ -64,6 +154,9 @@ func (s *Store) PutOffers(ctx context.Context, link Link, offers []Offer, at tim
 		}
 		return nil
 	})
+	if errors.Is(err, ErrOffersNotKept) {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("leaguesync: keep offers %s: %w", link.ID, err)
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/exports"
+	"github.com/jhunthrop/commish/api/internal/leaguesync"
 	"github.com/jhunthrop/commish/api/internal/mail"
 	"github.com/jhunthrop/commish/api/internal/mocks"
 	"github.com/jhunthrop/commish/api/internal/season"
@@ -42,8 +43,9 @@ func jobTable() map[string]job {
 		"billing-reconcile": runReconcile,
 		// renewal-reminders runs daily: the mail seven days before a renewal.
 		"renewal-reminders": runReminders,
-		// sweep runs daily: expired sessions, pairing codes and exports, and
-		// the sign-in users of deleted accounts the provider refused.
+		// sweep runs daily: expired sessions, pairing codes and exports, the
+		// host offer reads past leaguesync.OfferReadsKept, and the sign-in
+		// users of deleted accounts the provider refused.
 		"sweep": runSweep,
 		// stripe-setup runs by hand once per Stripe mode.
 		"stripe-setup": runStripeSetup,
@@ -155,6 +157,11 @@ func runSweep(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 		return err
 	}
 	log.Info("swept device pairing codes", "deleted", codes)
+	offers, err := (&leaguesync.Store{Pool: pool}).PruneOfferReads(ctx, now.Add(-leaguesync.OfferReadsKept))
+	if err != nil {
+		return err
+	}
+	log.Info("pruned archived host offer reads", "deleted", offers)
 	if err := retryUserDeletions(ctx, log, cfg, pool, now); err != nil {
 		return err
 	}
