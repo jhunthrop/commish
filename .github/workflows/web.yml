@@ -62,9 +62,10 @@ jobs:
   checks:
     if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
-    # The typed lint alone takes about 18 minutes on a hosted runner (Lane 260's branch, 2026-10-28),
-    # so 20 cut a branch off mid-lint twice (Lane 257); the whole job runs well inside 35.
-    timeout-minutes: 35
+    # The typed lint ran serially for about 18 minutes on a hosted runner (Lane 260's branch,
+    # 2026-10-28), which cut a branch off at the old 20 twice (Lane 257). It now runs across the
+    # runner's cores (npm run lint, eslint --concurrency=auto, Lane 272); 25 leaves room.
+    timeout-minutes: 25
     env:
       # The committed build run: every file a build reads (web/src/lib/run/reads.ts), every format's
       # board among them, from the nightly's contract fixture. Test data, never served.
