@@ -5,7 +5,8 @@ week's facts (`render.render_week_sheet`), the sentences other pages already car
 a correction quotes the attempt, how far it is from its length, and every rule broken on any attempt so
 far, each with its sentence (`rule_notes`, Lane 52). The prompt states the week, the kickoff (on the
 sheet), and that the week's number is a published projection, never ours, while `sheet.PROJECTION_BASIS`
-says so. The answer is one JSON object: the read, and the writer's own call for it in one word (`CALLS`),
+says so. The read never states it (Lane 275, the founder 2026-10-28): the card prints it, and a read
+that quoted it went stale the moment it moved. The answer is one JSON object: the read, and the writer's own call for it in one word (`CALLS`),
 which the rules hold to the sheet (a player who may not be started is never "start", the review's H2).
 """
 
@@ -34,15 +35,14 @@ ASKED_WORDS: Final = (45, 70)
 # The shape that lands near the target: a writer told a sentence's length keeps to it better than one told a
 # total (the Lane 117 replay).
 SENTENCE_WORDS: Final = 15
+# Lane 275 (the founder, 2026-10-28): the read never names the published projection, its figure or its move.
+# The card prints it, and the read stands when it moves; the read never names the card (fix round 2).
 _NUMBER_RULE: Final = {
     "published": (
-        "- The week's number is the published projection: a projection published for the week, never ours. Name "
-        "it once, with its figure exactly as the facts print it, as a cell placed inside a sentence about this "
-        "player's week (his matchup, his role, his status), never a sentence that only states it. Never put another "
-        'figure on it, never say "published" without its figure, and never "our projection", "our number", "our model" or "we project" for this week. State it and '
-        'never grade it: no "light", "heavy", "high", "low", "generous", "conservative", "too" or '
-        '"only" beside it, no "looks" or "feels" about it. No round of our weekly number has passed to back a '
-        "judgment of it. Say what you see in the matchup or in his rate, in a sentence of its own."
+        "- The week's number is a published projection, never ours. Never state it, its figure, its change or a "
+        "judgment of it: the card prints it. Never name the card, a cell or a tile, and never \"the week's "
+        'number", "our projection", "our number", "our model" or "we project" for this week. Say what you see in '
+        "his status, his role, the matchup or his rate."
     ),
 }
 # The four calls, defined (the re-review's F4): the page shows the call beside the read.
@@ -67,14 +67,14 @@ def _quoted(words: Sequence[str]) -> str:
 WEEK_RULES: Final = f"""You write the week-ahead read on one player's page for a fantasy football manager setting his lineup for the week in front of him. You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
 
 THE FOUR RULES READS BREAK MOST
-- One figure to a sentence. The published projection, the opponent's rank and his points a game each get a sentence of their own.
-- The published projection is a cell you place inside a sentence about this player's week (his matchup, his role, his status), named the published projection with its figure. Never a sentence that only states it, and never one another player's page could carry with the names and numbers swapped.
+- One figure to a sentence. The opponent's rank, his points a game and his last game's points each get a sentence of their own.
+- Never the published projection, its figure or its change: the card prints it. Never a sentence another player's page could carry with the names and numbers swapped.
 - The season once, with the first week you name ("week 7 of 2026"), every later week without it. Never the year twice, never a week before the year is named.
 - The injury list in the facts' own words for it ("Friday's report"), never a day or a name the facts do not give.
 
 THE READ
-- {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, {ASKED_WORDS[0]} to {ASKED_WORDS[1]} words in all, about {TARGET_WORDS}, and never more than {_HIGH}: four sentences of about {SENTENCE_WORDS} words each is the shape. Count the words before you answer. One paragraph, about the week the facts name and nothing else. Pick the two or three facts that decide his week (his game, his status, the published projection, the matchup, the weather, his role) and build on those. Leave the rest unquoted.
-- The read sits under his player card, whose cells already print his numbers: the published projection and its change, the opponent's rank, his points a game, each game's points, his rest-of-season points, the expected score and the weather. Say what those cells cannot: why his week looks the way it does (his status, his role, the matchup, the weather) and what a manager who has him does this week. Never retell the cells: quote at most {MAX_FIGURES} figures in all.
+- {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, {ASKED_WORDS[0]} to {ASKED_WORDS[1]} words in all, about {TARGET_WORDS}, and never more than {_HIGH}: four sentences of about {SENTENCE_WORDS} words each is the shape. Count the words before you answer. One paragraph, about the week the facts name and nothing else. Pick the two or three facts that decide his week (his game, his status, the matchup, the weather, his role, his rate) and build on those. Leave the rest unquoted.
+- The read sits under his player card, whose cells already print his numbers: the published projection and its change, the opponent's rank, his points a game, each game's points, his rest-of-season points, the expected score and the weather. The published projection and its change are the card's alone: never quote them. Say what those cells cannot: why his week looks the way it does (his status, his role, the matchup, the weather) and what a manager who has him does this week. Never retell the cells: quote at most {MAX_FIGURES} figures in all.
 - Open on the fact that matters most for him this week: the first sentence carries the call, a figure or his status. Never open with a scene-setting clause (no "runs into the kind of matchup" before a colon), a greeting, a question, or his name followed by a verdict. Name him in the read.
 - Every read on this site is written from facts like these, and no sentence may sit on two players' pages, even with the names and numbers swapped: build each sentence your own way for this player, never a sentence shape that would fit another player.
 - End on what a manager who has him does this week, in his own terms: start him, sit him, keep him on the bench, find a fill-in for the week.
@@ -86,7 +86,7 @@ THE NUMBER
 - His place in our order says which order it is: "in our preseason order" or "in our rest-of-season order", as the facts name it.
 
 NUMBERS, TIME AND WORDS
-- Use ONLY the numbers and names in the facts. Never invent a stat, an injury, a teammate or any figure. Quote a number exactly as the facts give it, never a rounding of it and never a figure you worked out. Every figure in the facts is one the page prints as a cell: name it the way the cell does ("242.5 PPR points for the rest of the season", "30.7 PPR points a game this season", "37.7 points in his last game", "26th of 32 against receivers"), and the published projection by that name with its figure. On his bye this week has no figure, and the week after it has none in the facts.
+- Use ONLY the numbers and names in the facts. Never invent a stat, an injury, a teammate or any figure. Quote a number exactly as the facts give it, never a rounding of it and never a figure you worked out. Every figure in the facts is one the page prints as a cell: name it the way the cell does ("242.5 PPR points for the rest of the season", "30.7 PPR points a game this season", "37.7 points in his last game", "26th of 32 against receivers"). The published projection is the one figure in the facts the read never quotes. On his bye this week has no figure, and the week after it has none in the facts.
 - Every figure carries its unit right after it: "32 points", "19.5 points", "25.9 PPR points a game", "28th of 32 against receivers", "61 degrees", "14 mph", "a 30% chance". Never a bare figure, never "32 to 19.5".
 - A rank against his position reads as the facts give it, 1st allowed the fewest, said the way a person would, never a code. "The most" is only the last rank and "the fewest" only the first: say a rank in the words the facts give for it.
 - Name the season once, with the first week you name ("week 6 of 2026"), and every week after it without the year ("week 5", "week 7"). Never the year twice. "This week" is fine. Never a date or the name of a month. A week still to play is only looked ahead to.

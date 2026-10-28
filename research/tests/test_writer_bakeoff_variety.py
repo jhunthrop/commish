@@ -12,7 +12,7 @@ def test_an_opener_masks_names_and_numbers() -> None:
     assert opener("Start Nacua against the Bears this week.", _MASKS, 3) == opener(
         "Start Chase against the Bears.", _MASKS, 3
     )
-    assert opener("18.4 points is his published projection.", _MASKS, 1) == "zznum"
+    assert opener("18.4 points a game is his average.", _MASKS, 1) == "zznum"
 
 
 def test_variety_counts_distinct_openers_per_100_reads() -> None:

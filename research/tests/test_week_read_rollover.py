@@ -215,7 +215,7 @@ class _Writer:
         if "Puka Nacua" in who:
             if self.fail_first > 0:
                 self.fail_first -= 1
-                return _completion(STARTER_READ.replace("18.4 points", "18.6 points"), "start")
+                return _completion(STARTER_READ.replace("25.9 PPR points", "25.6 PPR points"), "start")
             return _completion(STARTER_READ, "start")
         return _completion(_QUESTIONABLE_READ, "hold")
 
@@ -291,7 +291,8 @@ def test_a_read_that_falls_to_its_facts_block_is_asked_again_and_the_pass_ends_c
     reads = _reads(engine)
     assert {read.source for read in reads.values()} == {WRITTEN_SOURCE}
     puka = reads[(starter().player_id, _BOARD_WEEK)]
-    assert puka.body == STARTER_READ and puka.attempts == 2  # noqa: PLR2004 - the fallen read and its retry
+    # A written read's attempts restart at its write (Lane 275 fix round 2): the fall before it is the facts row's.
+    assert puka.body == STARTER_READ and puka.attempts == 1
     assert "2 rounds" in record.summary and "every due read written" in record.summary
     assert "1 fell to their facts blocks: Puka Nacua" in record.summary
 
@@ -329,7 +330,9 @@ def test_an_hourly_pass_the_budget_cut_short_says_what_it_left_before_the_names(
     engine: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Lane 263's reads-left-unread note and Lane 265's names on one line (the Lane 265 review's M3): the note
-    sits in the tally, before the names, never on the last name's line."""
+    sits in the tally, before the names, never on the last name's line. Since Lane 275 fix round 2 a status
+    rewrite that falls keeps the written read (held) and one the budget stopped keeps it too: neither landed,
+    so both are named for the next pass."""
     _step(engine, monkeypatch, [starter(), questionable()], _Writer())
     monkeypatch.setattr(week_reads, "HOURLY_BUDGET_USD", week_reads.worst_read_usd(_PRICE) + 0.0001)
     moved = [
@@ -337,10 +340,12 @@ def test_an_hourly_pass_the_budget_cut_short_says_what_it_left_before_the_names(
         replace(questionable(), status=Status("out", REPORT)),
     ]
     record = _step(engine, monkeypatch, moved, _Writer(), hourly=True)
-    assert record.status == week_reads.PARTIAL and record.summary.startswith("1 still unwritten; hourly, ")
+    assert record.status == week_reads.PARTIAL and record.summary.startswith("2 still unwritten; hourly, ")
     tally, names = record.summary.split("; unwritten, asked again on the next pass:")
-    assert "1 reads left unread, the next kickoff among them" in tally
-    assert names.count("\n  ") == 1 and "reads left unread" not in names
+    assert "1 reads left unread, the next kickoff among them" in tally and "(1 held over the written read)" in tally
+    assert names.count("\n  ") == 2 and "reads left unread" not in names  # noqa: PLR2004 - the held and the stopped
+    reads = _reads(engine)
+    assert {read.source for read in reads.values()} == {WRITTEN_SOURCE}
 
 
 def test_mid_week_a_status_change_rewrites_that_player_alone(engine: Engine, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -10,8 +10,9 @@ Two modes on one pass (`run_week_read_step`), both on the board week alone (`col
   sentence another page carries) is asked again within the pass, `ROLLOVER_ROUNDS` in all, and any still
   unwritten are counted at the head of the step line, the step's status "partial", each named on a line of
   its own, and asked again on the next nightly. After it, a nightly writes only
-  what the cadence says moved (`capsules.week.cadence`: a status, the published projection the card prints,
-  a read still unwritten, a player new to the board).
+  what the cadence says moved (`capsules.week.cadence`: a status, a read still unwritten, a player new to the
+  board, a written read the current rules refuse; a move of the published projection leaves the read
+  standing, Lane 275).
 - **Hourly**, after the in-season job's status capture (`research.inseason --task capture-harvest`): only
   the reads whose status moved, under `HOURLY_BUDGET_USD` a pass and `HOURLY_DAY_USD` across a Central day's
   passes (`player_week_read_runs`).
@@ -28,14 +29,15 @@ sentence shape another page carries for its week, and lands in its own transacti
 (`week_read_demotion`) over every read of the board week.
 
 Without AI_GATEWAY_API_KEY nothing is written, by name. The step is advisory: a page shows a board week's
-read only while it stands (`nightly.build.pages.week_read_json`), so a failed step is reported and never
+read whenever one is written (`nightly.build.pages.week_read_json`), so a failed step is reported and never
 holds the night's board back (`ADVISORY`, read by `nightly.run`). A rewrite that falls to its facts block
-replaces the written row, and the page then shows no week read.
+never replaces a written read (Lane 275 fix round 1, `landed_row`): the written row stays, its attempt counted,
+and the step line counts it held; only a read with nothing written yet stores its facts block.
 """
 
 import os
 from collections import deque
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence, Set
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, time
 from typing import Final
@@ -51,7 +53,14 @@ from research.capsules.narrative import ShapeMasks, sentences_verbatim
 from research.capsules.run_budget import RunBudget
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.sweep import FactsPassMemo
-from research.capsules.week.cadence import UNWRITTEN, attempts_today, central_day, due_reason
+from research.capsules.week.cadence import (
+    PRIORITY,
+    UNWRITTEN,
+    attempts_today,
+    central_day,
+    due_reason,
+    kept_read,
+)
 from research.capsules.week.collect import collect_week_sheets, read_week_facts
 from research.capsules.week.judge import JUDGE_MODEL, judge_model
 from research.capsules.week.rollover import Rollover
@@ -68,7 +77,7 @@ from research.capsules.week.validate import week_masks
 from research.capsules.week.write import MAX_TOKENS, WeekReadResult, write_week_read
 from research.nightly.capsule_step import checked_price
 from research.nightly.steps import StepRecord
-from research.nightly.week_read_demotion import demote_shared, player_names, read_shapes
+from research.nightly.week_read_demotion import demote_shared_keeping, player_names, read_shapes
 from research.season import PRODUCT_SEASON
 
 STEP: Final = "week-reads"
@@ -89,7 +98,7 @@ HOURLY: Final = "hourly"
 # at NIGHTLY_BUDGET_USD (`step_budget`, the gateway's reservation), not by this sum: before a read starts the
 # budget's check prices it at BUDGETED_CALLS_PER_READ asks at the worst (`worst_read_usd`), and a read cut by
 # the stop writes nothing and is asked again the next night. An hourly pass writes only the reads a status
-# moved (a projection move waits for the nightly, Lane 66v), held the same way at HOURLY_BUDGET_USD a pass and
+# moved, held the same way at HOURLY_BUDGET_USD a pass and
 # HOURLY_DAY_USD across a Central day's passes (the capture runs 18 times).
 NIGHTLY_BUDGET_USD: Final = 2.50
 # The asks of a read within the roll-over pass: its first, then two more for a read that fell to its facts block
@@ -118,6 +127,10 @@ class WeekReadSpend:
     due: dict[str, int] = field(default_factory=dict)
     written: int = 0
     facts_blocks: int = 0
+    # The fallen rewrites that kept the written read they would have replaced (Lane 275 fix round 1).
+    held: int = 0
+    # The reads whose rewrite landed this pass and still stands, (player, week) (Lane 275 fix round 2).
+    written_reads: set[tuple[str, int]] = field(default_factory=set)
     budget_stopped: int = 0
     landed: int = 0
     calls: int = 0
@@ -161,7 +174,8 @@ class WeekReadSpend:
         due = ", ".join(f"{reason} {count}" for reason, count in sorted(self.due.items())) or "none"
         fell = "" if not self.fell else f"; {len(self.fell)} fell to their facts blocks: {'; '.join(self.fell)}"
         body = (
-            f"{sum(self.due.values())} reads due ({due}), {self.written} written, {self.facts_blocks} facts blocks, "
+            f"{sum(self.due.values())} reads due ({due}), {self.written} written, {self.facts_blocks} facts blocks "
+            f"({self.held} held over the written read), "
             f"{self.budget_stopped} stopped by the budget, {self.rounds} rounds, {self.calls} calls, "
             f"{self.prompt_tokens} prompt and {self.completion_tokens} completion tokens, ${self.cost_usd:.6f}, "
             f"{self.demoted} demoted for a sentence on two pages{fell}{'' if tail is None else f'; {tail}'}"
@@ -228,12 +242,33 @@ def stored_row(
     sheet: WeekSheet, result: WeekReadResult, reason: str, before: StoredWeekRead | None, at: datetime
 ) -> StoredWeekRead:
     """The row a written (or fallen) read is kept as: the facts' stamps, what the cadence compares, the
-    writer's call, and the attempt counted on `at`'s Central day."""
+    writer's call, and its attempts on `at`'s Central day (`_attempts`)."""
     return StoredWeekRead(
         sheet.player_id, sheet.season, sheet.week, result.source, result.text, result.model, sheet.written_at,
         sheet.facts_at, sheet.stamps(), None if sheet.projection is None else sheet.projection.points,
-        sheet.status.status, reason, result.call, central_day(at), attempts_today(before, at) + 1,
+        sheet.status.status, reason, result.call, central_day(at), _attempts(result, before, at),
     )  # fmt: skip
+
+
+def _attempts(result: WeekReadResult, before: StoredWeekRead | None, at: datetime) -> int:
+    """A written read's attempts restart at its write (Lane 275 fix round 2, `cadence.falls_since_written`); a
+    facts block counts its day's chain of falls, for the unwritten retry's limits."""
+    return 1 if result.source == WRITTEN_SOURCE else attempts_today(before, at) + 1
+
+
+def keeps_written(result: WeekReadResult, before: StoredWeekRead | None) -> bool:
+    """Whether a landed read keeps the written read it would replace: the rewrite fell to its facts block over
+    a written row (a first read that falls has nothing to keep and stores its facts block)."""
+    return result.source == FACTS_SOURCE and before is not None and before.source == WRITTEN_SOURCE
+
+
+def landed_row(
+    sheet: WeekSheet, result: WeekReadResult, reason: str, before: StoredWeekRead | None, at: datetime
+) -> StoredWeekRead:
+    """What a landed read stores: the new row, or the written read kept over a fallen rewrite."""
+    if before is not None and keeps_written(result, before):
+        return kept_read(before, at)
+    return stored_row(sheet, result, reason, before, at)
 
 
 @dataclass(frozen=True, slots=True)
@@ -294,7 +329,14 @@ def _write(  # noqa: PLR0913 - the pass's parts
         sheet, reason = item
         if result.source == FACTS_SOURCE and result.fallback is not None:
             spend.fell_to_facts(sheet.name, result.fallback)
-        row = stored_row(sheet, result, reason, stored.get((sheet.player_id, sheet.week)), sheet.written_at)
+        before = stored.get((sheet.player_id, sheet.week))
+        row = landed_row(sheet, result, reason, before, sheet.written_at)
+        spend.held += keeps_written(result, before)
+        key = (sheet.player_id, sheet.week)
+        if row.source == WRITTEN_SOURCE and not keeps_written(result, before):
+            spend.written_reads.add(key)
+        else:
+            spend.written_reads.discard(key)
         with engine.begin() as conn:
             upsert_week_read(conn, row)
         board.land(row)
@@ -316,6 +358,13 @@ def _unwritten(
     return [sheet for sheet, row in rows if row is None or row.source != WRITTEN_SOURCE]
 
 
+def _not_landed(due: Sequence[tuple[WeekSheet, str]], landed: Set[tuple[str, int]]) -> list[WeekSheet]:
+    """The sheets whose due rewrite did not land and stand this pass (the step line's unwritten, and its
+    partial): a facts block, none, or a written read the pass kept, held over a fall or a shared shape or left
+    by the budget's stop (Lane 275 fix round 2: a held read is shown, never counted written)."""
+    return [sheet for sheet, _ in due if (sheet.player_id, sheet.week) not in landed]
+
+
 def _write_rounds(  # noqa: PLR0913 - the pass's parts
     engine: Engine,
     gateway: GatewayClient,
@@ -335,10 +384,13 @@ def _write_rounds(  # noqa: PLR0913 - the pass's parts
     while batch and spend.rounds < rounds and room():
         spend.rounds += 1
         _write(engine, gateway, stored, batch, room=room, spend=spend, masks=night.masks, judge=judge)
-        spend.demoted_reads |= demote_shared(engine, night.sheets, night.board_week, now, night.masks)
+        demotion = demote_shared_keeping(engine, night.sheets, night.board_week, now, night.masks, kept=night.stored)
+        spend.demoted_reads |= demotion.demoted
+        spend.held += len(demotion.restored)
+        spend.written_reads -= demotion.demoted | demotion.restored
         stored = _reread(engine, night.board_week)
         batch = [(sheet, UNWRITTEN) for sheet in _unwritten(night, due, stored)]
-    spend.unwritten = [sheet.name for sheet in _unwritten(night, due, stored)]
+    spend.unwritten = [sheet.name for sheet in _not_landed(due, spend.written_reads)]
 
 
 def _room(budget: RunBudget, worst: float) -> Callable[[], bool]:
@@ -369,7 +421,8 @@ def _budget_usd(engine: Engine, now: datetime, hourly: bool) -> float:
 
 
 def _due(night: _Night, now: datetime, hourly: bool) -> list[tuple[WeekSheet, str]]:
-    """Every board-week read the cadence says is due, in board order; an hourly pass (the game-day status
+    """Every board-week read the cadence says is due, in board order within the cadence's `PRIORITY` (a rule-stale
+    rewrite last, so a budget stop leaves those for the next night); an hourly pass (the game-day status
     passes among them) soonest kickoff first, so when its budget stops the reads the 13:00 starters are written
     before the 16:25 ones (Lane 263). Stable: board order within a kickoff."""
     due = [
@@ -378,7 +431,9 @@ def _due(night: _Night, now: datetime, hourly: bool) -> list[tuple[WeekSheet, st
         if (reason := due_reason(sheet, night.stored.get((sheet.player_id, sheet.week)), now, hourly=hourly))
         is not None
     ]
-    return sorted(due, key=lambda item: _kickoff_of(item[0])) if hourly else due
+    if hourly:
+        return sorted(due, key=lambda item: _kickoff_of(item[0]))
+    return sorted(due, key=lambda item: PRIORITY.index(item[1]))
 
 
 def _kickoff_of(sheet: WeekSheet) -> datetime:

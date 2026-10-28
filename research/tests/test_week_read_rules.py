@@ -1,9 +1,9 @@
 """Lane 72, the week-ahead read: its sheet, its caption and its rules (fix round 1 included).
 
 The sheet carries only stamped facts, each line with its read, and names the projection as published,
-never ours; the caption is the page's "Written Fri 9:00 pm Central, for week 6"; the read is held to the
+never ours, for the writer alone; the caption is the page's "Written Fri 9:00 pm Central, for week 6"; the read is held to the
 writer's rules and to the week's own: no betting or trading word, no provider or rival product, no tip;
-the published projection named with its exact figure and nothing else put on it (H4); a player who may
+the published projection never named in the read, nor its figure or its change (H4, Lane 275); a player who may
 not be started never recommended, by his call or in any wording (H2); every figure with its unit (M1);
 his place in our order said with which order (M2); the season named once (the ruling on L5); three to
 five sentences; no sentence shape another page carries (M4). The season read in season refuses the
@@ -20,11 +20,12 @@ from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.rank_words import rank_words
 from research.capsules.week.render import render_week_facts_block, render_week_sheet
-from research.capsules.week.rules import WEEK_NEVER_WORDS, stated_figures, week_rule_violations
+from research.capsules.week.rules import WEEK_NEVER_WORDS, names_the_projection, stated_figures, week_rule_violations
 from research.capsules.week.sheet import (
     Allowed,
     BoardPlace,
     DepthPlace,
+    GameLine,
     PublishedProjection,
     Status,
     Weather,
@@ -50,7 +51,7 @@ from research.tests.week_read_fixtures import (
 
 STARTER_READ = (
     "Puka Nacua gets Arizona at home in week 6 of 2026, and the Cardinals rank 26th of 32 against receivers. "
-    "The published projection has him at 18.4 points, up 0.5 points from the published figure before it. "
+    "He leads the Rams' receivers with 25.9 PPR points a game over his 3 games this season. "
     "The Rams play indoors, so nothing about the weather gets in his way. Start him with confidence."
 )
 BYE_READ = (
@@ -68,7 +69,9 @@ def test_the_sheet_names_the_week_the_projection_as_published_and_the_order() ->
     sheet = render_week_sheet(starter())
     assert "week 6 of 2026" in sheet
     assert "published projection" in sheet.lower() and "not ours" in sheet
-    assert "18.4 points" in sheet and "+0.5" in sheet
+    # Lane 275: the writer knows the week's figure and is told never to name it; the change is not on the sheet.
+    assert "18.4 points" in sheet and "never name it, its figure or its change in the read" in sheet
+    assert "+0.5" not in sheet and "It moved" not in sheet
     assert "26th of 32" in sheet and "1st allowed the fewest" in sheet
     assert "Sunday 3:05 pm Central" in sheet
     assert "32.5" in sheet and "indoors" in sheet
@@ -115,9 +118,9 @@ def test_the_sheet_states_a_bye_and_a_status_that_keeps_him_out() -> None:
 def test_the_questionable_sheet_names_the_designation_the_change_and_the_forecast() -> None:
     sheet = render_week_sheet(questionable())
     assert "Questionable on Friday's report" in sheet
-    # The change is the card's Delta Proj cell; the figure before it and the change since our last read are
-    # in no cell, so the sheet holds neither (Lane 100, B17).
-    assert "-1.8" in sheet and "17 points" not in sheet and "since our last read" not in sheet.lower()
+    # The change is the card's Delta Proj cell alone (Lane 275): the read never states it, so the sheet holds it
+    # no more than the figure before it or the change since our last read (Lane 100, B17).
+    assert "-1.8" not in sheet and "17 points" not in sheet and "since our last read" not in sheet.lower()
     assert "18.7" not in sheet and "touchdowns" not in sheet
     assert "61 degrees" in sheet and "14 mph" in sheet and "30% chance of rain" in sheet
 
@@ -201,34 +204,73 @@ def test_a_tip_is_refused() -> None:
 
 
 def test_the_projection_is_never_called_ours() -> None:
-    text = STARTER_READ.replace("The published projection has him at", "Our projection has him at")
-    assert any("ours" in v for v in week_rule_violations(text, starter()))
+    text = STARTER_READ.replace("He leads the Rams' receivers", "Our projection says he leads the Rams' receivers")
+    assert any("ours" in v for v in week_rule_violations(text, starter(), "start"))
 
 
-def test_the_projection_figure_needs_the_word_published() -> None:
-    text = STARTER_READ.replace(
-        "The published projection has him at 18.4 points, up 0.5 points from the published figure before it.",
-        "He is projected for 18.4 points this week.",
-    )
-    violations = week_rule_violations(text, starter())
-    assert any("without saying it is published" in v for v in violations), violations
-    assert any("never names the published projection" in v for v in violations), violations
-
-
-def test_another_figure_put_on_the_published_projection_is_refused() -> None:
-    """The review's H4: 25.9 is his points a game, grounded but not the projection."""
-    text = STARTER_READ.replace("has him at 18.4 points", "has him at 25.9 points")
-    violations = validate_week_read(text, starter(), call="start").violations
-    assert any("puts 25.9 on the published projection" in v for v in violations), violations
-
-
-def test_the_published_projection_named_without_its_figure_is_refused() -> None:
-    text = STARTER_READ.replace(
-        "The published projection has him at 18.4 points, up 0.5 points from the published figure before it.",
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "The published projection has him at 18.4 points.",
         "The published projection likes him a lot this week.",
+        "His projection for the week sits where a WR2 lives.",
+        "He is projected for a big afternoon.",
+        "The projections are friendly to him this week.",
+    ],
+)
+def test_a_sentence_naming_the_published_projection_is_refused(sentence: str) -> None:
+    """Lane 275 (the founder, 2026-10-28): the read never names the published projection, with a figure or
+    without one, and never grades it: the card's Wk cell prints it."""
+    text = STARTER_READ.replace("The Rams play indoors", f"{sentence} The Rams play indoors")
+    violations = week_rule_violations(text, starter(), "start")
+    assert any("names the published projection" in v for v in violations), violations
+
+
+@pytest.mark.parametrize("figure", ["18.4 points", "18.4", "0.5 points", "17.9 points"])
+def test_the_published_projections_figure_is_refused_with_or_without_a_unit(figure: str) -> None:
+    """The figure, the change and the one before it, as a cell or bare, are the Wk cell's alone (Lane 275)."""
+    text = STARTER_READ.replace("Start him with confidence.", f"Count on {figure} from him. Start him.")
+    violations = week_rule_violations(text, starter(), "start")
+    raw = figure.removesuffix(" points")
+    assert any(f'states the published projection\'s figure "{raw}"' in v for v in violations), violations
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "The number on his card undersells him this week.",
+        "His Wk figure looks light for this matchup.",
+        "The week's number feels conservative for him.",
+        "The Wk cell sells him short.",
+        "The Proj tile is too cautious about him.",
+    ],
+)
+def test_a_sentence_naming_the_card_is_refused(sentence: str) -> None:
+    """Lane 275 fix round 2 (review M2): the card, its cells and the week's number by name grade the published
+    projection without its words; the read never names them, and the cadence counts such a read stale."""
+    text = STARTER_READ.replace("The Rams play indoors", f"{sentence} The Rams play indoors")
+    assert any("names the card" in v for v in week_rule_violations(text, starter(), "start"))
+    assert names_the_projection(text) and not names_the_projection(STARTER_READ)
+
+
+def test_a_figure_another_cell_prints_too_is_that_cells_to_quote() -> None:
+    """A last game of 18.4 points is the game log's figure, whatever the projection prints (Lane 275)."""
+    sheet = replace(starter(), last_games=(GameLine(5, "SF", False, 18.4), *starter().last_games[1:]))
+    text = STARTER_READ.replace(
+        "He leads the Rams' receivers with 25.9 PPR points a game over his 3 games this season.",
+        "He put up 18.4 points in his last game.",
     )
-    violations = validate_week_read(text, starter(), call="start").violations
-    assert any("without its figure" in v for v in violations), violations
+    assert not any("published projection" in v for v in week_rule_violations(text, sheet, "start"))
+
+
+def test_our_rest_of_season_projection_is_not_the_weeks() -> None:
+    text = STARTER_READ.replace("Start him with confidence.", "He is WR2 in our rest-of-season order. Start him.")
+    assert not any("published projection" in v for v in week_rule_violations(text, starter(), "start"))
+
+
+def test_an_honest_read_names_no_projection_at_all() -> None:
+    """The rule the read once had to meet (a read with a projection names it) is gone (Lane 275)."""
+    assert not any("projection" in v for v in week_rule_violations(STARTER_READ, starter(), "start"))
 
 
 @pytest.mark.parametrize(
@@ -303,7 +345,7 @@ def test_a_bare_week_before_the_season_is_named_is_refused() -> None:
 def test_a_read_runs_three_to_five_sentences(count: int) -> None:
     sentences = [
         "Puka Nacua faces Arizona at home in week 6 of 2026.",
-        "The published projection has him at 18.4 points.",
+        "He leads the Rams' receivers this week.",
         "The Cardinals allow receivers 41.3 PPR points a game.",
         "The Rams are expected to score 32.5 points.",
         "He has 25.9 PPR points a game.",
@@ -395,7 +437,7 @@ def test_a_call_is_required() -> None:
 
 
 def test_a_number_the_sheet_never_printed_is_refused() -> None:
-    text = STARTER_READ.replace("18.4 points", "18.7 points")
+    text = STARTER_READ.replace("25.9 PPR points", "18.7 PPR points")
     assert any('"18.7"' in v for v in validate_week_read(text, starter(), call="start").violations)
 
 
@@ -492,9 +534,9 @@ def test_the_opponents_rank_is_opp_ranks_and_a_bye_has_none() -> None:
     assert not _named_hits("He brings 21.3 PPR points a game.", bye, BYE_READ, "hold")
 
 
-def test_a_ranks_of_32_is_never_a_second_figure_on_the_projection() -> None:
+def test_a_ranks_of_32_is_its_rank_and_no_figure() -> None:
     """Lane 117 fix round 1 (H2): "21st of 32" is the opponent's rank, the 32 its own, so Christian
-    McCaffrey's sentence puts nothing on the published projection and states one figure."""
+    McCaffrey's sentence states one figure, his points a game."""
     sheet = replace(
         questionable(),
         name="Christian McCaffrey",
@@ -502,11 +544,12 @@ def test_a_ranks_of_32_is_never_a_second_figure_on_the_projection() -> None:
         game=WeekGame(6, "ATL", home=True, kickoff=KICKOFF),
         projection=PublishedProjection(18.6, CAPTURED, None, None),
         allowed=Allowed(21, 32, 22.0, "RB", 5, LINES),
+        points_per_game=19.2,
     )
-    sentence = "The published projection has him at 18.6 points, and Atlanta sits 21st of 32 against running backs."
+    sentence = "He brings 19.2 PPR points a game, and Atlanta sits 21st of 32 against running backs."
     violations = week_rule_violations(f"{sentence} He plays. Start him.", sheet, "start")
-    assert not [v for v in violations if "on the published projection" in v or "draws in no cell" in v], violations
-    assert stated_figures(sentence, sheet.season) == [("18.6", 18.6)]
+    assert not [v for v in violations if "published projection" in v or "draws in no cell" in v], violations
+    assert stated_figures(sentence, sheet.season) == [("19.2", 19.2)]
 
 
 def test_the_sheet_prints_a_chance_of_rain_only_as_the_cell_names_it() -> None:
@@ -584,23 +627,6 @@ def test_the_list_refuses_every_start_phrasing_the_re_review_found(advice: str, 
     sheet = on_bye() if status is None else replace(on_bye(), bye=False, status=Status(status, REPORT))
     assert start_advice_in(advice, sheet.name) is not None, advice
     assert any("recommends starting" in v for v in week_rule_violations(advice, sheet, "hold")), advice
-
-
-@pytest.mark.parametrize(
-    "sentence",
-    [
-        "The published projection has him at 18.4 points, which looks light.",
-        "The published projection of 18.4 points is too low for him.",
-        "The published projection has him at only 18.4 points.",
-        "The published projection, a generous 18.4 points, says enough.",
-    ],
-)
-def test_the_published_projection_is_stated_and_never_graded(sentence: str) -> None:
-    """The re-review's F2: no round of ours has passed to back a judgment of the week's number."""
-    text = STARTER_READ.replace(
-        "The published projection has him at 18.4 points, up 0.5 points from the published figure before it.", sentence
-    )
-    assert any("grades the published projection" in v for v in week_rule_violations(text, starter(), "start"))
 
 
 def test_a_wait_and_see_read_calls_itself_hold() -> None:
@@ -704,12 +730,14 @@ def test_a_read_that_opens_on_the_call_the_fact_or_his_status_is_taken(opener: s
 
 
 def test_a_change_under_half_a_point_is_no_cell_a_read_may_quote() -> None:
-    """Lane 139 (C21): the Proj change tile shows no move under 0.5, so neither the sheet nor a read says one."""
+    """Lane 139 (C21): the Proj change tile shows no move under 0.5, so neither the sheet nor a read says one;
+    since Lane 275 a change of any size is the tile's alone."""
     sheet = replace(starter(), projection=PublishedProjection(18.4, CAPTURED, 18.3, BEFORE))
     assert "It moved" not in render_week_sheet(sheet)
-    text = "Puka Nacua's published projection is 18.4 points, up 0.1 points since the figure before it."
-    assert any("a figure the page draws in no cell" in v for v in week_rule_violations(text, sheet, "start"))
-    assert not any("no cell" in v for v in week_rule_violations(text.replace("0.1", "0.5"), starter(), "start"))
+    text = "Puka Nacua is up 0.1 points since the figure before it."
+    said = "published projection's figure"
+    assert any(said in v for v in week_rule_violations(text, sheet, "start"))
+    assert any(said in v for v in week_rule_violations(text.replace("0.1", "0.5"), starter(), "start"))
 
 
 @pytest.mark.parametrize(
