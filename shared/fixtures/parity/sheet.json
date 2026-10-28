@@ -472,5 +472,205 @@
 				}
 			]
 		}
+	],
+	"listBoard": [
+		{
+			"id": "4429795",
+			"name": "Jahmyr Gibbs",
+			"position": "RB",
+			"team": "DET",
+			"headshot": null
+		},
+		{
+			"id": "4362628",
+			"name": "Ja'Marr Chase",
+			"position": "WR",
+			"team": "CIN",
+			"headshot": null
+		},
+		{
+			"id": "4239996",
+			"name": "Travis Etienne Jr.",
+			"position": "RB",
+			"team": "JAX",
+			"headshot": null
+		},
+		{
+			"id": "3055899",
+			"name": "Brandon Aubrey",
+			"position": "K",
+			"team": "DAL",
+			"headshot": null
+		},
+		{
+			"id": "wr-thomas",
+			"name": "Michael Thomas",
+			"position": "WR",
+			"team": "NO",
+			"headshot": null
+		},
+		{
+			"id": "te-thomas",
+			"name": "Michael Thomas",
+			"position": "TE",
+			"team": "FA",
+			"headshot": null
+		},
+		{
+			"id": "wr-estime",
+			"name": "Audric Estimé",
+			"position": "WR",
+			"team": null,
+			"headshot": null
+		},
+		{
+			"id": "DST-BUF",
+			"name": "Buffalo Bills",
+			"position": "DST",
+			"team": "BUF",
+			"headshot": null
+		},
+		{
+			"id": "DST-KC",
+			"name": "Kansas City Chiefs",
+			"position": "DST",
+			"team": "KC",
+			"headshot": null
+		},
+		{
+			"id": "DST-LAR",
+			"name": "Los Angeles Rams",
+			"position": "DST",
+			"team": "LAR",
+			"headshot": null
+		},
+		{
+			"id": "DST-LAC",
+			"name": "Los Angeles Chargers",
+			"position": "DST",
+			"team": "LAC",
+			"headshot": null
+		}
+	],
+	"lists": [
+		{
+			"text": "1. Puka Nacua\n2. Ja'Marr Chase, WR",
+			"csv": false,
+			"ids": [
+				"4362628"
+			],
+			"skipped": [
+				{
+					"line": 1,
+					"reason": "No player on our board has this name"
+				}
+			]
+		},
+		{
+			"text": "1. Jahmyr Gibbs\r\n\r\n2) ja'marr chase\n3 - Travis Etienne\n4: Brandon Aubrey (PK, DAL)\n  \n5. Jahmyr Gibbs, RB",
+			"csv": false,
+			"ids": [
+				"4429795",
+				"4362628",
+				"4239996",
+				"3055899"
+			],
+			"skipped": [
+				{
+					"line": 7,
+					"reason": "This player is already on an earlier line"
+				}
+			]
+		},
+		{
+			"text": "Michael Thomas\nMichael Thomas, TE\n7. Michael Thomas (WR, NO)\nMichael Thomas, QB",
+			"csv": false,
+			"ids": [
+				"te-thomas",
+				"wr-thomas"
+			],
+			"skipped": [
+				{
+					"line": 1,
+					"reason": "Two players share this name. Add his position after a comma"
+				},
+				{
+					"line": 4,
+					"reason": "No player on our board has this name"
+				}
+			]
+		},
+		{
+			"text": "audric estime\nAUDRIC ESTIMÉ, WR",
+			"csv": false,
+			"ids": [
+				"wr-estime"
+			],
+			"skipped": [
+				{
+					"line": 2,
+					"reason": "This player is already on an earlier line"
+				}
+			]
+		},
+		{
+			"text": "Bills D/ST\nBUF DST\nChiefs\nKC\nBuffalo Defense\nLos Angeles D/ST\nRams D/ST\nLAC DEF\nLos Angeles",
+			"csv": false,
+			"ids": [
+				"DST-BUF",
+				"DST-KC",
+				"DST-LAR",
+				"DST-LAC"
+			],
+			"skipped": [
+				{
+					"line": 2,
+					"reason": "This player is already on an earlier line"
+				},
+				{
+					"line": 4,
+					"reason": "This player is already on an earlier line"
+				},
+				{
+					"line": 5,
+					"reason": "This player is already on an earlier line"
+				},
+				{
+					"line": 6,
+					"reason": "Two clubs share this city. Write the club, like LAR"
+				},
+				{
+					"line": 9,
+					"reason": "Two clubs share this city. Write the club, like LAR"
+				}
+			]
+		},
+		{
+			"text": "Gibbs\nJahmyr",
+			"csv": false,
+			"ids": [],
+			"skipped": [
+				{
+					"line": 1,
+					"reason": "No player on our board has this name"
+				},
+				{
+					"line": 2,
+					"reason": "No player on our board has this name"
+				}
+			]
+		},
+		{
+			"text": "rank,player_id,name,position\n1,a,B,QB",
+			"csv": true,
+			"ids": [],
+			"skipped": []
+		},
+		{
+			"text": "",
+			"csv": false,
+			"ids": [],
+			"skipped": []
+		}
 	]
 }

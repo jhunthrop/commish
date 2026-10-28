@@ -1,8 +1,10 @@
 package sheets
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 )
 
@@ -38,10 +41,16 @@ type Repository interface {
 	UpdateRow(ctx context.Context, accountID, id uuid.UUID, playerID string, in apitypes.SheetRowUpdate) (apitypes.SheetRow, error)
 }
 
-// Handler serves /sheets.
+// BoardLoader reads a stored board: boards.Cache.
+type BoardLoader interface {
+	Load(ctx context.Context, f boards.Format) (*boards.Raw, error)
+}
+
+// Handler serves /sheets. Boards is what a names list is read against.
 type Handler struct {
-	Store Repository
-	Log   *slog.Logger
+	Store  Repository
+	Boards BoardLoader
+	Log    *slog.Logger
 }
 
 // Routes is every route this package serves.
@@ -214,22 +223,85 @@ func (h *Handler) updateRow(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, http.StatusOK, row)
 }
 
+// emptyReadSentence refuses a body that read to no player: the import
+// replaces the sheet, so an empty read would empty it.
+const emptyReadSentence = "No player read, so your sheet is as it was."
+
+// readImport reads the body as the sheet's CSV, or as a names list against
+// the board the sheet is built on. It answers the request itself when it
+// cannot read.
+func (h *Handler) readImport(w http.ResponseWriter, r *http.Request, id uuid.UUID) ([]apitypes.SheetRowInput, []apitypes.ImportSkip, bool) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxSheetBody))
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		httpx.WriteError(w, r, http.StatusRequestEntityTooLarge, httpx.CodePayloadTooLarge, "That file is over 1 MB", nil)
+		return nil, nil, false
+	}
+	if err != nil {
+		httpx.WriteInternal(w, r, h.Log, "sheets: import", err)
+		return nil, nil, false
+	}
+	if looksLikeCSV(string(body)) {
+		rows, skipped, err := DecodeCSV(bytes.NewReader(body))
+		if errors.Is(err, ErrBadHeader) {
+			httpx.WriteInvalid(w, r, map[string]string{"body": "The first line must name rank, player_id, name and position"})
+			return nil, nil, false
+		}
+		if err != nil {
+			httpx.WriteInternal(w, r, h.Log, "sheets: import", err)
+			return nil, nil, false
+		}
+		return rows, skipped, true
+	}
+	raw, ok := h.boardFor(w, r, id)
+	if !ok {
+		return nil, nil, false
+	}
+	rows, skipped := ReadList(string(body), raw)
+	return rows, skipped, true
+}
+
+// boardFor is the stored board of the sheet's format, which a names list
+// is matched against.
+func (h *Handler) boardFor(w http.ResponseWriter, r *http.Request, id uuid.UUID) (*boards.Raw, bool) {
+	d, err := h.Store.Get(r.Context(), auth.AccountID(r), id)
+	if err != nil {
+		h.fail(w, r, "sheets: import", err)
+		return nil, false
+	}
+	raw, err := h.Boards.Load(r.Context(), storedFormat(d.Format))
+	if err != nil {
+		h.Log.Error("sheets: import board", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "Our board did not load, so a list of names cannot be read yet", nil)
+		return nil, false
+	}
+	return raw, true
+}
+
+// storedFormat is the stored board a sheet format reads its players from;
+// a format with no board of its own reads the PPR board's players.
+func storedFormat(f apitypes.BoardFormat) boards.Format {
+	switch f {
+	case apitypes.BoardFormatHalfPpr:
+		return boards.Half
+	case apitypes.BoardFormatStandard:
+		return boards.Standard
+	default:
+		return boards.PPR
+	}
+}
+
 func (h *Handler) importCSV(w http.ResponseWriter, r *http.Request) {
 	id, ok := httpx.PathUUID(w, r, "id")
 	if !ok {
 		return
 	}
-	rows, skipped, err := DecodeCSV(http.MaxBytesReader(w, r.Body, maxSheetBody))
-	var tooLarge *http.MaxBytesError
-	switch {
-	case errors.As(err, &tooLarge):
-		httpx.WriteError(w, r, http.StatusRequestEntityTooLarge, httpx.CodePayloadTooLarge, "That file is over 1 MB", nil)
+	rows, skipped, ok := h.readImport(w, r, id)
+	if !ok {
 		return
-	case errors.Is(err, ErrBadHeader):
-		httpx.WriteInvalid(w, r, map[string]string{"body": "The first line must name rank, player_id, name and position"})
-		return
-	case err != nil:
-		httpx.WriteInternal(w, r, h.Log, "sheets: import", err)
+	}
+	if len(rows) == 0 {
+		httpx.WriteInvalid(w, r, map[string]string{"body": emptyReadSentence})
 		return
 	}
 	d, err := h.Store.ReplaceRows(r.Context(), auth.AccountID(r), id, rows, nil, nil)

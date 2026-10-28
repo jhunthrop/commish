@@ -11,7 +11,8 @@
  * beside the others. */
 import { CsvHeaderError, decodeCsv, encodeCsv } from '../../web/src/lib/sheet/csv.ts';
 import { DEFAULT_SHEET_NAME, SHEET_LIMITS } from '../../web/src/lib/sheet/limits.ts';
-import type { SheetRow } from '../../web/src/lib/sheet/model.ts';
+import type { SheetPlayer, SheetRow } from '../../web/src/lib/sheet/model.ts';
+import { looksLikeCsv, nameIndex, readList } from '../../web/src/lib/sheet/paste.ts';
 import { statusWords, type StatusFacts } from '../../web/src/lib/sheet/status.ts';
 import {
 	FIXED_TAGS,
@@ -140,6 +141,58 @@ const READS: readonly string[] = [
 	].join('\n')
 ];
 
+/** The board a pasted names list is read against (paste.ts readList), which the API's import is held to
+ * (api/internal/sheets/paste.go ReadList): two players who share a name, a name with an accent, a
+ * suffix and an apostrophe, a defense by name, club, nickname and city, a city two clubs share, a
+ * kicker, a free agent. */
+export const LIST_BOARD: readonly SheetPlayer[] = [
+	listPlayer('4429795', 'Jahmyr Gibbs', 'RB', 'DET'),
+	listPlayer('4362628', "Ja'Marr Chase", 'WR', 'CIN'),
+	listPlayer('4239996', 'Travis Etienne Jr.', 'RB', 'JAX'),
+	listPlayer('3055899', 'Brandon Aubrey', 'K', 'DAL'),
+	listPlayer('wr-thomas', 'Michael Thomas', 'WR', 'NO'),
+	listPlayer('te-thomas', 'Michael Thomas', 'TE', 'FA'),
+	listPlayer('wr-estime', 'Audric Estimé', 'WR', null),
+	listPlayer('DST-BUF', 'Buffalo Bills', 'DST', 'BUF'),
+	listPlayer('DST-KC', 'Kansas City Chiefs', 'DST', 'KC'),
+	listPlayer('DST-LAR', 'Los Angeles Rams', 'DST', 'LAR'),
+	listPlayer('DST-LAC', 'Los Angeles Chargers', 'DST', 'LAC')
+];
+
+function listPlayer(
+	id: string,
+	name: string,
+	position: SheetPlayer['position'],
+	team: string | null
+): SheetPlayer {
+	return { id, name, position, team, headshot: null };
+}
+
+/** Pasted lists: numbering styles, hints, a repeat, an unknown name, a shared name with and without
+ * its position, defenses every way, CRLF and blank lines, and a first line that names player_id (a
+ * CSV, not a list). */
+const LISTS: readonly string[] = [
+	"1. Puka Nacua\n2. Ja'Marr Chase, WR",
+	"1. Jahmyr Gibbs\r\n\r\n2) ja'marr chase\n3 - Travis Etienne\n4: Brandon Aubrey (PK, DAL)\n  \n5. Jahmyr Gibbs, RB",
+	'Michael Thomas\nMichael Thomas, TE\n7. Michael Thomas (WR, NO)\nMichael Thomas, QB',
+	'audric estime\nAUDRIC ESTIMÉ, WR',
+	'Bills D/ST\nBUF DST\nChiefs\nKC\nBuffalo Defense\nLos Angeles D/ST\nRams D/ST\nLAC DEF\nLos Angeles',
+	'Gibbs\nJahmyr',
+	'rank,player_id,name,position\n1,a,B,QB',
+	''
+];
+
+function listOf(text: string): {
+	text: string;
+	csv: boolean;
+	ids: readonly string[];
+	skipped: readonly { line: number; reason: string }[];
+} {
+	if (looksLikeCsv(text)) return { text, csv: true, ids: [], skipped: [] };
+	const read = readList(text, nameIndex(LIST_BOARD));
+	return { text, csv: false, ids: read.rows.map((row) => row.id), skipped: read.skipped };
+}
+
 function readOf(text: string): {
 	text: string;
 	header: string | null;
@@ -195,7 +248,9 @@ export function renderSheet(about: string): string {
 			players: status.players,
 			words: statusWords(status)
 		})),
-		reads: READS.map(readOf)
+		reads: READS.map(readOf),
+		listBoard: LIST_BOARD,
+		lists: LISTS.map(listOf)
 	};
 	return `${JSON.stringify(sheet, null, '\t')}\n`;
 }

@@ -6727,6 +6727,9 @@ type ListSheetsParams struct {
 	PerPage *PerPage `form:"per_page,omitempty" json:"per_page,omitempty"`
 }
 
+// ImportSheetTextBody defines parameters for ImportSheet.
+type ImportSheetTextBody = string
+
 // CheckoutJSONRequestBody defines body for Checkout for application/json ContentType.
 type CheckoutJSONRequestBody = CheckoutRequest
 
@@ -6807,6 +6810,9 @@ type RenameSheetJSONRequestBody = SheetUpdate
 
 // ExportSheetJSONRequestBody defines body for ExportSheet for application/json ContentType.
 type ExportSheetJSONRequestBody = ExportCreate
+
+// ImportSheetTextRequestBody defines body for ImportSheet for text/plain ContentType.
+type ImportSheetTextRequestBody = ImportSheetTextBody
 
 // ReplaceSheetRowsJSONRequestBody defines body for ReplaceSheetRows for application/json ContentType.
 type ReplaceSheetRowsJSONRequestBody = SheetRowsReplace
