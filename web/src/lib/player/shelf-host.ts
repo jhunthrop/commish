@@ -17,6 +17,7 @@ export function loadShelf(): Promise<typeof import('./PlayerShelf.svelte')> {
 const KIT: ShelfNav = {
 	href: () => window.location.href,
 	card: () => page.state.card,
+	cardIn: () => page.state.cardIn,
 	go: (href, { state, replace = false }) => {
 		const shallow = state !== undefined;
 		// eslint-disable-next-line svelte/no-navigation-without-resolve -- the current page's own address, or a verb's link built with resolve() (links.ts, tabs.ts).
