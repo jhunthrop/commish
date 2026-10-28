@@ -98,7 +98,12 @@ class BoardParityTest {
     fun `the status column's stamp is the newer of the run's capture and the order's, as the web's (Lane 280)`() {
         val zone = ZoneId.of(runParity.string("zone"))
         val cases = runParity.getValue("liveStamps").jsonArray.map { it.jsonObject }
-        assertEquals(listOf("run-only", "live-newer", "live-newer-unchecked", "live-older"), cases.map { it.string("name") })
+        assertEquals(
+            listOf("run-only", "live-newer", "live-newer-unchecked", "live-newer-earlier-day", "live-older"),
+            cases.map {
+                it.string("name")
+            },
+        )
         cases.forEach { case ->
             val run = stampOf(case.getValue("run").jsonObject)
             val live = stampOf(case["live"]?.takeIf { it != JsonNull }?.jsonObject)

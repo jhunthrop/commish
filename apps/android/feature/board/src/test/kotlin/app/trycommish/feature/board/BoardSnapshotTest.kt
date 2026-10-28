@@ -167,7 +167,7 @@ class BoardSceneTest {
         assertTrue(fromRun.atClock)
         assertEquals("the foot draws him, from the run", MISSING, fromRun.rows.last().id)
         assertEquals(LiveOrderWords.fromRun(1), fromRun.basis.last())
-        assertTrue(fromRun.basis.toString(), "Status read Oct 18." in fromRun.basis)
+        assertTrue(fromRun.basis.toString(), "Status read today 1:00 pm CT." in fromRun.basis)
     }
 
     @Test

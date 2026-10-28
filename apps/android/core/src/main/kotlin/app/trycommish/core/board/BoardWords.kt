@@ -97,8 +97,9 @@ data class BoardWords(
             )
         }
 
-        /** designation.ts captureShort: "Status read Oct 16.", "as of" its last change with no check, and
-         * past a day and a half how old it is. */
+        /** designation.ts captureShort: "Status read Oct 16.", "as of" its last change with no check, the
+         * hour on the member's own day ("Status read today 9:15 am CT."), and past a day and a half how old
+         * it is. */
         fun capture(
             asOf: Instant,
             checkedAt: Instant?,
@@ -106,9 +107,15 @@ data class BoardWords(
             zone: ZoneId,
         ): String {
             val last = checkedAt ?: asOf
-            val said =
-                checkedAt?.let { "${Words.Capture.read} ${Format.shortDay(it, zone)}" }
-                    ?: "${Words.Capture.asOf} ${Format.shortDay(asOf, zone)}"
+            // On the member's own day the hour tells this hour's capture from last night's (Lane 280).
+            val day = { at: Instant ->
+                if (Format.sameDay(at, now, zone)) {
+                    "${Words.Capture.today} ${Format.timeOfDay(at, zone)} ${Format.zoneShort(at, zone)}"
+                } else {
+                    Format.shortDay(at, zone)
+                }
+            }
+            val said = checkedAt?.let { "${Words.Capture.read} ${day(it)}" } ?: "${Words.Capture.asOf} ${day(asOf)}"
             val old = if (Duration.between(last, now) > CAPTURE_BEHIND) ", ${Words.Capture.old}" else ""
             return "${Words.Capture.status} $said$old."
         }

@@ -56,7 +56,7 @@ object LiveOrderWords {
     ): String = "The first $shown of the $total players on our board, in our order."
 
     /** live-order.ts LIVE_ORDER_WORDS.fromRunLine (Lane 280, B257): the run's players an uncut order omits,
-     * counted once, "2 players from the run, not in the live order."; null with none. */
+     * counted once, "2 players from our board, not in our order right now."; null with none. */
     fun fromRun(count: Int): String? = if (count > 0) "${Format.plural(count, "player", "players")} ${Words.LiveOrder.fromRun}." else null
 
     /** formats-words.ts FORMATS_RANK.unranked: under the table when a format's rank cell reads "--", the

@@ -22,6 +22,7 @@ import app.trycommish.core.liveorder.OneValueReads.obj
 import app.trycommish.core.liveorder.OneValueReads.strings
 import app.trycommish.core.liveorder.OneValueReads.text
 import app.trycommish.core.rankings.OrderQuery
+import app.trycommish.core.rankings.RankingsReads
 import app.trycommish.design.Words
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,6 +47,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.net.UnknownHostException
 
 /**
  * One value and one order for a player on every in-season screen (Lane 226, the iOS Lane 224's tests, the
@@ -191,7 +193,7 @@ class OneValueTest {
             assertTrue(run in reads.board(whole).basis, "the run's alone")
             val newer = StatusRead(asOf = "2026-10-18T15:00:00Z", checkedAt = "2026-10-18T18:00:00Z", source = "feed")
             val live = reads.board(OrderAtClock(whole.body, whole.answer.copy(statusRead = newer), whole.landed))
-            assertTrue("Status read Oct 18." in live.basis, "${live.basis}")
+            assertTrue("Status read today 1:00 pm CT." in live.basis, "${live.basis}")
             assertFalse(run in live.basis)
             val older = StatusRead(asOf = "2026-10-12T15:00:00Z", checkedAt = "2026-10-13T15:00:00Z", source = "feed")
             assertTrue(run in reads.board(OrderAtClock(whole.body, whole.answer.copy(statusRead = older), whole.landed)).basis)
@@ -487,6 +489,30 @@ class OneValueTest {
             val later = OrderReader(OrderShare(search, FixedClock(reads.now.plus(OrderShare.WINDOW))))
             later.read()
             assertEquals(4, search.routes.size, "an answer stands for its window alone")
+        }
+
+    @Test
+    fun `the reader pages the whole order into one uncut answer, a failed later page leaves it cut (Lane 280)`() =
+        runTest {
+            val search = StubOrderSearch()
+            val whole = reads.order()
+            val page = 50
+            val paged = OrderReader(OrderShare(search, FixedClock(reads.now)), pageSize = page).read()
+            assertEquals(whole.answer.rows.map { it.line.player.boardId }, paged.answer.rows.map { it.line.player.boardId })
+            assertFalse(LiveOrder.cut(paged.answer), "every page read: the merged answer is uncut")
+            assertEquals(
+                listOf(0, page, 2 * page).map { OrderReader.query(null, page, it).route },
+                search.routes,
+                "pages from where the last ended until the total",
+            )
+            val failing =
+                object : RankingsReads by search {
+                    override suspend fun order(query: OrderQuery): String =
+                        if (query.offset > 0) throw UnknownHostException("api.test") else search.order(query)
+                }
+            val first = OrderReader(OrderShare(failing, FixedClock(reads.now)), pageSize = page).read()
+            assertEquals(page, first.answer.rows.size)
+            assertTrue(LiveOrder.cut(first.answer), "a later page that fails leaves the first, cut")
         }
 
     @Test

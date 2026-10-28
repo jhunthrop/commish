@@ -165,7 +165,7 @@ class StubOrderSearch(
                 }
             } ?: all
         val answer =
-            data + mapOf("rows" to JsonArray(searched.take(query.limit)), "total" to JsonPrimitive(searched.size))
+            data + mapOf("rows" to JsonArray(searched.drop(query.offset).take(query.limit)), "total" to JsonPrimitive(searched.size))
         return JsonObject(envelope + mapOf("data" to JsonObject(answer))).toString()
     }
 
