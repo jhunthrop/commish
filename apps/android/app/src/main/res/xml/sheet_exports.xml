@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The one folder the file provider serves: the cheat sheet's export, written by the app's graph (AppGraph
+     SHEET_EXPORTS) and handed to the share sheet. -->
+<paths>
+    <cache-path name="sheet_exports" path="sheet-exports/" />
+</paths>

@@ -151,6 +151,7 @@ dependencies {
     implementation(project(":feature:reference"))
     implementation(project(":feature:companion"))
     implementation(project(":feature:mock"))
+    implementation(project(":feature:sheet"))
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
