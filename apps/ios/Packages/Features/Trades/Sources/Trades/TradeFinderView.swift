@@ -24,9 +24,35 @@ struct TradeFinderView: View {
                     )
                 }
             }
+            ForEach(model.noIdeas) { NoIdeaRow(line: $0) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Words.Trades.every)
+    }
+}
+
+/// A team the finder lists no trade with (B271): "With Carried by QJs", then "No idea they would
+/// take.", quiet, nothing to open.
+struct NoIdeaRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let line: NoIdeaLine
+
+    var body: some View {
+        let theme = Theme(colorScheme)
+        VStack(alignment: .leading, spacing: 2) {
+            Text(line.with)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
+                .foregroundStyle(theme.color(Tokens.Color.ink2))
+            Text(line.note)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.sm))
+                .foregroundStyle(theme.color(Tokens.Color.ink2))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Tokens.Space.s2)
+        .padding(.leading, FinderColumn.open)
+        .padding(.vertical, 6)
+        .overlay(alignment: .bottom) { Hairline() }
+        .accessibilityElement(children: .combine)
     }
 }
 

@@ -75156,9 +75156,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Both lineups gain: yours 1.5 points over replacement a week, theirs 0.6. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong.",
 				"cells": {
 					"yours": {
@@ -75189,9 +75194,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Your lineup gains 2.1 points over replacement a week, theirs loses 0.8. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong.",
 				"cells": {
 					"yours": {
@@ -75222,9 +75232,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Your lineup loses 3.0 points over replacement a week, theirs gains 4.2. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong.",
 				"cells": {
 					"yours": {
@@ -75255,9 +75270,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Neither lineup changes on our order. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong.",
 				"cells": {
 					"yours": {
@@ -75288,9 +75308,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Your lineup does not change, theirs gains 1.1 points over replacement a week. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong.",
 				"cells": {
 					"yours": {
@@ -75321,9 +75346,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Your lineup loses 1.2 points over replacement a week, theirs does not change. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong.",
 				"cells": {
 					"yours": {
@@ -75354,9 +75384,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Your lineup does not change, theirs gains 0.6 points over replacement a week. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong.",
 				"cells": {
 					"yours": {
@@ -75387,9 +75422,14 @@
 				"keepDrop": true,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Both lineups gain: yours 2.1 points over replacement a week, theirs 0.8. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong. You drop Jaxson Dart to make room.",
 				"cells": {
 					"yours": {
@@ -75420,9 +75460,14 @@
 				"keepDrop": true,
 				"dropReason": "Dart starts at QB for you this week, and Mahomes takes that spot after the trade.",
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Both lineups gain: yours 2.1 points over replacement a week, theirs 0.8. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong. You drop Jaxson Dart to make room. Dart starts at QB for you this week, and Mahomes takes that spot after the trade.",
 				"cells": {
 					"yours": {
@@ -75453,9 +75498,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": false,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Both lineups gain: yours 2.1 points over replacement a week, theirs 0.8.",
 				"cells": {
 					"yours": {
@@ -75486,9 +75536,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Your roster would not fill RB2.",
 				"cells": {
 					"yours": {
@@ -75519,9 +75574,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Your roster would not fill the flex.",
 				"cells": {
 					"yours": {
@@ -75552,9 +75612,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Your roster would not fill every slot.",
 				"cells": {
 					"yours": {
@@ -75585,9 +75650,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Their roster would not fill TE.",
 				"cells": {
 					"yours": {
@@ -75618,9 +75688,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Your roster has no one to drop to make room.",
 				"cells": {
 					"yours": {
@@ -75651,9 +75726,14 @@
 				"keepDrop": false,
 				"dropReason": null,
 				"perGame": true,
-				"acceptable": null,
-				"rest": null,
-				"keepsRest": true,
+				"acceptable": {
+					"yours": true,
+					"theirs": true
+				},
+				"rest": {
+					"yours": 9.6,
+					"theirs": -9.6
+				},
 				"sentence": "Their roster has no one to drop to make room.",
 				"cells": {
 					"yours": {
@@ -75692,7 +75772,6 @@
 					"yours": 21.6,
 					"theirs": -21.6
 				},
-				"keepsRest": false,
 				"sentence": "They give up more rest of season than they get. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong. You drop Jaxson Dart to make room.",
 				"cells": {
 					"yours": {
@@ -75731,7 +75810,6 @@
 					"yours": -14.2,
 					"theirs": 14.2
 				},
-				"keepsRest": false,
 				"sentence": "You give up more rest of season than you get. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong.",
 				"cells": {
 					"yours": {
@@ -75770,7 +75848,6 @@
 					"yours": -12.5,
 					"theirs": -11.4
 				},
-				"keepsRest": false,
 				"sentence": "Both sides give up more rest of season than they get.",
 				"cells": {
 					"yours": {
@@ -75809,7 +75886,6 @@
 					"yours": 30,
 					"theirs": -30
 				},
-				"keepsRest": false,
 				"sentence": "Your roster would not fill RB2.",
 				"cells": {
 					"yours": {
@@ -75848,7 +75924,6 @@
 					"yours": 5,
 					"theirs": -5
 				},
-				"keepsRest": false,
 				"sentence": "Both lineups gain: yours 2.1 points over replacement a week, theirs 0.8. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong.",
 				"cells": {
 					"yours": {
@@ -75881,7 +75956,6 @@
 				"perGame": true,
 				"acceptable": null,
 				"rest": null,
-				"keepsRest": false,
 				"sentence": "Both lineups gain: yours 2.1 points over replacement a week, theirs 0.8. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong.",
 				"cells": {
 					"yours": {

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.trycommish.core.trades.CopiedLine
 import app.trycommish.core.trades.GainCell
+import app.trycommish.core.trades.NoIdeaLine
 import app.trycommish.core.trades.TradeLine
 import app.trycommish.core.trades.TradeSort
 import app.trycommish.core.trades.TradesModel
@@ -87,7 +88,26 @@ internal fun TradeFinderView(
             FinderRow(line, open, ui.sort) { actions.toggle(line.key) }
             if (open) OpenedTrade(line, model, ui.copied[line.key], actions)
         }
+        model.noIdeas.forEach { NoIdeaRow(it) }
     }
+}
+
+/** A team the finder lists no trade with (B271): "With Carried by QJs", then "No idea they would
+ * take.", quiet, nothing to open. */
+@Composable
+private fun NoIdeaRow(line: NoIdeaLine) {
+    val c = CommishTheme.colors
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = FinderColumn.open + Tokens.Space.s2.dp, end = Tokens.Space.s2.dp, top = 6.dp, bottom = 6.dp)
+            .semantics(mergeDescendants = true) {},
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(line.with, style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp), color = c.ink2)
+        Text(line.note, style = Faces.body.copy(fontSize = Tokens.Type.sm.sp), color = c.ink2)
+    }
+    Hairline()
 }
 
 /** The heads: You give, then Your gain and Their gain, each a button that sorts by it, the sorted one with

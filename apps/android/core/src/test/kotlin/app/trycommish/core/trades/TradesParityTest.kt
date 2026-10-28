@@ -8,6 +8,7 @@ import app.trycommish.core.leaguehome.Fixtures
 import app.trycommish.core.start.GameRead
 import app.trycommish.core.start.LineRead
 import app.trycommish.core.start.StartFixtures
+import app.trycommish.core.start.int
 import app.trycommish.core.start.rowOf
 import app.trycommish.core.start.text
 import app.trycommish.design.Words
@@ -115,6 +116,31 @@ class TradesParityTest {
             val ours = TradesParity.check(check, TradesParity.me, strip.cards[index].team)
             assertEquals(TradesParity.check(web.jsonObject), ours, "$clock ${index + 1}")
         }
+    }
+
+    /** B271: each team the finder lists no trade with keeps its place, said, as the web's ideas row
+     * draws it (its places of kind none, in order). */
+    @ParameterizedTest
+    @MethodSource("clocks")
+    fun `every team with no idea is the web's`(clock: String) {
+        val places =
+            web(clock)
+                .getValue("ideas")
+                .jsonObject
+                .getValue("places")
+                .jsonArray
+                .map { it.jsonObject }
+                .filter { it.text("kind") == "none" }
+        val model = TradesParity.model(clock)
+        assertEquals(places.map { it.int("rosterId") }, model.noIdeas.map { it.id }, clock)
+        assertEquals(places.map { it.text("team") }, model.noIdeas.map { it.team }, clock)
+        assertTrue(places.all { it.text("note") == Words.Trades.noIdea })
+        assertTrue(model.noIdeas.all { it.note == Words.Trades.noIdea })
+    }
+
+    @Test
+    fun `the fixture drops every idea with a team`() {
+        assertTrue(TradesParity.model(TradeFixtures.WEEK).noIdeas.isNotEmpty())
     }
 
     @Test

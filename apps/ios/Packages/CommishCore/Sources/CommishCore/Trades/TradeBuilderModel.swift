@@ -227,13 +227,23 @@ enum TradeBuilder {
             own: check?.basis ?? inputs.advice.checkBasis,
             yours: box(.give, inputs.advice.roster, inputs.me.name, true, inputs.me.aside),
             theirs: team.map { box(.get, $0.roster, $0.name, false, aside($0)) },
-            pin: trade.map {
-                .gains(
-                    mine: TradesWords.gain($0.myGain),
-                    rest: "\(Words.Trades.aWeekForYou), \(TradesWords.gain($0.theirGain)) \(Words.Trades.forTheirs)"
-                )
-            } ?? .words(sentence),
+            pin: pin(check: check, sentence: sentence),
             verbEnabled: inputs.pageKnown && check != nil
+        )
+    }
+
+    /// The pin's line: why a side would not take it (TradeBuilder.svelte's refusal, Lane 277), else the
+    /// two gains a week, else the answer line.
+    static func pin(check: TradeCheck?, sentence: String) -> TradeBuilderModel.Pin {
+        if let check, TradeChecks.fillsBoth(check), let refusal = TradeChecks.refusal(check) {
+            return .words(refusal)
+        }
+        guard let trade = check?.trade.value1 else {
+            return .words(sentence)
+        }
+        return .gains(
+            mine: TradesWords.gain(trade.myGain),
+            rest: "\(Words.Trades.aWeekForYou), \(TradesWords.gain(trade.theirGain)) \(Words.Trades.forTheirs)"
         )
     }
 

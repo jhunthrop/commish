@@ -29,7 +29,7 @@ class TradesMockTest {
     @Test
     fun theMockShowsTheStatesItNames() {
         val finder = viewModelAt(TradesSnapshotTest.Scene.Finder).ui.value
-        assertEquals(11, (finder.state as TradesState.Loaded).model.rows.size)
+        assertEquals(9, (finder.state as TradesState.Loaded).model.rows.size)
         val copied = viewModelAt(TradesSnapshotTest.Scene.Copied).ui.value
         assertEquals("Copied. Propose it on FFPC's trade page.", copied.copied[TradeFixtures.BEST]?.words)
         val holding = viewModelAt(TradesSnapshotTest.Scene.Holding).ui.value

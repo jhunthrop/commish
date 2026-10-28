@@ -1,6 +1,7 @@
 package app.trycommish.core.trades
 
 import app.trycommish.api.models.PlayerLine
+import app.trycommish.api.models.TradeAcceptable
 import app.trycommish.api.models.TradeCheck
 import app.trycommish.api.models.TradeFills
 import app.trycommish.core.leaguehome.Fixtures
@@ -9,6 +10,7 @@ import app.trycommish.core.start.int
 import app.trycommish.core.start.rowOf
 import app.trycommish.core.start.strings
 import app.trycommish.core.start.text
+import app.trycommish.design.Words
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
@@ -48,7 +50,11 @@ class TradesBuilderParityTest {
         val fills = edit.getValue("fills").jsonObject
         val trade = check.trade
         val perGame = edit.flag("perGame")
+        // The edited check's acceptable and rest of season (Lane 277); null for an older answer.
+        val acceptable = (edit.getValue("acceptable") as? JsonObject)?.let { TradeAcceptable(it.flag("yours"), it.flag("theirs")) }
+        val rest = edit.getValue("rest") as? JsonObject
         return check.copy(
+            acceptable = acceptable,
             fills =
                 TradeFills(
                     yours = fills.flag("yours"),
@@ -66,6 +72,8 @@ class TradesBuilderParityTest {
                     dropReason = edit.text("dropReason"),
                     give = if (perGame) trade.give else trade.give.map(::unfigured),
                     get = if (perGame) trade.get else trade.get.map(::unfigured),
+                    myRestOfSeason = rest?.number("yours"),
+                    theirRestOfSeason = rest?.number("theirs"),
                 ),
         )
     }
@@ -74,8 +82,17 @@ class TradesBuilderParityTest {
     fun `every check sentence is the web's`() {
         val base = TradeFixtures.check()
         val checks = words.getValue("checks").jsonArray.map { it.jsonObject }
-        assertEquals(16, checks.size)
-        checks.forEach { edit -> assertEquals(edit.text("sentence"), TradeChecks.words(edited(base, edit)), edit.text("name")) }
+        assertEquals(22, checks.size)
+        checks.forEach { edit ->
+            val check = edited(base, edit)
+            assertEquals(edit.text("sentence"), TradeChecks.words(check), edit.text("name"))
+            assertEquals(edit.text("refusal"), TradeChecks.refusal(check), edit.text("name"))
+        }
+        // Lane 277: each side that would not take it leads its line.
+        val refusals = checks.map { it.text("refusal") }
+        assertTrue(Words.Trades.theyGiveUp in refusals)
+        assertTrue(Words.Trades.youGiveUp in refusals)
+        assertTrue(Words.Trades.bothGiveUp in refusals)
     }
 
     @Test

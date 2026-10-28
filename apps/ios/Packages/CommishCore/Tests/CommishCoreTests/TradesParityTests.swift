@@ -87,6 +87,23 @@ struct TradesParityTests {
         }
     }
 
+    /// B271: each team the finder lists no trade with keeps its place, said, as the web's ideas row draws
+    /// it (its places of kind none, in order).
+    @Test(arguments: StartParityTests.clocks)
+    func everyTeamWithNoIdeaIsTheWebs(clock: String) throws {
+        let web = try Self.web(clock)
+        let model = try Self.model(clock)
+        let none = web.ideas.places.filter { $0.kind == "none" }
+        #expect(model.noIdeas.map(\.id) == none.map(\.rosterId), "\(clock)")
+        #expect(model.noIdeas.map(\.team) == none.map(\.team), "\(clock)")
+        #expect(model.noIdeas.allSatisfy { $0.note == Words.Trades.noIdea })
+        #expect(none.allSatisfy { $0.note == Words.Trades.noIdea })
+    }
+
+    @Test func theFixtureDropsEveryIdeaWithATeam() throws {
+        #expect(try !Self.model(Fixtures.week).noIdeas.isEmpty)
+    }
+
     @Test func theLineUnderAPressedVerbIsTheWebs() {
         #expect(TradesWords.copied(true, platform: "FFPC").words == Self.parity.copied.done)
         #expect(TradesWords.copied(false, platform: "FFPC").words == Self.parity.copied.failed)
@@ -226,6 +243,20 @@ struct TradesParity: Decodable {
         let reason: String?
         let finder: Finder
         let basis: Basis
+        let ideas: Ideas
+    }
+
+    /// The builder-first screen's ideas row (Lane 277): each place an idea or a team with none.
+    struct Ideas: Decodable {
+        let head: String
+        let places: [Place]
+    }
+
+    struct Place: Decodable {
+        let kind: String
+        let rosterId: Int
+        let team: String
+        let note: String?
     }
 
     struct Figures: Decodable, Equatable {

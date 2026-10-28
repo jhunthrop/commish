@@ -24,10 +24,16 @@ struct TradesBuilderParityTests {
 
     @Test func everyCheckSentenceIsTheWebs() throws {
         let base = try Self.check()
-        #expect(Self.parity.words.checks.count == 16)
+        #expect(Self.parity.words.checks.count == 22)
         for edit in Self.parity.words.checks {
-            #expect(TradeChecks.words(edit.applied(to: base)) == edit.sentence, "\(edit.name)")
+            let edited = edit.applied(to: base)
+            #expect(TradeChecks.words(edited) == edit.sentence, "\(edit.name)")
+            #expect(TradeChecks.refusal(edited) == edit.refusal, "\(edit.name)")
         }
+        // Lane 277: each side that would not take it leads its line.
+        #expect(Self.parity.words.checks.contains { $0.refusal == Words.Trades.theyGiveUp })
+        #expect(Self.parity.words.checks.contains { $0.refusal == Words.Trades.youGiveUp })
+        #expect(Self.parity.words.checks.contains { $0.refusal == Words.Trades.bothGiveUp })
     }
 
     @Test func theDecisionsTitlesAndPromptsAreTheWebs() throws {
@@ -139,6 +145,20 @@ struct BuilderParity: Decodable {
         let dropReason: String?
         let perGame: Bool
         let sentence: String
+        /// The edited check's acceptable and rest of season (Lane 277); nil for an older answer.
+        let acceptable: Acceptable?
+        let rest: Rest?
+        let refusal: String?
+
+        struct Acceptable: Decodable {
+            let yours: Bool
+            let theirs: Bool
+        }
+
+        struct Rest: Decodable {
+            let yours: Double
+            let theirs: Double
+        }
 
         /// The fixture's check with this edit, as trades-parity.ts editedCheck makes it.
         func applied(to check: TradeCheck) -> TradeCheck {
@@ -156,7 +176,10 @@ struct BuilderParity: Decodable {
                 trade.give = trade.give.map(Self.unfigured)
                 trade.get = trade.get.map(Self.unfigured)
             }
+            trade.myRestOfSeason = rest?.yours
+            trade.theirRestOfSeason = rest?.theirs
             edited.trade = .init(value1: trade)
+            edited.acceptable = acceptable.map { .init(value1: .init(yours: $0.yours, theirs: $0.theirs)) }
             return edited
         }
 

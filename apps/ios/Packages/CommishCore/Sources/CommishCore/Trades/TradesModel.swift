@@ -117,6 +117,26 @@ public enum TradeSort: String, CaseIterable, Equatable, Sendable {
     }
 }
 
+/// A team the finder lists no trade with (builder.ts noIdeasFrom, B271): every idea it found with them,
+/// they would not take (Lane 269), so its place says so rather than leaving the team out.
+public struct NoIdeaLine: Equatable, Sendable, Identifiable {
+    public let id: Int
+    public let team: String
+    /// "With Carried by QJs", over its line.
+    public let with: String
+    /// "No idea they would take."
+    public let note: String
+
+    /// The teams with no trade, in the answer's order.
+    static func of(_ teams: [TradeTeam]) -> [NoIdeaLine] {
+        teams.filter(\.trades.isEmpty).map {
+            NoIdeaLine(
+                id: $0.rosterId, team: $0.name, with: "\(Words.Trades.with) \($0.name)", note: Words.Trades.noIdea
+            )
+        }
+    }
+}
+
 /// The Trades screen at one read (TradeScreen.svelte at 390): the decision as a strip, the chips, the
 /// finder in the chosen order, the verb, the basis with no trade opened and with one.
 public struct TradesModel: Equatable, Sendable {
@@ -137,6 +157,9 @@ public struct TradesModel: Equatable, Sendable {
     public let platform: String
     /// The builder's opening picks for Build a trade.
     public let opening: TradePicks
+    /// Each team the finder lists no trade with, its line in its place under the rows (B271), none
+    /// while a player is picked.
+    public let noIdeas: [NoIdeaLine]
     private let bases: [TradesOpened: String]
 
     /// The basis as the screen stands: closed, a trade opened, or the builder open.
@@ -182,6 +205,7 @@ public struct TradesModel: Equatable, Sendable {
         page = advice.hostTradesUrl.isEmpty ? nil : URL(string: advice.hostTradesUrl)
         reason = advice.hostTradesUrl.isEmpty ? advice.hostNote : nil
         opening = TradeBuilder.opening(advice)
+        noIdeas = holding == nil ? NoIdeaLine.of(advice.teams) : []
         let teams = TradeFinder.holding(shown.teams, player: holding)
         rows = TradeFinder.sorted(TradeFinder.rows(teams, every: showsEvery), by: sort).map {
             Self.line($0, me: me, zone: zone, now: now)

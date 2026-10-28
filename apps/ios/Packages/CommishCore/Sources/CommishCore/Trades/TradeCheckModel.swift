@@ -174,8 +174,30 @@ enum TradeChecks {
         return " You give \(side(row.give)) for \(side(row.get))."
     }
 
-    /// builder.ts checkWords: a roster the trade leaves short, a roster with no one to drop, else each
-    /// lineup's change, the players with their points a game, and the drop.
+    /// trades.ts refusalWords (Lane 277): the answer line's lead when a side would not take the trade on
+    /// its rest of season, nil when both would or the answer does not say (an older API).
+    static func refusal(_ check: TradeCheck) -> String? {
+        guard let acceptable = check.acceptable?.value1 else {
+            return nil
+        }
+        if !acceptable.yours, !acceptable.theirs {
+            return Words.Trades.bothGiveUp
+        }
+        if !acceptable.theirs {
+            return Words.Trades.theyGiveUp
+        }
+        return acceptable.yours ? nil : Words.Trades.youGiveUp
+    }
+
+    /// builder.ts fillsBoth: a trade both rosters can make.
+    static func fillsBoth(_ check: TradeCheck) -> Bool {
+        let fills = check.fills
+        return fills.yours && fills.theirs && fills.yoursRoom && fills.theirsRoom
+    }
+
+    /// builder.ts checkWords: a roster the trade leaves short, a roster with no one to drop, then a side
+    /// that would not take it in place of the lineups' change, else each lineup's change; the players
+    /// with their points a game, and the drop.
     static func words(_ check: TradeCheck) -> String {
         let fills = check.fills
         let trade = check.trade.value1
@@ -193,6 +215,6 @@ enum TradeChecks {
         }
         let reason = trade.dropReason.map { " \($0)" } ?? ""
         let drop = trade.drop.map { " You drop \($0.value1.player.name) to make room.\(reason)" } ?? ""
-        return "\(change(trade))\(players(trade))\(drop)"
+        return "\(refusal(check) ?? change(trade))\(players(trade))\(drop)"
     }
 }
