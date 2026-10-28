@@ -20,6 +20,15 @@ const CloseCall = 0.5
 // (Lane 103, B43), unless it fills a need.
 const KeepGain = 1.0
 
+// GiveUpPerWeek is the most rest-of-season points over replacement a
+// week, as a page prints it, a side may give up and still take a trade
+// (Lane 269). A manager takes a trade that costs him a little rest of
+// season for a lineup need: a point a week sits inside our order's own
+// spread between neighbours at a position, and is the gain a page first
+// prints as one (KeepGain). A starter's points over replacement run to
+// several a week, so a trade that costs a side a starter is past it.
+const GiveUpPerWeek = 1.0
+
 // Trade is one trade both lineups gain from: who the member gives and
 // gets (indexes into each squad), who the member drops to make room
 // (Drop, -1 for none) and each side's gain in points over replacement a
@@ -28,7 +37,9 @@ const KeepGain = 1.0
 // lineup kept full (DropFor, an index into Get) and the slot that player
 // takes (ForSlot); all -1 for a bench drop or none. Need is the
 // starting spot of this week's lineup no one of the member's who can play
-// fills that the trade fills (an index into Slots, -1 for none).
+// fills that the trade fills (an index into Slots, -1 for none). MyRest
+// and TheirRest are each side's rest-of-season change (restOfSeason) over
+// the weeks the order covers, each side's drop counted against it.
 type Trade struct {
 	Give      []int
 	Get       []int
@@ -38,6 +49,8 @@ type Trade struct {
 	ForSlot   int
 	MyGain    float64
 	TheirGain float64
+	MyRest    float64
+	TheirRest float64
 	Need      int
 }
 
@@ -191,6 +204,45 @@ func (s tradeSide) countsAfter(out []int, in []*Candidate) map[draft.Position]in
 	return counts
 }
 
+// restOfSeason is the side's rest-of-season change from losing out and
+// drop (-1 for none) and taking in (Lane 269): the points over
+// replacement of the players it takes in less those it sends out and
+// drops, each counted at replacement or above, since a player under it is
+// one a manager replaces from waivers. Unlike the lineup gain it counts
+// the bench, so a trade that fills one slot by giving up two players the
+// side would keep shows what it costs.
+func (s tradeSide) restOfSeason(out []int, drop int, in []*Candidate) float64 {
+	total := 0.0
+	for _, c := range in {
+		total += overReplacement(c)
+	}
+	for _, o := range out {
+		total -= overReplacement(s.players[o])
+	}
+	if drop >= 0 {
+		total -= overReplacement(s.players[drop])
+	}
+	return total
+}
+
+// overReplacement is a player's rest-of-season points over replacement,
+// none under replacement or without a figure.
+func overReplacement(c *Candidate) float64 {
+	if !c.HasValue {
+		return 0
+	}
+	return max(0, c.Value)
+}
+
+// Acceptable is whether a side takes a trade whose rest-of-season change
+// over weeks is rest: as a page prints it, it gives up no more than
+// GiveUp(weeks).
+func Acceptable(rest float64, weeks int) bool { return roundTenth(rest) >= -GiveUp(weeks) }
+
+// GiveUp is the most rest of season a side gives up over weeks:
+// GiveUpPerWeek for each.
+func GiveUp(weeks int) float64 { return GiveUpPerWeek * float64(max(1, weeks)) }
+
 func (s tradeSide) at(list []int, buf []*Candidate) []*Candidate {
 	buf = buf[:0]
 	for _, p := range list {
@@ -322,7 +374,8 @@ func (t *tradeSearch) theirs(give, get []int, always bool) Change {
 // Trades is §6.2's search between the member's squad and one other team's:
 // exact over every one-for-one and two-for-one pair both ways at the
 // skill positions, a trade kept when both lineups gain and both still
-// fill every slot, and proposable (Lane 103). focus, when set, keeps
+// fill every slot, the other side giving up no more rest of season than
+// Acceptable allows (Lane 269), and proposable (Lane 103). focus, when set, keeps
 // only trades holding that player (either side's id). The best limit trades in orderTrades' order.
 // Gains are a week's over the weeks the order covers.
 func Trades(config []draft.SlotConfig, weeks int, mine, theirs Squad, focus string, limit int) []Trade {
@@ -341,7 +394,10 @@ func Trades(config []draft.SlotConfig, weeks int, mine, theirs Squad, focus stri
 		if !their.stands() || !positive(their.Gain) {
 			return
 		}
-		tr := tradeOf(give, get, my, their)
+		tr := t.tradeOf(give, get, my, their)
+		if !Acceptable(tr.TheirRest, t.f.weeks) {
+			return
+		}
 		tr.Need = t.need(give, tr.Drop, get)
 		if proposable(tr, mine.Players) {
 			out = append(out, tr)
@@ -397,10 +453,16 @@ func holdsFocus(mine, theirs []Candidate, give, get []int, focus string) bool {
 	return focus == "" || holds(mine, give, focus) || holds(theirs, get, focus)
 }
 
-// tradeOf is the trade from each side's change: the member's drop and
-// both gains.
-func tradeOf(give, get []int, my, their Change) Trade {
-	return Trade{Give: give, Get: get, Drop: my.Drop, DropFor: my.DropFor, DropSlot: my.DropSlot, ForSlot: my.ForSlot, MyGain: my.Gain, TheirGain: their.Gain, Need: -1}
+// tradeOf is the trade from each side's change: the member's drop, both
+// gains and both rest-of-season changes, each side's drop counted
+// against it.
+func (t *tradeSearch) tradeOf(give, get []int, my, their Change) Trade {
+	t.buffer = t.them.at(get, t.buffer)
+	myRest := t.me.restOfSeason(give, my.Drop, t.buffer)
+	t.buffer = t.me.at(give, t.buffer)
+	theirRest := t.them.restOfSeason(get, their.Drop, t.buffer)
+	return Trade{Give: give, Get: get, Drop: my.Drop, DropFor: my.DropFor, DropSlot: my.DropSlot, ForSlot: my.ForSlot,
+		MyGain: my.Gain, TheirGain: their.Gain, MyRest: myRest, TheirRest: theirRest, Need: -1}
 }
 
 // Checked is one trade the member built, on the finder's reckoning: its
@@ -422,7 +484,7 @@ type Checked struct {
 func Check(config []draft.SlotConfig, weeks int, mine, theirs Squad, give, get []int) Checked {
 	t := newSearch(config, weeks, mine, theirs)
 	my, their := t.mine(give, get, true), t.theirs(give, get, true)
-	tr := tradeOf(give, get, my, their)
+	tr := t.tradeOf(give, get, my, their)
 	tr.Need = t.need(give, tr.Drop, get)
 	return Checked{Trade: tr, Mine: my, Theirs: their, MineBase: t.me.base, TheirsBase: t.them.base}
 }

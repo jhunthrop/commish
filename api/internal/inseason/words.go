@@ -513,10 +513,37 @@ var keptWords = fmt.Sprintf("A player we rank first at his position goes only fo
 // B42): whose points, and the weeks they are a week over, "points over
 // replacement in each lineup, weeks 7 to 17".
 func TradeGainBasis(b OrderBasis, weeks int, h Horizon) string {
+	return "points over replacement in each lineup, " + tradeWeeks(b, weeks, h)
+}
+
+// tradeWeeks is the weeks a trade's figures cover, as the trade lines
+// say them: "weeks 7 to 17", or the season's on the preseason number.
+func tradeWeeks(b OrderBasis, weeks int, h Horizon) string {
 	if b != RestOfSeason {
-		return fmt.Sprintf("points over replacement in each lineup, over the season's %s on our preseason number", weekCount(weeks))
+		return fmt.Sprintf("over the season's %s on our preseason number", weekCount(weeks))
 	}
-	return "points over replacement in each lineup, " + weekSpan(weeks, h)
+	return weekSpan(weeks, h)
+}
+
+// Who the rest-of-season rule (Lane 269) speaks for: the finder lists
+// only trades the other side takes; the builder answers each side.
+const (
+	finderRest = "We list a trade only when theirs falls by %s or less."
+	checkRest  = "A side takes a trade that costs it %s or less."
+)
+
+// RestOfSeasonBasis is the line for a trade's rest-of-season figures
+// (Lane 269): what they count, the weeks, and the rule, the finder's
+// (finder) or the builder's: "Rest of season is the points over
+// replacement of the players a side gets less those it gives and drops,
+// weeks 9 to 17. We list a trade only when theirs falls by 9.0 or less."
+func RestOfSeasonBasis(b OrderBasis, weeks int, h Horizon, finder bool) string {
+	rule := checkRest
+	if finder {
+		rule = finderRest
+	}
+	return "Rest of season is the points over replacement of the players a side gets less those it gives and drops, " +
+		tradeWeeks(b, weeks, h) + ". " + fmt.Sprintf(rule, points(GiveUp(weeks)))
 }
 
 // TradeNeedWords is the need a trade fills (Lane 103, B43): the empty
