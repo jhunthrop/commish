@@ -82,15 +82,20 @@ func TestAStarterGoesOnlyForHisSpot(t *testing.T) {
 			t.Fatalf("%s drops %s, a held player", words, mine[tr.Drop].ID)
 		}
 	}
-	tr, ok := seen["m-qb for t-qb+t-wr5"]
-	if !ok || tr.DropFor != 0 || SlotLabel(slots, tr.DropSlot) != "QB" || tr.ForSlot != tr.DropSlot {
-		t.Fatalf("m-qb for t-qb+t-wr5: %+v (found %v), want t-qb in m-qb2's QB spot", tr, ok)
+	// m-qb for t-qb+t-wr5 costs them far more rest of season than it
+	// brings, so the finder leaves it out (Lane 269); the builder still
+	// answers it with the drop, and refuses one that leaves the QB spot
+	// empty this week.
+	if tr, ok := seen["m-qb for t-qb+t-wr5"]; ok {
+		t.Fatalf("the finder lists m-qb for t-qb+t-wr5: %+v", tr)
 	}
-	// The builder answers the same trade the same way, and refuses one that
-	// leaves the QB spot empty this week.
 	checked := Check(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, []int{0}, []int{0, 7})
-	if checked.Drop < 0 || mine[checked.Drop].ID != "m-qb2" || checked.DropFor != 0 {
-		t.Fatalf("the builder's drop %d for %d", checked.Drop, checked.DropFor)
+	if checked.Drop < 0 || mine[checked.Drop].ID != "m-qb2" || checked.DropFor != 0 ||
+		SlotLabel(slots, checked.DropSlot) != "QB" || checked.ForSlot != checked.DropSlot {
+		t.Fatalf("the builder's drop %d for %d: %+v, want t-qb in m-qb2's QB spot", checked.Drop, checked.DropFor, checked.Trade)
+	}
+	if Acceptable(checked.TheirRest, SeasonGames) {
+		t.Fatalf("m-qb for t-qb+t-wr5 reads acceptable to them: %v", checked.TheirRest)
 	}
 	empty := Check(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, []int{0}, []int{6, 7})
 	if empty.Mine.Room || empty.Drop >= 0 {

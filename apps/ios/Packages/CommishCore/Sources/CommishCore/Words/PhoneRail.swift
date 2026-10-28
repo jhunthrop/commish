@@ -66,7 +66,9 @@ public enum PhoneRail {
     static let board = RailTab(key: boardKey, label: AppWords.Tab.board)
     static let players = RailTab(key: "players", label: AppWords.Tab.players)
     static let mock = RailTab(key: "mock", label: AppWords.Tab.mock)
-    static let sheet = RailTab(key: "sheet", label: AppWords.Tab.sheet)
+    /// The Cheat sheet tab's key (before the draft and on draft day): the member's sheet.
+    public static let sheetKey = "sheet"
+    static let sheet = RailTab(key: sheetKey, label: AppWords.Tab.sheet)
     static let advisor = RailTab(key: "advisor", label: AppWords.Tab.advisor)
     /// The Rankings tab's key: our order with the week's game beside each player (the web's /players).
     public static let rankingsKey = "week"

@@ -88,7 +88,10 @@ func (a *advisor) CheckTrade(in apitypes.TradeCheckInput) (apitypes.TradeCheck, 
 			YoursOpen: a.openLabel(checked.Mine), TheirsOpen: a.openLabel(checked.Theirs),
 			YoursRoom: checked.Mine.Room, TheirsRoom: checked.Theirs.Room},
 		Totals: apitypes.TradeTotals{Yours: sideTotals(week.mine, checked.MineBase, checked.MyGain),
-			Theirs: sideTotals(week.theirs, checked.TheirsBase, checked.TheirGain)}}
+			Theirs: sideTotals(week.theirs, checked.TheirsBase, checked.TheirGain)},
+		Acceptable: &apitypes.TradeAcceptable{Yours: Acceptable(checked.MyRest, a.weeks), Theirs: Acceptable(checked.TheirRest, a.weeks)}}
+	restBasis := RestOfSeasonBasis(a.basis, a.weeks, a.horizon, false, a.levels().read, a.levels().lacking(a.slots))
+	out.RestOfSeasonBasis = &restBasis
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	return out, nil, true
 }
@@ -246,7 +249,8 @@ func possessive(name string) string {
 func (a *advisor) tradeRow(mine, theirs []person, tr Trade, week tradeWeek) apitypes.TradeRow {
 	row := apitypes.TradeRow{Give: lines(mine, tr.Give), Get: lines(theirs, tr.Get),
 		MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: tr.CloseForThem(),
-		MyProjChange: week.mine.change(), TheirProjChange: week.theirs.change()}
+		MyProjChange: week.mine.change(), TheirProjChange: week.theirs.change(),
+		MyRestOfSeason: tenthOf(tr.MyRest), TheirRestOfSeason: tenthOf(tr.TheirRest)}
 	if tr.Drop >= 0 {
 		drop := mine[tr.Drop].line
 		row.Drop = &drop
@@ -264,6 +268,12 @@ func (a *advisor) tradeRow(mine, theirs []person, tr Trade, week tradeWeek) apit
 		row.Need = &need
 	}
 	return row
+}
+
+// tenthOf is a figure to the tenth, for an optional field on the wire.
+func tenthOf(v float64) *float64 {
+	t := roundTenth(v)
+	return &t
 }
 
 // sentOnBye is the first player at give whose club is on bye the week the
