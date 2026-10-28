@@ -468,6 +468,13 @@ public enum Words {
         public static let sortBy = "Sort by"
         public static let to = "to"
         public static let projForYou = "Proj this week for your lineup"
+        public static let restHead = "Rest of season"
+        public static let wouldNotTake = "Would not take it"
+        public static let theyGiveUp = "They give up more rest of season than they get."
+        public static let youGiveUp = "You give up more rest of season than you get."
+        public static let bothGiveUp = "Both sides give up more rest of season than they get."
+        public static let restBasis = "Rest of season: points over the waiver level, weeks left."
+        public static let noIdea = "No idea they would take."
     }
 
     public enum TradePicker {

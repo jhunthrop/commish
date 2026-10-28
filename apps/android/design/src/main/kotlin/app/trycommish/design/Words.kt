@@ -470,6 +470,13 @@ object Words {
         const val sortBy = "Sort by"
         const val to = "to"
         const val projForYou = "Proj this week for your lineup"
+        const val restHead = "Rest of season"
+        const val wouldNotTake = "Would not take it"
+        const val theyGiveUp = "They give up more rest of season than they get."
+        const val youGiveUp = "You give up more rest of season than you get."
+        const val bothGiveUp = "Both sides give up more rest of season than they get."
+        const val restBasis = "Rest of season: points over the waiver level, weeks left."
+        const val noIdea = "No idea they would take."
     }
 
     object TradePicker {

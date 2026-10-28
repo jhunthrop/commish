@@ -42,6 +42,8 @@ internal object TradesBasis {
         val parts =
             listOf(
                 advice.basis,
+                // What the verdict's rest-of-season cells are, with the builder open (Lane 277).
+                if (facts.opened == TradesOpened.Builder) Words.Trades.restBasis else null,
                 if (open) advice.perGameBasis else null,
                 arrives(facts) ?: proj(facts),
                 finals(facts),

@@ -23,6 +23,7 @@ export type TradeAdvice = Schemas['TradeAdvice'];
 export type TradeTeam = Schemas['TradeTeam'];
 export type TradeRow = Schemas['TradeRow'];
 export type TradeCheck = Schemas['TradeCheck'];
+export type TradeAcceptable = Schemas['TradeAcceptable'];
 export type TradeCheckInput = Schemas['TradeCheckInput'];
 export type TradeMoves = Schemas['TradeMoves'];
 export type TradeSideTotals = Schemas['TradeSideTotals'];

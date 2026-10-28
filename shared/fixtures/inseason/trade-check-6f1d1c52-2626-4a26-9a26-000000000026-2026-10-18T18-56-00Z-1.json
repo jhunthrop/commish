@@ -90,79 +90,73 @@
 			"get": [
 				{
 					"player": {
-						"host_id": "12481",
-						"board_id": "4696981",
-						"name": "Cam Skattebo",
-						"position": "RB",
-						"team": "NYG",
+						"host_id": "7526",
+						"board_id": "4372016",
+						"name": "Jaylen Waddle",
+						"position": "WR",
+						"team": "DEN",
 						"injured_reserve": false
 					},
-					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4696981.png",
-					"slug": "cam-skattebo",
-					"position_rank": 23,
-					"points_over_replacement": 1.2,
-					"rest_of_season_per_game": 9.3,
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4372016.png",
+					"slug": "jaylen-waddle",
+					"position_rank": 20,
+					"points_over_replacement": 0.8,
+					"rest_of_season_per_game": 13.6,
 					"held": false,
 					"facts": {
 						"week": 6,
-						"opponent": "NO",
+						"opponent": "SEA",
 						"home": true,
-						"kickoff": "2026-10-18T17:00:00.000Z",
+						"kickoff": "2026-10-16T00:15:00.000Z",
 						"bye": false,
 						"designation": null,
-						"played": false,
+						"played": true,
 						"points_this_week": null,
 						"last_games": [
 							{
 								"week": 5,
-								"points": 7.1
+								"points": 4.8
 							},
 							{
 								"week": 4,
-								"points": 7.6
+								"points": 14.5
 							},
 							{
 								"week": 3,
-								"points": 13
+								"points": 4.4
 							}
 						],
 						"allowed_to_position": {
-							"points_a_game": 28.8,
-							"rank": 2,
+							"points_a_game": 24.6,
+							"rank": 9,
 							"of": 32,
-							"position": "RB"
+							"position": "WR"
 						},
 						"game_total": {
-							"points": 45.5,
-							"team_points": 23.5,
+							"points": 40.5,
+							"team_points": 19,
 							"read_at": "2026-10-16T21:01:26.774Z"
 						},
 						"spread": {
-							"side": "win",
-							"points": 1.5,
+							"side": "lose",
+							"points": 3,
 							"read_at": "2026-10-16T21:01:26.774Z"
 						},
 						"roof": {
 							"kind": "outdoors",
 							"abroad": false
 						},
-						"weather": {
-							"temperature_f": 54,
-							"wind_mph": 6.9,
-							"precipitation_chance": 0,
-							"precipitation_kind": "none",
-							"read_at": "2026-10-16T21:01:34.611Z"
-						},
-						"game_state": "kicked_off"
+						"weather": null,
+						"game_state": "final"
 					},
-					"week_projection": 13.3,
-					"projection_delta": 0.1,
-					"opp_rank": 2,
-					"season_avg": 9.2,
-					"last_points": 7.1,
+					"week_projection": 14.1,
+					"projection_delta": 0.2,
+					"opp_rank": 9,
+					"season_avg": 7.9,
+					"last_points": 4.8,
 					"game_state": {
-						"state": "kicked_off",
-						"word": "Kicked off"
+						"state": "final",
+						"word": "Final"
 					}
 				},
 				{
@@ -308,13 +302,15 @@
 					"word": "Kicked off"
 				}
 			},
-			"my_gain": 5.7,
-			"their_gain": 0.7,
+			"my_gain": 5.3,
+			"their_gain": 1.1,
 			"close_for_them": false,
-			"my_proj_change": 10.1,
-			"their_proj_change": 2.5,
+			"my_proj_change": 10.9,
+			"their_proj_change": 1.7,
 			"drop_reason": null,
-			"need": null
+			"need": null,
+			"my_rest_of_season": 9.6,
+			"their_rest_of_season": -9.6
 		},
 		"fills": {
 			"yours": true,
@@ -327,19 +323,24 @@
 		"totals": {
 			"yours": {
 				"proj_before": 98.9,
-				"proj_after": 109,
+				"proj_after": 109.8,
 				"season_before": 2,
-				"season_after": 7.7
+				"season_after": 7.3
 			},
 			"theirs": {
 				"proj_before": 53.9,
-				"proj_after": 56.4,
+				"proj_after": 55.6,
 				"season_before": 3.5,
-				"season_after": 4.2
+				"season_after": 4.6
 			}
 		},
 		"host_trades_url": "https://sleeper.com/leagues/1382163311038038016/team",
 		"host_note": null,
+		"acceptable": {
+			"yours": true,
+			"theirs": true
+		},
+		"rest_of_season_basis": "Rest of season is what the players a side gets score over the best free agent at their position, less the same for those it gives and drops, weeks 6 to 17. A side takes a trade that costs it 12.0 or less.",
 		"basis_note_list": "two-point, missed kick, fumble recovery and safety"
 	},
 	"error": null

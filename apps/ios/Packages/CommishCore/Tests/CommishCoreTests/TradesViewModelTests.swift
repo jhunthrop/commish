@@ -13,7 +13,7 @@ import Testing
 struct TradesViewModelTests {
     private let folder = FileManager.default.temporaryDirectory
         .appendingPathComponent("commish-trades-tests-\(UUID().uuidString)")
-    static let best = "8:96>12481+8116"
+    static let best = "8:96>7526+8116"
     static let me = TradeMe(name: "McConkey Kong Country", aside: "5-1, 2nd of 12")
 
     static func stub(check: Bool = true) throws -> TradesStub {
@@ -52,7 +52,7 @@ struct TradesViewModelTests {
         #expect(!shown.stale)
         #expect(viewModel.stampWords == nil)
         #expect(shown.model.rows.first?.id == Self.best)
-        #expect(shown.model.rows.count == 11)
+        #expect(shown.model.rows.count == 9)
     }
 
     @Test func aSavedFinderShowsAtOnceDatedThenAFailedReadKeepsIt() async throws {
@@ -109,7 +109,7 @@ struct TradesViewModelTests {
         #expect(try Self.shown(viewModel).model.picker.label == "Aaron Rodgers")
         #expect(await stub.reads == [nil, "8439"])
         await viewModel.pick(nil, leagueID: Fixtures.league)
-        #expect(try Self.shown(viewModel).model.rows.count == 11)
+        #expect(try Self.shown(viewModel).model.rows.count == 9)
         #expect(await stub.reads.count == 2)
     }
 
@@ -142,10 +142,11 @@ struct TradesViewModelTests {
         let viewModel = model(stub)
         await viewModel.load(leagueID: Fixtures.league)
         await viewModel.build(from: Self.best, leagueID: Fixtures.league)
-        #expect(await stub.checked == [TradeCheckInput(team: 8, give: ["96"], get: ["12481", "8116"])])
+        #expect(await stub.checked == [TradeCheckInput(team: 8, give: ["96"], get: ["7526", "8116"])])
         let builder = try #require(viewModel.builder)
-        #expect(builder.bug.yours.figures.projBefore == "98.9")
-        #expect(builder.bug.yours.figures.projAfter == "109.0")
+        // The best trade moves Waddle, whose Thursday game is final: no change this week (heldCheck).
+        #expect(builder.bug.yours.figures.projBefore == Words.Box.none)
+        #expect(builder.bug.yours.figures.seasonAfter == "7.3")
         #expect(builder.bug.theirs.name == "Max_Jensen10")
         #expect(builder.yours.aside == "5-1, 2nd of 12")
         #expect(builder.sentence == TradesBuilderParityTests.parity.builder.sentence)
@@ -255,7 +256,7 @@ struct TradesViewModelTests {
         let model = try TradesParityTests.model(Fixtures.week)
         let ids = model.sheetPlayers.map(\.id)
         #expect(ids.contains("96"))
-        #expect(ids.contains("12481"))
+        #expect(ids.contains("7526"))
         // A player the site has no page for (no slug) opens no sheet, as the web's row draws no link.
         #expect(!ids.contains("8116"))
     }

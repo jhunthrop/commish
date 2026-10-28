@@ -7,7 +7,15 @@ import { fixed } from '#lib/format/number.ts';
 import { listWords } from '#lib/format/list.ts';
 import { onReserve, type BoxRow } from '../box/box.ts';
 import { stripMark } from '../box/strip.ts';
-import { finderRows, gainWord, offerText, shortSide, worthProposing } from '../box/trades.ts';
+import {
+	finderRows,
+	gainWord,
+	offerText,
+	refusalWords,
+	shortSide,
+	TRADES,
+	worthProposing
+} from '../box/trades.ts';
 import type { PlayerLine, TradeCheck, TradeCheckInput, TradeRow, TradeTeam } from './api.ts';
 import { GAIN_DECIMALS, gainAmount, perGameWords, teamAside } from './words.ts';
 
@@ -114,9 +122,11 @@ function playersWords(row: Pick<TradeRow, 'give' | 'get'>): string {
 }
 
 /** The answer line: a roster the trade leaves short first ("Your roster would not fill RB2."), then
- * a roster with no one it could drop to take two in, else each lineup's change, the trade's players
- * with their rest-of-season points a game, and the drop a full roster makes for two in. */
-export function checkWords(check: Pick<TradeCheck, 'trade' | 'fills'>): string {
+ * a roster with no one it could drop to take two in, then a side that would not take it on its rest of
+ * season (Lane 277: "They give up more rest of season than they get.") in place of the lineups' change,
+ * else each lineup's change; then the trade's players with their rest-of-season points a game, and
+ * the drop a full roster makes for two in. */
+export function checkWords(check: Pick<TradeCheck, 'trade' | 'fills' | 'acceptable'>): string {
 	const { fills, trade } = check;
 	if (!fills.yours) return `Your roster would not fill ${slotPlace(fills.yours_open)}.`;
 	if (!fills.theirs) return `Their roster would not fill ${slotPlace(fills.theirs_open)}.`;
@@ -124,7 +134,7 @@ export function checkWords(check: Pick<TradeCheck, 'trade' | 'fills'>): string {
 	if (!fills.theirs_room) return 'Their roster has no one to drop to make room.';
 	const reason = trade.drop_reason === null ? '' : ` ${trade.drop_reason}`;
 	const drop = trade.drop ? ` You drop ${trade.drop.player.name} to make room.${reason}` : '';
-	return `${changeWords(trade)}${playersWords(trade)}${drop}`;
+	return `${refusalWords(check.acceptable) ?? changeWords(trade)}${playersWords(trade)}${drop}`;
 }
 
 /** The answer line before an answer: what is still to pick, or, once both sides hold a player, that
@@ -198,6 +208,33 @@ export function presetsFrom(teams: readonly TradeTeam[]): Preset[] {
 		deal: `${shortSide(entry.row.give)} for ${shortSide(entry.row.get)}`,
 		gains: `${gainWord(entry.row.my_gain)} ${ANALYZER_LINES.yours}, ${gainWord(entry.row.their_gain)} ${ANALYZER_LINES.theirs}`
 	}));
+}
+
+/** A team in the ideas row the finder lists no trade with (B271): every idea it found with them, they
+ * would not take (Lane 269), so its place says so rather than leaving the team out. */
+export interface NoIdea {
+	key: string;
+	team: TradeTeam;
+	/** "No idea they would take." */
+	note: string;
+}
+
+/** The teams with no idea, after the ideas, in the answer's order. */
+export function noIdeasFrom(teams: readonly TradeTeam[]): NoIdea[] {
+	return teams
+		.filter((team) => team.trades.length === 0)
+		.map((team) => ({ key: `none:${String(team.roster_id)}`, team, note: TRADES.noIdea }));
+}
+
+/** One place in the ideas row: an idea to load, or a team's line with none. */
+export type IdeaPlace = { kind: 'idea'; preset: Preset } | { kind: 'none'; none: NoIdea };
+
+/** The ideas row's places: our ideas best first, then each team with none (B271). */
+export function ideaPlaces(presets: readonly Preset[], none: readonly NoIdea[]): IdeaPlace[] {
+	return [
+		...presets.map((preset): IdeaPlace => ({ kind: 'idea', preset })),
+		...none.map((entry): IdeaPlace => ({ kind: 'none', none: entry }))
+	];
 }
 
 /** The picks the screen opens with: the team of our best trade and nothing ticked, so the member's

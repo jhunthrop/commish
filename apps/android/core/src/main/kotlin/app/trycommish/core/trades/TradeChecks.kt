@@ -60,6 +60,8 @@ data class TradeBugSide(
     val mine: Boolean,
     val figures: TradeFigures,
     val room: String,
+    /** Its rest of season (Lane 277). */
+    val rest: TradeRest,
 ) {
     companion object {
         fun of(
@@ -69,6 +71,7 @@ data class TradeBugSide(
             gain: Double?,
             projChange: Double?,
             room: String,
+            rest: TradeRest,
         ): TradeBugSide =
             TradeBugSide(
                 label = if (me) Words.Trades.yourSide else Words.Trades.theirSide,
@@ -77,7 +80,32 @@ data class TradeBugSide(
                 mine = me,
                 figures = TradeFigures.of(totals, gain, projChange),
                 room = room,
+                rest = rest,
             )
+    }
+}
+
+/** A side's rest-of-season cell (trades.ts restFigure, Lane 277): its change over the weeks the check
+ * covers, toned, and whether that side would not take the trade. Before an answer the none mark; on an
+ * answer without the figure (an older API) empty, never a figure we did not read. */
+data class TradeRest(
+    val text: String,
+    val tone: Tone,
+    val refuses: Boolean,
+) {
+    companion object {
+        private val NONE = TradeRest(Words.Box.none, Tone.Even, false)
+
+        fun of(
+            check: TradeCheck?,
+            mine: Boolean,
+        ): TradeRest {
+            if (check == null) return NONE
+            val trade = check.trade
+            val rest = (if (mine) trade.myRestOfSeason else trade.theirRestOfSeason) ?: return TradeRest("", Tone.Even, false)
+            val takes = check.acceptable?.let { if (mine) it.yours else it.theirs }
+            return TradeRest(TradesWords.gain(rest), TradesWords.tone(rest), takes == false)
+        }
     }
 }
 
@@ -188,8 +216,27 @@ object TradeChecks {
         return " You give ${side(row.give)} for ${side(row.get)}."
     }
 
-    /** builder.ts checkWords: a roster the trade leaves short, a roster with no one to drop, else each
-     * lineup's change, the players with their points a game, and the drop. */
+    /** trades.ts refusalWords (Lane 277): the answer line's lead when a side would not take the trade on
+     * its rest of season, null when both would or the answer does not say (an older API). */
+    fun refusal(check: TradeCheck): String? {
+        val acceptable = check.acceptable ?: return null
+        return when {
+            !acceptable.yours && !acceptable.theirs -> Words.Trades.bothGiveUp
+            !acceptable.theirs -> Words.Trades.theyGiveUp
+            !acceptable.yours -> Words.Trades.youGiveUp
+            else -> null
+        }
+    }
+
+    /** builder.ts fillsBoth: a trade both rosters can make. */
+    fun fillsBoth(check: TradeCheck): Boolean {
+        val fills = check.fills
+        return fills.yours && fills.theirs && fills.yoursRoom && fills.theirsRoom
+    }
+
+    /** builder.ts checkWords: a roster the trade leaves short, a roster with no one to drop, then a side
+     * that would not take it in place of the lineups' change, else each lineup's change; the players
+     * with their points a game, and the drop. */
     fun words(check: TradeCheck): String {
         val fills = check.fills
         val trade = check.trade
@@ -201,7 +248,7 @@ object TradeChecks {
             else -> {
                 val reason = trade.dropReason?.let { " $it" }.orEmpty()
                 val drop = trade.drop?.let { " You drop ${it.player.name} to make room.$reason" }.orEmpty()
-                "${change(trade)}${players(trade)}$drop"
+                "${refusal(check) ?: change(trade)}${players(trade)}$drop"
             }
         }
     }

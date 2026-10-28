@@ -228,7 +228,15 @@ object TradeBuilder {
             team = picks.team,
             bug =
                 TradeBug(
-                    TradeBugSide.of(true, inputs.me.name, check?.totals?.yours, trade?.myGain, trade?.myProjChange, room.yours),
+                    TradeBugSide.of(
+                        true,
+                        inputs.me.name,
+                        check?.totals?.yours,
+                        trade?.myGain,
+                        trade?.myProjChange,
+                        room.yours,
+                        TradeRest.of(check, mine = true),
+                    ),
                     TradeBugSide.of(
                         false,
                         team?.name.orEmpty(),
@@ -236,6 +244,7 @@ object TradeBuilder {
                         trade?.theirGain,
                         trade?.theirProjChange,
                         room.theirs,
+                        TradeRest.of(check, mine = false),
                     ),
                 ),
             sentence = sentence,
@@ -244,14 +253,23 @@ object TradeBuilder {
             own = check?.basis ?: inputs.advice.checkBasis,
             yours = box(PickSide.Give, inputs.advice.roster, inputs.me.name, true, inputs.me.aside),
             theirs = team?.let { box(PickSide.Get, it.roster, it.name, false, aside(it)) },
-            pin =
-                trade?.let {
-                    BuilderPinWords.Gains(
-                        TradesWords.gain(it.myGain),
-                        "${Words.Trades.aWeekForYou}, ${TradesWords.gain(it.theirGain)} ${Words.Trades.forTheirs}",
-                    )
-                } ?: BuilderPinWords.Said(sentence),
+            pin = pin(check, sentence),
             verbEnabled = inputs.pageKnown && check != null,
+        )
+    }
+
+    /** The pin's line: why a side would not take it (TradeBuilder.svelte's refusal, Lane 277), else the
+     * two gains a week, else the answer line. */
+    private fun pin(
+        check: TradeCheck?,
+        sentence: String,
+    ): BuilderPinWords {
+        val refusal = check?.takeIf(TradeChecks::fillsBoth)?.let(TradeChecks::refusal)
+        if (refusal != null) return BuilderPinWords.Said(refusal)
+        val trade = check?.trade ?: return BuilderPinWords.Said(sentence)
+        return BuilderPinWords.Gains(
+            TradesWords.gain(trade.myGain),
+            "${Words.Trades.aWeekForYou}, ${TradesWords.gain(trade.theirGain)} ${Words.Trades.forTheirs}",
         )
     }
 

@@ -9,7 +9,7 @@ import Testing
 /// check answering without one, and the refusals that throw.
 struct TradesAPITests {
     private static let base = URL(string: "http://localhost:8080")!
-    private static let check = TradeCheckInput(team: 8, give: ["96"], get: ["12481", "8116"])
+    private static let check = TradeCheckInput(team: 8, give: ["96"], get: ["7526", "8116"])
 
     private static func client(_ transport: some ClientTransport) -> APIClient {
         APIClient(client: Client(
@@ -38,8 +38,13 @@ struct TradesAPITests {
         let transport = RecordingTransport(status: .ok, body: body)
         let check = try #require(try await Self.client(transport).checkTrade(id: Fixture.league, trade: Self.check))
         #expect(check.totals.yours.projBefore == 98.9)
-        #expect(check.totals.yours.seasonAfter == 7.7)
+        #expect(check.totals.yours.seasonAfter == 7.3)
         #expect(check.fills.yoursRoom)
+        // Lane 269's fields, read through the generated client (Lane 277).
+        #expect(check.trade.value1.myRestOfSeason == 9.6)
+        #expect(check.trade.value1.theirRestOfSeason == -9.6)
+        #expect(check.acceptable?.value1.theirs == true)
+        #expect(check.restOfSeasonBasis?.hasSuffix("A side takes a trade that costs it 12.0 or less.") == true)
         let sent = await transport.sent
         #expect(sent.first?.method == .post)
         #expect(sent.first?.path == "/leagues/attached/\(Fixture.league)/trades/check")
@@ -47,7 +52,7 @@ struct TradesAPITests {
         let posted = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(posted["team"] as? Int == 8)
         #expect(posted["give"] as? [String] == ["96"])
-        #expect(posted["get"] as? [String] == ["12481", "8116"])
+        #expect(posted["get"] as? [String] == ["7526", "8116"])
     }
 
     @Test func theTradesHoldingOnePlayerAreAskedByHisBoardID() async throws {

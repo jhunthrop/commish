@@ -24,10 +24,18 @@ struct TradesBuilderParityTests {
 
     @Test func everyCheckSentenceIsTheWebs() throws {
         let base = try Self.check()
-        #expect(Self.parity.words.checks.count == 16)
+        #expect(Self.parity.words.checks.count == 22)
         for edit in Self.parity.words.checks {
-            #expect(TradeChecks.words(edit.applied(to: base)) == edit.sentence, "\(edit.name)")
+            let edited = edit.applied(to: base)
+            #expect(TradeChecks.words(edited) == edit.sentence, "\(edit.name)")
+            #expect(TradeChecks.refusal(edited) == edit.refusal, "\(edit.name)")
+            #expect(TradesParity.Rest(TradeRest.of(edited, mine: true)) == edit.cells.yours, "\(edit.name)")
+            #expect(TradesParity.Rest(TradeRest.of(edited, mine: false)) == edit.cells.theirs, "\(edit.name)")
         }
+        // Lane 277: each side that would not take it leads its line.
+        #expect(Self.parity.words.checks.contains { $0.refusal == Words.Trades.theyGiveUp })
+        #expect(Self.parity.words.checks.contains { $0.refusal == Words.Trades.youGiveUp })
+        #expect(Self.parity.words.checks.contains { $0.refusal == Words.Trades.bothGiveUp })
     }
 
     @Test func theDecisionsTitlesAndPromptsAreTheWebs() throws {
@@ -95,6 +103,8 @@ struct TradesBuilderParityTests {
         #expect(model.sentence == web.sentence)
         #expect(model.close == web.close)
         #expect(model.own == web.own)
+        #expect(TradesParity.Rest(model.bug.yours.rest) == web.rest.yours)
+        #expect(TradesParity.Rest(model.bug.theirs.rest) == web.rest.theirs)
         #expect(BuilderParity.Box(model.yours) == web.yours)
         let theirs = try #require(model.theirs)
         #expect(BuilderParity.Box(theirs) == web.theirs)
@@ -139,6 +149,26 @@ struct BuilderParity: Decodable {
         let dropReason: String?
         let perGame: Bool
         let sentence: String
+        /// The edited check's acceptable and rest of season (Lane 277); nil for an older answer.
+        let acceptable: Acceptable?
+        let rest: Rest?
+        let refusal: String?
+        let cells: Cells
+
+        struct Cells: Decodable {
+            let yours: TradesParity.Rest
+            let theirs: TradesParity.Rest
+        }
+
+        struct Acceptable: Decodable {
+            let yours: Bool
+            let theirs: Bool
+        }
+
+        struct Rest: Decodable {
+            let yours: Double
+            let theirs: Double
+        }
 
         /// The fixture's check with this edit, as trades-parity.ts editedCheck makes it.
         func applied(to check: TradeCheck) -> TradeCheck {
@@ -156,7 +186,10 @@ struct BuilderParity: Decodable {
                 trade.give = trade.give.map(Self.unfigured)
                 trade.get = trade.get.map(Self.unfigured)
             }
+            trade.myRestOfSeason = rest?.yours
+            trade.theirRestOfSeason = rest?.theirs
             edited.trade = .init(value1: trade)
+            edited.acceptable = acceptable.map { .init(value1: .init(yours: $0.yours, theirs: $0.theirs)) }
             return edited
         }
 
@@ -277,6 +310,12 @@ struct BuilderParity: Decodable {
         let yours: Box
         let theirs: TheirBox
         let pin: String
+        let rest: Rests
+    }
+
+    struct Rests: Decodable {
+        let yours: TradesParity.Rest
+        let theirs: TradesParity.Rest
     }
 
     let words: Words

@@ -140,7 +140,7 @@ class TradesViewModelTest {
                     .first()
                     .key,
             )
-            assertEquals(11, loaded(vm).model.rows.size)
+            assertEquals(9, loaded(vm).model.rows.size)
             assertEquals(saturday, cache.read(TradeKeys.trades(TradeFixtures.LEAGUE))?.stamp)
         }
 
@@ -216,7 +216,7 @@ class TradesViewModelTest {
             assertEquals("Aaron Rodgers", loaded(vm).model.picker.label)
             assertEquals(listOf(null, TradeFixtures.RODGERS), stub.reads)
             run(vm.pick(null, TradeFixtures.LEAGUE))
-            assertEquals(11, loaded(vm).model.rows.size)
+            assertEquals(9, loaded(vm).model.rows.size)
             assertEquals(2, stub.reads.size)
         }
 
@@ -259,10 +259,11 @@ class TradesViewModelTest {
             val vm = viewModel(stub, copies = copies, opened = opened)
             open(vm)
             run(vm.buildFrom(best, TradeFixtures.LEAGUE))
-            assertEquals(listOf(TradeCheckInput(8, listOf("96"), listOf("12481", "8116"))), stub.checked)
+            assertEquals(listOf(TradeCheckInput(8, listOf("96"), listOf("7526", "8116"))), stub.checked)
             val builder = requireNotNull(vm.ui.value.builder)
-            assertEquals("98.9", builder.bug.yours.figures.projBefore)
-            assertEquals("109.0", builder.bug.yours.figures.projAfter)
+            // The best trade moves Waddle, whose Thursday game is final: no change this week (heldCheck).
+            assertEquals(Words.Box.none, builder.bug.yours.figures.projBefore)
+            assertEquals("7.3", builder.bug.yours.figures.seasonAfter)
             assertEquals("Max_Jensen10", builder.bug.theirs.name)
             assertEquals("5-1, 2nd of 12", builder.yours.aside)
             assertEquals(
@@ -458,7 +459,7 @@ class TradesViewModelTest {
     fun `an opened trade's rows open the player sheet by their ids`() {
         val ids = TradesParity.model(TradeFixtures.WEEK).sheetPlayers.map { it.id }
         assertTrue("96" in ids)
-        assertTrue("12481" in ids)
+        assertTrue("7526" in ids)
         // A player the site has no page for (no slug) opens no sheet, as the web's row draws no link.
         assertFalse("8116" in ids)
     }

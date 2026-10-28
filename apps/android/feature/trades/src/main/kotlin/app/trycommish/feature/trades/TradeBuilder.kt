@@ -40,6 +40,7 @@ import app.trycommish.core.trades.PickSide
 import app.trycommish.core.trades.Tone
 import app.trycommish.core.trades.TradeBugSide
 import app.trycommish.core.trades.TradeBuilderModel
+import app.trycommish.core.trades.TradeRest
 import app.trycommish.design.Avatar
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
@@ -182,6 +183,7 @@ private fun BugHalf(side: TradeBugSide) {
         Row(horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s4.dp)) {
             Swing(Words.Trades.weekHead, f.projBefore, f.projAfter, f.projChange, f.projTone)
             Swing(Words.Trades.gainHead, f.seasonBefore, f.seasonAfter, f.seasonChange, f.seasonTone)
+            if (side.rest.text.isNotEmpty()) Rest(side.rest)
         }
     }
 }
@@ -223,6 +225,23 @@ private fun Swing(
             style = Faces.number(NumWeight.Medium),
             maxLines = 1,
         )
+    }
+}
+
+/** "REST OF SEASON" over "−14.4" in its ink (TradeBug.svelte's phone cell, Lane 277); who would not
+ * take it is the builder's line and its pin, as the web's phone says it. */
+@Composable
+private fun Rest(rest: TradeRest) {
+    val c = CommishTheme.colors
+    val ink =
+        when (rest.tone) {
+            Tone.Gain -> c.scoreboardNum
+            Tone.Loss -> c.lossInk
+            Tone.Even -> c.scoreboardInk
+        }
+    Column {
+        BoardLabel(Words.Trades.restHead)
+        Text(rest.text, style = Faces.number(NumWeight.Bold), color = ink, maxLines = 1)
     }
 }
 

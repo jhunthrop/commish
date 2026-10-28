@@ -8,6 +8,7 @@ import app.trycommish.core.leaguehome.Fixtures
 import app.trycommish.core.start.GameRead
 import app.trycommish.core.start.LineRead
 import app.trycommish.core.start.StartFixtures
+import app.trycommish.core.start.int
 import app.trycommish.core.start.rowOf
 import app.trycommish.core.start.text
 import app.trycommish.design.Words
@@ -115,6 +116,31 @@ class TradesParityTest {
             val ours = TradesParity.check(check, TradesParity.me, strip.cards[index].team)
             assertEquals(TradesParity.check(web.jsonObject), ours, "$clock ${index + 1}")
         }
+    }
+
+    /** B271: each team the finder lists no trade with keeps its place, said, as the web's ideas row
+     * draws it (its places of kind none, in order). */
+    @ParameterizedTest
+    @MethodSource("clocks")
+    fun `every team with no idea is the web's`(clock: String) {
+        val places =
+            web(clock)
+                .getValue("ideas")
+                .jsonObject
+                .getValue("places")
+                .jsonArray
+                .map { it.jsonObject }
+                .filter { it.text("kind") == "none" }
+        val model = TradesParity.model(clock)
+        assertEquals(places.map { it.int("rosterId") }, model.noIdeas.map { it.id }, clock)
+        assertEquals(places.map { it.text("team") }, model.noIdeas.map { it.team }, clock)
+        assertTrue(places.all { it.text("note") == Words.Trades.noIdea })
+        assertTrue(model.noIdeas.all { it.note == Words.Trades.noIdea })
+    }
+
+    @Test
+    fun `the fixture drops every idea with a team`() {
+        assertTrue(TradesParity.model(TradeFixtures.WEEK).noIdeas.isNotEmpty())
     }
 
     @Test
@@ -250,7 +276,14 @@ internal object TradesParity {
 
     private fun side(web: JsonObject): List<Any?> {
         val figures = web.getValue("figures").jsonObject
-        return listOf(web.text("label"), web.text("name"), figureKeys.map(figures::text), web.text("room"))
+        val rest = web.getValue("rest").jsonObject
+        return listOf(
+            web.text("label"),
+            web.text("name"),
+            figureKeys.map(figures::text),
+            web.text("room"),
+            listOf(rest.text("text"), rest.text("tone"), rest.text("refuses")),
+        )
     }
 
     private fun side(side: TradeBugSide): List<Any?> {
@@ -266,8 +299,11 @@ internal object TradesParity {
                 f.seasonChange,
                 f.seasonTone.word,
             )
-        return listOf(side.label, side.name, figures, side.room)
+        return listOf(side.label, side.name, figures, side.room, rest(side.rest))
     }
+
+    /** A rest-of-season cell as the web's JSON writes it. */
+    fun rest(rest: TradeRest): List<String> = listOf(rest.text, rest.tone.word, rest.refuses.toString())
 
     /** A check as the web's JSON writes it. */
     fun check(web: JsonObject): List<Any?> =
@@ -281,8 +317,18 @@ internal object TradesParity {
     ): List<Any?> {
         val trade = check.trade
         val room = TradeChecks.room(check)
-        val yours = TradeBugSide.of(true, me, check.totals.yours, trade.myGain, trade.myProjChange, room.yours)
-        val theirs = TradeBugSide.of(false, team, check.totals.theirs, trade.theirGain, trade.theirProjChange, room.theirs)
+        val yours =
+            TradeBugSide.of(true, me, check.totals.yours, trade.myGain, trade.myProjChange, room.yours, TradeRest.of(check, true))
+        val theirs =
+            TradeBugSide.of(
+                false,
+                team,
+                check.totals.theirs,
+                trade.theirGain,
+                trade.theirProjChange,
+                room.theirs,
+                TradeRest.of(check, false),
+            )
         return listOf(side(yours), side(theirs), TradeChecks.words(check), check.basis)
     }
 }
