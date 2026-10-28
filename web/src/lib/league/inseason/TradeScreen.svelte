@@ -10,24 +10,22 @@
 		heldTrades,
 		offerText,
 		tradeBasis,
-		worthProposing,
 		type CopiedTrade
 	} from '../box/trades.ts';
-	import Screen from './Screen.svelte';
 	import TradeBuilder from './TradeBuilder.svelte';
 	import type { TradeAdvice, TradeCheck, TradeCheckInput, TradeRow, TradeTeam } from './api.ts';
 	import { BUILDER_LINES, openingPicks, presetsFrom, type Picks } from './builder.ts';
-	import { tradeDecision } from './words.ts';
 	import { page } from '$app/state';
 	import { boxRow, type BoxRow } from '../box/box.ts';
 	import type { ScreenOffer } from '#lib/player/shelf-state.ts';
 	import { providePlayerShelf } from '#lib/player/shelf-host.ts';
 	import PlayerShelfLayer from '#lib/player/PlayerShelfLayer.svelte';
 
-	/** The Trades screen as one experience (Lane 260, after Lane 66g's table and builder): the decision
-	 * names our best trade; under it the builder is the screen, my roster beside a chosen team's with a
-	 * tick on every row and the verdict read again on every tick, and the finder's trades are its
-	 * presets, one tap each to load; the basis said once under it. The verb follows the moves rule:
+	/** The Trades screen as one experience (Lane 260, after Lane 66g's table and builder; dense since
+	 * Lane 268): the builder is the screen, my roster beside a chosen team's with a tick on every row
+	 * and the verdict read again on every tick, and the finder's trades are its presets, one tap each to
+	 * load, the best first (no decision line: the Best idea is where our best trade shows, and loading
+	 * it shows it in full); the basis said once under it. The verb follows the moves rule:
 	 * Propose on the platform where it takes a proposal from here (none today), else Open the
 	 * platform's trades, which copies the offer and opens its page. We never send one. */
 	interface Props {
@@ -61,10 +59,6 @@
 	const BASIS_ID = 'trades-basis';
 
 	const presets = $derived(presetsFrom(advice.teams));
-	const worth = $derived(worthProposing(advice.teams));
-	const decision = $derived(
-		tradeDecision(worth[0] ? { row: worth[0].row, team: worth[0].team.name } : null)
-	);
 
 	/** The picks the builder opens with, a count that makes it again for each opening a verb asks for,
 	 * and whether it takes the focus (not on the page's own load). */
@@ -158,30 +152,26 @@
 	}
 </script>
 
-<Screen {decision} verb={null} href={advice.host_trades_url} basis={null} panelVerb>
-	{#snippet move()}
-		{#key building.opening}
-			<TradeBuilder
-				id={BUILDER_ID}
-				teams={advice.teams}
-				roster={advice.roster}
-				{me}
-				{host}
-				moves={advice.moves}
-				{presets}
-				start={building.picks}
-				focus={building.focus}
-				basis={advice.check_basis}
-				basisHref="#{BASIS_ID}"
-				href={advice.host_trades_url}
-				hostNote={advice.host_note}
-				{check}
-				{propose}
-				{share}
-				{now}
-			/>
-		{/key}
-	{/snippet}
-	<BasisBlock parts={basis} id={BASIS_ID} />
-	<PlayerShelfLayer host={shelf} />
-</Screen>
+{#key building.opening}
+	<TradeBuilder
+		id={BUILDER_ID}
+		teams={advice.teams}
+		roster={advice.roster}
+		{me}
+		{host}
+		moves={advice.moves}
+		{presets}
+		start={building.picks}
+		focus={building.focus}
+		basis={advice.check_basis}
+		basisHref="#{BASIS_ID}"
+		href={advice.host_trades_url}
+		hostNote={advice.host_note}
+		{check}
+		{propose}
+		{share}
+		{now}
+	/>
+{/key}
+<BasisBlock parts={basis} id={BASIS_ID} />
+<PlayerShelfLayer host={shelf} />

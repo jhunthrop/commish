@@ -1,9 +1,11 @@
-// Screenshots of the Trades screen as one experience (Lane 260, after Lane 103) at 1280 and 390 in
-// both themes, on the fixture API's clock: the screen as it opens, a trade the member builds by tick
-// (his own RB2 for the other team's WR1), the verdict held in sight at a desk, and one of our ideas
-// loaded. Each asserts what it shows:
-//   our ideas are drawn above the rosters, the first marked Best and its gains in a player's words
-//   ("+5.7 a week for your lineup, +0.7 for theirs"); the team picker opens on the team the first idea
+// Screenshots of the Trades screen as one experience (Lane 260, after Lane 103; dense since Lane 268)
+// at 1280 and 390 in both themes, on the fixture API's clock: the screen as it opens (and its window at
+// 1280 by 800 and 390 by 844, with the member's rows in sight counted: ten and seven at least), a trade
+// the member builds by tick (his own RB2 for the other team's WR1), the verdict held in sight at a
+// desk, and one of our ideas loaded. Each asserts what it shows:
+//   no decision line; our ideas by team drawn above the rosters, the best three and the rest behind
+//   "N more", the first marked Best and its gains in its one line ("+5.7 yours, +0.7 theirs"); the
+//   team picker at the head of their roster opens on the team the first idea
 //   names, nothing ticked; a tick on each side reads the verdict with no submit: each side's figures and
 //   a bar, the answer line naming the lineups' change; the taps from the page to that verdict are
 //   counted; a preset's one tap ticks its players and is pressed; Share copies the trade in our words;
@@ -28,7 +30,17 @@ const ZONE = 'America/Chicago';
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const OWN_WORDS = /\bover repl\b|\b(price|market|buy|sell|grade)\b/i;
-const IDEA_GAINS = /^[+−]\d+\.\d a week for your lineup, [+−]\d+\.\d for theirs$/;
+const IDEA_GAINS = /^[+−]\d+\.\d yours, [+−]\d+\.\d theirs$/;
+/** The ideas row's label, which names them as this league's teams (Lane 268). */
+const IDEAS_LABEL = 'Our ideas, by team';
+/** The best ideas the row shows before its "N more" (Lane 268). */
+const IDEAS_SHOWN = 3;
+/** The windows the rows are counted in (Lane 268): a desk at 1280 by 800, a phone at 390 by 844, and
+ * the fewest whole rows of the member's roster each must show above the verdict as the screen opens. */
+const ROW_WINDOWS = {
+	1280: { height: 800, rows: 10 },
+	390: { height: 844, rows: 7 }
+} as const;
 const VERDICT = /^(Your lineup|Both lineups|Neither lineup|Your roster|Their roster)/;
 const KEEP_RULE = 'A player we rank first at his position goes only for';
 /** At this width and under, the rosters stack and the switch draws one at a time (TradeBuilder). */
@@ -132,6 +144,21 @@ async function waitLive(page: Page): Promise<void> {
 	);
 }
 
+/** The member's roster rows wholly in sight as the screen opens: under the bar, over the verdict held
+ * at the window's foot (or, where the rosters stack, the pinned gains). */
+async function rowsInSight(page: Page): Promise<number> {
+	return page.evaluate(() => {
+		const held = [...document.querySelectorAll<HTMLElement>('main .verdict, main .pin')]
+			.filter((el) => el.offsetParent !== null && getComputedStyle(el).position === 'sticky')
+			.map((el) => el.getBoundingClientRect().top);
+		const floor = Math.min(innerHeight, ...held);
+		const top = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
+		return [...document.querySelectorAll('main table.box.mine tbody tr')]
+			.map((row) => row.getBoundingClientRect())
+			.filter((r) => r.top >= top - 1 && r.bottom <= floor + 1).length;
+	});
+}
+
 /** The whole page at its height, so the verdict sits in its place rather than over the rows. */
 async function shoot(page: Page, name: string, width: number): Promise<void> {
 	const height = await page.evaluate(() => document.documentElement.scrollHeight);
@@ -143,6 +170,7 @@ async function shoot(page: Page, name: string, width: number): Promise<void> {
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 const taps: string[] = [];
+const counts: string[] = [];
 for (const theme of THEMES) {
 	for (const width of WIDTHS) {
 		const where = `${theme} ${String(width)}`;
@@ -170,9 +198,45 @@ for (const theme of THEMES) {
 		await page.evaluate(() => document.fonts.ready);
 		await page.waitForLoadState('networkidle');
 
-		// As it opens: our ideas, the first's team chosen, nothing ticked.
+		// As it opens, the rosters take the window: the member's rows counted over the verdict (Lane 268).
+		const window = ROW_WINDOWS[width];
+		await page.setViewportSize({ width, height: window.height });
+		const inSight = await rowsInSight(page);
+		counts.push(
+			`${where}: ${String(inSight)} of your rows in sight at ${String(width)} by ${String(window.height)}`
+		);
+		check(
+			inSight >= window.rows,
+			`${where}: ${String(inSight)} rows in sight, want ${String(window.rows)}`
+		);
+		await page.screenshot({
+			path: new URL(`trades-${theme}-${String(width)}-open-window.png`, out).pathname
+		});
+		await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+
+		// As it opens: our ideas by team, the best three and the rest behind "N more", the first's team
+		// chosen, nothing ticked; no decision line over the screen (the Best idea is our best trade).
+		check(
+			(await page.getByText(IDEAS_LABEL, { exact: true }).count()) === 1,
+			`${where}: the ideas row is not labelled ${IDEAS_LABEL}`
+		);
+		check(
+			(await page.locator('main [role="status"] .line, main .decision').count()) === 0,
+			`${where}: a decision line over the screen`
+		);
+		const first = await seen(page);
+		check(
+			first.ideas.length === IDEAS_SHOWN,
+			`${where}: ${String(first.ideas.length)} ideas shown`
+		);
+		const more = (await page.locator('main .ideas .more').innerText()).trim();
+		check(/^\d+ more$/.test(more), `${where}: the ideas row's more says "${more}"`);
+		await page.locator('main .ideas .more').click();
 		const open = await seen(page);
-		check(open.ideas.length > 1, `${where}: ${String(open.ideas.length)} ideas`);
+		check(
+			open.ideas.length === IDEAS_SHOWN + Number(more.split(' ')[0]),
+			`${where}: ${String(open.ideas.length)} ideas after ${more}`
+		);
 		check(open.ideas[0]?.mark.toLowerCase() === STRIP.best.toLowerCase(), `${where}: no Best`);
 		check(
 			open.ideas.every((i) => IDEA_GAINS.test(i.gains)),
@@ -216,7 +280,11 @@ for (const theme of THEMES) {
 
 		// Share copies the trade in our words.
 		await page.getByRole('button', { name: ANALYZER_LINES.share }).click();
-		await page.getByText(ANALYZER_LINES.shared).waitFor({ timeout: READY_TIMEOUT_MS });
+		await page
+			.getByText(ANALYZER_LINES.shared)
+			.filter({ visible: true })
+			.first()
+			.waitFor({ timeout: READY_TIMEOUT_MS });
 		const copied = await page.evaluate(() => navigator.clipboard.readText());
 		check(copied.startsWith('Trade with '), `${where}: shared "${copied}"`);
 
@@ -247,7 +315,7 @@ for (const theme of THEMES) {
 	}
 }
 await browser.close();
-process.stdout.write(`${taps.join('\n')}\n`);
+process.stdout.write(`${counts.join('\n')}\n${taps.join('\n')}\n`);
 if (failures.length > 0) {
 	process.stderr.write(`${failures.join('\n')}\n`);
 	process.exit(1);

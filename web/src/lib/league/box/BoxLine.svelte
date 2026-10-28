@@ -74,6 +74,9 @@
 		/** A player on injured reserve (Lane 98, B34): on the bench his game cell says why he is a drop,
 		 * in the IR slot it is empty; neither draws his matchup (Opp rank), the slot no points. */
 		reserve?: 'bench' | 'slot' | null;
+		/** The Game cell's expected score and weather under the opponent; the trade builder's rows leave
+		 * them out, so a row keeps the box-score height (Lane 268). */
+		gameFacts?: boolean;
 		/** A Waivers stash row's Game cell (Lane 118, B79): "Back week 9" in place of his game, with no
 		 * matchup, Proj or points, as an IR slot row draws none. */
 		away?: string | null;
@@ -103,6 +106,7 @@
 		projCells = true,
 		rankCell = false,
 		reserve = null,
+		gameFacts = true,
 		away = null
 	}: Props = $props();
 	/** The row as drawn: an IR row, or a stash, without its matchup (reserveRow). */
@@ -204,7 +208,7 @@
 				>{/if}</td
 		>
 	{/if}
-	{#if !compact}<td class="game"><BoxGame row={drawn} {clears} {note} /></td>{/if}
+	{#if !compact}<td class="game"><BoxGame row={drawn} facts={gameFacts} {clears} {note} /></td>{/if}
 	{#if projCells}<td class="n proj">{boxNumber(drawn.proj)}</td>{/if}
 	{#if ptsCell && !compact}<td class="n pts" class:none={drawn.pts === null}
 			>{boxNumber(drawn.pts)}</td
