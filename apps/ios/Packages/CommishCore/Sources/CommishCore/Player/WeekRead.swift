@@ -115,6 +115,34 @@ public enum WeekReads {
         return played && read.caption.hasPrefix(lead) ? lead : read.caption
     }
 
+    /// newestWeekRead (Lane 284, B277): the card's live read when its answer carries one written after the
+    /// run's, so an hourly rewrite or a rescue shows within the hour; else the run's. The status rule
+    /// (StatusHeld) is judged on the read this returns, as on the run's.
+    public static func newest(run: RunWeekRead?, live: LiveWeekRead?) -> RunWeekRead? {
+        guard let live else {
+            return run
+        }
+        if let run, live.writtenAt <= run.writtenAt {
+            return run
+        }
+        return RunWeekRead(
+            week: live.week, body: live.body, caption: live.caption, status: live.status,
+            call: live.call.map { call in
+                RunWeekRead.CallPayload(
+                    value1: call.value1.flatMap { .init(rawValue: $0.rawValue) },
+                    value2: call.value2
+                )
+            },
+            writtenAt: live.writtenAt, factsAt: live.factsAt, projection: live.projection,
+            // A live read is from after the projection field: an absent figure was written without one
+            // (QuotedProjection reads a present movedCaption so), as the web reads a null projection.
+            movedCaption: liveMovedCaption
+        )
+    }
+
+    /// The marker a live read carries in place of the run's movedCaption, never shown.
+    static let liveMovedCaption = ""
+
     /// noReadWords: his next game while it is to come, never "next" for one under way or final; while the
     /// coming week's reads are not yet written, the night of the nightly that writes them (Lane 256, the
     /// run's `weekReadsDue`), until the screen's clock passes it (Lane 265); a run from before names no
