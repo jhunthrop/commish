@@ -22,6 +22,12 @@ This week's rulings and the Lane 72 review's, each a rule the validator reads:
 - Every figure is one the page draws as a cell, as the cell prints it (`cells`), and a read states at most
   `MAX_FIGURES` of them: the cells carry his numbers, the read says what they cannot (Lane 100, B17, B44).
 - One paragraph, three to five sentences.
+- A rank is stated once (B282, Lane 286): never the same rank in two forms ("the 11th-fewest ..., 11th of 32").
+- The read never addresses the member's sheet, lineup or roster ("on your sheet", "in your lineup", "your
+  roster"): it is about the player's week, and the call carries the advice (B282).
+- The first sentence opens on no set-up clause ended by a colon (C25, made strict by B282: "Bye week for
+  Kittle:" sets a scene even when its words name the bye).
+- Every figure is digits, never spelled out ("Fourteen PPR points" is "14 PPR points", B282).
 
 Each violation names its sentence in the writer's form (`the sentence "..."`), so a correction hands it
 back word for word (`rule_notes`).
@@ -133,7 +139,10 @@ _STATUS_WORDS: Final = re.compile(
     + r"|IR|PUP|designation|designated|healthy|cleared|active|practiced|practice)\b",
     re.IGNORECASE,
 )
-_SET_UP: Final = ":"
+# A colon that sets up what follows, never one inside a clock time ("6:00 pm").
+_SET_UP: Final = re.compile(r"(?<!\d):|:(?!\d)")
+# The end of a sentence's first clause: a set-up colon after it is in a later clause.
+_CLAUSE_END: Final = re.compile(r"[,;]")
 _ALLOWS: Final = re.compile(r"\b(?:allow\w*|gives? up|giving up|gave up|surrender\w*)\b", re.IGNORECASE)
 
 
@@ -487,17 +496,27 @@ def _carries_the_point(text: str, season: int) -> bool:
     )
 
 
+def _set_up_head(first: str) -> str | None:
+    """The first clause of a read's first sentence when a colon ends it ("Bye week for Kittle"), else None."""
+    colon = _SET_UP.search(first)
+    if colon is None:
+        return None
+    head = first[: colon.start()]
+    return None if _CLAUSE_END.search(head) else head.strip()
+
+
 def _opener_violation(sentences: Sequence[str], season: int) -> list[str]:
     """The read leads with the verb or the fact (Lane 139, C25): its first sentence carries the call, a
-    figure or his status, and opens on no set-up clause ended by a colon before it."""
+    figure or his status, and its first clause never ends in a colon that sets up the rest (B282: refused
+    whatever the clause names)."""
     if not sentences:
         return []
     first = sentences[0]
-    head, colon, _ = first.partition(_SET_UP)
-    if colon and not _carries_the_point(head, season):
+    head = _set_up_head(first)
+    if head is not None:
         return [
             _sentence_violation(
-                f'opens on a set-up clause ("{head.strip()}")',
+                f'opens on a set-up clause ended by a colon ("{head}")',
                 first,
                 "Lead with the call or the fact that decides his week, and drop the clause before the colon.",
             )
@@ -512,6 +531,88 @@ def _opener_violation(sentences: Sequence[str], season: int) -> list[str]:
             )
         ]
     return []
+
+
+# A rank in any of its forms (B282): "11th of 32", "11th-fewest", "the 11th most", "ranked 11th".
+_RANK: Final = re.compile(r"\b(\d+)(?:st|nd|rd|th)\b", re.IGNORECASE)
+
+
+def _twice_ranked_violations(sentences: Sequence[str]) -> list[str]:
+    """The same rank stated twice in one read (B282): "the 11th-fewest PPR points a game to receivers, 11th
+    of 32" says one rank in two forms."""
+    seen: set[str] = set()
+    out = []
+    for s in sentences:
+        for match in _RANK.finditer(s):
+            rank = match.group(1)
+            if rank not in seen:
+                seen.add(rank)
+                continue
+            out.append(
+                _sentence_violation(
+                    f'states the rank "{match.group(0)}" twice',
+                    s,
+                    f'Say a rank once, in one form ("{match.group(0)} of 32" or its words), never in two.',
+                )
+            )
+            break
+    return out
+
+
+# The member's own sheet, lineup or roster addressed (B282): "on your sheet", "in your lineup", "your roster".
+_ADDRESSES_THE_MEMBER: Final = re.compile(
+    r"\byour (?:fantasy )?(?:sheet|lineup|starting lineup|roster|bench)s?\b", re.IGNORECASE
+)
+
+
+def _addressed_violations(sentences: Sequence[str]) -> list[str]:
+    """The read is about the player's week, and the call carries the advice: it never addresses the member's
+    sheet, lineup or roster (B282)."""
+    out = []
+    for s in sentences:
+        found = _ADDRESSES_THE_MEMBER.search(s)
+        if found is not None:
+            out.append(
+                _sentence_violation(
+                    f'addresses the member\'s sheet ("{found.group(0)}")',
+                    s,
+                    "The read is about his week, and the call carries the advice: say what his week holds, never "
+                    "your sheet, your lineup or your roster.",
+                )
+            )
+    return out
+
+
+# A figure spelled out (B282): a number word with a figure's unit after it ("Fourteen PPR points", "five
+# games"). Zero is no cell's figure ("he scores zero points" on a bye), so it is words.
+_ONES: Final = "one|two|three|four|five|six|seven|eight|nine"
+_NUMBER_WORD: Final = (
+    rf"(?:(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:-(?:{_ONES}))?|"
+    r"ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|"
+    rf"{_ONES})"
+)
+_SPELLED_FIGURE: Final = re.compile(
+    rf"\b{_NUMBER_WORD}[\s-]+(?:(?:half-)?ppr\s+)?(?:fantasy\s+)?"
+    r"(?:points?|pts|a game|per game|games?|degrees|mph|percent|touchdowns?|tds?|targets?|carries|"
+    r"receptions?|catches|yards?|snaps?)\b",
+    re.IGNORECASE,
+)
+
+
+def _spelled_figure_violations(sentences: Sequence[str]) -> list[str]:
+    """Every figure is digits, as its cell prints it (B282): never "Fourteen PPR points" for 14."""
+    out = []
+    for s in sentences:
+        found = _SPELLED_FIGURE.search(s)
+        if found is not None:
+            out.append(
+                _sentence_violation(
+                    f'spells out a figure ("{found.group(0)}")',
+                    s,
+                    'Write every figure in digits, as its cell prints it: "14 PPR points", "5 games".',
+                )
+            )
+    return out
 
 
 def _season_violation(text: str, season: int) -> list[str]:
@@ -557,6 +658,9 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_code_violations(sentences),
         *_superlative_violations(sentences, sheet),
         *_opener_violation(sentences, sheet.season),
+        *_twice_ranked_violations(sentences),
+        *_addressed_violations(sentences),
+        *_spelled_figure_violations(sentences),
     ]
 
 
