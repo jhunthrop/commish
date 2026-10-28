@@ -135,10 +135,11 @@ func supersede(ctx context.Context, tx pgx.Tx, n Notification, id uuid.UUID, top
 	const onTopic = `account_id = $1 and kind = $2 and data ->> 'topic' = $3 and id <> $4`
 	// The rows to give up are locked first, in id order, as every writer
 	// of a topic's rows locks them (lockTopic), and rows already given up
-	// are never touched again (re-review N8).
+	// or out of retries (at the drain's bound, which no claim takes again)
+	// are never touched again (re-review N8, rereview 2 L-b).
 	rows, err := tx.Query(ctx, `select id from app.notifications
 		where `+onTopic+` and sent_at is null and attempts < $6 and (data ->> 'topic_at')::bigint < $5
-		order by id for update`, n.AccountID, string(n.Kind), topic, id, when, deadAttempts)
+		order by id for update`, n.AccountID, string(n.Kind), topic, id, when, DefaultMaxAttempts)
 	if err != nil {
 		return err
 	}
@@ -282,7 +283,7 @@ func lockTopic(ctx context.Context, tx pgx.Tx, n Notification) error {
 	_, err := tx.Exec(ctx, `select id from app.notifications
 		where id = $1 or ($2 <> '' and account_id = $3 and kind = $4 and data ->> 'topic' = $2
 			and sent_at is null and attempts < $5)
-		order by id for update`, n.ID, n.Data[TopicKey], n.AccountID, string(n.Kind), deadAttempts)
+		order by id for update`, n.ID, n.Data[TopicKey], n.AccountID, string(n.Kind), DefaultMaxAttempts)
 	return err
 }
 

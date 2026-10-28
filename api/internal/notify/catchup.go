@@ -13,7 +13,7 @@ import (
 // 06:00 New York) many times over and a day's outage of the job (Lane
 // 262 re-review N4). Captures are never deleted, so the bound is the
 // news's age, not the store's retention; the pair read takes at most
-// boards.pairsTried captures.
+// boards.maxPairCaptures captures after the mark.
 const (
 	FirstRunWindow = 3 * time.Hour
 	MaxCatchUp     = 24 * time.Hour
@@ -71,7 +71,7 @@ func (c *CatchUp) Run(ctx context.Context) (Produced, bool, error) {
 		through = *got.NewerAt
 	}
 	c.Log.Info("notify: starter status produced", "pairs", got.Pairs, "changes", got.Changes,
-		"queued", got.Queued, "skipped", got.Skipped, "through", through)
+		"queued", got.Queued, "skipped", got.Skipped, "stale_leagues", got.StaleLeagues, "through", through)
 	return got, true, c.Marks.Finish(ctx, markStarterStatus, started, through)
 }
 

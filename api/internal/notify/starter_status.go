@@ -52,8 +52,12 @@ type Produced struct {
 	Changes int
 	Queued  int
 	// Skipped is the accounts whose lineups could not be read this run
-	// (review L3); the next run's catch-up tries them again.
+	// (review L3): they miss this run's changes, which the mark moves past.
 	Skipped int
+	// StaleLeagues is the followed leagues whose kept read was too old to
+	// be taken as the member's lineup (leaguesync.MaxStarterReadAge, re-review
+	// N15): none of their starters is pushed.
+	StaleLeagues int
 	// NewerAt is the newest capture compared, nil with none after since.
 	NewerAt *time.Time
 }
@@ -100,7 +104,7 @@ func (p *StarterStatus) Produce(ctx context.Context, since time.Time) (Produced,
 		if err := ctx.Err(); err != nil {
 			return out, err
 		}
-		n, read, err := p.produceFor(ctx, accountID, found, now)
+		n, stale, read, err := p.produceFor(ctx, accountID, found, now)
 		if err != nil {
 			return out, err
 		}
@@ -108,23 +112,25 @@ func (p *StarterStatus) Produce(ctx context.Context, since time.Time) (Produced,
 			out.Skipped++
 		}
 		out.Queued += n
+		out.StaleLeagues += stale
 	}
 	return out, nil
 }
 
 // produceFor queues one account's pushes: each changed player one of its
 // leagues starts, once however many leagues start him, pair by pair.
-// read is false when its lineups could not be read.
-func (p *StarterStatus) produceFor(ctx context.Context, accountID uuid.UUID, found []pairChanges, now time.Time) (int, bool, error) {
+// stale is its leagues whose kept read was too old; read is false when
+// its lineups could not be read.
+func (p *StarterStatus) produceFor(ctx context.Context, accountID uuid.UUID, found []pairChanges, now time.Time) (int, int, bool, error) {
 	leagues, err := p.Lineups.Starters(ctx, accountID)
 	if err != nil {
 		p.Log.Warn("notify: starters", "account_id", accountID, "err", err)
-		return 0, false, nil
+		return 0, 0, false, nil
 	}
-	starts := startsByPlayer(leagues)
+	starts, stale := startsByPlayer(leagues)
 	prefs, err := p.Queue.Preferences(ctx, accountID)
 	if err != nil {
-		return 0, true, err
+		return 0, stale, true, err
 	}
 	var rows []Notification
 	for _, pc := range found {
@@ -135,10 +141,10 @@ func (p *StarterStatus) produceFor(ctx context.Context, accountID uuid.UUID, fou
 		}
 	}
 	if len(rows) == 0 {
-		return 0, true, nil
+		return 0, stale, true, nil
 	}
 	n, err := p.Queue.Enqueue(ctx, rows)
-	return n, true, err
+	return n, stale, true, err
 }
 
 // start is one league that starts a player.
@@ -148,15 +154,21 @@ type start struct {
 }
 
 // startsByPlayer is the leagues that start each board id, in the
-// account's own order.
-func startsByPlayer(leagues []leaguesync.LeagueStarters) map[string][]start {
+// account's own order, and how many leagues were stale (none of whose
+// starters counts).
+func startsByPlayer(leagues []leaguesync.LeagueStarters) (map[string][]start, int) {
 	out := map[string][]start{}
+	stale := 0
 	for _, l := range leagues {
+		if l.Stale {
+			stale++
+			continue
+		}
 		for _, pl := range l.Players {
 			out[pl.BoardID] = append(out[pl.BoardID], start{league: l, player: pl})
 		}
 	}
-	return out
+	return out, stale
 }
 
 // starterRow is one account's push for one change. Its dedupe key is the

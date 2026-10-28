@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -23,7 +24,18 @@ type LeagueStarters struct {
 	LinkID     uuid.UUID
 	LeagueName string
 	Players    []StartingPlayer
+	// Stale is a league whose kept read is older than MaxStarterReadAge:
+	// its lineup may have changed on the host since, so it carries no
+	// players and no push claims it (Lane 262 re-review N15).
+	Stale bool
 }
+
+// MaxStarterReadAge is how old a league's kept read may be and still be
+// taken as the member's lineup. The API keeps a read fresh while someone
+// views the league, and the FFPC and ESPN jobs refresh theirs; a member
+// who last opened Commish on Tuesday may have set Sunday's lineup on the
+// host since, so after a day and a half the read is not their lineup.
+const MaxStarterReadAge = 36 * time.Hour
 
 // AttachedLinks is the part of Store the starters read lists links with.
 type AttachedLinks interface {
@@ -51,11 +63,13 @@ type StoredStarters struct {
 	Directory StoredDirectory
 	Boards    BoardSource
 	Log       *slog.Logger
+	Now       func() time.Time
 }
 
 // Starters is the starting lineup of the member's team in each league the
 // account follows, each starter placed on our board as the league page
-// places him (Place). A league with no kept read, or whose directory or
+// places him (Place). A league whose kept read is too old is answered
+// Stale with no players; one with no kept read, or whose directory or
 // board fails, is left out and logged, never the whole answer.
 func (s *StoredStarters) Starters(ctx context.Context, accountID uuid.UUID) ([]LeagueStarters, error) {
 	attached, err := s.Links.Attached(ctx, accountID)
@@ -88,6 +102,10 @@ func (s *StoredStarters) leagueStarters(ctx context.Context, link Link) (LeagueS
 		return LeagueStarters{}, false, err
 	}
 	out := LeagueStarters{LinkID: link.ID, LeagueName: snap.Name}
+	if s.Now().Sub(snap.ReadAt) > MaxStarterReadAge {
+		out.Stale = true
+		return out, true, nil
+	}
 	team, found := snap.TeamByRoster(link.RosterID)
 	if !found || len(team.Starters) == 0 {
 		return out, true, nil

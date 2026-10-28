@@ -231,3 +231,26 @@ func TestStarterWords(t *testing.T) {
 		}
 	}
 }
+
+// A league whose kept read is too old is counted and none of its starters
+// is pushed; a fresh league beside it still is (re-review N15).
+func TestStarterStatusSkipsStaleLeagues(t *testing.T) {
+	f := newOutbox(t)
+	f.device("android", PlatformFCM, androidToken)
+	lineups := fakeLineups{f.acct: {
+		{LinkID: uuid.New(), LeagueName: "Stale", Stale: true},
+		{LinkID: uuid.New(), LeagueName: "Fresh", Players: []leaguesync.StartingPlayer{{BoardID: "doubtful", Name: "A Back"}}},
+	}}
+	c := &clock{now: newerAt.Add(20 * time.Minute)}
+	p := &StarterStatus{Designations: pairsOf(fixturePair()), Lineups: lineups, Queue: f.store, Now: c.Now, Log: quiet()}
+	got, err := p.Produce(context.Background(), c.Now().Add(-FirstRunWindow))
+	if err != nil || got.StaleLeagues != 1 || got.Queued != 1 {
+		t.Fatalf("%+v %v", got, err)
+	}
+	stale := fakeLineups{f.acct: {{LinkID: uuid.New(), LeagueName: "Stale", Stale: true,
+		Players: []leaguesync.StartingPlayer{{BoardID: "out", Name: "Ja'Marr Chase"}}}}}
+	p.Lineups = stale
+	if got, err := p.Produce(context.Background(), c.Now().Add(-FirstRunWindow)); err != nil || got.Queued != 0 || got.StaleLeagues != 1 {
+		t.Fatalf("a stale league's starter was pushed: %+v %v", got, err)
+	}
+}

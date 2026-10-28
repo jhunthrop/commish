@@ -70,7 +70,7 @@ func TestStartersOnOurBoard(t *testing.T) {
 
 	store := &Store{Pool: pool}
 	reads := &StoredStarters{Links: store, Snapshots: store, Directory: memoryDirectory{memoryPlayers{replayHosts(time.Now)}},
-		Boards: smallBoard{}, Log: quietLog()}
+		Boards: smallBoard{}, Log: quietLog(), Now: func() time.Time { return read.Snapshot.ReadAt.Add(time.Hour) }}
 	got, err := reads.Starters(ctx, alice.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -93,5 +93,16 @@ func TestStartersOnOurBoard(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("Aaron Rodgers not among %+v", players)
+	}
+
+	// A kept read three days old is no longer the member's lineup: the
+	// league is answered stale, with no starters (re-review N15).
+	if _, err := pool.Exec(ctx, `update app.league_snapshots set snapshot = jsonb_set(snapshot, '{read_at}', to_jsonb($1::timestamptz))`,
+		read.Snapshot.ReadAt.Add(-72*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	got, err = reads.Starters(ctx, alice.ID)
+	if err != nil || len(got) != 1 || !got[0].Stale || len(got[0].Players) != 0 {
+		t.Fatalf("a stale read: %+v %v", got, err)
 	}
 }

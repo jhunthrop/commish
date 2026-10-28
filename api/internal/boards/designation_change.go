@@ -18,16 +18,17 @@ type DesignationPair struct {
 	OlderAt time.Time
 }
 
-// pairsTried is how many of a source's newest captures the pair read
-// takes: a capture is stored only when the list changed, at most one an
-// hour, so a day's catch-up is under this, with room for the floor to
-// refuse a short one among them.
-const pairsTried = 30
+// maxPairCaptures bounds the captures after since one pair read takes: a
+// capture is stored only when the list changed, at most four an hour on a
+// game day (Lane 263's quarter-hour status captures), so a day's catch-up
+// is about a hundred; the bound is a guard, not the window.
+const maxPairCaptures = 500
 
 // DesignationPairs is every consecutive pair of readable captures of the
 // source Designations reads (the by-date list, else the roster sweep)
-// whose newer capture is after since, oldest first. A capture the floor
-// refuses is passed over, as Designations passes it over, so a cut-short
+// whose newer capture is after since, oldest first: read by time, every
+// capture after since and the few at or before it the first pair and the
+// floor need (re-review N16). A capture the floor refuses is passed over, as Designations passes it over, so a cut-short
 // list never reads as everyone cleared. Walking every pair since the
 // producer's last run lets a run that missed an hour catch up at the next
 // (review H2). A source with fewer than two readable captures gives way
@@ -35,7 +36,7 @@ const pairsTried = 30
 // (re-review N7).
 func (s *PGSource) DesignationPairs(ctx context.Context, since time.Time) ([]DesignationPair, error) {
 	for _, source := range []string{injuriesByDate, injuriesRosterWide} {
-		captures, err := s.captures(ctx, source, pairsTried, time.Time{})
+		captures, err := s.pairCaptures(ctx, source, since)
 		if err != nil {
 			return nil, err
 		}
@@ -46,6 +47,24 @@ func (s *PGSource) DesignationPairs(ctx context.Context, since time.Time) ([]Des
 		return pairsOf(source, read, since), nil
 	}
 	return nil, nil
+}
+
+// pairCaptures is the source's captures after since, newest first, and
+// the few at or before it that pair with the oldest and that the floor
+// reads it against; with no since, the newest maxPairCaptures.
+func (s *PGSource) pairCaptures(ctx context.Context, source string, since time.Time) ([]capture, error) {
+	if since.IsZero() {
+		return s.captures(ctx, source, maxPairCaptures, time.Time{})
+	}
+	recent, err := s.capturesAfter(ctx, source, maxPairCaptures, since)
+	if err != nil {
+		return nil, err
+	}
+	before, err := s.captures(ctx, source, capturesTried+1, since)
+	if err != nil {
+		return nil, err
+	}
+	return append(recent, before...), nil
 }
 
 // NewestCaptureAt is when the newest injury capture of either source was

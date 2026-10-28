@@ -113,3 +113,31 @@ func TestExclusiveIsOneAtATime(t *testing.T) {
 		t.Fatalf("after the first released: %v %v", ran, err)
 	}
 }
+
+// blockingCatchUp waits until its context ends.
+type blockingCatchUp struct{}
+
+func (blockingCatchUp) Run(ctx context.Context) (Produced, bool, error) {
+	<-ctx.Done()
+	return Produced{}, true, ctx.Err()
+}
+
+// recordingDrain records the context it ran on.
+type recordingDrain struct{ ranAlive bool }
+
+func (d *recordingDrain) Run(ctx context.Context) (Drained, error) {
+	d.ranAlive = ctx.Err() == nil
+	return Drained{Sent: 1}, nil
+}
+
+// A catch-up that blocks is cut at its own deadline and the drain still
+// runs, on a context still alive (re-review N17).
+func TestPassBoundsTheCatchUp(t *testing.T) {
+	drain := &recordingDrain{}
+	pass := &Pass{CatchUp: blockingCatchUp{}, Drain: drain, CatchUpBudget: 50 * time.Millisecond, Log: quiet()}
+	start := time.Now()
+	got, err := pass.Run(context.Background())
+	if err != nil || got.Sent != 1 || !drain.ranAlive || time.Since(start) > 5*time.Second {
+		t.Fatalf("%+v %v, drain alive %v after %v", got, err, drain.ranAlive, time.Since(start))
+	}
+}

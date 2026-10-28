@@ -21,6 +21,18 @@ import (
 // minute in season (Lane 262, spec §5.3).
 const notifyJob = "notify"
 
+// The job's time inside api-notify's 90 s task timeout (api.yml): the
+// catch-up stops at 20 s, so a slow one never starves the drain (re-review
+// N17; a cut catch-up does not move its mark and resumes next minute);
+// the drain claims for 45 s and sends nothing past 80 s from the
+// run's start, releasing what it did not try, so the task is never killed
+// mid-send.
+const (
+	catchUpBudget = 20 * time.Second
+	drainBudget   = 45 * time.Second
+	jobDeadline   = 80 * time.Second
+)
+
 // runNotify is one api-notify execution, on the job's own narrow
 // configuration (config.LoadNotify: the database, the board and push,
 // nothing of the API's secrets). Holding the notify lock, one process at
@@ -49,12 +61,12 @@ func runNotify(ctx context.Context, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	drainer := &notify.Drainer{Outbox: store, Senders: senders, Now: time.Now, Log: log}
+	drainer := &notify.Drainer{Outbox: store, Senders: senders, Now: time.Now, Log: log, Budget: drainBudget}
+	ctx, cancel := context.WithTimeout(ctx, jobDeadline)
+	defer cancel()
+	pass := &notify.Pass{CatchUp: catchUp, Drain: drainer, CatchUpBudget: catchUpBudget, Log: log}
 	ran, err := store.Exclusive(ctx, func(ctx context.Context) error {
-		if _, _, err := catchUp.Run(ctx); err != nil {
-			log.Error("notify: starter status catch-up failed", "err", err)
-		}
-		n, err := drainer.Run(ctx)
+		n, err := pass.Run(ctx)
 		log.Info("notified", "sent", n.Sent, "retried", n.Retried, "dead", n.Dead, "dropped_tokens", n.DroppedTokens,
 			"released", n.Released, "lost", n.Lost)
 		return err
@@ -79,8 +91,10 @@ func starterCatchUp(pool *pgxpool.Pool, cfg config.Notify, store *notify.Store, 
 	leagues := &leaguesync.Store{Pool: pool}
 	producer := &notify.StarterStatus{
 		Designations: boards.Schedule,
-		Lineups:      &leaguesync.StoredStarters{Links: leagues, Snapshots: leagues, Directory: leagues, Boards: boards, Log: log},
-		Queue:        store, Now: time.Now, Log: log,
+		Lineups: &leaguesync.StoredStarters{
+			Links: leagues, Snapshots: leagues, Directory: leagues, Boards: boards, Log: log, Now: time.Now,
+		},
+		Queue: store, Now: time.Now, Log: log,
 	}
 	return &notify.CatchUp{Marks: store, Captures: boards.Schedule, StarterStatus: producer, Now: time.Now, Log: log}, closeBoards, nil
 }
