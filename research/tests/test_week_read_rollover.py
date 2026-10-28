@@ -30,7 +30,7 @@ from research.capsules.week.collect import board_week
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.rollover import NIGHTS, ReadsDue, Rollover, next_nightly, night_of, reads_due, rollover
 from research.capsules.week.sheet import Status, WeekSheet
-from research.capsules.week.store import StoredWeekRead, stored_week_reads, upsert_week_read
+from research.capsules.week.store import StoredWeekRead, replace_week_read, stored_week_reads, upsert_week_read
 from research.capsules.week.write import MAX_CALLS_PER_READ
 from research.db.engine import make_engine
 from research.db.schema import PLAYER_WEEK_READ_RUNS, PLAYER_WEEK_READS, PLAYERS
@@ -565,3 +565,60 @@ def test_a_retry_writer_rescue_replaces_a_held_read_and_a_retry_fall_keeps_it(
     written = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
     assert (written.source, written.model, written.status) == (WRITTEN_SOURCE, _RETRY, "questionable")
     assert written.attempts == 1 and "1 rescued" in done.summary and "every due read written" in done.summary
+
+
+def test_an_hourly_fall_never_lands_over_a_read_another_pass_wrote_meanwhile(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The re-review's N1: an hourly pass reads Puka's facts row and asks him again; before its fall lands, the
+    nightly (another pass) writes his read. The hourly's facts block is never written over it: the written read
+    stands, the hourly counts him held, and his name stays among the unwritten for the cadence."""
+    writer = _Writer(fail_first=(MAX_CALLS_PER_READ + 1) * week_reads.ROLLOVER_ROUNDS)
+    _step(engine, monkeypatch, [starter(), questionable()], writer, retry=_RETRY)
+    fallen = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert fallen.source == FACTS_SOURCE
+    nightly = replace(fallen, source=WRITTEN_SOURCE, body=STARTER_READ, model="m/x", call="start",
+                      written_at=_PASS + timedelta(minutes=61), attempts=1)  # fmt: skip
+    racing = _Writer(fail_first=MAX_CALLS_PER_READ + 1)
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        with engine.begin() as conn:
+            upsert_week_read(conn, nightly)
+        return racing(request)
+
+    hour = _step(engine, monkeypatch, [starter(), questionable()], answer, retry=_RETRY, hourly=True,  # type: ignore[arg-type]
+                 at=_PASS + timedelta(hours=1))  # fmt: skip
+    stood = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert (stood.source, stood.body, stood.written_at) == (WRITTEN_SOURCE, STARTER_READ, nightly.written_at)
+    assert "(1 held over the written read)" in hour.summary
+    assert hour.summary.endswith("; unwritten, asked again on the next pass:\n  Puka Nacua")
+
+
+def test_the_store_replaces_only_the_row_the_pass_read(engine: Engine) -> None:
+    pid = starter().player_id
+    first = StoredWeekRead(
+        pid, _SEASON, _BOARD_WEEK, FACTS_SOURCE, "Week: 6 of 2026", None, _PASS, None, {}, 18.4, None, "first",
+        None, _YESTERDAY, 1,
+    )  # fmt: skip
+    written = replace(first, source=WRITTEN_SOURCE, body=STARTER_READ, written_at=_PASS + timedelta(hours=1))
+    with engine.begin() as conn:
+        assert replace_week_read(conn, first, None)
+        assert not replace_week_read(conn, written, None)  # a row appeared since the pass read none
+        assert replace_week_read(conn, written, first)
+        assert not replace_week_read(conn, first, first)  # the row the pass read is gone
+    assert _reads(engine)[(pid, _BOARD_WEEK)].body == STARTER_READ
+
+
+def test_a_retry_model_listed_with_no_price_turns_the_retry_writer_off_with_one_warning(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The re-review's N4: never the budget in calls a missing price would make of the pass."""
+    unpriced = ModelPrice(_RETRY, None, None, "listed without pricing", True)
+    monkeypatch.setattr(week_reads, "fetch_price", lambda *_args: unpriced)
+    models: list[str] = []
+    lines: list[str] = []
+    record = _step(engine, monkeypatch, [starter(), questionable()], _Writer(models=models), retry=_RETRY, lines=lines)
+    assert record.status == "ran" and "the retry writer off" in record.summary and _RETRY not in models
+    assert "budget $2.50" in record.summary  # dollars, never calls
+    warnings = [line for line in lines if "RETRY_WRITER_MODEL" in line]
+    assert len(warnings) == 1 and "carries with no price" in warnings[0]
