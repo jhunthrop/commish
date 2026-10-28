@@ -42,12 +42,13 @@
 	interface Props {
 		advice: LineupAdvice;
 		host: LeagueHost;
-		/** Plans the move in words with its confirm token; nothing is sent. */
-		plan: (move: HostMoveInput) => Promise<HostMovePlan>;
+		/** Plans the move in words with its confirm token; nothing is sent. Left out where a mover is
+		 * given, which carries its own. */
+		plan?: (move: HostMoveInput) => Promise<HostMovePlan>;
 		/** Makes the planned move once with its token. */
-		make: (move: HostMoveInput, confirm: string) => Promise<HostMoveResult>;
+		make?: (move: HostMoveInput, confirm: string) => Promise<HostMoveResult>;
 		/** Reads the lineup again, once a move has been made. */
-		reread: () => void;
+		reread?: () => void;
 		/** Puts the lineup on the clipboard. */
 		copy?: (text: string) => Promise<void>;
 		/** The instant the answer was read, in ms: the page's clock the rows and the basis draw at. */
@@ -61,6 +62,8 @@
 		mover?: LineupMover;
 		/** The page's verb confirms the move: the panel shows the move with no verb of its own. */
 		held?: boolean;
+		/** Whether the verb pins above the tab bar on a phone (Screen's pin). */
+		pin?: boolean;
 	}
 
 	let {
@@ -74,7 +77,8 @@
 		league,
 		scope,
 		mover: given,
-		held = false
+		held = false,
+		pin = true
 	}: Props = $props();
 	/** The answer with no change on a row whose game has kicked off or is final (Lane 85): every word,
 	 * the verb and the move read it. */
@@ -121,7 +125,15 @@
 	let rows = $state<HTMLElement | null>(null);
 	// The page's own mover when it gives one, fixed for the screen's life.
 	// svelte-ignore state_referenced_locally
-	const mover = given ?? new LineupMover({ plan, make, reread });
+	const mover = given ?? ownMover();
+
+	/** The screen's own mover, from its calls. */
+	function ownMover(): LineupMover {
+		if (plan === undefined || make === undefined || reread === undefined) {
+			throw new Error('StartScreen needs plan, make and reread, or a mover.');
+		}
+		return new LineupMover({ plan, make, reread });
+	}
 	const step = $derived(mover.step);
 	const MOVE_ID = $derived(scope === undefined ? 'lineup-move' : `lineup-move-${scope}`);
 	const at = $derived({ host, href: advice.host_lineup_url });
@@ -159,6 +171,7 @@
 	href={advice.host_lineup_url}
 	basis={null}
 	onverb={onHost ? open : () => void copyLineup()}
+	{pin}
 	controls={onHost ? MOVE_ID : undefined}
 	expanded={onHost ? step.kind !== 'closed' : undefined}
 >

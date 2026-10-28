@@ -13,7 +13,7 @@
 	import { screenSection } from '#lib/ui/rail-league.ts';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { leagueApi, type AttachedLeague, type LeagueHost } from '../api.ts';
+	import { leagueApi, type AttachedLeague } from '../api.ts';
 	import { POLL_MS } from '../model.ts';
 	import { hasStatus, HTTP_STATUS } from '#lib/api/status.ts';
 	import { MOVE_LINES } from './move.ts';
@@ -27,6 +27,8 @@
 		makeEvery,
 		NONE_READY,
 		planEvery,
+		plannedChanges,
+		stillReadingWords,
 		readingEveryWords,
 		readyEntries,
 		setEveryWords,
@@ -94,23 +96,25 @@
 	const answered = $derived(
 		all.length > 0 && all.every((r) => r !== undefined && r.kind !== 'reading')
 	);
+	/** The leagues not yet answered: the verb waits on them, so no league is ever left out of it. */
+	const reading = $derived(all.filter((r) => r === undefined || r.kind === 'reading').length);
 	const entries = $derived(all.flatMap((r): MoveEntry[] => (r?.entry ? [r.entry] : [])));
-	const hosts = $derived(entries.map((e) => e.host));
 	const elsewhere = $derived(
 		(leagues ?? []).filter((l) => reports[l.id]?.kind === 'elsewhere').map((l) => l.host)
 	);
-	/** The moves the member is asked to confirm: the leagues whose plan is ready. */
-	const ready = $derived(phase === 'confirm' ? readyEntries(entries) : []);
-	const readyChanges = $derived(ready.reduce((sum, e) => sum + (reports[e.id]?.changes ?? 0), 0));
 	/** The leagues the verb is moving, fixed when it is pressed, so a block that re-reads meanwhile
 	 * leaves the moves as planned. */
-	let moving: readonly MoveEntry[] = [];
-	/** Their hosts, which the panel names while the moves are sent. */
-	let movingHosts = $state<readonly LeagueHost[]>([]);
+	let moving = $state.raw<readonly MoveEntry[]>([]);
+	const movingHosts = $derived(moving.map((e) => e.host));
+	/** The moves the member is asked to confirm: the leagues whose plan is ready, and their changes as
+	 * planned (review L2). */
+	const ready = $derived(phase === 'confirm' ? readyEntries(moving) : []);
+	const readyChanges = $derived(plannedChanges(ready));
 
 	async function start(): Promise<void> {
+		// One run at a time, and only once every league has answered (review M1, L3).
+		if (phase !== 'idle' || reading > 0) return;
 		moving = entries;
-		movingHosts = entries.map((e) => e.host);
 		report = null;
 		phase = 'planning';
 		await planEvery(moving);
@@ -118,6 +122,7 @@
 	}
 
 	async function confirm(): Promise<void> {
+		if (phase !== 'confirm') return;
 		phase = 'sending';
 		await makeEvery(moving);
 		report = everyReport(everyOutcome(moving));
@@ -162,11 +167,13 @@
 							<p class="line" class:quiet={!answered}>
 								{answered ? everyLine(leagues.length, entries.length, elsewhere) : LINES.reading}
 							</p>
-							{#if entries.length > 0}
+							{#if reading > 0}
+								<Verb disabled>{stillReadingWords(reading)}</Verb>
+							{:else if entries.length > 0}
 								<Verb onclick={() => void start()}>{EVERY.verb}</Verb>
 							{/if}
 						{:else if phase === 'planning'}
-							<p class="line quiet">{readingEveryWords(hosts)}</p>
+							<p class="line quiet">{readingEveryWords(movingHosts)}</p>
 						{:else if phase === 'confirm'}
 							{#if ready.length > 0}
 								<p class="line">{confirmEveryWords(readyChanges, ready.length)}</p>

@@ -94,6 +94,13 @@ async function walk(width: number, theme: (typeof THEMES)[number]): Promise<void
 		if (blocks !== 4) fault(at, `${String(blocks)} league blocks, not 4`);
 		const set = page.locator('main section.block').filter({ hasText: EVERY.set });
 		if ((await set.count()) !== 1) fault(at, 'the set league is not one line');
+		if (width < 500) {
+			const pinned = await page
+				.locator('main section.block .pin')
+				.filter({ hasText: 'Make these changes' })
+				.count();
+			if (pinned !== 0) fault(at, `${String(pinned)} leagues pin their own verb on the phone`);
+		}
 		await holds(page, `${at} landed`);
 		await shoot(page, `every-${theme}-${String(width)}`);
 
@@ -142,7 +149,59 @@ async function redirects(attached: string, path: RegExp, name: string): Promise<
 	}
 }
 
+/** The rail's Lineup, off a league's page, opens every league's Lineup for an account with more than
+ * one league (Lane 257 review L4). */
+async function railOpens(): Promise<void> {
+	const name = 'rail-opens-every-lineup';
+	const ctx = await context(1280, 'dark', FOUR);
+	const page = await ctx.newPage();
+	try {
+		await page.goto(`${web}/board`);
+		const lineup = page.locator('a.item[data-k="lineup"]').filter({ visible: true }).first();
+		await page.waitForFunction(
+			() => document.querySelector('a.item[data-k="lineup"]')?.getAttribute('href') === '/league',
+			undefined,
+			{ timeout: READY_TIMEOUT_MS }
+		);
+		await lineup.click();
+		await page.waitForURL(/\/league$/, { timeout: READY_TIMEOUT_MS });
+		await says(page, LANDED, name);
+		await holds(page, name);
+		await page.screenshot({ path: new URL(`${name}.png`, out).pathname });
+		process.stdout.write(`${name}: /board to ${new URL(page.url()).pathname}\n`);
+	} catch (error) {
+		fault(name, error instanceof Error ? error.message : String(error));
+	} finally {
+		await ctx.close();
+	}
+}
+
+/** While a league is still read the verb waits and says so (review M1): the fixture's slow league
+ * holds its lineup's answer. */
+async function stillReading(): Promise<void> {
+	const name = 'still-reading';
+	const ctx = await context(390, 'light', 'espnDone,slow');
+	const page = await ctx.newPage();
+	try {
+		await page.goto(`${web}/league`);
+		const verb = page.getByRole('button', { name: '1 league still reading' });
+		await verb.waitFor({ timeout: READY_TIMEOUT_MS });
+		if (!(await verb.isDisabled())) fault(name, 'the waiting verb can be pressed');
+		if ((await page.getByRole('button', { name: EVERY.verb }).count()) !== 0)
+			fault(name, 'Make every change is offered while a league is still read');
+		await holds(page, name);
+		await page.screenshot({ path: new URL(`${name}.png`, out).pathname });
+		process.stdout.write(`${name}: the verb waits on the slow league\n`);
+	} catch (error) {
+		fault(name, error instanceof Error ? error.message : String(error));
+	} finally {
+		await ctx.close();
+	}
+}
+
 for (const theme of THEMES) for (const width of WIDTHS) await walk(width, theme);
+await railOpens();
+await stillReading();
 await redirects('espnDone', new RegExp(`/league/${FIXTURE_IDS.espnDone}/start$`), 'one-league');
 await redirects('none', /\/league\/new$/, 'no-league');
 await browser.close();

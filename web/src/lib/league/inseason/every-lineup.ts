@@ -85,11 +85,34 @@ export function closeEvery(entries: readonly MoveEntry[]): void {
 	for (const entry of entries) entry.mover.close();
 }
 
-/** What the moves came to: the leagues set, and the leagues that did not change (each says why). */
-export function everyOutcome(entries: readonly MoveEntry[]): { set: number; unchanged: number } {
+/** What the moves came to: the leagues set, those that may have been set (the host took the move but
+ * its read-back did not show it, or the move's answer never came back: each says how to check), and
+ * those that did not change (a refusal, a move the API could not make, a failed plan or an answered
+ * failure: each says why). */
+export interface EveryOutcome {
+	set: number;
+	unknown: number;
+	unchanged: number;
+}
+
+export function everyOutcome(entries: readonly MoveEntry[]): EveryOutcome {
 	const steps = entries.map((entry) => entry.mover.step);
 	const set = steps.filter((s) => s.kind === 'answered' && s.result.outcome === 'done').length;
-	return { set, unchanged: steps.length - set };
+	const unknown = steps.filter(
+		(s) =>
+			(s.kind === 'answered' && s.result.outcome === 'pending') ||
+			(s.kind === 'failed' && s.lost === true)
+	).length;
+	return { set, unknown, unchanged: steps.length - set - unknown };
+}
+
+/** The changes the planned moves make, counted from the lineups they were planned from: the count the
+ * plans' own sentences spell out, whatever a later read says. */
+export function plannedChanges(entries: readonly MoveEntry[]): number {
+	return entries.reduce(
+		(sum, entry) => sum + lineupMove(heldLineup(entry.advice, entry.now)).changes.length,
+		0
+	);
 }
 
 /** The hosts in words, each once: "ESPN", "ESPN and FFPC". */
@@ -151,13 +174,26 @@ export function settingEveryWords(hosts: readonly LeagueHost[]): string {
 	return `Setting them on ${hostsWords(hosts)}`;
 }
 
-/** What the moves came to: "Set in 2 leagues.", "Set in 1 league. 1 did not change; its league says
- * why below.", "Nothing changed. Each league says why below." */
-export function everyReport(outcome: { set: number; unchanged: number }): string {
-	if (outcome.set === 0) return 'Nothing changed. Each league says why below.';
-	const set = `Set in ${plural(outcome.set, 'league')}.`;
-	if (outcome.unchanged === 0) return set;
-	return `${set} ${String(outcome.unchanged)} did not change. ${outcome.unchanged === 1 ? 'Its league says' : 'Each says'} why below.`;
+/** What the moves came to: "Set in 2 leagues.", "Set in 1 league. 1 may have been set. Its league says
+ * how to check below.", "1 did not change. Its league says why below.", or "Nothing changed. Each league says why
+ * below." when no league was set or may have been. */
+export function everyReport(outcome: EveryOutcome): string {
+	const { set, unknown, unchanged } = outcome;
+	if (set === 0 && unknown === 0) return 'Nothing changed. Each league says why below.';
+	const its = (n: number): string => (n === 1 ? 'Its league says' : 'Each league says');
+	const parts = [
+		set > 0 ? `Set in ${plural(set, 'league')}.` : null,
+		unknown > 0
+			? `${String(unknown)} may have been set. ${its(unknown)} how to check below.`
+			: null,
+		unchanged > 0 ? `${String(unchanged)} did not change. ${its(unchanged)} why below.` : null
+	];
+	return parts.filter((part) => part !== null).join(' ');
+}
+
+/** The verb while leagues are still read: "1 league still reading". */
+export function stillReadingWords(leagues: number): string {
+	return `${plural(leagues, 'league')} still reading`;
 }
 
 /** No plan was ready to make: every league says why in its block. */

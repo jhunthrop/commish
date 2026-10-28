@@ -18,6 +18,8 @@ import {
 	everyReport,
 	lineupBlock,
 	makeEvery,
+	plannedChanges,
+	stillReadingWords,
 	planEvery,
 	readingEveryWords,
 	readyEntries,
@@ -138,7 +140,7 @@ void test('the one verb plans each league in turn, then makes each with its own 
 	assert.equal(readyEntries(entries).length, 2);
 	await makeEvery(entries);
 	assert.deepEqual(log.slice(2), ['make a token', 'reread a', 'make b token', 'reread b']);
-	assert.deepEqual(everyOutcome(entries), { set: 2, unchanged: 0 });
+	assert.deepEqual(everyOutcome(entries), { set: 2, unknown: 0, unchanged: 0 });
 	assert.equal(everyReport(everyOutcome(entries)), 'Set in 2 leagues.');
 	closeEvery(entries);
 	assert.ok(entries.every((e) => e.mover.step.kind === 'closed'));
@@ -170,10 +172,10 @@ void test('a failure or a refusal in one league never stops the others', async (
 	// The failed plan is never made; the refusal says so in its league and the next is still made.
 	assert.ok(!log.includes('make a token'));
 	assert.ok(log.includes('make c token'));
-	assert.deepEqual(everyOutcome(entries), { set: 1, unchanged: 2 });
+	assert.deepEqual(everyOutcome(entries), { set: 1, unknown: 0, unchanged: 2 });
 	assert.equal(
 		everyReport(everyOutcome(entries)),
-		'Set in 1 league. 2 did not change. Each says why below.'
+		'Set in 1 league. 2 did not change. Each league says why below.'
 	);
 });
 
@@ -188,8 +190,50 @@ void test('a move whose answer never came back is not counted as set', async () 
 	await makeEvery(entries);
 	const step = entries[0]?.mover.step;
 	assert.equal(step?.kind, 'failed');
-	assert.deepEqual(everyOutcome(entries), { set: 0, unchanged: 1 });
-	assert.equal(everyReport(everyOutcome(entries)), 'Nothing changed. Each league says why below.');
+	// The move may have left: the league is counted as maybe set, never as unchanged (review H1).
+	assert.deepEqual(everyOutcome(entries), { set: 0, unknown: 1, unchanged: 0 });
+	assert.equal(
+		everyReport(everyOutcome(entries)),
+		'1 may have been set. Its league says how to check below.'
+	);
+});
+
+void test('a move the host took but did not show yet may have been set, beside one set and one refused', async () => {
+	const log: string[] = [];
+	const PENDING: HostMoveResult = {
+		...DONE,
+		outcome: 'pending',
+		sentence:
+			'Sent to ESPN, but your lineup there did not show it when we read it back. Check your lineup on ESPN before you set it again.'
+	};
+	const entries = [
+		entry(
+			'a',
+			fakeMover('a', log, { plan: () => Promise.resolve(PLAN), make: () => Promise.resolve(DONE) })
+		),
+		entry(
+			'b',
+			fakeMover('b', log, {
+				plan: () => Promise.resolve(PLAN),
+				make: () => Promise.resolve(PENDING)
+			})
+		),
+		entry(
+			'c',
+			fakeMover('c', log, {
+				plan: () => Promise.resolve(PLAN),
+				make: () => Promise.resolve(REFUSED)
+			})
+		)
+	];
+	await planEvery(entries);
+	assert.equal(plannedChanges(readyEntries(entries)), CHANGES * 3);
+	await makeEvery(entries);
+	assert.deepEqual(everyOutcome(entries), { set: 1, unknown: 1, unchanged: 1 });
+	assert.equal(
+		everyReport(everyOutcome(entries)),
+		'Set in 1 league. 1 may have been set. Its league says how to check below. 1 did not change. Its league says why below.'
+	);
 });
 
 void test("the page's words", () => {
@@ -219,8 +263,10 @@ void test("the page's words", () => {
 	assert.equal(setEveryWords(['espn', 'espn'], 2), 'Set them on ESPN');
 	assert.equal(setEveryWords(['espn'], 1), 'Set it on ESPN');
 	assert.equal(settingEveryWords(['espn', 'ffpc']), 'Setting them on ESPN and FFPC');
+	assert.equal(stillReadingWords(1), '1 league still reading');
+	assert.equal(stillReadingWords(2), '2 leagues still reading');
 	assert.equal(
-		everyReport({ set: 1, unchanged: 1 }),
+		everyReport({ set: 1, unknown: 0, unchanged: 1 }),
 		'Set in 1 league. 1 did not change. Its league says why below.'
 	);
 	const said = [
@@ -228,7 +274,9 @@ void test("the page's words", () => {
 		NONE_READY,
 		everyLine(4, 2, ['sleeper']),
 		confirmEveryWords(5, 2),
-		everyReport({ set: 1, unchanged: 1 })
+		everyReport({ set: 1, unknown: 0, unchanged: 1 }),
+		everyReport({ set: 1, unknown: 2, unchanged: 1 }),
+		stillReadingWords(2)
 	].join(' ');
 	assert.ok(!BANNED_MARKS.test(said), said);
 	assert.ok(!BANNED_WORDS.test(said), said);

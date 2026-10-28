@@ -195,6 +195,12 @@ function attachedIds(cookie: string | undefined): string[] {
 		});
 }
 
+/** The refused and the set ESPN stand-ins' names on the account's list (Lane 257). */
+const SHOT_NAMES: Readonly<Record<string, string>> = {
+	[ESPN_REFUSED]: 'Work League (ESPN stand-in)',
+	[ESPN_SET]: 'Family League (ESPN stand-in)'
+};
+
 /** The ESPN league whose lineup is already ours: the recorded lineup with every slot kept. */
 const setLineup = (advice: LineupAdvice): LineupAdvice => ({
 	...advice,
@@ -1007,6 +1013,10 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		// Every fixture league is on the account; only the first is in the switch's list (/me), so
 		// the page names the others from this list.
 		const phased = new Map(leaguesNow().map((league) => [league.id, league]));
+		// An account the every-league shots name tells the refused ESPN league apart from the done one
+		// (Lane 257 review L4); every other list, the apps' shared fixtures among them, keeps the one
+		// stand-in name.
+		const named = ATTACHED_ASKED.test(req.headers.cookie ?? '');
 		send(
 			req,
 			res,
@@ -1018,7 +1028,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 					host: isEspn(id) ? 'espn' : (platformAsked(req, id) ?? sync.host),
 					host_league_id: sync.host_league_id,
 					season: sync.season,
-					name: league.name,
+					name: (named ? SHOT_NAMES[id] : undefined) ?? league.name,
 					roster_id: sync.me,
 					team_name: league.team_name,
 					standing: league.standing,

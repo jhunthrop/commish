@@ -40,7 +40,8 @@
 	const hasLineup = $derived(leagueScreens(league).includes('start'));
 
 	let advice = $state<LineupAdvice | null>(null);
-	let now = $state(Date.now());
+	/** The clock the lineup is drawn at: set at each read, drawn only once one has landed. */
+	let now = $state(0);
 	let refusal = $state<string | null>(null);
 	let problem = $state<string | null>(null);
 
@@ -138,13 +139,11 @@
 				{advice}
 				{now}
 				host={league.host}
-				plan={(move: HostMoveInput) => inSeasonApi.planMove(id, move)}
-				make={(move: HostMoveInput, confirm: string) => inSeasonApi.makeMove(id, move, confirm)}
-				reread={() => void read()}
 				league={id}
 				scope={id}
 				{mover}
 				{held}
+				pin={block.kind !== 'here'}
 			/>
 		</div>
 	{:else}

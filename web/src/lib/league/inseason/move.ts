@@ -95,7 +95,13 @@ export type MoveStep =
 	| { kind: 'sending'; plan: ReadyPlan }
 	| { kind: 'answered'; result: HostMoveResult }
 	| { kind: 'unavailable'; sentence: string; href: string }
-	| { kind: 'failed'; sentence: string; href: string | null };
+	| {
+			kind: 'failed';
+			sentence: string;
+			href: string | null;
+			/** The move's call got no answer, so the move may have left (Lane 257 H1). */
+			lost?: true;
+	  };
 
 /** The panel after a plan: the move to confirm, or the host's page when the API cannot make it. */
 export function planStep(plan: HostMovePlan): MoveStep {
@@ -191,7 +197,12 @@ export function failedStep(
 		return { kind: 'failed', sentence, href: null };
 	}
 	if (stage === 'make') {
-		return { kind: 'failed', sentence: lostWords(host, kind), href: href === '' ? null : href };
+		return {
+			kind: 'failed',
+			sentence: lostWords(host, kind),
+			href: href === '' ? null : href,
+			lost: true
+		};
 	}
 	return { kind: 'failed', sentence: NOT_REACHED, href: null };
 }
