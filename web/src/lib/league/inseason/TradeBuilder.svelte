@@ -448,8 +448,6 @@
 	{#if moves.reason ?? hostNote}<p class="own">{moves.reason ?? hostNote}</p>{/if}
 	<p class="own" data-basis="builder">
 		{answer?.basis ?? basis}
-		{#if answer?.rest_of_season_basis}<span class="rest-said">{answer.rest_of_season_basis}</span
-			>{/if}
 		<a href={basisHref}>{BUILDER_LINES.figures}</a>
 	</p>
 	<!-- Where the rosters stack the gains, Share and the verb are pinned to the window's foot (above the
@@ -621,14 +619,6 @@
 		font-size: var(--t-xs);
 		font-variant-numeric: tabular-nums;
 		color: var(--ink-2);
-	}
-
-	/* What the verdict's rest-of-season cells are and the rule a side takes a trade by (Lane 277),
-	   under the cells; at a desk only, as the phone draws no cell (TradeBug). */
-	@media (max-width: 760px) {
-		.rest-said {
-			display: none;
-		}
 	}
 
 	.choose {

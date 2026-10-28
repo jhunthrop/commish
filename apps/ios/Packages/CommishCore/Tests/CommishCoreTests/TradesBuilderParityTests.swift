@@ -29,6 +29,8 @@ struct TradesBuilderParityTests {
             let edited = edit.applied(to: base)
             #expect(TradeChecks.words(edited) == edit.sentence, "\(edit.name)")
             #expect(TradeChecks.refusal(edited) == edit.refusal, "\(edit.name)")
+            #expect(TradesParity.Rest(TradeRest.of(edited, mine: true)) == edit.cells.yours, "\(edit.name)")
+            #expect(TradesParity.Rest(TradeRest.of(edited, mine: false)) == edit.cells.theirs, "\(edit.name)")
         }
         // Lane 277: each side that would not take it leads its line.
         #expect(Self.parity.words.checks.contains { $0.refusal == Words.Trades.theyGiveUp })
@@ -101,6 +103,8 @@ struct TradesBuilderParityTests {
         #expect(model.sentence == web.sentence)
         #expect(model.close == web.close)
         #expect(model.own == web.own)
+        #expect(TradesParity.Rest(model.bug.yours.rest) == web.rest.yours)
+        #expect(TradesParity.Rest(model.bug.theirs.rest) == web.rest.theirs)
         #expect(BuilderParity.Box(model.yours) == web.yours)
         let theirs = try #require(model.theirs)
         #expect(BuilderParity.Box(theirs) == web.theirs)
@@ -149,6 +153,12 @@ struct BuilderParity: Decodable {
         let acceptable: Acceptable?
         let rest: Rest?
         let refusal: String?
+        let cells: Cells
+
+        struct Cells: Decodable {
+            let yours: TradesParity.Rest
+            let theirs: TradesParity.Rest
+        }
 
         struct Acceptable: Decodable {
             let yours: Bool
@@ -300,6 +310,12 @@ struct BuilderParity: Decodable {
         let yours: Box
         let theirs: TheirBox
         let pin: String
+        let rest: Rests
+    }
+
+    struct Rests: Decodable {
+        let yours: TradesParity.Rest
+        let theirs: TradesParity.Rest
     }
 
     let words: Words

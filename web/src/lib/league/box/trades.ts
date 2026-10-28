@@ -97,6 +97,9 @@ export const TRADES = {
 	theyGiveUp: 'They give up more rest of season than they get.',
 	youGiveUp: 'You give up more rest of season than you get.',
 	bothGiveUp: 'Both sides give up more rest of season than they get.',
+	/** What the verdict's rest-of-season cells are, said once in the basis with the builder open, at a
+	 * desk and on a phone alike (coordinator ruling, Lane 277). */
+	restBasis: 'Rest of season: points over the waiver level, weeks left.',
 	/** The ideas row's line for a team the finder lists no trade with (B271): every idea it found with
 	 * them, they would not take. */
 	noIdea: 'No idea they would take.'
@@ -525,6 +528,7 @@ export function tradeBasis(
 			: [];
 	return [
 		...said(advice.basis),
+		...(opened === 'builder' ? said(TRADES.restBasis) : []),
 		...(opened === 'none' ? [] : said(advice.per_game_basis)),
 		...proj,
 		...waiting,

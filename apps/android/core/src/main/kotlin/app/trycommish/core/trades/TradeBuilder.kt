@@ -228,7 +228,15 @@ object TradeBuilder {
             team = picks.team,
             bug =
                 TradeBug(
-                    TradeBugSide.of(true, inputs.me.name, check?.totals?.yours, trade?.myGain, trade?.myProjChange, room.yours),
+                    TradeBugSide.of(
+                        true,
+                        inputs.me.name,
+                        check?.totals?.yours,
+                        trade?.myGain,
+                        trade?.myProjChange,
+                        room.yours,
+                        TradeRest.of(check, mine = true),
+                    ),
                     TradeBugSide.of(
                         false,
                         team?.name.orEmpty(),
@@ -236,6 +244,7 @@ object TradeBuilder {
                         trade?.theirGain,
                         trade?.theirProjChange,
                         room.theirs,
+                        TradeRest.of(check, mine = false),
                     ),
                 ),
             sentence = sentence,

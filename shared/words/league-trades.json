@@ -40,6 +40,7 @@
 	"theyGiveUp": "They give up more rest of season than they get.",
 	"youGiveUp": "You give up more rest of season than you get.",
 	"bothGiveUp": "Both sides give up more rest of season than they get.",
+	"restBasis": "Rest of season: points over the waiver level, weeks left.",
 	"noIdea": "No idea they would take.",
 	"functions": []
 }

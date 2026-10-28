@@ -40,6 +40,8 @@ class TradesBuilderParityTest {
 
     private fun JsonObject.number(key: String): Double = getValue(key).jsonPrimitive.double
 
+    private fun webRest(web: JsonObject): List<String?> = listOf(web.text("text"), web.text("tone"), web.text("refuses"))
+
     private fun unfigured(line: PlayerLine): PlayerLine = line.copy(restOfSeasonPerGame = null)
 
     /** The fixture's check with an edit, as trades-parity.ts editedCheck makes it. */
@@ -87,6 +89,9 @@ class TradesBuilderParityTest {
             val check = edited(base, edit)
             assertEquals(edit.text("sentence"), TradeChecks.words(check), edit.text("name"))
             assertEquals(edit.text("refusal"), TradeChecks.refusal(check), edit.text("name"))
+            val cells = edit.getValue("cells").jsonObject
+            assertEquals(webRest(cells.getValue("yours").jsonObject), TradesParity.rest(TradeRest.of(check, true)), edit.text("name"))
+            assertEquals(webRest(cells.getValue("theirs").jsonObject), TradesParity.rest(TradeRest.of(check, false)), edit.text("name"))
         }
         // Lane 277: each side that would not take it leads its line.
         val refusals = checks.map { it.text("refusal") }
@@ -194,6 +199,9 @@ class TradesBuilderParityTest {
         assertEquals(web.text("sentence"), model.sentence)
         assertEquals(web.text("close"), model.close)
         assertEquals(web.text("own"), model.own)
+        val rest = web.getValue("rest").jsonObject
+        assertEquals(webRest(rest.getValue("yours").jsonObject), TradesParity.rest(model.bug.yours.rest))
+        assertEquals(webRest(rest.getValue("theirs").jsonObject), TradesParity.rest(model.bug.theirs.rest))
         assertEquals(box(web.getValue("yours").jsonObject), box(model.yours))
         val theirs = requireNotNull(model.theirs)
         val webTheirs = web.getValue("theirs").jsonObject

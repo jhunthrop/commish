@@ -275,8 +275,11 @@ struct TradesParity: Decodable {
         let name: String
         let figures: Figures
         let room: String
+        /// Its rest-of-season cell (Lane 277).
+        let rest: Rest
 
         init(_ side: TradeBugSide) {
+            rest = Rest(side.rest)
             label = side.label
             name = side.name
             let figures = side.figures
@@ -287,6 +290,19 @@ struct TradesParity: Decodable {
                 seasonTone: figures.seasonTone.rawValue
             )
             room = side.room
+        }
+    }
+
+    /// trades.ts RestFigure as the parity file writes it.
+    struct Rest: Decodable, Equatable {
+        let text: String
+        let tone: String
+        let refuses: Bool
+
+        init(_ rest: TradeRest) {
+            text = rest.text
+            tone = rest.tone.rawValue
+            refuses = rest.refuses
         }
     }
 
@@ -302,11 +318,11 @@ struct TradesParity: Decodable {
             let room = TradeChecks.room(check)
             yours = Side(TradeBugSide(
                 me: true, name: me, totals: check.totals.yours, gain: trade.myGain, projChange: trade.myProjChange,
-                room: room.yours
+                room: room.yours, rest: TradeRest.of(check, mine: true)
             ))
             theirs = Side(TradeBugSide(
                 me: false, name: team, totals: check.totals.theirs, gain: trade.theirGain,
-                projChange: trade.theirProjChange, room: room.theirs
+                projChange: trade.theirProjChange, room: room.theirs, rest: TradeRest.of(check, mine: false)
             ))
             sentence = TradeChecks.words(check)
             basis = check.basis

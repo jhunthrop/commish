@@ -276,7 +276,14 @@ internal object TradesParity {
 
     private fun side(web: JsonObject): List<Any?> {
         val figures = web.getValue("figures").jsonObject
-        return listOf(web.text("label"), web.text("name"), figureKeys.map(figures::text), web.text("room"))
+        val rest = web.getValue("rest").jsonObject
+        return listOf(
+            web.text("label"),
+            web.text("name"),
+            figureKeys.map(figures::text),
+            web.text("room"),
+            listOf(rest.text("text"), rest.text("tone"), rest.text("refuses")),
+        )
     }
 
     private fun side(side: TradeBugSide): List<Any?> {
@@ -292,8 +299,11 @@ internal object TradesParity {
                 f.seasonChange,
                 f.seasonTone.word,
             )
-        return listOf(side.label, side.name, figures, side.room)
+        return listOf(side.label, side.name, figures, side.room, rest(side.rest))
     }
+
+    /** A rest-of-season cell as the web's JSON writes it. */
+    fun rest(rest: TradeRest): List<String> = listOf(rest.text, rest.tone.word, rest.refuses.toString())
 
     /** A check as the web's JSON writes it. */
     fun check(web: JsonObject): List<Any?> =
@@ -307,8 +317,18 @@ internal object TradesParity {
     ): List<Any?> {
         val trade = check.trade
         val room = TradeChecks.room(check)
-        val yours = TradeBugSide.of(true, me, check.totals.yours, trade.myGain, trade.myProjChange, room.yours)
-        val theirs = TradeBugSide.of(false, team, check.totals.theirs, trade.theirGain, trade.theirProjChange, room.theirs)
+        val yours =
+            TradeBugSide.of(true, me, check.totals.yours, trade.myGain, trade.myProjChange, room.yours, TradeRest.of(check, true))
+        val theirs =
+            TradeBugSide.of(
+                false,
+                team,
+                check.totals.theirs,
+                trade.theirGain,
+                trade.theirProjChange,
+                room.theirs,
+                TradeRest.of(check, false),
+            )
         return listOf(side(yours), side(theirs), TradeChecks.words(check), check.basis)
     }
 }

@@ -471,36 +471,32 @@ for (const theme of THEMES) {
 			refused.line.startsWith(TRADES.theyGiveUp),
 			`${where}: the refused idea reads "${refused.line}"`
 		);
-		if (!stacked) {
-			check(
-				refused.rest.length === 2 && /^\+\d+\.\d/.test(refused.rest[0] ?? ''),
-				`${where}: rest of season cells ${refused.rest.join(' | ')}`
-			);
-			check(
-				/^−\d+\.\d/.test(refused.rest[1] ?? ''),
-				`${where}: their rest of season ${refused.rest[1] ?? ''}`
-			);
+		// Both sides' rest of season, at a desk and on a phone (coordinator ruling): the tag beside
+		// theirs at a desk, the pinned sentence on a phone.
+		check(
+			refused.rest.length === 2 && /^\+\d+\.\d/.test(refused.rest[0] ?? ''),
+			`${where}: rest of season cells ${refused.rest.join(' | ')}`
+		);
+		check(
+			/^−\d+\.\d/.test(refused.rest[1] ?? ''),
+			`${where}: their rest of season ${refused.rest[1] ?? ''}`
+		);
+		if (!stacked)
 			check(
 				(refused.rest[1] ?? '').includes(TRADES.wouldNotTake),
 				`${where}: their cell is not tagged ${TRADES.wouldNotTake}`
 			);
-		} else {
-			// The phone draws no cell, as its basis has no room for its sentence; the pin says why.
-			check(refused.rest.length === 0, `${where}: a rest-of-season cell on the phone`);
+		else
 			check(refused.pin.startsWith(TRADES.theyGiveUp), `${where}: the pin reads "${refused.pin}"`);
-		}
 		const refusedCut = await cutText(page);
 		check(
 			refusedCut.length === 0,
 			`${where}: cut text in the refused verdict ${refusedCut.join(' | ')}`
 		);
-		if (!stacked)
-			check(
-				(await page.locator('main [data-basis="builder"]').innerText()).includes(
-					'A side takes a trade that costs it'
-				),
-				`${where}: the builder's line leaves out the rest-of-season rule`
-			);
+		check(
+			refused.basis.includes(TRADES.restBasis),
+			`${where}: the basis leaves out what rest of season is`
+		);
 		taps.push(`${where}: refused, ${refused.line} | ${refused.rest.join(' | ')}`);
 		await page.screenshot({
 			path: new URL(`trades-${theme}-${String(width)}-refused-window.png`, out).pathname

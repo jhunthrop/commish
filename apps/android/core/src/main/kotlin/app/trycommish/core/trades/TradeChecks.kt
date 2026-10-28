@@ -60,6 +60,8 @@ data class TradeBugSide(
     val mine: Boolean,
     val figures: TradeFigures,
     val room: String,
+    /** Its rest of season (Lane 277). */
+    val rest: TradeRest,
 ) {
     companion object {
         fun of(
@@ -69,6 +71,7 @@ data class TradeBugSide(
             gain: Double?,
             projChange: Double?,
             room: String,
+            rest: TradeRest,
         ): TradeBugSide =
             TradeBugSide(
                 label = if (me) Words.Trades.yourSide else Words.Trades.theirSide,
@@ -77,7 +80,32 @@ data class TradeBugSide(
                 mine = me,
                 figures = TradeFigures.of(totals, gain, projChange),
                 room = room,
+                rest = rest,
             )
+    }
+}
+
+/** A side's rest-of-season cell (trades.ts restFigure, Lane 277): its change over the weeks the check
+ * covers, toned, and whether that side would not take the trade. Before an answer the none mark; on an
+ * answer without the figure (an older API) empty, never a figure we did not read. */
+data class TradeRest(
+    val text: String,
+    val tone: Tone,
+    val refuses: Boolean,
+) {
+    companion object {
+        private val NONE = TradeRest(Words.Box.none, Tone.Even, false)
+
+        fun of(
+            check: TradeCheck?,
+            mine: Boolean,
+        ): TradeRest {
+            if (check == null) return NONE
+            val trade = check.trade
+            val rest = (if (mine) trade.myRestOfSeason else trade.theirRestOfSeason) ?: return TradeRest("", Tone.Even, false)
+            val takes = check.acceptable?.let { if (mine) it.yours else it.theirs }
+            return TradeRest(TradesWords.gain(rest), TradesWords.tone(rest), takes == false)
+        }
     }
 }
 

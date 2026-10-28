@@ -298,21 +298,26 @@
 			display: none;
 		}
 
-		/* The phone's basis has no room for what rest of season is within its eight lines, so the cell
-		   goes with its sentence (the 2026-10-19 rule); the line under the rows and the pin say who
-		   would not take the trade. */
-		.rest,
-		.rest-head {
+		/* The pinned line under the rows says who would not take it; the cell keeps its figure. */
+		.refuses {
 			display: none;
 		}
 
+		/* The rest-of-season head in two short lines, so its cell takes the figure's width. */
+		thead th.rest-head {
+			white-space: normal;
+			width: 3.5em;
+			line-height: 1.15;
+			height: auto;
+		}
+
 		.bar {
-			width: 28px;
+			width: 20px;
 		}
 
 		th,
 		td {
-			padding-right: var(--s-2);
+			padding-right: 6px;
 		}
 
 		/* The team's name whole, on a second line where it is long, never cut. */
@@ -344,7 +349,7 @@
 		}
 
 		.figs {
-			gap: 4px;
+			gap: 3px;
 		}
 
 		i,
@@ -353,6 +358,7 @@
 		}
 
 		em {
+			padding: 0 3px;
 			font-size: var(--t-xs);
 		}
 	}

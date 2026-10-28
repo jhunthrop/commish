@@ -37,6 +37,30 @@ public struct TradeFigures: Equatable, Sendable {
     }
 }
 
+/// A side's rest-of-season cell (trades.ts restFigure, Lane 277): its change over the weeks the check
+/// covers, toned, and whether that side would not take the trade. Before an answer the none mark; on an
+/// answer without the figure (an older API) empty, never a figure we did not read.
+public struct TradeRest: Equatable, Sendable {
+    public let text: String
+    public let tone: Tone
+    public let refuses: Bool
+
+    static let none = TradeRest(text: Words.Box.none, tone: .even, refuses: false)
+
+    static func of(_ check: TradeCheck?, mine: Bool) -> TradeRest {
+        guard let check else {
+            return none
+        }
+        let trade = check.trade.value1
+        guard let rest = mine ? trade.myRestOfSeason : trade.theirRestOfSeason else {
+            return TradeRest(text: "", tone: .even, refuses: false)
+        }
+        let acceptable = check.acceptable?.value1
+        let takes = mine ? acceptable?.yours : acceptable?.theirs
+        return TradeRest(text: TradesWords.gain(rest), tone: TradesWords.tone(rest), refuses: takes == false)
+    }
+}
+
 /// One half of the scoreboard: You or With, the team, its figures and its room.
 public struct TradeBugSide: Equatable, Sendable {
     public let label: String
@@ -45,10 +69,14 @@ public struct TradeBugSide: Equatable, Sendable {
     public let mine: Bool
     public let figures: TradeFigures
     public let room: String
+    /// Its rest of season (Lane 277).
+    public let rest: TradeRest
 
     init(
-        me: Bool, name: String, totals: TradeSideTotals?, gain: Double?, projChange: Double?, room: String
+        me: Bool, name: String, totals: TradeSideTotals?, gain: Double?, projChange: Double?, room: String,
+        rest: TradeRest
     ) {
+        self.rest = rest
         label = me ? Words.Trades.yourSide : Words.Trades.theirSide
         self.name = name
         initials = Initials.of(name)

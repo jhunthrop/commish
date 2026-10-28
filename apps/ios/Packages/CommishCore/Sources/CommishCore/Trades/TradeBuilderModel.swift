@@ -214,11 +214,12 @@ enum TradeBuilder {
             bug: TradeBug(
                 yours: TradeBugSide(
                     me: true, name: inputs.me.name, totals: check?.totals.yours, gain: trade?.myGain,
-                    projChange: trade?.myProjChange, room: room.yours
+                    projChange: trade?.myProjChange, room: room.yours, rest: TradeRest.of(check, mine: true)
                 ),
                 theirs: TradeBugSide(
                     me: false, name: team?.name ?? "", totals: check?.totals.theirs, gain: trade?.theirGain,
-                    projChange: trade?.theirProjChange, room: room.theirs
+                    projChange: trade?.theirProjChange, room: room.theirs,
+                    rest: TradeRest.of(check, mine: false)
                 )
             ),
             sentence: sentence,

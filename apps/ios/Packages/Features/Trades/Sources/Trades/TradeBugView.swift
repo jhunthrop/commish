@@ -37,6 +37,9 @@ struct TradeBugView: View {
             HStack(alignment: .top, spacing: Tokens.Space.s4) {
                 figure(Words.Trades.weekHead, Swing.week(side.figures), theme: theme)
                 figure(Words.Trades.gainHead, Swing.season(side.figures), theme: theme)
+                if !side.rest.text.isEmpty {
+                    rest(side.rest, theme: theme)
+                }
                 Spacer(minLength: 0)
             }
         }
@@ -58,6 +61,20 @@ struct TradeBugView: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+        }
+    }
+
+    /// "REST OF SEASON" over "−14.4" in its ink (TradeBug.svelte's phone cell, Lane 277); who would not
+    /// take it is the builder's line and its pin, as the web's phone says it.
+    private func rest(_ rest: TradeRest, theme: Theme) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            label(Words.Trades.restHead, theme: theme)
+            Text(rest.text)
+                .bold()
+                .foregroundStyle(ink(rest.tone, theme: theme))
+                .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .medium))
+                .monospacedDigit()
+                .lineLimit(1)
         }
     }
 

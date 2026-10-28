@@ -27,6 +27,8 @@ enum TradesBasis {
         let open = facts.opened != .none
         let parts: [String?] = [
             advice.basis,
+            // What the verdict's rest-of-season cells are, with the builder open (Lane 277).
+            facts.opened == .builder ? Words.Trades.restBasis : nil,
             open ? advice.perGameBasis : nil,
             arrives(facts) ?? proj(facts),
             finals(facts),

@@ -473,6 +473,7 @@ public enum Words {
         public static let theyGiveUp = "They give up more rest of season than they get."
         public static let youGiveUp = "You give up more rest of season than you get."
         public static let bothGiveUp = "Both sides give up more rest of season than they get."
+        public static let restBasis = "Rest of season: points over the waiver level, weeks left."
         public static let noIdea = "No idea they would take."
     }
 

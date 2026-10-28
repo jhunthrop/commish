@@ -407,7 +407,7 @@ void test("a trade opened or the builder open adds the players' columns, each on
 	);
 	assert.equal(
 		basisText(parts),
-		`${advice.basis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. ${advice.basis_note} ${WEEK_ROOM} How the order has done`
+		`${advice.basis} ${TRADES.restBasis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. ${advice.basis_note} ${WEEK_ROOM} How the order has done`
 	);
 	assert.deepEqual(
 		parts.filter((p) => p.href !== undefined).map((p) => p.href),
@@ -569,4 +569,13 @@ void test('the answer line leads with the side that would not take it (Lane 277)
 	assert.equal(refusalWords(undefined), null);
 	assert.equal(TRADES.theyGiveUp, 'They give up more rest of season than they get.');
 	assert.equal(TRADES.noIdea, 'No idea they would take.');
+});
+
+void test('what rest of season is, said once with the builder open, desk and phone alike (Lane 277)', () => {
+	for (const opened of ['none', 'trade'] as const) {
+		const parts = tradeBasis(advice, 'sleeper', [], opened, TRADE_LINKS, TRADE_CLOCK, NOW_66T);
+		assert.doesNotMatch(basisText(parts), /Rest of season:/, opened);
+	}
+	const built = tradeBasis(advice, 'sleeper', [], 'builder', TRADE_LINKS, TRADE_CLOCK, NOW_66T);
+	assert.deepEqual(built[1], { text: TRADES.restBasis, phone: true });
 });
