@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -104,6 +105,8 @@ internal fun SheetRowView(
     open: Boolean,
     actions: SheetRowActions,
     editable: Boolean = true,
+    /** A retry is on its way: Try again is held, so a second tap sends nothing. */
+    retrying: Boolean = false,
 ) {
     val c = CommishTheme.colors
     Column(Modifier.fillMaxWidth().background(if (open) c.surface2 else c.surface)) {
@@ -115,7 +118,7 @@ internal fun SheetRowView(
             Who(line, Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = line.name) { actions.open(line.player) })
             Place(line, open, editable) { actions.toggle(line.id) }
         }
-        line.save.words?.let { SaveLine(it, line.save is RowSave.Unsaved, actions.retry) }
+        line.save.words?.let { SaveLine(it, line.save is RowSave.Unsaved, retrying, actions.retry) }
         line.notices.forEach { Under(it, c.ink3) }
         Hairline()
     }
@@ -211,6 +214,7 @@ private fun Place(
 private fun SaveLine(
     words: String,
     unsaved: Boolean,
+    retrying: Boolean,
     retry: () -> Unit,
 ) {
     val c = CommishTheme.colors
@@ -220,7 +224,7 @@ private fun SaveLine(
         horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp),
     ) {
         Text(words, style = underStyle(), color = if (unsaved) c.lossInk else c.ink3, modifier = Modifier.weight(1f))
-        if (unsaved) QuietButton(SheetWords.tryAgain, onClick = retry)
+        if (unsaved) QuietButton(SheetWords.tryAgain, enabled = !retrying, onClick = retry)
     }
 }
 
@@ -285,27 +289,39 @@ internal fun SheetEditor(
     Hairline()
 }
 
-/** His note: typed in place, written when the field lets go of the keyboard or the editor closes. */
+/** His note: typed in place, and written when the field lets go of the keyboard or the editor closes only
+ * where the member typed something other than what the field holds from the account (NoteDraft); while the
+ * field is not being typed in it follows the account's note, so a refresh, a retry's merge or an import under
+ * it is never written back. */
 @Composable
 private fun NoteField(
     line: SheetLine,
     live: Boolean,
     write: (String) -> Unit,
 ) {
-    var note by remember(line.id) { mutableStateOf(line.note.orEmpty()) }
-    val latest by rememberUpdatedState(note)
+    var draft by remember(line.id) { mutableStateOf(NoteDraft.opened(line.note)) }
+    LaunchedEffect(line.note) { draft = draft.follow(line.note) }
+    val latest by rememberUpdatedState(draft)
     val writeNow by rememberUpdatedState(write)
     if (live) {
-        DisposableEffect(line.id) { onDispose { writeNow(latest) } }
+        DisposableEffect(line.id) { onDispose { latest.commit().second?.let(writeNow) } }
     }
     SheetField(
-        note,
+        draft.text,
         SheetWords.notePlaceholder,
         live,
         Modifier.fillMaxWidth(),
         lines = NOTE_LINES,
-        focusLost = { write(note) },
-    ) { note = it }
+        focusChanged = { focused ->
+            if (focused) {
+                draft = draft.focus(true)
+            } else {
+                val (next, typed) = draft.focus(false).commit()
+                draft = if (typed == null) next.follow(line.note) else next
+                typed?.let(write)
+            }
+        },
+    ) { draft = draft.typed(it) }
 }
 
 private val NOTE_LINES = 2..4
@@ -321,7 +337,7 @@ internal fun SheetField(
     modifier: Modifier = Modifier,
     lines: IntRange = 1..1,
     style: TextStyle = Faces.body,
-    focusLost: () -> Unit = {},
+    focusChanged: (Boolean) -> Unit = {},
     onDone: () -> Unit = {},
     change: (String) -> Unit,
 ) {
@@ -357,7 +373,7 @@ internal fun SheetField(
             frame
                 .semantics { contentDescription = placeholder }
                 .onFocusChanged { state ->
-                    if (focused && !state.isFocused) focusLost()
+                    if (focused != state.isFocused) focusChanged(state.isFocused)
                     focused = state.isFocused
                 },
         decorationBox = { field ->

@@ -149,7 +149,7 @@ private fun RowAndEditor(
 ) {
     val open = view.ui.openRow == line.id
     Column {
-        SheetRowView(line, open, actions.row)
+        SheetRowView(line, open, actions.row, retrying = view.ui.retrying)
         if (open) SheetEditor(line, model.ownTags, actions.row, live)
     }
 }

@@ -27,6 +27,8 @@ const PHONE_OWN: Readonly<Record<string, string>> = {
 	'h:mm a': 'a date format, not a word',
 	'No connection.': 'the reason an edit did not reach the account; the web has no request to fail',
 	'Try again in a minute.': 'the reason when the account answered nothing readable',
+	'The file could not be saved on this phone.':
+		"the export's file could not be written for the share sheet; the web's browser downloads it",
 	'Edit ': "a screen reader's label for the row's disclosure, which the web's row has no need of",
 	'No player read, so your sheet is as it was.':
 		'a file the phone read no player from is not sent; the web disables its verb instead',

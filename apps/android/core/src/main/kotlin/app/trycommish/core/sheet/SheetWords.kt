@@ -137,6 +137,12 @@ object SheetWords {
     const val cancel = "Cancel"
     const val done = "Done"
     const val tooLarge = "That file is over 1 MB"
+
+    /** FilePick.svelte's words beside the button until a file is chosen. */
+    const val noFile = "No file chosen"
+
+    /** The phone's own: the export's file could not be kept on the phone for the share sheet. */
+    const val notKept = "The file could not be saved on this phone."
     const val unreadable = "That file does not read as CSV"
 
     /** How many skipped rows the result names before it counts the rest (SKIPS_SHOWN). */

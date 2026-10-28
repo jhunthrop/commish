@@ -80,6 +80,12 @@ data class SheetImportWords(
     }
 }
 
+/** A CSV chosen from the phone's files: the name the picker gives it and the text it read as. */
+data class ChosenFile(
+    val name: String,
+    val text: String,
+)
+
 /** The import panel (ImportPanel.svelte): closed, open with what was refused, the CSV on its way, or what
  * the import read and skipped. */
 sealed interface SheetImport {

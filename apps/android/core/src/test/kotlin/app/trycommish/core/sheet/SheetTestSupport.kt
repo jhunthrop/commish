@@ -9,6 +9,7 @@ import app.trycommish.core.board.StubRunReads
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import java.io.File
 import java.nio.file.Files
 import java.time.ZoneId
 
@@ -31,6 +32,7 @@ fun sheetViewModel(
     cache: MemoryCache = MemoryCache(),
     format: BoardFormat = BoardFormat.ppr,
     ends: SessionEnd = Ends(),
+    exports: File = Files.createTempDirectory("sheet-exports").toFile(),
 ): SheetViewModel =
     SheetViewModel(
         SheetDeps(
@@ -39,7 +41,7 @@ fun sheetViewModel(
             cache = cache,
             clock = FixedClock(SheetClock.now),
             zone = SHEET_ZONE,
-            exports = Files.createTempDirectory("sheet-exports").toFile(),
+            exports = exports,
             io = io,
         ),
         format,

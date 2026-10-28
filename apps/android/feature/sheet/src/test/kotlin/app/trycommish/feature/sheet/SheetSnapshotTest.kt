@@ -193,7 +193,7 @@ private object SheetScenes {
             }
         }
         val ui = vm.ui.value
-        return SheetView(ui, vm.model(ui), ui.formatLabel(vm.format), ui.stampWords(zone))
+        return SheetView(ui, vm.model(ui), ui.formatLabel, ui.stampWords(zone))
     }
 }
 

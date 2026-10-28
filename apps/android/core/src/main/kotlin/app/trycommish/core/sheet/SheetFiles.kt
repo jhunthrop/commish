@@ -8,6 +8,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
@@ -20,7 +21,7 @@ internal suspend fun SheetViewModel.readBoard() {
     update { it.copy(board = SheetBoard.Loading) }
     val board =
         try {
-            SheetStart.rows(deps.run, format)?.let { SheetBoard.Ready(it) } ?: SheetBoard.None
+            SheetStart.rows(deps.run, ui.value.start)?.let { SheetBoard.Ready(it) } ?: SheetBoard.None
         } catch (e: CancellationException) {
             throw e
         } catch (e: Unauthorized) {
@@ -41,7 +42,7 @@ fun SheetViewModel.start(): Job? {
     update { it.copy(starting = true, startProblem = null) }
     return viewModelScope.launch {
         try {
-            val made = reads().create(SheetWords.defaultName, format, board.entries.map { it.input })
+            val made = reads().create(SheetWords.defaultName, ui.value.start, board.entries.map { it.input })
             update { it.shown(made, deps.clock.now(), false) }
             keep()
         } catch (e: CancellationException) {
@@ -66,27 +67,29 @@ fun SheetViewModel.openImport() {
 }
 
 fun SheetViewModel.closeImport() {
-    if (ui.value.importing != SheetImport.Sending) update { it.copy(importing = SheetImport.Closed, pasted = "") }
+    if (ui.value.importing != SheetImport.Sending) update { it.copy(importing = SheetImport.Closed, pasted = "", chosen = null) }
 }
 
-/** The paste box as typed. */
-fun SheetViewModel.paste(text: String) = update { it.copy(pasted = text) }
+/** The paste box as typed: the last way in is the one the verb sends, so a chosen file is let go. */
+fun SheetViewModel.paste(text: String) = update { it.copy(pasted = text, chosen = null) }
 
-/** A chosen file read into the paste box, so the verb replaces the sheet with what the box shows: refused
- * past 1 MB (files.ts readCsvFile) or when it is not UTF-8 text. */
-fun SheetViewModel.chose(file: ByteArray) {
+/** A chosen file read and held under its name, which the panel says beside the button (FilePick.svelte);
+ * the verb sends its text, which never fills the paste box. Refused past 1 MB (files.ts readCsvFile) or
+ * when it is not UTF-8 text. */
+fun SheetViewModel.chose(
+    file: ByteArray,
+    name: String,
+) {
     if (file.size > SheetLimits.CSV_BYTES) {
-        update { it.copy(importing = SheetImport.Open(SheetWords.tooLarge)) }
+        update { it.copy(importing = SheetImport.Open(SheetWords.tooLarge), chosen = null) }
         return
     }
     val text = utf8(file)
     update {
-        if (text ==
-            null
-        ) {
-            it.copy(importing = SheetImport.Open(SheetWords.unreadable))
+        if (text == null) {
+            it.copy(importing = SheetImport.Open(SheetWords.unreadable), chosen = null)
         } else {
-            it.copy(pasted = text, importing = SheetImport.Open())
+            it.copy(chosen = ChosenFile(name, text), importing = SheetImport.Open())
         }
     }
 }
@@ -138,7 +141,7 @@ private suspend fun SheetViewModel.send(text: String) {
         val id =
             ui.value.detail
                 ?.id
-                ?.toString() ?: reads().create(SheetWords.defaultName, format, emptyList()).let { sheet ->
+                ?.toString() ?: reads().create(SheetWords.defaultName, ui.value.start, emptyList()).let { sheet ->
                 made = sheet.id.toString()
                 update { it.shown(sheet, deps.clock.now(), false) }
                 sheet.id.toString()
@@ -152,6 +155,7 @@ private suspend fun SheetViewModel.send(text: String) {
                         notices = emptyMap(),
                         save = SheetSave.Idle,
                         pasted = "",
+                        chosen = null,
                         importing = SheetImport.Done(words(result, null)),
                     ).shown(result.sheet, deps.clock.now(), false)
             }
@@ -216,15 +220,7 @@ fun SheetViewModel.exportFile(): Job? {
             try {
                 val link = reads().export(id)
                 val bytes = reads().download(link.url)
-                val name = File(link.fileName).name.ifEmpty { EXPORT_NAME }
-                val file = File(deps.exports, name)
-                withContext(deps.io) {
-                    // One file kept at a time: an earlier export (perhaps another account's) is let go.
-                    deps.exports.listFiles()?.forEach { it.delete() }
-                    deps.exports.mkdirs()
-                    file.writeBytes(bytes)
-                }
-                SheetExport.Ready(file)
+                kept(File(link.fileName).name.ifEmpty { EXPORT_NAME }, bytes)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Unauthorized) {
@@ -238,6 +234,25 @@ fun SheetViewModel.exportFile(): Job? {
         update { it.copy(export = export) }
     }
 }
+
+/** The export's bytes kept on the phone for the share sheet, one file at a time (an earlier export, perhaps
+ * another account's, is let go); a write the phone refuses (no room, the folder gone) says so in its own
+ * words, never as no connection. */
+private suspend fun SheetViewModel.kept(
+    name: String,
+    bytes: ByteArray,
+): SheetExport =
+    try {
+        val file = File(deps.exports, name)
+        withContext(deps.io) {
+            deps.exports.listFiles()?.forEach { it.delete() }
+            deps.exports.mkdirs()
+            file.writeBytes(bytes)
+        }
+        SheetExport.Ready(file)
+    } catch (e: IOException) {
+        SheetExport.Failed(SheetWords.notKept)
+    }
 
 /** The share sheet closed. */
 fun SheetViewModel.finishExport() = update { it.copy(export = SheetExport.Idle) }

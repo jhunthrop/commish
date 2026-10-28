@@ -39,7 +39,10 @@ object SheetCsv {
     /** The byte-order mark a header may open with, named by its code. */
     private val byteOrderMark = BYTE_ORDER_MARK_CODE.toChar()
 
-    /** JavaScript's decimal number grammar for a trimmed cell (Number), so "1d" or "0x1p3" are not ranks. */
+    /** A decimal number for a trimmed cell, as the web's Number reads a decimal ("1.0" and "1e0" are 1). A
+     * hex cell, which Number also takes, is refused here as the API's integer read (strconv.Atoi) refuses
+     * it, and Java's suffixes ("1d") are never a number. The API refuses "1.0" too (Lane 267 review M3, the
+     * API's to settle). */
     private val decimal = Regex("^[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?$")
 
     /** The file read as the web reads it; throws [HeaderError] when the header cannot be used. */

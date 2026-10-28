@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -62,10 +63,11 @@ fun sheetFormat(shell: ShellState): BoardFormat {
 }
 
 /**
- * The Cheat sheet tab (the iOS SheetTab): its own view model per start format, which keeps an unsaved edit
- * and the open row while the player sheet is over it. The saved sheet at once, then the account's; a pull
- * reads again; a row's face and name open the one player sheet, which keeps him as the sheet reads again
- * under it; a CSV chosen through the system's picker fills the import's paste box; the export is handed to
+ * The Cheat sheet tab (the iOS SheetTab): one view model for the tab, which keeps an unsaved edit and the
+ * open row while the player sheet is over it and when the league shown changes; the league's format is a
+ * value it reads only for an empty sheet's start. The saved sheet at once, then the account's; a pull reads
+ * again; a row's face and name open the one player sheet, which keeps him as the sheet reads again under it;
+ * a CSV chosen through the system's picker is held under its name for the import; the export is handed to
  * the share sheet through the app's file provider; the pinned verb opens a mock draft's setup.
  */
 @Composable
@@ -75,7 +77,8 @@ fun SheetTab(
     openMock: () -> Unit,
 ) {
     val format = sheetFormat(shell)
-    val vm: SheetViewModel = viewModel(key = "sheet-${format.value}") { graph.sheetViewModel(format) }
+    val vm: SheetViewModel = viewModel(key = "sheet") { graph.sheetViewModel(format) }
+    LaunchedEffect(format) { vm.startIn(format) }
     val ui by vm.ui.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     val sheet = LocalPlayerSheet.current
@@ -86,7 +89,12 @@ fun SheetTab(
     LaunchedEffect(model?.lines) { model?.let { sheet.parentRefreshed(it.lines.map { line -> line.player }) } }
     val picker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            uri?.let { scope.launch { vm.chose(withContext(Dispatchers.IO) { readPicked(context, it) }) } }
+            uri?.let {
+                scope.launch {
+                    val (bytes, name) = withContext(Dispatchers.IO) { readPicked(context, it) to nameOf(context, it) }
+                    vm.chose(bytes, name)
+                }
+            }
         }
     val ready = ui.export as? SheetExport.Ready
     LaunchedEffect(ready) {
@@ -96,7 +104,7 @@ fun SheetTab(
         }
     }
     SheetScreen(
-        view = SheetView(ui, model, ui.formatLabel(vm.format), ui.stampWords(graph.zone)),
+        view = SheetView(ui, model, ui.formatLabel, ui.stampWords(graph.zone)),
         refreshing = refreshing && ui.phase == SheetPhase.Ready,
         actions =
             SheetActions(
@@ -142,6 +150,23 @@ private fun readPicked(
         Log.w(TAG, "read a picked sheet", e)
         UNREADABLE
     }
+
+/** The picked file's name as the phone's files show it, else the last part of its address. */
+private fun nameOf(
+    context: Context,
+    uri: Uri,
+): String {
+    val shown =
+        try {
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "name a picked sheet", e)
+            null
+        }
+    return shown ?: uri.lastPathSegment.orEmpty()
+}
 
 private fun readAtMost(
     stream: InputStream,

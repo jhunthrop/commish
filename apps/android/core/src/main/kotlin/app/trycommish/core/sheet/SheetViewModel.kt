@@ -52,11 +52,11 @@ class SheetDeps(
  */
 class SheetViewModel(
     internal val deps: SheetDeps,
-    /** The format an empty sheet starts in: the selected league's, else the account's, else PPR. */
-    val format: BoardFormat,
+    /** The format an empty sheet starts in at first; the tab moves it as the league shown changes. */
+    start: BoardFormat,
     private val sessionEnd: SessionEnd,
 ) : ViewModel() {
-    internal val mutableUi = MutableStateFlow(SheetUi())
+    internal val mutableUi = MutableStateFlow(SheetUi(start = start))
     private val mutableRefreshing = MutableStateFlow(false)
 
     /** The edits the write on its way carries. */
@@ -68,7 +68,18 @@ class SheetViewModel(
     val refreshing: StateFlow<Boolean> = mutableRefreshing.asStateFlow()
 
     /** The sheet as the screen draws it at the clock; null while the account has no sheet. */
-    fun model(ui: SheetUi = this.ui.value): SheetModel? = ui.model(format, deps.clock.now(), deps.zone)
+    fun model(ui: SheetUi = this.ui.value): SheetModel? = ui.model(deps.clock.now(), deps.zone)
+
+    /** The format an empty sheet starts in, as the league shown sets it: a value read only for that start
+     * (iOS reads it the same way), so the sheet, its unsaved edits and the open row stay as they are; an empty
+     * sheet's preview reads our board in the new format. */
+    fun startIn(format: BoardFormat): Job? {
+        val ui = ui.value
+        if (ui.start == format) return null
+        update { it.copy(start = format) }
+        if (ui.phase != SheetPhase.Ready || ui.detail != null) return null
+        return viewModelScope.launch { readBoard() }
+    }
 
     /** What the cache keeps: the sheet, or none when the account has none. */
     @Serializable
@@ -100,6 +111,8 @@ class SheetViewModel(
             // A write on its way answers with the account's sheet itself; the read is left to it, so its edits
             // are not held against rows it is about to replace and sent a second time.
             if (ui.value.save == SheetSave.Saving) return
+            // A slow read passed by a write's answer would step the sheet back.
+            if (ui.value.older(fresh)) return
             update { ui ->
                 val merged = ui.merged(fresh)
                 // Every unsaved edit already on the account (or its row taken off there): nothing is left
@@ -135,14 +148,21 @@ class SheetViewModel(
     /** A row's editor opened, or closed when it is the one open. */
     fun toggle(row: String) = update { it.copy(openRow = if (it.openRow == row) null else row) }
 
-    // Edits.
+    // Edits. The rows are held while an import is on its way: its answer replaces them all.
+
+    /** His row as it is drawn, while the rows can be edited. */
+    private fun editable(id: String): SheetEntry? =
+        ui.value
+            .takeIf { it.canEdit }
+            ?.entries
+            ?.firstOrNull { it.id == id }
 
     /** His note set, or cleared when empty (model.ts setNote); nothing when it reads the same. */
     fun setNote(
         id: String,
         text: String,
     ): Job? {
-        val entry = ui.value.entries.firstOrNull { it.id == id } ?: return null
+        val entry = editable(id) ?: return null
         val note = text.trim().take(SheetLimits.NOTE).ifEmpty { null }
         if (note == entry.note) return null
         return annotate(entry, entry.tags, note)
@@ -153,7 +173,7 @@ class SheetViewModel(
         id: String,
         tag: String,
     ): Boolean {
-        val entry = ui.value.entries.firstOrNull { it.id == id } ?: return true
+        val entry = editable(id) ?: return true
         val tags = SheetTags.toggled(entry.tags, tag) ?: return false
         annotate(entry, tags, entry.note)
         return true
@@ -166,13 +186,14 @@ class SheetViewModel(
     ): String? {
         val tag = SheetTags.canonical(typed)
         SheetTags.problem(tag)?.let { return it }
-        val entry = ui.value.entries.firstOrNull { it.id == id } ?: return null
+        val entry = editable(id) ?: return null
         if (SheetTags.has(entry.tags, tag)) return null
         return if (toggleTag(id, tag)) null else SheetWords.full
     }
 
     /** His row taken off the sheet. */
     fun remove(id: String): Job? {
+        if (!ui.value.canEdit) return null
         update { it.copy(openRow = null) }
         val account = ui.value.accountRow(id) ?: return null
         update { it.copy(notices = it.notices - id, edits = it.edits + (id to SheetEdit(it.edits[id]?.base ?: account, null))) }
@@ -195,17 +216,20 @@ class SheetViewModel(
                     ui.edits +
                         (entry.id to SheetEdit(ui.edits[entry.id]?.base ?: account, entry.with(tags, note)))
                 }
-            ui.copy(notices = ui.notices - entry.id, edits = edits)
+            // An edit taken back to what the account holds leaves nothing unsaved: the head stops saying so.
+            val save = if (edits.isEmpty() && ui.save is SheetSave.Failed) SheetSave.Idle else ui.save
+            ui.copy(notices = ui.notices - entry.id, edits = edits, save = save)
         }
         return viewModelScope.launch { write() }
     }
 
-    /** Every row written in one request guarded by the sheet's stamp; an edit made while it is on its way is
-     * written after it. */
+    /** Every row written in one request guarded by the sheet's stamp, one write at a time: an edit made while
+     * one is on its way is written after it, and one made while a retry reads the sheet is written by the
+     * retry. */
     internal suspend fun write() {
         val ui = ui.value
         val sheet = ui.detail ?: return
-        if (ui.edits.isEmpty() || ui.save == SheetSave.Saving) return
+        if (ui.edits.isEmpty() || ui.save == SheetSave.Saving || ui.retrying) return
         sending = ui.edits
         update { it.copy(save = SheetSave.Saving) }
         try {
@@ -239,33 +263,48 @@ class SheetViewModel(
     }
 
     /** The unsaved edits written again over the account's sheet read afresh: it may have changed on another
-     * device while the edit waited, signal or not, so the edits are merged into it field by field first. */
+     * device while the edit waited, signal or not, so the edits are merged into it field by field first. One
+     * retry at a time: a second tap while one is on its way does nothing (the screen holds the button). */
     fun retry(): Job? {
-        val failed = ui.value.save as? SheetSave.Failed ?: return null
-        val id =
-            ui.value.detail
-                ?.id
-                ?.toString() ?: return null
+        val now = ui.value
+        val failed = now.save as? SheetSave.Failed ?: return null
+        if (now.retrying) return null
+        val id = now.detail?.id?.toString() ?: return null
+        update { it.copy(retrying = true) }
         return viewModelScope.launch {
-            try {
-                val fresh = reads().sheet(id)
-                update { it.merged(fresh).shown(fresh, deps.clock.now(), false) }
-                keep()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Unauthorized) {
-                signOut()
-                return@launch
-            } catch (
-                @Suppress("TooGenericExceptionCaught") e: Exception,
-            ) {
-                update { it.copy(save = SheetSave.Failed(reason(e), failed.changed)) }
-                return@launch
-            }
+            val read = readForRetry(id, failed)
+            update { it.copy(retrying = false) }
+            // Nothing to write after a failed read; a write already on its way carries the edits.
+            if (!read || ui.value.save == SheetSave.Saving) return@launch
             update { it.copy(save = SheetSave.Idle) }
             write()
         }
     }
+
+    /** The sheet read again and the edits merged into it, unless the read is older than the copy shown;
+     * false when the read failed. */
+    private suspend fun readForRetry(
+        id: String,
+        failed: SheetSave.Failed,
+    ): Boolean =
+        try {
+            val fresh = reads().sheet(id)
+            if (!ui.value.older(fresh)) {
+                update { it.merged(fresh).shown(fresh, deps.clock.now(), false) }
+                keep()
+            }
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Unauthorized) {
+            signOut()
+            false
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            update { it.copy(save = SheetSave.Failed(reason(e), failed.changed)) }
+            false
+        }
 
     // Failures and the state.
 

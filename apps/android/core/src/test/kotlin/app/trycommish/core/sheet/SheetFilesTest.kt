@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.nio.file.Files
 
 /**
  * The cheat sheet's import, export and empty sheet over a stub account at a fixed clock, as the iOS ones are
@@ -130,13 +131,62 @@ class SheetFilesTest {
             val (stub, vm) = loaded()
             vm.importCsv("x".repeat(SheetLimits.CSV_BYTES + 1))
             assertEquals(SheetImport.Open(SheetWords.tooLarge), vm.ui.value.importing)
-            vm.chose(ByteArray(SheetLimits.CSV_BYTES + 1))
+            vm.chose(ByteArray(SheetLimits.CSV_BYTES + 1), "big.csv")
             assertEquals(SheetImport.Open(SheetWords.tooLarge), vm.ui.value.importing)
-            vm.chose(byteArrayOf(0xFF.toByte()))
+            vm.chose(byteArrayOf(0xFF.toByte()), "odd.csv")
             assertEquals(SheetImport.Open(SheetWords.unreadable), vm.ui.value.importing)
-            vm.chose("rank,player_id,name,position\n".toByteArray())
-            assertEquals("rank,player_id,name,position\n", vm.ui.value.pasted, "a chosen file fills the paste box")
+            assertNull(vm.ui.value.chosen)
             assertTrue(stub.imports.isEmpty())
+        }
+
+    @Test
+    fun `a chosen file is held under its name and never fills the paste box`() =
+        runTest(main) {
+            val (stub, vm) = loaded()
+            vm.openImport()
+            val csv = SheetParity.load().csv
+            vm.chose(csv.toByteArray(), "rankings.csv")
+            assertEquals(ChosenFile("rankings.csv", csv), vm.ui.value.chosen, "the panel says its name")
+            assertEquals("", vm.ui.value.pasted)
+            assertEquals(csv, vm.ui.value.importText, "the verb sends the file")
+            vm.paste("rank,player_id,name,position\n")
+            assertNull(vm.ui.value.chosen, "the last way in is the one sent")
+            vm.chose(csv.toByteArray(), "rankings.csv")
+            stub.importAnswer = SheetImportAnswer(8, emptyList(), parityRows())
+            vm.importCsv(vm.ui.value.importText)
+            settle()
+            assertEquals(listOf(csv), stub.imports)
+            assertNull(vm.ui.value.chosen, "an import that lands lets the file go")
+        }
+
+    @Test
+    fun `the rows are held while an import is on its way`() =
+        runTest(main) {
+            val (stub, vm) = loaded()
+            vm.update { it.copy(importing = SheetImport.Sending) }
+            assertNull(vm.setNote("4689114", "Stash"))
+            assertTrue(vm.toggleTag("4689114", "sleeper"))
+            assertNull(vm.addTag("4689114", "late round"))
+            assertNull(vm.remove("dst-BUF"))
+            settle()
+            assertTrue(
+                vm.ui.value.edits
+                    .isEmpty(),
+            )
+            assertTrue(stub.writes.isEmpty())
+        }
+
+    @Test
+    fun `an export the phone cannot keep says so in its own words`() =
+        runTest(main) {
+            val stub = SheetStub(sheetDetail(parityRows()))
+            val blocked = Files.createTempFile("sheet-exports", ".csv").toFile()
+            val vm = sheetViewModel(stub, main, exports = blocked)
+            vm.load()
+            settle()
+            vm.exportFile()
+            settle()
+            assertEquals(SheetExport.Failed(SheetWords.notKept), vm.ui.value.export, "never no connection")
         }
 
     @Test
@@ -255,7 +305,7 @@ class SheetFilesTest {
             assertEquals(board.rows.first().id, entries.first().id)
             assertEquals(board.market.map { it.id }.toSet(), entries.takeLast(board.market.size).map { it.id }.toSet())
             assertEquals(5, vm.ui.value.preview.size)
-            assertEquals("PPR", vm.ui.value.formatLabel(vm.format))
+            assertEquals("PPR", vm.ui.value.formatLabel)
             vm.start()
             settle()
             assertEquals(entries.size, stub.created.first().size)

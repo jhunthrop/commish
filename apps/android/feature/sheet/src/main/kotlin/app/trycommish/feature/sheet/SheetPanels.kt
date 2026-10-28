@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import app.trycommish.core.sheet.SheetBoard
@@ -134,7 +135,7 @@ internal fun SheetImportPanel(
             }
             else -> {
                 Label(SheetWords.fileLabel)
-                QuietButton(SheetWords.chooseFile, onClick = actions.chooseFile)
+                ChosenLine(ui, actions.chooseFile)
                 Label(SheetWords.pasteLabel)
                 SheetField(
                     ui.pasted,
@@ -148,10 +149,39 @@ internal fun SheetImportPanel(
                 (importing as? SheetImport.Open)?.problem?.let { Problem(it) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp)) {
                     val sending = importing == SheetImport.Sending
-                    Verb(ui.importVerb, Modifier.weight(1f), enabled = !sending && ui.pasted.isNotBlank()) { actions.importCsv(ui.pasted) }
+                    Verb(
+                        ui.importVerb,
+                        Modifier.weight(1f),
+                        enabled = !sending && ui.importText.isNotBlank(),
+                    ) { actions.importCsv(ui.importText) }
                     QuietButton(SheetWords.cancel, onClick = actions.closeImport)
                 }
             }
+        }
+    }
+}
+
+/** The file's way in (FilePick.svelte): the button, and beside it the chosen file's name, or that none is
+ * chosen yet. A chosen file's text is never put in the paste box. */
+@Composable
+private fun ChosenLine(
+    ui: SheetUi,
+    choose: () -> Unit,
+) {
+    val c = CommishTheme.colors
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
+        QuietButton(SheetWords.chooseFile, onClick = choose)
+        val chosen = ui.chosen
+        if (chosen == null) {
+            Label(SheetWords.noFile)
+        } else {
+            Text(
+                chosen.name,
+                style = Faces.small.copy(fontWeight = FontWeight.SemiBold),
+                color = c.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

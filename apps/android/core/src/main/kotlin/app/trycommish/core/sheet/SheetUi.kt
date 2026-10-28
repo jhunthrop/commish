@@ -25,9 +25,10 @@ sealed interface SheetPhase {
 /**
  * Everything the Sheet screen draws from, one value the view model replaces whole: the account's sheet as
  * last read or written (null while it has none), when it was read and whether that read is a saved copy,
- * the last write's state, the position chosen, the row whose editor is open, the empty sheet's board and
- * start, the import panel and its paste box, the export, the unsaved edits by player id, and by player id
- * what the phone had where the account's copy won a conflict.
+ * the last write's state and whether a retry is on its way, the position chosen, the row whose editor is
+ * open, the format an empty sheet starts in, its board and start, the import panel with its paste box and
+ * the file chosen, the export, the unsaved edits by player id, and by player id what the phone had where the
+ * account's copy won a conflict.
  */
 data class SheetUi(
     val phase: SheetPhase = SheetPhase.Loading,
@@ -35,6 +36,12 @@ data class SheetUi(
     val stamp: Instant? = null,
     val stale: Boolean = false,
     val save: SheetSave = SheetSave.Idle,
+    val retrying: Boolean = false,
+    /** The format an empty sheet starts in: the selected league's, else the account's, else PPR. */
+    val start: BoardFormat = BoardFormat.ppr,
+    /** A CSV chosen from the phone's files: its name, said beside the button, and its text, which the verb
+     * sends (FilePick.svelte); the paste box keeps what was typed. */
+    val chosen: ChosenFile? = null,
     val position: String? = null,
     val openRow: String? = null,
     val board: SheetBoard = SheetBoard.Loading,
@@ -57,31 +64,47 @@ data class SheetUi(
     /** Whether a write is held: an edit not yet on the account, which an export would leave out. */
     val unsaved: Boolean get() = edits.isNotEmpty()
 
-    /** Import is closed while a row's write is on its way, whose answer would land over the imported rows. */
-    val canImport: Boolean get() = save != SheetSave.Saving
+    /** Import is closed while a row's write or a retry is on its way, whose answer would land over the
+     * imported rows. */
+    val canImport: Boolean get() = save != SheetSave.Saving && !retrying
+
+    /** The rows are held while an import is on its way, which replaces them all. */
+    val canEdit: Boolean get() = importing != SheetImport.Sending
+
+    /** What the import's verb sends: the chosen file, else the paste box. */
+    val importText: String get() = chosen?.text ?: pasted
 
     /** The import panel's verb: "Replace my sheet" over rows, else "Use this sheet". */
     val importVerb: String get() = if (entries.isEmpty()) SheetWords.use else SheetWords.replace
+
+    /** A read of the sheet shown that is older than the copy shown (a slow read passed by a write's answer):
+     * drawing it would step the sheet back. */
+    fun older(fresh: SheetDetail?): Boolean {
+        val shown = detail ?: return false
+        if (fresh == null || fresh.id != shown.id) return false
+        val read = instantOrNull(fresh.updatedAt) ?: return false
+        val held = instantOrNull(shown.updatedAt) ?: return false
+        return read < held
+    }
 
     /** His row as the account holds it. */
     fun accountRow(id: String): SheetEntry? = detail?.rows?.firstOrNull { it.playerId == id }?.let(SheetEntry::of)
 
     /** The sheet's format chip: its own, else the one an empty sheet starts in. */
-    fun formatLabel(start: BoardFormat): String = detail?.format?.let(SheetWords::formatLabel) ?: SheetWords.formatLabel(start).orEmpty()
+    val formatLabel: String get() = detail?.format?.let(SheetWords::formatLabel) ?: SheetWords.formatLabel(start).orEmpty()
 
     /** "Last read Sat 12:00 pm" while the sheet shown is a saved copy. */
     fun stampWords(zone: ZoneId): String? = stamp?.takeIf { stale }?.let { "${AppWords.lastRead} ${Format.weekdayTime(it, zone)}" }
 
     /** The sheet as the screen draws it; null while the account has no sheet. */
     fun model(
-        start: BoardFormat,
         now: Instant,
         zone: ZoneId,
     ): SheetModel? {
         val sheet = detail ?: return null
         val entries = entries
         val status = SheetWords.status(save, instantOrNull(sheet.updatedAt), stamp ?: now, entries.size, zone)
-        val line = SheetWords.headLine(formatLabel(start), entries.size, status)
+        val line = SheetWords.headLine(formatLabel, entries.size, status)
         return SheetModel.of(sheet.name, line, entries, rowSaves, position, notices)
     }
 
