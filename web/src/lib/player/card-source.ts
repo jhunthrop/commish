@@ -29,6 +29,7 @@ export type CardData = Pick<
 	| 'card'
 	| 'weekRead'
 	| 'weekReadsDue'
+	| 'builtStatus'
 	| 'lastKickoffs'
 > &
 	CardLead & { lines: CardLead[] };
@@ -55,7 +56,8 @@ export function cardData(page: PlayerPage): CardData {
 		status,
 		card,
 		weekRead,
-		weekReadsDue
+		weekReadsDue,
+		builtStatus
 	} = page;
 	return {
 		id,
@@ -69,6 +71,7 @@ export function cardData(page: PlayerPage): CardData {
 		card,
 		weekRead,
 		weekReadsDue,
+		builtStatus,
 		lastKickoffs: page.lastKickoffs,
 		...leadOf(page),
 		lines: page.lines.map(leadOf)
@@ -93,7 +96,15 @@ export function cardPlayer(page: Pick<CardData, 'id' | 'name' | 'team' | 'positi
 export function cardSource(
 	page: Pick<
 		CardData,
-		'id' | 'name' | 'team' | 'position' | 'card' | 'lastKickoffs' | 'status' | 'weekRead'
+		| 'id'
+		| 'name'
+		| 'team'
+		| 'position'
+		| 'card'
+		| 'lastKickoffs'
+		| 'status'
+		| 'weekRead'
+		| 'builtStatus'
 	>,
 	lead: CardLead,
 	tier: TierAsk | null
@@ -109,6 +120,7 @@ export function cardSource(
 		lastKickoffs: page.lastKickoffs,
 		// The list his page's pill shows (the run's injury capture), "IR" in place of his week.
 		held: page.status?.words.view.rank ?? null,
-		read: page.weekRead
+		read: page.weekRead,
+		built: page.builtStatus
 	};
 }
