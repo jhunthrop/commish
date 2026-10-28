@@ -4,6 +4,7 @@ import app.trycommish.api.decodeEnvelope
 import app.trycommish.api.models.OrderAdvice
 import app.trycommish.api.models.OrderRow
 import app.trycommish.core.Clock
+import app.trycommish.core.board.CaptureStamp
 import app.trycommish.core.instantOrNull
 import app.trycommish.core.rankings.OrderQuery
 import app.trycommish.core.rankings.RankingsReads
@@ -35,6 +36,14 @@ class OrderAtClock(
     /** When it was read (live-board.ts answerReadAt): the league's read when it says one, else the
      * screen's clock as it landed. */
     val readAt: Instant get() = instantOrNull(answer.readAt) ?: landed
+
+    /** The capture its rows' statuses come from (live-order.ts liveCapture), null when the answer names
+     * none or is older than the field (Lane 280, B257). */
+    val capture: CaptureStamp?
+        get() =
+            answer.statusRead?.let { read ->
+                instantOrNull(read.asOf)?.let { CaptureStamp(it, instantOrNull(read.checkedAt)) }
+            }
 
     /** The lead a screen's basis says in place of the run's board sentence, for a board of `teams`. */
     fun lead(

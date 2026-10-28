@@ -1,5 +1,6 @@
 package app.trycommish.core.board
 
+import app.trycommish.core.liveorder.LiveOrder
 import app.trycommish.core.liveorder.LiveOrderWords
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -87,6 +88,35 @@ class BoardParityTest {
                     zone = zone,
                 )
             assertEquals(capture.string("text"), said)
+        }
+    }
+
+    private fun stampOf(json: JsonObject?): CaptureStamp? =
+        json?.let { CaptureStamp(Instant.parse(it.string("readAt")), it.text("checkedAt")?.let(Instant::parse)) }
+
+    @Test
+    fun `the status column's stamp is the newer of the run's capture and the order's, as the web's (Lane 280)`() {
+        val zone = ZoneId.of(runParity.string("zone"))
+        val cases = runParity.getValue("liveStamps").jsonArray.map { it.jsonObject }
+        assertEquals(listOf("run-only", "live-newer", "live-newer-unchecked", "live-older"), cases.map { it.string("name") })
+        cases.forEach { case ->
+            val run = stampOf(case.getValue("run").jsonObject)
+            val live = stampOf(case["live"]?.takeIf { it != JsonNull }?.jsonObject)
+            val chosen = requireNotNull(CaptureStamp.newer(run, live))
+            assertEquals(case.string("chosen"), if (live != null && chosen === live) "live" else "run", case.string("name"))
+            assertEquals(case.string("text"), BoardWords.capture(chosen, Instant.parse(case.string("now")), zone), case.string("name"))
+        }
+    }
+
+    @Test
+    fun `the run's players an uncut order omits are counted as the web counts them (Lane 280)`() {
+        runParity.getValue("fromRun").jsonArray.map { it.jsonObject }.forEach { case ->
+            val runIds = case.getValue("runIds").jsonArray.map { it.jsonPrimitive.content }
+            val answerIds = case.getValue("answerIds").jsonArray.map { it.jsonPrimitive.content }
+            val cut = case.getValue("total").jsonPrimitive.int > answerIds.size
+            val omitted = LiveOrder.omittedFromRun(runIds, answerIds.toSet(), cut)
+            assertEquals(case.getValue("omitted").jsonArray.map { it.jsonPrimitive.content }, omitted, case.string("name"))
+            assertEquals(case.text("line"), LiveOrderWords.fromRun(omitted.size), case.string("name"))
         }
     }
 

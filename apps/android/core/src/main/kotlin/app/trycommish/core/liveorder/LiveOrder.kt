@@ -96,6 +96,14 @@ object LiveOrder {
     /** Whether the answer is cut: the view holds more players than the rows it returned (its limit). */
     fun cut(answer: OrderAdvice): Boolean = answer.total > answer.rows.size
 
+    /** live-order.ts omittedFromRun (Lane 280, B257): the run's players, in the run's order, an uncut answer
+     * does not return, drawn from the run and counted once; none on a cut answer, whose limit omits them. */
+    fun omittedFromRun(
+        runIds: List<String>,
+        returned: Set<String>,
+        cut: Boolean,
+    ): List<String> = if (cut) emptyList() else runIds.filterNot { it in returned }
+
     /** Every row with its place, in the order's order, or null when the answer does not place one of
      * them: the screen then keeps the run's rows, never a table half one board and half the other
      * (placedRows). */
