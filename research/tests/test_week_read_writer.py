@@ -297,7 +297,7 @@ def test_the_worst_prompt_bound_holds_the_heaviest_correction() -> None:
     chars = len(WEEK_RULES) + len(user)
     assert chars / MIN_CHARS_PER_TOKEN <= WORST_PROMPT_TOKENS, chars
     assert step_budget(ModelPrice("m", None, None, "unread", None), HOURLY_BUDGET_USD).max_calls == int(0.05 / 0.00065)
-    assert pytest.approx(2.00) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
+    assert pytest.approx(2.40) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
 
 
 _NOW = WRITTEN_AT

@@ -78,7 +78,7 @@ PAGES_PER_NIGHT: Final = 700
 # Central day's passes (the capture runs 18 times).
 NIGHTLY_BUDGET_USD: Final = 1.40
 HOURLY_BUDGET_USD: Final = 0.05
-HOURLY_DAY_USD: Final = 0.60
+HOURLY_DAY_USD: Final = 1.00  # 0.60 before the game-day status passes (Lane 263)
 # The heaviest prompt a week read's ask carries (a correction with its ledger and every line's stamp), for a
 # read's worst case against what is left of the budget. Measured on Lane 117's replay of 40 production
 # sheets of week 7 after the four-rule prompt: 8,506 prompt tokens at 17,643 characters, the fewest

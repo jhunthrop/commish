@@ -24,7 +24,7 @@ policy_body() { # display name, channel, absence enabled (true|false)
   python3 - "$1" "$2" "${3:-false}" <<'PY'
 import json, sys
 name, channel, enabled = sys.argv[1], sys.argv[2], sys.argv[3] == "true"
-jobs = 'resource.label.job_name = one_of("nightly", "nightly-publish", "inseason", "inseason-capture")'
+jobs = 'resource.label.job_name = one_of("nightly", "nightly-publish", "inseason", "inseason-capture", "inseason-status")'
 # The selector without its closing brace: each query adds its job_name and closes it.
 succeeded = 'run_googleapis_com:job_completed_execution_count{monitored_resource="cloud_run_job",result="succeeded"'
 # From September 8 (the first week's freeze passes run by then) through February (review R1: from

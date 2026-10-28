@@ -10,7 +10,7 @@ on:
         description: the Cloud Run job to execute
         required: true
         type: choice
-        options: [nightly, nightly-publish, inseason, inseason-capture, headshots]
+        options: [nightly, nightly-publish, inseason, inseason-capture, inseason-status, headshots]
       args:
         description: "optional: the container's arguments for this execution only, comma-separated (the image's entrypoint is python -m, so for example research.capsules,queue,--slugs,a,b or research.headshots,curate,--player,<id>,--url,<url>,--by,<who>, or on job inseason research.inseason,void-game,--season,<s>,--week,<w>,--game,<id>,--reason,<why>,--by,<who> with no comma in the reason)"
         required: false

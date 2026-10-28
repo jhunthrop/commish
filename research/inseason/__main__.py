@@ -3,6 +3,7 @@
     uv run python -m research.inseason --task season-week [--season 2026] [--skip props-snapshot]
     uv run python -m research.inseason --task usage-backfill [--season 2026]
     uv run python -m research.inseason --task capture-harvest
+    uv run python -m research.inseason --task capture-status
     uv run python -m research.inseason void-game --season S --week W --game ID --reason TEXT --by WHO [--lift]
 
 `void-game` is the operator's void of one game of the game table, so a game cancelled or dropped from
@@ -24,6 +25,12 @@ its ten requests, the player list (Lane 110, B79), the one feed carrying
 each injured player's expected return (`injReturnDate`), which the API reads beside his designation; the
 same read writes each listed player's club onto `provider_players` and names how many changed (Lane 122,
 `pipeline/tank01/player_clubs.py`), and a read that would change more than 60 writes none and fails.
+
+`capture-status` is the game-day status pass (Lane 263), every 15 minutes in the game-day windows: the injury
+designations and the inactives alone (two requests, `pipeline/tank01/capture.py` `run_capture_status`), the
+newest injury capture dated for the API in the same transaction, then the hourly week-ahead reads pass, so a
+status move found at :15 rewrites that player's read within the hourly dollar budgets. No game figures,
+statuses, player list, projections or market: the hourly harvest keeps those.
 
 `usage-backfill` runs the weekly pass's usage steps alone (play-by-play and the three charted feeds)
 for every week nflverse has published: the operator's one-shot for weeks played before the steps
@@ -94,13 +101,14 @@ from research.pipeline.tank01.capture import (
     CaptureResult,
     capture_return_dates,
     run_capture_harvest,
+    run_capture_status,
 )
 from research.pipeline.tank01.client import API_KEY_ENV, DEFAULT_SEASON, SEASON_ENV, Tank01Client
 from research.pipeline.tank01.game_status import STATUS_SOURCE, capture_game_status
 from research.pipeline.tank01.lines import LINES_SOURCE, lines_after_harvest
 from research.pipeline.tank01.projections import parse_stored_projections
 
-TASKS: Final = ("season-week", "usage-backfill", "capture-harvest")
+TASKS: Final = ("season-week", "usage-backfill", "capture-harvest", "capture-status")
 CONNECTION_LOST_LINE: Final = (
     "the connection was lost before the capture committed; the capture committed again on a new connection, "
     "undated (the API dates it itself)"
@@ -264,6 +272,37 @@ def _capture_harvest(now: datetime) -> bool:
     charts = _slot_depth_charts(now, season)
     _week_reads(now)
     return not failed and dated_ok and facts_ok and status.ok and returns_ok and parsed and market and charts
+
+
+def _capture_status(now: datetime) -> bool:
+    """The game-day status pass (Lane 263): the status feeds captured and dated, then the week reads."""
+    key = os.environ.get(API_KEY_ENV, "").strip()
+    if not key:
+        _line(f"capture-status: REFUSED, {API_KEY_ENV} is not set")
+        return False
+    engine = make_engine(database_url_from_env())
+    fetcher = LiveFetcher()
+    season = int(os.environ.get(SEASON_ENV, DEFAULT_SEASON))
+    try:
+        result, dated_ok = _capture_dated(
+            engine,
+            lambda conn, read: run_capture_status(conn, Tank01Client(read, key), now, season),
+            RecordingFetcher(fetcher),
+            now,
+        )
+    finally:
+        fetcher.close()
+        engine.dispose()
+    for feed in result.feeds:
+        reason = "" if feed.reason is None else f", {feed.reason}"
+        _line(f"  {feed.source}: {feed.status}, {feed.requests} requests{reason}")
+    if result.reason is not None:
+        _line(f"capture-status: REFUSED, {result.reason}")
+        return False
+    failed = [feed.source for feed in result.feeds if feed.status == "failed"]
+    _line(f"capture-status: {len(result.feeds)} feeds, {len(failed)} failed")
+    _week_reads(now)
+    return not failed and dated_ok
 
 
 def requests_left(answers: RecordingFetcher) -> int:
@@ -481,7 +520,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     configure_logging(logging.INFO)
     now = now_ms()
     tasks = {"season-week": _season_week, "usage-backfill": _usage_backfill}
-    ok = tasks[args.task](args, now) if args.task in tasks else _capture_harvest(now)
+    captures = {"capture-harvest": _capture_harvest, "capture-status": _capture_status}
+    ok = tasks[args.task](args, now) if args.task in tasks else captures[args.task](now)
     return 0 if ok else 1
 
 

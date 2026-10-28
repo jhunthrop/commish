@@ -58,6 +58,13 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
   | `research-season-week-wed` | `0 18 * 1,2,9-12 3` | America/New_York | `inseason` |
   | `research-season-week-thu` | `0 14 * 1,2,9-12 4` | America/New_York | `inseason` |
   | `research-capture-harvest` | `0 2,6-23 * * *` | America/New_York | `inseason-capture` |
+  | `research-status-sun` | `15,30,45 10-20 * 1,2,9-12 0` | America/New_York | `inseason-status` |
+  | `research-status-thu` | `15,30,45 18-19 * 1,2,9-12 4` | America/New_York | `inseason-status` |
+  | `research-status-thu-kickoff` | `15 20 * 1,2,9-12 4` | America/New_York | `inseason-status` |
+  | `research-status-mon` | `15,30,45 17-19 * 1,2,9-12 1` | America/New_York | `inseason-status` |
+  | `research-status-mon-kickoff` | `15 20 * 1,2,9-12 1` | America/New_York | `inseason-status` |
+
+  The game-day status passes (Lane 263, `research.inseason --task capture-status`, job `inseason-status`: RESEARCH_DATABASE_URL, TANK01_API_KEY, AI_GATEWAY_API_KEY) take the injury designations and the inactives alone, two provider requests, then the week reads pass for a status move. Together with the hourly harvest at :00 they make a 15-minute cadence on Sunday from 10:00 through 20:45 ET (inactives land about 90 minutes before a kickoff; 10:00 holds the 9:30 game abroad, 20:45 follows the night game), Thursday 18:15 to 20:15 and Monday 17:15 to 20:15, the two hours before a night game. The windows are fixed, not read from the season's kickoff slots: the scheduler script is bash with no database, and a slot-derived schedule would need the schedule re-applied by hand whenever the NFL flexes a game. A flex, a Thanksgiving or Christmas slate, or a Saturday game keeps the hourly cadence. Per week the passes ask the provider 66 + 14 + 20 = 100 more requests (33 Sunday passes, 7 Thursday, 10 Monday, at two each), against the plan's 15,000 a day (Sunday's 66 on top of at most 200 from the hourly harvest) and the 30,000 monthly ceiling (about 435 a month). Like every new scheduler job, all five are created paused: resume them by name after `apply`.
 
   `research-nightly-publish` runs every hour because the in-season runs go public after noon UTC, and the web backstop (`web.yml`, 30 past every hour) rebuilds within the hour at any hour. A run made live by hand (`gh workflow run web.yml -f runId=<id>`) must also move `runs/latest.json`, or the next push to main rebuilds the old run.
 
