@@ -219,7 +219,7 @@ public enum Words {
         public static let copy = "Copy the lineup"
         public static let set = "Your lineup is set"
         public static let sit = "Sit"
-        public static let pastWeeks = "Past weeks of our order, on Our record"
+        public static let pastWeeks = "Past weeks of our order"
         public static let copied = "Copied."
         public static let setItOn = "Set it on"
         public static let copyFailed = "This browser would not copy it."
@@ -299,6 +299,13 @@ public enum Words {
         public static let suspended = "Susp"
         public static let pup = "PUP"
         public static let nfi = "NFI"
+    }
+
+    public enum Capture {
+        public static let status = "Status"
+        public static let read = "read"
+        public static let asOf = "as of"
+        public static let old = "over 36 hours ago"
     }
 
     public enum Figure {
@@ -954,7 +961,7 @@ public enum Words {
     }
 
     public enum LiveOrder {
-
+        public static let fromRun = "from the run, not in the live order"
     }
 
     public enum ClubOrder {

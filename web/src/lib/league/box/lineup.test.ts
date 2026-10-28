@@ -173,7 +173,7 @@ void test('the Lineup strip names whose lineup its figure is, and once played gi
 	const playing = { ...played, playing: true, totals: { ...played.totals, final: 112.4 } };
 	assert.equal(lineupSum(playing, 'espn', WEEK_DONE)?.final, 'Proj final 112.4');
 	assert.equal(lineupSum(box, 'espn', WEEK_DONE), null, 'no points read, no figure');
-	assert.equal(LINEUP.pastWeeks, 'Past weeks of our order, on Our record');
+	assert.equal(LINEUP.pastWeeks, 'Past weeks of our order');
 });
 
 void test("the Lineup's rows carry our rank in their chip, as the Matchup's do (Lane 99, B24)", () => {

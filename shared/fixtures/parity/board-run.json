@@ -3229,5 +3229,115 @@
 				}
 			]
 		}
+	],
+	"liveStamps": [
+		{
+			"name": "run-only",
+			"now": "2026-10-22T17:00:00.000Z",
+			"run": {
+				"readAt": "2026-10-14T02:03:35.613Z",
+				"checkedAt": null
+			},
+			"live": null,
+			"chosen": "run",
+			"text": "Status as of Oct 13, over 36 hours ago."
+		},
+		{
+			"name": "live-newer",
+			"now": "2026-10-22T17:00:00.000Z",
+			"run": {
+				"readAt": "2026-10-14T02:03:35.613Z",
+				"checkedAt": null
+			},
+			"live": {
+				"readAt": "2026-10-22T12:00:00.000Z",
+				"checkedAt": "2026-10-22T16:00:00.000Z"
+			},
+			"chosen": "live",
+			"text": "Status read Oct 22."
+		},
+		{
+			"name": "live-newer-unchecked",
+			"now": "2026-10-22T17:00:00.000Z",
+			"run": {
+				"readAt": "2026-10-14T02:03:35.613Z",
+				"checkedAt": null
+			},
+			"live": {
+				"readAt": "2026-10-22T14:00:00.000Z",
+				"checkedAt": null
+			},
+			"chosen": "live",
+			"text": "Status as of Oct 22."
+		},
+		{
+			"name": "live-older",
+			"now": "2026-10-22T17:00:00.000Z",
+			"run": {
+				"readAt": "2026-10-14T02:03:35.613Z",
+				"checkedAt": null
+			},
+			"live": {
+				"readAt": "2026-10-12T20:03:35.613Z",
+				"checkedAt": "2026-10-13T20:03:35.613Z"
+			},
+			"chosen": "run",
+			"text": "Status as of Oct 13, over 36 hours ago."
+		}
+	],
+	"fromRun": [
+		{
+			"name": "uncut-whole",
+			"runIds": [
+				"4429795",
+				"3918298",
+				"4429023",
+				"4047365"
+			],
+			"answerIds": [
+				"4429795",
+				"3918298",
+				"4429023",
+				"4047365"
+			],
+			"total": 4,
+			"omitted": [],
+			"line": null
+		},
+		{
+			"name": "uncut-omits",
+			"runIds": [
+				"4429795",
+				"3918298",
+				"4429023",
+				"4047365"
+			],
+			"answerIds": [
+				"4429795",
+				"4429023"
+			],
+			"total": 2,
+			"omitted": [
+				"3918298",
+				"4047365"
+			],
+			"line": "2 players from the run, not in the live order."
+		},
+		{
+			"name": "cut",
+			"runIds": [
+				"4429795",
+				"3918298",
+				"4429023",
+				"4047365"
+			],
+			"answerIds": [
+				"4429795",
+				"3918298"
+			],
+			"total": 40,
+			"omitted": [],
+			"line": null
+		}
 	]
 }

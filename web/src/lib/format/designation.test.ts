@@ -10,6 +10,7 @@ import {
 	captureShort,
 	designationMark,
 	designationWord,
+	newerCapture,
 	rankWord,
 	seasonLongLine,
 	seasonLongMark,
@@ -116,4 +117,16 @@ void test('no line carries an em-dash or a semicolon', () => {
 		captureLine({ readAt: LISTED, checkedAt: null }, SOON + CAPTURE_BEHIND_MS, CENTRAL)
 	];
 	for (const line of lines) assert.doesNotMatch(line, bannedPattern(), line);
+});
+
+void test('the board dates its statuses by the newer of the run’s capture and the live order’s (Lane 280)', () => {
+	const run = { readAt: LISTED, checkedAt: null };
+	const live = { readAt: LISTED, checkedAt: CHECKED };
+	assert.equal(newerCapture(run, null), run, 'run only');
+	assert.equal(newerCapture(null, live), live, 'live only');
+	assert.equal(newerCapture(null, null), null);
+	assert.equal(newerCapture(run, live), live, 'live newer');
+	assert.equal(newerCapture(live, run), live, 'live older: the run’s stands');
+	assert.equal(newerCapture(live, { ...live }), live, 'a tie keeps the run’s');
+	assert.equal(captureShort(newerCapture(run, live) ?? run, SOON, CENTRAL), 'Status read Oct 16.');
 });
