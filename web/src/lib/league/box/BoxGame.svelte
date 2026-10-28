@@ -16,9 +16,19 @@
 		/** The weather as its glyph alone after the kickoff, its words the glyph's label (a phone's
 		 * Rankings row, Lane 209: the game in one cell on one line). */
 		glyph?: boolean;
+		/** The opponent over the kickoff, two short lines in a narrow Game cell (the trade rows, Lane
+		 * 268). */
+		stacked?: boolean;
 	}
 
-	let { row, facts = true, clears = null, note = null, glyph = false }: Props = $props();
+	let {
+		row,
+		facts = true,
+		clears = null,
+		note = null,
+		glyph = false,
+		stacked = false
+	}: Props = $props();
 </script>
 
 {#if note}
@@ -28,7 +38,7 @@
 {:else if row.game === 'no-club'}
 	<span class="bye">{BOX.noClub}</span>
 {:else if row.game}
-	<span class="opp"
+	<span class="opp" class:stacked
 		><b>{row.game.where}</b> <span>{row.game.when}</span>{#if glyph && row.weather}<span
 				class="wx-glyph"
 				role="img"
@@ -55,6 +65,12 @@
 
 	.opp b {
 		font-weight: 600;
+	}
+
+	.opp.stacked {
+		flex-direction: column;
+		gap: 0;
+		font-size: var(--t-xs);
 	}
 
 	.note {

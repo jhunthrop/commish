@@ -23,6 +23,10 @@ export interface StatusView {
 	 * season-long status with its start ("IR since Sep 22"). The capture's read is said once, in the
 	 * page's basis. */
 	mark: string;
+	/** The chip in the few characters a tight row has (the trade rows, Lane 268): "Q", "Out", "Back
+	 * Sun"; null where his position pill already says it ("RB IR"). Left out where no tight row draws
+	 * him; such a chip prints its mark. */
+	short?: string | null;
 	/** Drawn as a loss: a status that keeps him out. */
 	sits: boolean;
 	/** A week's question (questionable, or due back this week, Lane 153): no reason on its own to sit

@@ -144,19 +144,57 @@ async function waitLive(page: Page): Promise<void> {
 	);
 }
 
-/** The member's roster rows wholly in sight as the screen opens: under the bar, over the verdict held
- * at the window's foot (or, where the rosters stack, the pinned gains). */
-async function rowsInSight(page: Page): Promise<number> {
-	return page.evaluate(() => {
-		const held = [...document.querySelectorAll<HTMLElement>('main .verdict, main .pin')]
-			.filter((el) => el.offsetParent !== null && getComputedStyle(el).position === 'sticky')
-			.map((el) => el.getBoundingClientRect().top);
-		const floor = Math.min(innerHeight, ...held);
-		const top = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
-		return [...document.querySelectorAll('main table.box.mine tbody tr')]
-			.map((row) => row.getBoundingClientRect())
-			.filter((r) => r.top >= top - 1 && r.bottom <= floor + 1).length;
-	});
+/** A side's roster rows wholly in sight as the screen opens: under the bar, over the verdict held at
+ * the window's foot (or, where the rosters stack, the pinned gains); with the side's whole roster. */
+async function rowsInSight(page: Page, mine: boolean): Promise<{ seen: number; roster: number }> {
+	return page.evaluate(
+		(box) => {
+			const held = [...document.querySelectorAll<HTMLElement>('main .verdict, main .pin')]
+				.filter((el) => el.offsetParent !== null && getComputedStyle(el).position === 'sticky')
+				.map((el) => el.getBoundingClientRect().top);
+			const floor = Math.min(innerHeight, ...held);
+			const top = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
+			const rows = [...document.querySelectorAll(`main ${box} tbody tr`)].map((row) =>
+				row.getBoundingClientRect()
+			);
+			return {
+				seen: rows.filter((r) => r.height > 0 && r.top >= top - 1 && r.bottom <= floor + 1).length,
+				roster: rows.length
+			};
+		},
+		mine ? 'table.box.mine' : 'table.box:not(.mine)'
+	);
+}
+
+/** The Lineup's row height, which every roster row keeps at a desk (Lane 268). */
+const ROW_HEIGHT = 52;
+
+/** Text the screen cuts (Lane 268 fix round 1, the box-score rule): an idea card or anything in it, a
+ * status chip, a verdict's team name, any drawn element whose words run past its box. */
+async function cutText(page: Page): Promise<string[]> {
+	return page.evaluate(() =>
+		[
+			...document.querySelectorAll<HTMLElement>(
+				'main .idea, main .idea *, main .status-chip, main .bug .name'
+			)
+		]
+			.filter((el) => el.offsetParent !== null && el.scrollWidth > el.clientWidth + 1)
+			.map((el) => el.innerText.trim())
+	);
+}
+
+/** The roster rows at a desk whose height is not the Lineup's. */
+async function offHeightRows(page: Page): Promise<string[]> {
+	return page.evaluate(
+		(height) =>
+			[...document.querySelectorAll<HTMLElement>('main table.box tbody tr')]
+				.filter((row) => Math.round(row.getBoundingClientRect().height) !== height)
+				.map(
+					(row) =>
+						`${row.querySelector('td.player')?.textContent.trim().split('\n')[0] ?? ''} ${String(Math.round(row.getBoundingClientRect().height))}px`
+				),
+		ROW_HEIGHT
+	);
 }
 
 /** The whole page at its height, so the verdict sits in its place rather than over the rows. */
@@ -201,14 +239,30 @@ for (const theme of THEMES) {
 		// As it opens, the rosters take the window: the member's rows counted over the verdict (Lane 268).
 		const window = ROW_WINDOWS[width];
 		await page.setViewportSize({ width, height: window.height });
-		const inSight = await rowsInSight(page);
+		const yours = await rowsInSight(page, true);
 		counts.push(
-			`${where}: ${String(inSight)} of your rows in sight at ${String(width)} by ${String(window.height)}`
+			`${where}: ${String(yours.seen)} of your ${String(yours.roster)} rows in sight at ${String(width)} by ${String(window.height)}`
 		);
 		check(
-			inSight >= window.rows,
-			`${where}: ${String(inSight)} rows in sight, want ${String(window.rows)}`
+			yours.seen >= window.rows,
+			`${where}: ${String(yours.seen)} rows in sight, want ${String(window.rows)}`
 		);
+		// The other side's rows at a desk, where both rosters show: as many as the first side's floor, or
+		// its whole roster when it has fewer.
+		if (width > STACKS_AT) {
+			const theirs = await rowsInSight(page, false);
+			counts.push(
+				`${where}: ${String(theirs.seen)} of their ${String(theirs.roster)} rows in sight`
+			);
+			check(
+				theirs.seen >= Math.min(window.rows, theirs.roster),
+				`${where}: ${String(theirs.seen)} of their ${String(theirs.roster)} rows in sight`
+			);
+			const off = await offHeightRows(page);
+			check(off.length === 0, `${where}: rows off ${String(ROW_HEIGHT)}px: ${off.join(', ')}`);
+		}
+		const cut = await cutText(page);
+		check(cut.length === 0, `${where}: cut text ${cut.join(' | ')}`);
 		await page.screenshot({
 			path: new URL(`trades-${theme}-${String(width)}-open-window.png`, out).pathname
 		});
@@ -231,7 +285,30 @@ for (const theme of THEMES) {
 		);
 		const more = (await page.locator('main .ideas .more').innerText()).trim();
 		check(/^\d+ more$/.test(more), `${where}: the ideas row's more says "${more}"`);
-		await page.locator('main .ideas .more').click();
+		check(
+			(await page.locator('main .ideas .more').getAttribute('aria-expanded')) === 'false',
+			`${where}: N more carries no aria-expanded`
+		);
+		// By keyboard: Enter shows the rest in place and hands the focus to the first idea it adds.
+		await page.locator('main .ideas .more').focus();
+		await page.keyboard.press('Enter');
+		const focused = await page.evaluate(() => {
+			const el = document.activeElement;
+			const all = [...document.querySelectorAll('main .idea')];
+			return el === null ? -1 : all.indexOf(el);
+		});
+		check(focused === IDEAS_SHOWN, `${where}: N more left the focus on idea ${String(focused)}`);
+		// The Best card stays first and in sight once every idea shows (a phone's row wraps under it).
+		const bestInSight = await page.evaluate(() => {
+			const best = document.querySelector('main .idea')?.getBoundingClientRect();
+			return best !== undefined && best.left >= 0 && best.right <= innerWidth;
+		});
+		check(bestInSight, `${where}: the Best card is off the row once every idea shows`);
+		const shownCut = await cutText(page);
+		check(
+			shownCut.length === 0,
+			`${where}: cut text once every idea shows ${shownCut.join(' | ')}`
+		);
 		const open = await seen(page);
 		check(
 			open.ideas.length === IDEAS_SHOWN + Number(more.split(' ')[0]),
@@ -258,6 +335,8 @@ for (const theme of THEMES) {
 		const tapCount = stacked ? 3 : 2;
 		await verdict(page);
 		const built = await seen(page);
+		const builtCut = await cutText(page);
+		check(builtCut.length === 0, `${where}: cut text in the verdict ${builtCut.join(' | ')}`);
 		check(built.ticked === 2, `${where}: ${String(built.ticked)} ticked after two ticks`);
 		check(built.bars.length === 2, `${where}: ${String(built.bars.length)} bars`);
 		taps.push(

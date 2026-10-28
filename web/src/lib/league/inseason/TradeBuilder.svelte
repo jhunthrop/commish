@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
@@ -134,6 +134,17 @@
 	/** Whether the ideas row shows every idea, or the best IDEAS_SHOWN and its "N more". */
 	let allIdeas = $state(false);
 	const shownIdeas = $derived(allIdeas ? presets : presets.slice(0, IDEAS_SHOWN));
+	/** The ideas' list, so "N more" hands the focus to the first idea it shows. */
+	let ideaList = $state<HTMLUListElement | null>(null);
+	const IDEAS_ID = $derived(`${id}-ideas`);
+
+	/** Shows every idea in place and moves the focus to the first one it adds, so a keyboard carries
+	 * on from there (the control itself goes). */
+	async function showAllIdeas(): Promise<void> {
+		allIdeas = true;
+		await tick();
+		[...(ideaList?.querySelectorAll<HTMLButtonElement>('.idea') ?? [])].at(IDEAS_SHOWN)?.focus();
+	}
 	const hiddenIdeas = $derived(presets.length - shownIdeas.length);
 
 	// svelte-ignore state_referenced_locally
@@ -297,11 +308,11 @@
 
 <section {id} class="builder" tabindex="-1" aria-label={BUILDER_LINES.open} {@attach takeFocus}>
 	{#if presets.length > 0}
-		<!-- Our ideas: the best trade with each team in this league, one line a card, the best three and
-		     the rest in place behind "N more". -->
+		<!-- Our ideas: the best trade with each team in this league, a card of two lines (the team and
+		     both gains, then the deal), the best three and the rest in place behind "N more". -->
 		<div class="ideas" role="group" aria-label={ANALYZER_LINES.ideas}>
 			<span class="ideas-head">{ANALYZER_LINES.ideas}</span>
-			<ul class:all={allIdeas}>
+			<ul id={IDEAS_ID} class:all={allIdeas} bind:this={ideaList}>
 				{#each shownIdeas as preset (preset.key)}
 					<li>
 						<button
@@ -310,16 +321,22 @@
 							aria-pressed={samePicks(picks, preset.picks)}
 							onclick={() => load(preset)}
 						>
-							{#if preset.mark}<b class="mark">{preset.mark}</b>{/if}<span class="with"
-								>{TRADES.with} {preset.team.name}:</span
-							><span class="deal">{preset.deal},</span><span class="gains">{preset.gains}</span>
+							<span class="top"
+								>{#if preset.mark}<b class="mark">{preset.mark}</b>{/if}<span class="with"
+									>{TRADES.with} {preset.team.name}</span
+								><span class="gains">{preset.gains}</span></span
+							><span class="deal">{preset.deal}</span>
 						</button>
 					</li>
 				{/each}
 				{#if hiddenIdeas > 0}
 					<li>
-						<button type="button" class="more" onclick={() => (allIdeas = true)}
-							>{moreWords(hiddenIdeas)}</button
+						<button
+							type="button"
+							class="more"
+							aria-expanded="false"
+							aria-controls={IDEAS_ID}
+							onclick={() => void showAllIdeas()}>{moreWords(hiddenIdeas)}</button
 						>
 					</li>
 				{/if}
@@ -366,6 +383,7 @@
 		<div class:reading>
 			<TradeBug
 				gainHead={TRADES.gainHead}
+				teamHead={ANALYZER_LINES.team}
 				yours={{
 					name: me.name,
 					figures: bugFigures(
@@ -425,13 +443,13 @@
 	.builder {
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
+		gap: 4px;
 		outline: none;
 		scroll-margin: var(--s-4);
 	}
 
-	/* Our ideas: one row, the label then the best three cards of one line each and "N more"; the rest
-	   wrap in place under them once shown. */
+	/* Our ideas: one row, the label then the best three cards of two lines each and "N more"; the
+	   rest wrap in place under them once shown. Nothing in a card is ever cut. */
 	.ideas {
 		display: flex;
 		align-items: flex-start;
@@ -441,8 +459,9 @@
 
 	.ideas-head {
 		flex: none;
-		align-self: flex-start;
-		line-height: 28px;
+		align-self: center;
+		max-width: 6.5em;
+		line-height: 1.3;
 		font-size: var(--t-xs);
 		font-weight: 700;
 		text-transform: uppercase;
@@ -476,8 +495,8 @@
 		align-items: center;
 		gap: 6px;
 		width: 100%;
-		height: 28px;
-		padding: 0 var(--s-3);
+		min-height: 38px;
+		padding: 3px var(--s-3);
 		border: 1px solid var(--line);
 		border-radius: var(--r-md);
 		background: var(--surface);
@@ -485,12 +504,21 @@
 		font: inherit;
 		font-size: var(--t-sm);
 		text-align: left;
-		white-space: nowrap;
 		cursor: pointer;
+	}
+
+	.idea {
+		flex-direction: column;
+		align-items: stretch;
+		justify-content: center;
+		gap: 0;
+		overflow: hidden;
+		line-height: 16px;
 	}
 
 	.more {
 		width: auto;
+		white-space: nowrap;
 		font-weight: 600;
 		color: var(--accent-text);
 	}
@@ -520,27 +548,26 @@
 		color: var(--accent-text);
 	}
 
-	/* The deal gives way first, then a long team name, so the team and the two gains show: loading
-	   the idea draws the trade in full in the ticks and the verdict. */
+	/* The first line, the team and both gains; a long one wraps, never cut. */
+	.top {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		column-gap: 6px;
+		font-size: var(--t-xs);
+	}
+
 	.deal {
-		flex: 1 1 auto;
-		min-width: 2.5em;
-		overflow: hidden;
-		text-overflow: ellipsis;
 		font-weight: 600;
+		overflow-wrap: anywhere;
 	}
 
 	.with {
-		flex: 0 0 auto;
-		min-width: 0;
-		max-width: 50%;
-		overflow: hidden;
-		text-overflow: ellipsis;
 		color: var(--ink-2);
 	}
 
 	.gains {
-		flex: none;
+		margin-left: auto;
 		font-size: var(--t-xs);
 		font-variant-numeric: tabular-nums;
 		color: var(--ink-2);
@@ -645,7 +672,7 @@
 		bottom: 0;
 		z-index: 5;
 		margin: 0 calc(var(--s-5) * -1);
-		padding: 3px var(--s-5);
+		padding: 2px var(--s-5);
 		background: var(--surface);
 		border-top: 1px solid var(--line-strong);
 		box-shadow: 0 -6px 16px -12px rgb(0 0 0 / 0.35);
@@ -656,7 +683,8 @@
 	}
 
 	@media (max-width: 1180px) {
-		/* Where three cards would cut their gains, the row scrolls sideways, each card its one line. */
+		/* Where three cards would not fit, the row scrolls sideways from the Best card; once every idea
+		   shows, they wrap in place under it, the Best card first. */
 		.ideas ul,
 		.ideas ul.all {
 			display: flex;
@@ -664,6 +692,11 @@
 			scroll-snap-type: x proximity;
 			padding: 2px;
 			margin: -2px;
+		}
+
+		.ideas ul.all {
+			flex-wrap: wrap;
+			overflow-x: visible;
 		}
 
 		.ideas li {
@@ -740,6 +773,8 @@
 		}
 
 		.ideas-head {
+			align-self: flex-start;
+			max-width: none;
 			line-height: 1.3;
 		}
 

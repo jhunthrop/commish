@@ -9,6 +9,8 @@
 	import { tagMarks } from '#lib/sheet/tags.ts';
 	import StatusChip from '#lib/ui/StatusChip.svelte';
 	import StatusPill from '#lib/ui/StatusPill.svelte';
+	import PositionPill from '#lib/ui/PositionPill.svelte';
+	import { pillRank } from '#lib/run/held-places.ts';
 	import { HELD, tagCountWords } from '../inseason/words.ts';
 	import { fitName, initialName, type BoxRow } from './box.ts';
 	import BoxGame from './BoxGame.svelte';
@@ -45,6 +47,10 @@
 		 * own line (its strip of labelled cells) across the row. The screen keeps room at the line ends
 		 * for its own cells with --line-end (the big figure) and --line-end-2 (the verb). */
 		line?: boolean;
+		/** The trade rows' tight cell (Lane 268): his club, pill, status in its short word and tags on
+		 * one line, so the row keeps the Lineup's height whole, never a word cut; on a phone his name
+		 * over that line and his game, two lines. */
+		tight?: boolean;
 		/** Drawn on the club line after the pill. */
 		after?: Snippet;
 		/** The screen's own line under the name, as the phone and narrow screens fold it. */
@@ -62,6 +68,7 @@
 		rankApart = false,
 		note = null,
 		line = false,
+		tight = false,
 		after,
 		children
 	}: Props = $props();
@@ -75,6 +82,14 @@
 	 * stays the link's for a new tab. Undefined where no screen holds one. */
 	const shelf = shelfOpener();
 	/** His tags as the chips draw them: Held when the sheet's own tags are not in, else the tags. */
+	/** The tight row's pill rank, as StatusPill reckons it (a season-long list's word in his rank). */
+	const tightRank = $derived(
+		row.pill === null
+			? undefined
+			: row.pill.rank === null
+				? (row.status?.rank ?? undefined)
+				: pillRank(row.status, row.pill.rank)
+	);
 	const tagLabels = $derived(
 		row.held && tags.length === 0 ? [HELD] : tagMarks(tags).map((mark) => mark.label)
 	);
@@ -99,7 +114,7 @@
 		>{:else}<NameWords name={row.name} />{/if}
 {/snippet}
 
-<span class="pl" class:apart={rankApart} class:line>
+<span class="pl" class:apart={rankApart} class:line class:tight>
 	{#if row.face.mark && row.face.src !== null}
 		<ClubMark src={row.face.src} alt={row.face.alt} size={32} />
 	{:else}
@@ -110,7 +125,7 @@
 			phoneSize={rankApart ? APART_PHONE_FACE : line ? LINE_PHONE_FACE : undefined}
 		/>
 	{/if}
-	<span class="who" class:line>
+	<span class="who" class:line class:tight>
 		<span class="nm">
 			{#if row.slug !== null}
 				<a
@@ -126,13 +141,26 @@
 		</span>
 		<span class="club"
 			><span>{row.club}</span>{#if rankApart}<span class="ppos">{row.position}</span
-				>{#if row.status}<StatusChip status={row.status} />{/if}{:else if row.pill}<StatusPill
+				>{#if row.status}<StatusChip
+						status={row.status}
+					/>{/if}{:else if row.pill && tight}<PositionPill
+					position={row.pill.position}
+					rank={tightRank}
+				/>{#if row.status && row.status.short !== null}<span
+						class="status-chip"
+						class:sits={row.status.sits}
+						><span aria-hidden="true">{row.status.short ?? row.status.mark}</span><span
+							class="whole">{row.status.mark}</span
+						></span
+					>{/if}{:else if row.pill}<StatusPill
 					position={row.pill.position}
 					positionRank={row.pill.rank ?? undefined}
 					status={row.status}
-				/>{/if}{#if after}<span class="club-after">{@render after()}</span>{/if}</span
+				/>{/if}{#if tight}{@render tagChips()}{/if}{#if after}<span class="club-after"
+					>{@render after()}</span
+				>{/if}</span
 		>
-		{#if tags.length > 0 || row.held}
+		{#if !tight && (tags.length > 0 || row.held)}
 			<span class="tags">{@render tagChips()}</span>
 		{/if}
 		<span class="phone-game" class:compact
@@ -230,6 +258,26 @@
 		display: none;
 	}
 
+	/* The trade rows' tight cell (Lane 268): one club line that never wraps, its chips short. */
+	.pl.tight {
+		gap: 6px;
+	}
+
+	.tight .club {
+		flex-wrap: nowrap;
+		white-space: nowrap;
+	}
+
+	/* The whole status for a screen reader beside its short word (Lane 268). */
+	.whole {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
 	/* The screen's mark after the pill, laid out as if unwrapped. */
 	.club-after {
 		display: contents;
@@ -311,6 +359,22 @@
 			gap: 1px;
 			font-size: var(--t-xs);
 			color: var(--ink-2);
+		}
+
+		/* A tight row on a phone is two lines: his name, then his club, pill, status and game. */
+		.who.tight {
+			flex-direction: row;
+			flex-wrap: wrap;
+			align-items: center;
+			column-gap: 6px;
+		}
+
+		.who.tight .nm {
+			flex-basis: 100%;
+		}
+
+		.who.tight .phone-game {
+			flex-direction: row;
 		}
 	}
 

@@ -8,8 +8,8 @@
 	import TeamAvatar from './TeamAvatar.svelte';
 	import { rosterOrder, TRADES } from './trades.ts';
 
-	/** One roster of the trade builder as a box score (Lane 66g; the Lineup's rows since Lane 268): the
-	 * team over the columns (a tick, the player with his position and our rank under his name (Lane
+	/** One roster of the trade builder as a box score (Lane 66g; the Lineup's rows since Lane 268,
+	 * BoxLine's tight row): the team over the columns (a tick, the player with his position and our rank under his name (Lane
 	 * 260), his game, Proj, Opp rank, Avg, Last, Rest of season), each row a tap that picks him for the
 	 * trade, at the Lineup table's row height and type. */
 	interface Props {
@@ -83,7 +83,7 @@
 				row={rosterRow(boxRow(line, '', zone, true, now))}
 				slotCell={false}
 				ptsCell={false}
-				gameFacts={false}
+				tight
 				evidence
 				season
 				pick={pickOf(line)}
@@ -110,7 +110,7 @@
 	}
 
 	.team th {
-		height: 28px;
+		height: 26px;
 		border-bottom: 2px solid var(--line-strong);
 	}
 
@@ -159,7 +159,7 @@
 	}
 
 	.cols th {
-		height: 22px;
+		height: 20px;
 		white-space: nowrap;
 		font-size: var(--t-xs);
 		font-weight: 600;
@@ -169,41 +169,6 @@
 		color: var(--ink-3);
 		background: var(--bg);
 		border-bottom: 1px solid var(--line);
-	}
-
-	/* The Lineup's row height (52px, Lane 268): the cells' padding a little tighter, as the pill
-	   rides the club line here where the Lineup gives it a cell of its own. */
-	.box :global(tbody td) {
-		padding-block: 4px;
-	}
-
-	/* The face a little closer to the name, so a status as long as Questionable keeps its line. */
-	.box :global(.pl) {
-		gap: 6px;
-	}
-
-	/* His club, pill and status on one line, the status giving way last, so a row keeps its height. */
-	.box :global(.club) {
-		flex-wrap: nowrap;
-		min-width: 0;
-		white-space: nowrap;
-	}
-
-	.box :global(.club .status-chip) {
-		display: inline-block;
-		min-width: 0;
-		height: 20px;
-		line-height: 20px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	/* The game in two short lines, opponent over kickoff, so the player keeps his room. */
-	.box :global(td.game .opp) {
-		flex-direction: column;
-		gap: 0;
-		font-size: var(--t-xs);
 	}
 
 	.c-tk {
@@ -290,27 +255,6 @@
 
 		.cols .season {
 			padding: 0 4px 0 0;
-		}
-
-		/* A phone's row is two lines, his name over his club, pill and game: Avg and Last stay the
-		   desk's, so seven rows and more show above the pinned verdict (Lane 268). */
-		.box :global(.phone-ev) {
-			display: none;
-		}
-
-		.box :global(.who) {
-			flex-direction: row;
-			flex-wrap: wrap;
-			align-items: center;
-			column-gap: 6px;
-		}
-
-		.box :global(.who .nm) {
-			flex-basis: 100%;
-		}
-
-		.box :global(.who .phone-game) {
-			flex-direction: row;
 		}
 	}
 </style>

@@ -230,6 +230,7 @@ void test("a status is Lane 63's pill: the week's word, a season-long list's wor
 	assert.deepEqual(statusOf({ status: 'questionable', as_of: asOf }, false), {
 		rank: null,
 		mark: 'Questionable',
+		short: 'Q',
 		sits: false,
 		line: null,
 		question: true
@@ -237,6 +238,7 @@ void test("a status is Lane 63's pill: the week's word, a season-long list's wor
 	assert.deepEqual(statusOf({ status: 'out', as_of: asOf }, false), {
 		rank: null,
 		mark: 'Out',
+		short: 'Out',
 		sits: true,
 		line: null
 	});
@@ -248,15 +250,23 @@ void test("a status is Lane 63's pill: the week's word, a season-long list's wor
 			false,
 			ZONE
 		),
-		{ rank: 'IR', mark: 'IR since Sep 28', sits: true, line: null }
+		// The tight row's chip is none: the pill already says IR (Lane 268).
+		{ rank: 'IR', mark: 'IR since Sep 28', short: null, sits: true, line: null }
 	);
 	assert.deepEqual(statusOf({ status: 'injured_reserve', as_of: asOf }, false, ZONE), {
 		rank: 'IR',
 		mark: 'IR',
+		short: null,
 		sits: true,
 		line: null
 	});
-	assert.deepEqual(statusOf(null, true), { rank: 'IR', mark: 'IR', sits: true, line: null });
+	assert.deepEqual(statusOf(null, true), {
+		rank: 'IR',
+		mark: 'IR',
+		short: null,
+		sits: true,
+		line: null
+	});
 	assert.equal(statusOf(null, false), null);
 	assert.deepEqual(boxRow(line(), 'QB', ZONE, true, NOW).pill, {
 		position: 'QB',
@@ -487,6 +497,8 @@ void test('a player designated to return is this week’s question: his day, his
 	assert.deepEqual(statusOf(back, true, ZONE), {
 		rank: null,
 		mark: 'Due back Sun Oct 18',
+		// The tight row's chip (Lane 268): his weekday, whole in a box-score cell.
+		short: 'Back Sun',
 		sits: false,
 		line: null,
 		question: true
@@ -511,6 +523,7 @@ void test('a player designated to return is this week’s question: his day, his
 	assert.deepEqual(statusOf(later, false, ZONE), {
 		rank: 'IR',
 		mark: 'IR, back Nov 8',
+		short: 'Back Nov 8',
 		sits: true,
 		line: null
 	});

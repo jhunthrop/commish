@@ -13,6 +13,7 @@ import { lastName } from '#lib/format/draft.ts';
 import {
 	designationWord,
 	rankWord,
+	calendarDay,
 	returningMark,
 	seasonLongMark,
 	seasonLongStatus,
@@ -271,10 +272,25 @@ export function statusOf(
 			: returning !== null
 				? returningMark(returning)
 				: (carriedMark(designation, zone) ?? designationWord(status)),
+		// The tight row's chip (Lane 268): the box-score letters, his return day's weekday, or nothing
+		// where the position pill already says the list ("RB IR").
+		short: seasonLong
+			? returning !== null
+				? `Back ${calendarDay(returning)}`
+				: null
+			: returning !== null
+				? returningShort(returning)
+				: rankWord(status),
 		sits: sitsHim(status),
 		line: null,
 		...(status === 'questionable' ? { question: true as const } : {})
 	};
+}
+
+/** "Back Sun": a player due back this week in the few characters a tight row's chip has (the trade
+ * rows, Lane 268); his day in full is the pill's word everywhere else. */
+export function returningShort(returning: string): string {
+	return `Back ${calendarDay(returning, true).slice(0, 3)}`;
 }
 
 /** Whether the API's designation has him due back this week (Lane 153): this week's question, so the

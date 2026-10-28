@@ -23,9 +23,11 @@
 		verb: Snippet;
 		/** The head over each side's gain, Gain a week (TRADES.gainHead). */
 		gainHead: string;
+		/** The head over the sides' names, for a screen reader: "Team". */
+		teamHead: string;
 	}
 
-	let { yours, theirs, verb, gainHead }: Props = $props();
+	let { yours, theirs, verb, gainHead, teamHead }: Props = $props();
 </script>
 
 {#snippet row(side: Side, mine: boolean)}
@@ -62,7 +64,7 @@
 	<table>
 		<thead>
 			<tr>
-				<th scope="col"><span class="vh">{TRADES.yourSide}</span></th>
+				<th scope="col"><span class="vh">{teamHead}</span></th>
 				<th scope="col">{TRADES.weekHead}</th>
 				<th scope="col">{gainHead}</th>
 				<th scope="col" class="room">{TRADES.room}</th>
@@ -267,9 +269,12 @@
 	}
 
 	@media (max-width: 760px) {
-		.room,
-		.bar {
+		.room {
 			display: none;
+		}
+
+		.bar {
+			width: 28px;
 		}
 
 		th,
@@ -277,8 +282,36 @@
 			padding-right: var(--s-2);
 		}
 
+		/* The team's name whole, on a second line where it is long, never cut. */
 		.who {
-			max-width: 8rem;
+			width: 7.5rem;
+			white-space: normal;
+		}
+
+		.who-in {
+			align-items: flex-start;
+			flex-wrap: wrap;
+			column-gap: 4px;
+		}
+
+		.name {
+			flex-basis: 100%;
+			overflow: visible;
+			overflow-wrap: anywhere;
+			line-height: 1.2;
+		}
+
+		tbody tr {
+			height: auto;
+		}
+
+		tbody th,
+		tbody td {
+			padding-block: 3px;
+		}
+
+		.figs {
+			gap: 4px;
 		}
 
 		i,

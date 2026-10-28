@@ -272,6 +272,8 @@ export const ANALYZER_LINES = {
 	/** An idea's two gains a week: "+5.7 yours, +0.7 theirs". */
 	yours: 'yours',
 	theirs: 'theirs',
+	/** The verdict's head over the sides' names, for a screen reader. */
+	team: 'Team',
 
 	/** The verb that copies the built trade as text. */
 	share: 'Share',
