@@ -202,6 +202,8 @@ export const SHOT_CASES: readonly ShotCase[] = [
 	}),
 	once('player-card-shots', 'standin', FIXTURE_WEEK_CLOCK),
 	once('inseason-shots', 'standin', FIXTURE_WEEK_CLOCK),
+	// Every league's Lineup on one page and its one verb (Lane 257).
+	once('every-lineup-shots', 'contract', FIXTURE_WEEK_CLOCK),
 	...clocked('platform-finals-shots', 'standin', {
 		saturday: FIXTURE_WEEK_CLOCK,
 		sunday: FIXTURE_SUNDAY_MORNING_CLOCK,

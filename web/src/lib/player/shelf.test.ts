@@ -40,6 +40,7 @@ import {
 	rowBySlug,
 	shelfHref,
 	shelfSlug,
+	shelfScope,
 	type ScreenOffer,
 	type ShelfClick,
 	type ShelfGo,
@@ -355,6 +356,45 @@ void test('a reload reopens the card the address names, and closing it then clea
 	host.close();
 	assert.deepEqual(nav.log.at(-1), `replace ${SCREEN}`);
 	assert.equal(host.slug, null);
+});
+
+void test("on a page of many, a card opens over its own block's rows only (Lane 257)", () => {
+	const nav = fakeNav(SCREEN);
+	let cardIn: string | undefined;
+	const go = nav.go;
+	const scoped: ShelfNav = {
+		...nav,
+		cardIn: () => cardIn,
+		go: (href, options) => {
+			go(href, options);
+			if (options.state !== undefined) cardIn = options.state.cardIn;
+		}
+	};
+	const a = new ShelfHost({ ...options, scope: 'a' }, scoped);
+	const b = new ShelfHost({ ...options, scope: 'b' }, scoped);
+	a.open(click(), rowOf(lineupRows(FIXTURE_WEEK_CLOCK), 'jaxson-dart'));
+	assert.equal(a.slug, 'jaxson-dart');
+	assert.equal(b.slug, null);
+	assert.equal(shelfScope(nav.at), 'a');
+	// A reload reopens it in the block the address names, and no other.
+	const reloaded = fakeNav(nav.at);
+	let reloadedIn: string | undefined;
+	const reloadedNav: ShelfNav = {
+		...reloaded,
+		cardIn: () => reloadedIn,
+		go: (href, options) => {
+			reloaded.go(href, options);
+			if (options.state !== undefined) reloadedIn = options.state.cardIn;
+		}
+	};
+	new ShelfHost({ ...options, scope: 'b' }, reloadedNav).restore();
+	assert.deepEqual(reloaded.log, []);
+	const again = new ShelfHost({ ...options, scope: 'a' }, reloadedNav);
+	again.restore();
+	assert.equal(again.slug, 'jaxson-dart');
+	// Closed, the address names neither the card nor its block.
+	assert.equal(shelfScope(shelfHref(nav.at, null)), null);
+	assert.equal(shelfSlug(shelfHref(nav.at, null)), null);
 });
 
 void test('a verb that opens a panel on the screen gives it the focus, the name otherwise', () => {

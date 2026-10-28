@@ -73,12 +73,12 @@ public struct ETagMiddleware: ClientMiddleware {
 }
 
 /// The API's dates: Go writes RFC 3339 with the fraction trimmed (none on a whole second), the
-/// fixtures with milliseconds, so both read.
+/// fixtures with milliseconds, so both read; a date is written back to the microsecond it was read at.
 public struct APIDateTranscoder: DateTranscoder {
     public init() {}
 
     public func encode(_ date: Date) throws -> String {
-        date.formatted(APIDecoding.fractional)
+        APIDecoding.text(date)
     }
 
     public func decode(_ text: String) throws -> Date {

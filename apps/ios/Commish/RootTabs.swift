@@ -8,6 +8,7 @@ import LeagueHome
 import Matchup
 import MockRoom
 import Player
+import Sheet
 import Shell
 import SwiftUI
 
@@ -16,7 +17,7 @@ import SwiftUI
 /// and the account's way in, which opens the Account. Choosing a league opens its home: the League
 /// tab where the bar has one, else the home pushed on the tab in view (B149). League, Lineup,
 /// Matchup, Waivers, Trades, the board (the Board item, and Rest of season in season with no league),
-/// Rankings, Our record and the Advisor (the live-draft companion) are live, and the search opens
+/// Rankings, Our record, the Cheat sheet and the Advisor (the live-draft companion) are live, and the search opens
 /// Rankings with its letters; the others say
 /// their screen's name until their lane lands. A score bug opens its game: the member's on the Matchup
 /// tab, another team's pushed on the tab in view (Lane 206). Every screen presents the player sheet through the one
@@ -194,7 +195,8 @@ struct RootTabs: View {
         }
     }
 
-    /// A tab of the draft's bar: the Advisor's companion, the board, or the name of a screen to come.
+    /// A tab of the draft's bar: the Advisor's companion, the board, the cheat sheet, the mock's setup, or the
+    /// name of a screen to come.
     @ViewBuilder
     private func draftScreen(_ tab: RailTab) -> some View {
         if PhoneRail.isAdvisor(tab.key) {
@@ -209,6 +211,10 @@ struct RootTabs: View {
                 expired: expired
             )
             .id("\(tab.key)-\(selectedLeague != nil)")
+        } else if tab.key == PhoneRail.sheetKey {
+            SheetTab(environment: environment, format: selectedLeague?.format ?? session.format, expired: expired) {
+                open(.mockSetup(from: nil, league: selectedLeague?.settingsLeagueID))
+            }
         } else if PhoneRail.isMock(tab.key) {
             MockSetupTab(environment: environment, from: nil, seed: mockSeed(league: nil), expired: expired) {
                 mockRoom = OpenMock(id: $0)

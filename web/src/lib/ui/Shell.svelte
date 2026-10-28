@@ -88,6 +88,8 @@
 	// names no format) opens in the context's format by itself (follow.svelte.ts).
 	onMount(() => void siteContext.load());
 	const leagueId = $derived(league ?? siteContext.league?.id ?? null);
+	/** Off a league's page, an account with more than one league opens every league's Lineup. */
+	const every = $derived(league === undefined && siteContext.leagues.length > 1);
 	/** The phone bar's rows from the parts this page passes (bar-rows.ts): with none, the one row led by
 	 * the site mark, the way home; the bottom bar keeps its five, so the mark takes no tab. */
 	const rows = $derived(barRows({ stamp, tail, search }));
@@ -105,7 +107,7 @@
 		class="item"
 		class:foot
 		data-k={foot ? undefined : item.key}
-		href={railHref(item, leagueId)}
+		href={railHref(item, leagueId, every)}
 		aria-current={item.section === current ? 'page' : undefined}
 	>
 		<RailIcon name={item.icon} />

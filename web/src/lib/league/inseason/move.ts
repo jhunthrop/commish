@@ -95,7 +95,13 @@ export type MoveStep =
 	| { kind: 'sending'; plan: ReadyPlan }
 	| { kind: 'answered'; result: HostMoveResult }
 	| { kind: 'unavailable'; sentence: string; href: string }
-	| { kind: 'failed'; sentence: string; href: string | null };
+	| {
+			kind: 'failed';
+			sentence: string;
+			href: string | null;
+			/** The move's call got no answer, so the move may have left (Lane 257 H1). */
+			lost?: true;
+	  };
 
 /** The panel after a plan: the move to confirm, or the host's page when the API cannot make it. */
 export function planStep(plan: HostMovePlan): MoveStep {
@@ -125,6 +131,52 @@ export function resultWords(
 	return `Claim submitted. ${hostWords(host)} processes it ${weekdayTime(result.processes_at, zone)}, and your lineup screen will show him once it goes through.`;
 }
 
+/** What a lineup move is made through: the league's plan and move calls, and its lineup's read. */
+export interface MoveCalls {
+	/** Plans the move in words with its confirm token; nothing is sent. */
+	plan: (move: HostMoveInput) => Promise<HostMovePlan>;
+	/** Makes the planned move once with its token. */
+	make: (move: HostMoveInput, confirm: string) => Promise<HostMoveResult>;
+	/** Reads the lineup again, once a move has been made. */
+	reread: () => void;
+}
+
+/** The league's host and its lineup page, which a failed call's step names. */
+export interface MoveHost {
+	host: LeagueHost;
+	href: string;
+}
+
+/** The panel once the move is planned; never throws (Lane 257). */
+export async function planMove(
+	calls: MoveCalls,
+	move: HostMoveInput,
+	at: MoveHost
+): Promise<MoveStep> {
+	try {
+		return planStep(await calls.plan(move));
+	} catch (error) {
+		return failedStep(error, at.host, 'plan', at.href);
+	}
+}
+
+/** The panel once the planned move is made with its token, the lineup read again after an answer;
+ * never throws (Lane 257). */
+export async function makeMove(
+	calls: MoveCalls,
+	move: HostMoveInput,
+	plan: ReadyPlan,
+	at: MoveHost
+): Promise<MoveStep> {
+	try {
+		const step = resultStep(await calls.make(move, plan.confirm));
+		calls.reread();
+		return step;
+	} catch (error) {
+		return failedStep(error, at.host, 'make', at.href);
+	}
+}
+
 /** When a call fails before the move could have left: nothing was sent. */
 export const NOT_REACHED =
 	'We could not reach Commish, and nothing was sent. Try again in a moment.';
@@ -145,7 +197,12 @@ export function failedStep(
 		return { kind: 'failed', sentence, href: null };
 	}
 	if (stage === 'make') {
-		return { kind: 'failed', sentence: lostWords(host, kind), href: href === '' ? null : href };
+		return {
+			kind: 'failed',
+			sentence: lostWords(host, kind),
+			href: href === '' ? null : href,
+			lost: true
+		};
 	}
 	return { kind: 'failed', sentence: NOT_REACHED, href: null };
 }

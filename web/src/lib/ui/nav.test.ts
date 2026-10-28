@@ -11,6 +11,8 @@ import {
 	SCREEN_PARAM,
 	shellHrefs,
 	railHref,
+	EVERY_LINEUP,
+	type RailItem,
 	railKey,
 	railPhase,
 	sectionHref,
@@ -147,6 +149,22 @@ void test("the in-season items open the selected league's screens, else the foll
 	// The rest keep their pages, a league or none.
 	assert.equal(href(WEEK_ITEM, id), '/players');
 	assert.equal(href('Rest of season, your league', id), '/board');
+});
+
+void test("Lineup opens every league's Lineup for an account with more than one, off a league's page", () => {
+	const items = railFor('in_season', false);
+	const item = (label: string): RailItem => {
+		const found = items.find((candidate) => candidate.label === label);
+		assert.ok(found, label);
+		return found;
+	};
+	const id = '6f1d1c52-2626-4a26-9a26-000000000026';
+	assert.equal(railHref(item('Lineup'), id, true), EVERY_LINEUP);
+	assert.equal(railHref(item('Lineup'), null, true), EVERY_LINEUP);
+	// Every other item keeps its league's page.
+	assert.equal(railHref(item('Matchup'), id, true), `/league/${id}/matchup`);
+	assert.equal(railHref(item('League'), id, true), `/league/${id}`);
+	assert.equal(railHref(item('Lineup'), id), `/league/${id}/start`);
 });
 
 void test('a page lights the item that owns it, a league page the item it names', () => {
