@@ -27,6 +27,7 @@ from sqlalchemy import Connection, text
 
 from research.capsules.page_figures import expected_score, page_tenth, projection_tenth
 from research.capsules.sweep import Subject
+from research.capsules.week.rollover import Rollover, projection_held, published_from_week, rollover
 from research.capsules.week.sheet import (
     Allowed,
     BoardPlace,
@@ -47,7 +48,7 @@ from research.nightly.build.page_club import call_for
 from research.nightly.build.player_season import SeasonContext, season_block, season_context
 from research.nightly.config import PAGE_FORMAT
 from research.nightly.designations import StatusRead, listed_status, read_statuses
-from research.nightly.reads.schedule import Game, weeks_left_at
+from research.nightly.reads.schedule import Game, finals_at, game_states, weeks_left
 from research.pipeline.nflverse.team_codes import product_team_code
 from research.pipeline.nws.grid import PRECIPITATION_KINDS
 from research.season import REGULAR_SEASON_WEEKS
@@ -217,19 +218,14 @@ def _schedule_reads(
     return {(int(r.week), team): r.ingested_at for r in rows for team in (r.home_team, r.away_team)}
 
 
-def board_week(conn: Connection, season: int, as_of: datetime, pending: Sequence[int]) -> int | None:
+def board_week(published_from: int | None, pending: Sequence[int]) -> int | None:
     """The site's board week: the first week the published rest-of-season board covers (the API's
-    `BoardWeek`), else the first week with a game still to kick off."""
-    published = conn.execute(
-        text(
-            "select min(from_week) from research.published_boards where season = :s "
-            "and order_basis = 'rest_of_season' and published_at <= :at"
-        ),
-        {"s": season, "at": as_of},
-    ).scalar_one()
-    if published is not None:
-        return int(published)
-    return pending[0] if pending else None
+    `BoardWeek`), once a game of it is still to come; the first week with a game still to kick off when the
+    board's first week has every game kicked off (the Tuesday run after a Monday final reads the board the
+    Monday run published, whose first week is played, Lane 256) or when no board is published."""
+    if not pending:
+        return published_from
+    return pending[0] if published_from is None else max(published_from, pending[0])
 
 
 def _weather(venue: tuple[str, datetime] | None, forecast: tuple[datetime, dict[str, float]] | None) -> Weather | None:
@@ -349,6 +345,8 @@ class WeekFacts:
     schedule_reads: Mapping[tuple[int, str], datetime]
     lines_at: datetime | None
     board_week: int
+    # Whether the board week's reads are written on a pass at `as_of` (Lane 256, `rollover`).
+    rollover: Rollover
 
 
 def _status(read: StatusRead | None, player_id: str, at: datetime | None, checked: datetime | None) -> Status:
@@ -366,10 +364,13 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         identity = subject.facts.identity
         players.setdefault(identity.id, (identity.position, identity.team))
     context = season_context(conn, season, list(players), as_of)
-    pending = weeks_left_at(conn, season, context.games, as_of)
-    the_board_week = board_week(conn, season, as_of, pending)
+    states = game_states(context.games, finals_at(conn, season, as_of), as_of)
+    pending = weeks_left(states)
+    published_from = published_from_week(conn, season, as_of)
+    the_board_week = board_week(published_from, pending)
     if not pending or the_board_week is None:
         return None
+    held = projection_held(conn, season, the_board_week, as_of)
     current = pending[0]
     weeks = {club: cw for club, slate in context.games.items() if (cw := club_week(slate, current, as_of)) is not None}
     wanted = sorted({cw.week for cw in weeks.values()} | {cw.game.week for cw in weeks.values() if cw.game is not None})
@@ -395,6 +396,7 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         _schedule_reads(conn, season, wanted, as_of),
         stamp,
         the_board_week,
+        rollover(the_board_week, context.games, states, published_from, held, as_of),
     )
 
 
@@ -424,7 +426,7 @@ def _depth(subject: Subject) -> DepthPlace | None:
 
 def last_read_of(stored: StoredWeekRead | None) -> LastRead | None:
     """The read before this one, its projection as the card's tenth (a row kept before the tenth was stored
-    reads as the figure the run and the web compare, `cadence.projection_moved`)."""
+    reads as the figure the run and the web compare, `cadence.projection_moved_past_shown`)."""
     if stored is None:
         return None
     points = None if stored.projection_points is None else projection_tenth(stored.projection_points)

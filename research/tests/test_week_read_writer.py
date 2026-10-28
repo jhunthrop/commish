@@ -279,7 +279,8 @@ def test_a_bye_read_is_written_and_never_recommends_him() -> None:
 
 
 def test_the_step_holds_a_dollar_budget_under_the_nightly_bound() -> None:
-    """The review's M3: the pass's own hard stop, its worst read, and a day of week reads beside $4.15."""
+    """The review's M3: the pass's own hard stop, its worst read, and a day of week reads beside $4.15 (Lane
+    256: the roll-over's $2.50 with the hourly $0.60)."""
     budget = step_budget(_PRICE, NIGHTLY_BUDGET_USD)
     assert budget.max_usd == NIGHTLY_BUDGET_USD and budget.price == _PRICE
     # Four asks, Lane 100's one overrun retry and the judge's ask that rides with it (Lane 117, B80).
@@ -297,7 +298,7 @@ def test_the_worst_prompt_bound_holds_the_heaviest_correction() -> None:
     chars = len(WEEK_RULES) + len(user)
     assert chars / MIN_CHARS_PER_TOKEN <= WORST_PROMPT_TOKENS, chars
     assert step_budget(ModelPrice("m", None, None, "unread", None), HOURLY_BUDGET_USD).max_calls == int(0.05 / 0.00065)
-    assert pytest.approx(2.00) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
+    assert pytest.approx(3.10) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
 
 
 _NOW = WRITTEN_AT
@@ -324,16 +325,20 @@ def _stored(sheet_week: int = 6, **changes: object) -> StoredWeekRead:
     return replace(row, **changes)  # type: ignore[arg-type]
 
 
-def test_the_cadence_writes_a_first_read_a_status_change_and_a_projection_the_card_prints_otherwise() -> None:
-    """Lane 66v: a read quotes the card's projection, so any move of the printed tenth makes it due (Josh
-    Allen's read said 26.6 a day after his card moved to 26.4, under the old one-point threshold)."""
-    sheet = questionable()
+def test_the_cadence_writes_a_first_read_a_status_change_and_a_projection_past_the_proj_change_threshold() -> None:
+    """Lane 256: after the roll-over a read is rewritten for a published projection that moved past the Proj
+    change tile's threshold (the page's serve rule), never for a smaller move, which rewrote the whole board
+    mid-week (330 reads on the night of 2026-10-21)."""
+    sheet = questionable()  # the card prints 15.2
     assert due_reason(sheet, None, _NOW) == FIRST
     assert due_reason(sheet, _stored(sheet_week=5), _NOW) == FIRST
     assert due_reason(sheet, _stored(), _NOW) is None
     assert due_reason(replace(sheet, status=Status("out", REPORT)), _stored(), _NOW) == STATUS_CHANGED
-    assert due_reason(sheet, _stored(projection_points=15.4), _NOW) == PROJECTION_MOVED
-    assert due_reason(sheet, _stored(projection_points=15.1), _NOW) == PROJECTION_MOVED
+    assert due_reason(sheet, _stored(projection_points=15.7), _NOW) == PROJECTION_MOVED
+    assert due_reason(sheet, _stored(projection_points=14.7), _NOW) == PROJECTION_MOVED
+    assert due_reason(sheet, _stored(projection_points=15.6), _NOW) is None
+    assert due_reason(sheet, _stored(projection_points=15.1), _NOW) is None
+    assert due_reason(sheet, _stored(projection_points=None), _NOW) == PROJECTION_MOVED
     # A row kept before the card's tenth was stored reads as the tenth it printed.
     assert due_reason(sheet, _stored(projection_points=15.24), _NOW) is None
     assert due_reason(sheet, _stored(source="facts"), _NOW) == UNWRITTEN
@@ -354,8 +359,8 @@ def test_the_hourly_pass_writes_only_a_status_that_moved() -> None:
     assert due_reason(sheet, _stored(source="facts"), _NOW, hourly=True) is None
     assert due_reason(replace(sheet, status=Status("out", REPORT)), _stored(), _NOW, hourly=True) == STATUS_CHANGED
     assert due_reason(sheet, _stored(projection_points=13.0), _NOW, hourly=True) is None
-    assert due_reason(sheet, _stored(projection_points=15.4), _NOW, hourly=True) is None
-    assert due_reason(sheet, _stored(projection_points=15.4), _NOW) == PROJECTION_MOVED
+    assert due_reason(sheet, _stored(projection_points=15.8), _NOW, hourly=True) is None
+    assert due_reason(sheet, _stored(projection_points=15.8), _NOW) == PROJECTION_MOVED
 
 
 def test_a_sentence_shape_on_two_pages_keeps_its_first_carrier_in_board_order() -> None:

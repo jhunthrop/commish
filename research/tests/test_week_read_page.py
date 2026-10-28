@@ -6,10 +6,11 @@ kicked off (H1)."""
 from datetime import UTC, date, datetime
 
 from research.capsules.week.caption import PROJECTION_MOVED_CAPTION
+from research.capsules.week.rollover import ReadsDue
 from research.capsules.week.sheet import PublishedProjection
 from research.capsules.week.store import StoredWeekRead
 from research.nightly.assemble import served_projections
-from research.nightly.build.pages import UNREAD, ReadClock, week_read_json
+from research.nightly.build.pages import UNREAD, ReadClock, reads_due_json, week_read_json
 
 _WRITTEN = datetime(2026, 10, 17, 2, 0, tzinfo=UTC)
 
@@ -89,3 +90,12 @@ def test_the_run_serves_each_players_projection_for_the_board_week_as_the_card_p
     assert served_projections(read, 6) == {"00-0038542": 15.2}
     # No snapshot for the week: the run does not judge the reads by it.
     assert served_projections(read, 8) is None
+
+
+def test_until_the_roll_over_a_page_with_no_read_names_the_week_and_the_night_its_reads_are_written() -> None:
+    """Lane 256: the page's words in place of "not written yet" come from the run's week and night; a page
+    serving a read, or a run after the roll-over, carries none."""
+    due = ReadsDue(8, "Tuesday")
+    assert reads_due_json(None, due) == {"week": 8, "night": "Tuesday"}
+    assert reads_due_json({"week": 8}, due) is None
+    assert reads_due_json(None, None) is None

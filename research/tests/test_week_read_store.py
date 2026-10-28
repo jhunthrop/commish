@@ -36,7 +36,7 @@ from research.db.schema import CAPTURE_SNAPSHOTS, PLAYER_WEEK_READ_RUNS, PLAYER_
 from research.db.url import sqlalchemy_url
 from research.nightly.designations import designations_file, read_statuses, status_word
 from research.nightly.week_read_demotion import DEMOTED, demote_shared
-from research.nightly.week_reads import WeekReadSpend, _Night, _write, record_spend
+from research.nightly.week_reads import WeekReadSpend, _write, record_spend
 from research.parity import databases
 from research.tests.test_week_read_rules import STARTER_READ
 from research.tests.week_read_fixtures import WRITTEN_AT, questionable, starter
@@ -108,9 +108,8 @@ def test_the_nights_pool_lands_each_read_with_its_stamps_call_and_attempt(engine
         return _completion(STARTER_READ, "start") if puka else _completion(_QUESTIONABLE_READ, "hold")
 
     first, second = starter(), questionable()
-    night = _Night((first, second), {}, 6)
     spend = WeekReadSpend()
-    _write(engine, _gateway(answer), night, [(first, FIRST), (second, STATUS_CHANGED)], room=lambda: True, spend=spend)
+    _write(engine, _gateway(answer), {}, [(first, FIRST), (second, STATUS_CHANGED)], room=lambda: True, spend=spend)
     with engine.connect() as conn:
         stored = stored_week_reads(conn, 2026, [6])
     assert spend.written == _BOTH and spend.facts_blocks == 0
@@ -126,10 +125,9 @@ def test_a_read_that_keeps_quoting_a_figure_off_the_page_falls_and_the_pass_says
     """Lane 66v: every draft says 18.6 where the card prints 18.4, so the read falls to its facts block and
     the pass's line names him and the figure guard."""
     off_page = STARTER_READ.replace("18.4 points", "18.6 points")
-    night = _Night((starter(),), {}, 6)
     spend = WeekReadSpend()
     gateway = _gateway(lambda _request: _completion(off_page, "start"))
-    _write(engine, gateway, night, [(starter(), FIRST)], room=lambda: True, spend=spend)
+    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend)
     assert spend.facts_blocks == 1 and spend.written == 0
     assert f'Puka Nacua: failed validation: {FIGURE_OFF_PAGE}: "18.6"' in spend.line()
 
@@ -139,9 +137,8 @@ def test_a_read_the_budget_stopped_writes_nothing(engine: Engine) -> None:
     with engine.begin() as conn:
         upsert_week_read(conn, _row(pid, 6, "A written read that stands."))
     gateway = _gateway(lambda _request: _completion(STARTER_READ, "start")).with_budget(RunBudget.of(calls=0))
-    night = _Night((starter(),), {}, 6)
     spend = WeekReadSpend()
-    _write(engine, gateway, night, [(starter(), FIRST)], room=lambda: True, spend=spend)
+    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend)
     with engine.connect() as conn:
         stored = stored_week_reads(conn, 2026, [6])
     assert spend.budget_stopped == 1 and spend.written == 0
