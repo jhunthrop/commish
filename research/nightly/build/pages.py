@@ -409,7 +409,7 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
         "formats": formats,
         "capsule": capsule_json(stored, page),
         "weekRead": week_read,
-        "weekReadsDue": reads_due_json(week_read, inputs.week.due),
+        "weekReadsDue": reads_due_json(week_read, _promised(who, season is not None, inputs)),
         "season": season,
         "priorSeasons": prior,
         # The club his newest game line was for, when it is not the page's (Lane 120), and whether that
@@ -418,6 +418,19 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
             call_for(inputs.season.clubs, who.id), () if season is None else season["log"]
         ),
     }
+
+
+def _promised(who: Identity, has_season: bool, inputs: PageInputs) -> ReadsDue | None:
+    """The roll-over's promise for a page the pass will write (Lane 265, L4): a season block and a club
+    (`collect.week_sheet`'s own tests) whose game of the week has not kicked off; None for a free agent and
+    for any page the pass never writes, which says its read is not written yet."""
+    due = inputs.week.due
+    if due is None or not has_season:
+        return None
+    club = call_for(inputs.season.clubs, who.id).club
+    if club is None or _kicked_off(inputs.season.games.get(club, ()), due.week, inputs.week.as_of):
+        return None
+    return due
 
 
 def _week_read(who: Identity, universe_id: str | None, inputs: PageInputs) -> Json | None:

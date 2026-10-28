@@ -8,7 +8,8 @@ Two modes on one pass (`run_week_read_step`), both on the board week alone (`col
   roll-over pass then writes every board player's read for the week, from that one facts instant, under
   `NIGHTLY_BUDGET_USD`, which covers the whole board; a read that falls to its facts block (or is demoted for a
   sentence another page carries) is asked again within the pass, `ROLLOVER_ROUNDS` in all, and any still
-  unwritten are named in the step line and asked again on the next nightly. After it, a nightly writes only
+  unwritten are counted at the head of the step line, the step's status "partial", each named on a line of
+  its own, and asked again on the next nightly. After it, a nightly writes only
   what the cadence says moved (`capsules.week.cadence`: a status, the published projection the card prints,
   a read still unwritten, a player new to the board).
 - **Hourly**, after the in-season job's status capture (`research.inseason --task capture-harvest`): only
@@ -46,7 +47,7 @@ from research.capsules.config import CAPSULE_CONFIG, writer_settings
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient
 from research.capsules.gateway_ledger import ModelPrice
-from research.capsules.narrative import sentences_verbatim
+from research.capsules.narrative import ShapeMasks, sentences_verbatim
 from research.capsules.run_budget import RunBudget
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.sweep import FactsPassMemo
@@ -63,6 +64,7 @@ from research.capsules.week.store import (
     stored_week_reads,
     upsert_week_read,
 )
+from research.capsules.week.validate import week_masks
 from research.capsules.week.write import MAX_TOKENS, WeekReadResult, write_week_read
 from research.nightly.capsule_step import checked_price
 from research.nightly.steps import StepRecord
@@ -70,6 +72,8 @@ from research.nightly.week_read_demotion import demote_shared, read_shapes
 from research.season import PRODUCT_SEASON
 
 STEP: Final = "week-reads"
+# A pass that ended with due reads still unwritten (the budget's stop, or every round spent): never a failure.
+PARTIAL: Final = "partial"
 # The nightly's steps whose failure is reported and never fails the run.
 ADVISORY: Final = frozenset({STEP})
 NIGHTLY: Final = "nightly"
@@ -120,7 +124,8 @@ class WeekReadSpend:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     cost_usd: float = 0.0
-    demoted: int = 0
+    # The reads the demotion wrote as their facts blocks, each counted once however many rounds demote it.
+    demoted_reads: set[tuple[str, int]] = field(default_factory=set)
     rounds: int = 0
     # Each read that fell to its facts block, "<name>: <why>" (Lane 66v): the pass's own record of why.
     fell: list[str] = field(default_factory=list)
@@ -141,20 +146,32 @@ class WeekReadSpend:
     def fell_to_facts(self, name: str, why: str) -> None:
         self.fell.append(f"{name}: {why}")
 
+    @property
+    def demoted(self) -> int:
+        return len(self.demoted_reads)
+
+    @property
+    def status(self) -> str:
+        """The step's status: "partial" while a read it was due to write is still unwritten."""
+        return PARTIAL if self.unwritten else "ran"
+
     def line(self) -> str:
         due = ", ".join(f"{reason} {count}" for reason, count in sorted(self.due.items())) or "none"
         fell = "" if not self.fell else f"; {len(self.fell)} fell to their facts blocks: {'; '.join(self.fell)}"
-        unwritten = (
-            "every due read written"
-            if not self.unwritten
-            else f"{len(self.unwritten)} still unwritten, asked again on the next pass: {', '.join(self.unwritten)}"
-        )
-        return (
+        body = (
             f"{sum(self.due.values())} reads due ({due}), {self.written} written, {self.facts_blocks} facts blocks, "
-            f"{self.budget_stopped} stopped by the budget, {self.rounds} rounds, {unwritten}, {self.calls} calls, "
+            f"{self.budget_stopped} stopped by the budget, {self.rounds} rounds, {self.calls} calls, "
             f"{self.prompt_tokens} prompt and {self.completion_tokens} completion tokens, ${self.cost_usd:.6f}, "
             f"{self.demoted} demoted for a sentence on two pages{fell}"
         )
+        if not self.unwritten:
+            return f"every due read written; {body}"
+        names = "".join(f"\n  {name}" for name in self.unwritten)
+        return f"{len(self.unwritten)} still unwritten, asked again on the next pass; {body}; unwritten:{names}"
+
+    def head(self) -> str:
+        """The count the step line leads with, before the night's facts."""
+        return "" if not self.unwritten else f"{len(self.unwritten)} still unwritten; "
 
 
 def worst_read_usd(price: ModelPrice) -> float:
@@ -173,9 +190,11 @@ def step_budget(price: ModelPrice, usd: float) -> RunBudget:
 
 
 class _Board:
-    """The week's sentence shapes as reads land: who carries each, and tonight's newest sentences to quote."""
+    """The week's sentence shapes as reads land (masked with every sheet's names, `week_masks`): who carries
+    each, and tonight's newest sentences to quote."""
 
-    def __init__(self, stored: Mapping[tuple[str, int], StoredWeekRead]) -> None:
+    def __init__(self, stored: Mapping[tuple[str, int], StoredWeekRead], masks: ShapeMasks) -> None:
+        self.masks = masks
         self.carriers: dict[int, dict[str, set[str]]] = {}
         self.recent: dict[int, deque[str]] = {}
         for (player_id, week), read in stored.items():
@@ -185,7 +204,7 @@ class _Board:
         by_shape = self.carriers.setdefault(week, {})
         for held in by_shape.values():
             held.discard(player_id)
-        for shape in read_shapes(read):
+        for shape in read_shapes(read, self.masks):
             by_shape.setdefault(shape, set()).add(player_id)
 
     def taken(self, sheet: WeekSheet) -> frozenset[str]:
@@ -233,9 +252,9 @@ def _read_night(engine: Engine, now: datetime, facts: FactsPassMemo) -> _Night |
             return None
         week = week_facts.board_week
         stored = stored_week_reads(conn, PRODUCT_SEASON, [week])
-        # The board week alone: a player whose game of it has kicked off has his next week ahead, written when
-        # that week rolls over (Lane 256), never trickled in before it.
-        sheets = tuple(s for s in collect_week_sheets(week_facts, subjects, stored) if s.week == week)
+        # The board week's sheets alone (`collect.read_week_facts`): a player whose game of it has kicked off
+        # has his next week ahead, written when that week rolls over (Lane 256), never trickled in before it.
+        sheets = tuple(collect_week_sheets(week_facts, subjects, stored))
         return _Night(sheets, stored, week, week_facts.rollover)
 
 
@@ -247,10 +266,11 @@ def _write(  # noqa: PLR0913 - the pass's parts
     *,
     room: Callable[[], bool],
     spend: WeekReadSpend,
+    masks: ShapeMasks,
     judge: str = JUDGE_MODEL,
 ) -> None:
     """The due reads on the writer's pool, each landed in its own transaction, tallied on `spend`."""
-    board = _Board(stored)
+    board = _Board(stored, masks)
     landed = spend.landed
 
     def start(item: tuple[WeekSheet, str]) -> Callable[[GatewayClient], WeekReadResult]:
@@ -304,10 +324,11 @@ def _write_rounds(  # noqa: PLR0913 - the pass's parts
     most `rounds` times while the budget has room; those still unwritten are named on `spend`."""
     stored: Mapping[tuple[str, int], StoredWeekRead] = night.stored
     batch = list(due)
+    masks = week_masks(night.sheets)
     while batch and spend.rounds < rounds and room():
         spend.rounds += 1
-        _write(engine, gateway, stored, batch, room=room, spend=spend, judge=judge)
-        spend.demoted += demote_shared(engine, night.sheets, night.board_week, now)
+        _write(engine, gateway, stored, batch, room=room, spend=spend, masks=masks, judge=judge)
+        spend.demoted_reads |= demote_shared(engine, night.sheets, night.board_week, now)
         stored = _reread(engine, night.board_week)
         batch = [(sheet, UNWRITTEN) for sheet in _unwritten(night, due, stored)]
     spend.unwritten = [sheet.name for sheet in _unwritten(night, due, stored)]
@@ -389,6 +410,9 @@ def run_week_read_step(
     finally:
         # Whatever the pass spent is on the day's ledger even when it raised (the re-review's F6).
         record_spend(engine, now, mode, spend, budget)
-    line = f"{head}, {len(night.sheets)} board players with a week {night.board_week} ahead, {budget.line()}; {spend.line()}"
+    line = (
+        f"{spend.head()}{head}, {len(night.sheets)} board players with a week {night.board_week} ahead, "
+        f"{budget.line()}; {spend.line()}"
+    )
     log(f"{STEP}: {line}")
-    return StepRecord(STEP, "ran", line)
+    return StepRecord(STEP, spend.status, line)

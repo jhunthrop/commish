@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient
+from research.capsules.narrative import ShapeMasks
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.run_budget import RunBudget
 from research.capsules.week.cadence import FIRST, STATUS_CHANGED
@@ -51,6 +52,7 @@ _QUESTIONABLE_READ = (
     "to score 25 points. If he is active, Bijan Robinson stays in your lineup over a lesser back."
 )
 _SHARED = "The Rams lean on him every single week."
+_MASKS = ShapeMasks.of(("Puka Nacua", "Bijan Robinson"))
 _THIS_WEEK, _NEXT_WEEK = 6, 7
 _BOTH = 2
 
@@ -109,7 +111,15 @@ def test_the_nights_pool_lands_each_read_with_its_stamps_call_and_attempt(engine
 
     first, second = starter(), questionable()
     spend = WeekReadSpend()
-    _write(engine, _gateway(answer), {}, [(first, FIRST), (second, STATUS_CHANGED)], room=lambda: True, spend=spend)
+    _write(
+        engine,
+        _gateway(answer),
+        {},
+        [(first, FIRST), (second, STATUS_CHANGED)],
+        room=lambda: True,
+        spend=spend,
+        masks=_MASKS,
+    )
     with engine.connect() as conn:
         stored = stored_week_reads(conn, 2026, [6])
     assert spend.written == _BOTH and spend.facts_blocks == 0
@@ -127,7 +137,7 @@ def test_a_read_that_keeps_quoting_a_figure_off_the_page_falls_and_the_pass_says
     off_page = STARTER_READ.replace("18.4 points", "18.6 points")
     spend = WeekReadSpend()
     gateway = _gateway(lambda _request: _completion(off_page, "start"))
-    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend)
+    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend, masks=_MASKS)
     assert spend.facts_blocks == 1 and spend.written == 0
     assert f'Puka Nacua: failed validation: {FIGURE_OFF_PAGE}: "18.6"' in spend.line()
 
@@ -138,7 +148,7 @@ def test_a_read_the_budget_stopped_writes_nothing(engine: Engine) -> None:
         upsert_week_read(conn, _row(pid, 6, "A written read that stands."))
     gateway = _gateway(lambda _request: _completion(STARTER_READ, "start")).with_budget(RunBudget.of(calls=0))
     spend = WeekReadSpend()
-    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend)
+    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend, masks=_MASKS)
     with engine.connect() as conn:
         stored = stored_week_reads(conn, 2026, [6])
     assert spend.budget_stopped == 1 and spend.written == 0
@@ -182,10 +192,10 @@ def test_a_sentence_shape_on_two_reads_demotes_the_later_carrier_over_the_board_
     first, second = starter(), questionable()
     with engine.begin() as conn:
         upsert_week_read(conn, _row(first.player_id, 6, f"Puka Nacua faces ARI at home. {_SHARED}"))
-        shaped = "The Falcons lean on Bijan Robinson every single week."
+        shaped = "The Falcons lean on him every single week."
         upsert_week_read(conn, _row(second.player_id, 6, f"Bijan Robinson faces CHI at home. {shaped}"))
     tonight = (first, replace(second, week=7))
-    assert demote_shared(engine, tonight, 6, datetime.now(UTC)) == 1
+    assert demote_shared(engine, tonight, 6, datetime.now(UTC)) == {(second.player_id, 6)}
     with engine.connect() as conn:
         stored = stored_week_reads(conn, 2026, [6])
     assert stored[(first.player_id, 6)].source == "llm"

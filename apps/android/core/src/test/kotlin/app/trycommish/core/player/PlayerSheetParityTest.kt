@@ -106,7 +106,13 @@ class PlayerSheetParityTest {
     fun `with no read the place names his next game only while it is to come`() {
         SheetParity.cases("noRead").forEach { test ->
             val due = test.obj("due")?.let { CommishJson.decodeFromJsonElement(RunReadsDue.serializer(), it) }
-            assertEquals(test.string("words"), WeekReads.noRead(SheetParity.state(test.text("state")), due), "${test.text("state")} $due")
+            // A case with no screen clock is the screen before it has read one: any instant before the nightly.
+            val now = test.text("now")?.let(Instant::parse) ?: Instant.EPOCH
+            assertEquals(
+                test.string("words"),
+                WeekReads.noRead(SheetParity.state(test.text("state")), due, now),
+                "${test.text("state")} $due $now",
+            )
         }
     }
 

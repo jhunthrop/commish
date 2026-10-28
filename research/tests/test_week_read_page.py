@@ -4,13 +4,26 @@ when his status moved since (the review's H3); none for a facts row (L3) or once
 kicked off (H1)."""
 
 from datetime import UTC, date, datetime
+from typing import cast
 
 from research.capsules.week.caption import PROJECTION_MOVED_CAPTION
 from research.capsules.week.rollover import ReadsDue
 from research.capsules.week.sheet import PublishedProjection
 from research.capsules.week.store import StoredWeekRead
 from research.nightly.assemble import served_projections
-from research.nightly.build.pages import UNREAD, ReadClock, reads_due_json, week_read_json
+from research.nightly.build.page_club import ClubCall
+from research.nightly.build.pages import (
+    UNREAD,
+    Identity,
+    PageInputs,
+    ReadClock,
+    ServedWeek,
+    _promised,
+    reads_due_json,
+    week_read_json,
+)
+from research.nightly.build.player_season import SeasonContext, SeasonStore
+from research.nightly.reads.schedule import Game
 
 _WRITTEN = datetime(2026, 10, 17, 2, 0, tzinfo=UTC)
 
@@ -95,7 +108,33 @@ def test_the_run_serves_each_players_projection_for_the_board_week_as_the_card_p
 def test_until_the_roll_over_a_page_with_no_read_names_the_week_and_the_night_its_reads_are_written() -> None:
     """Lane 256: the page's words in place of "not written yet" come from the run's week and night; a page
     serving a read, or a run after the roll-over, carries none."""
-    due = ReadsDue(8, "Tuesday")
-    assert reads_due_json(None, due) == {"week": 8, "night": "Tuesday"}
+    due = ReadsDue(8, datetime(2026, 10, 28, 5, 30, tzinfo=UTC))
+    assert reads_due_json(None, due) == {"week": 8, "night": "Tuesday", "at": "2026-10-28T05:30:00.000Z"}
     assert reads_due_json({"week": 8}, due) is None
     assert reads_due_json(None, None) is None
+
+
+def _inputs(due: ReadsDue, clubs: dict[str, str | None], games: dict[str, list[Game]], at: datetime) -> PageInputs:
+    calls = {pid: ClubCall(club, None, None, moved=False) for pid, club in clubs.items()}
+    season = SeasonContext(2026, 18, 7, games, {}, cast("SeasonStore", None), {}, calls)
+    return PageInputs({}, {}, {}, {}, season, ServedWeek({}, {}, at, None, due), {})
+
+
+def _who(player_id: str) -> Identity:
+    return Identity(player_id, player_id, player_id, "WR", "LAR", None)
+
+
+def test_the_promise_is_only_for_a_page_the_pass_will_write() -> None:
+    """The review's L4: a free agent, a page with no season, and a club whose week 8 game has kicked off are
+    never written by the roll-over, so their pages promise no night."""
+    tuesday = datetime(2026, 10, 27, 5, 50, tzinfo=UTC)
+    due = ReadsDue(8, datetime(2026, 10, 28, 5, 30, tzinfo=UTC))
+    games = {
+        "LAR": [Game(8, "ARI", False, datetime(2026, 10, 30, 0, 15, tzinfo=UTC))],
+        "SEA": [Game(8, "HOU", False, datetime(2026, 10, 27, 5, 0, tzinfo=UTC))],
+    }
+    inputs = _inputs(due, {"ram": "LAR", "free": None, "hawk": "SEA"}, games, tuesday)
+    assert _promised(_who("ram"), True, inputs) == due
+    assert _promised(_who("ram"), False, inputs) is None
+    assert _promised(_who("free"), True, inputs) is None
+    assert _promised(_who("hawk"), True, inputs) is None

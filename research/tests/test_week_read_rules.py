@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from research.capsules.narrative import ShapeMasks
 from research.capsules.season_voice import SeasonClock, time_frame_hits
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
@@ -31,7 +32,7 @@ from research.capsules.week.sheet import (
     WeekSheet,
 )
 from research.capsules.week.start_advice import start_advice_in
-from research.capsules.week.validate import sentence_shapes, validate_week_read, with_season
+from research.capsules.week.validate import sentence_shapes, validate_week_read, week_masks, with_season
 from research.tests.week_read_fixtures import (
     BEFORE,
     BOARD,
@@ -314,9 +315,36 @@ def test_a_read_runs_three_to_five_sentences(count: int) -> None:
 def test_a_sentence_shaped_like_one_on_another_page_is_refused() -> None:
     """The review's M4: the same skeleton with another name and other numbers is the same sentence."""
     theirs = "The Bears play indoors, so nothing about the weather gets in his way."
-    taken = frozenset(sentence_shapes(theirs))
+    taken = frozenset(sentence_shapes(theirs, week_masks((starter(),))))
     result = validate_week_read(STARTER_READ, starter(), taken, call="start")
     assert any("shaped like one another page carries" in v for v in result.violations), result.violations
+    # The ask shows the shape, its names, clubs and numbers as placeholders.
+    assert any('"the [club] play indoors so nothing about the weather gets in his way"' in v for v in result.violations)
+
+
+def test_the_same_shape_with_a_longer_name_or_another_ordinal_is_the_same_shape() -> None:
+    """Lane 265: a name is one placeholder however many words it runs (a word-by-word mask counted them),
+    and an ordinal's suffix goes with its number."""
+    masks = ShapeMasks.of(("Puka Nacua", "Amon-Ra St. Brown"))
+    ours = "Puka Nacua faces the Cardinals, who rank 26th of 32 against receivers this year."
+    theirs = "Amon-Ra St. Brown faces the New York Jets, who rank 23rd of 32 against receivers this year."
+    assert set(sentence_shapes(ours, masks)) == set(sentence_shapes(theirs, masks))
+    assert set(sentence_shapes("St. Brown's matchup is the best on the board this week.", masks)) == set(
+        sentence_shapes("Nacua's matchup is the best on the board this week.", masks)
+    )
+
+
+def test_a_shape_under_six_words_is_the_calls_vocabulary_and_never_held() -> None:
+    masks = ShapeMasks.of(("Puka Nacua",))
+    assert sentence_shapes("Start Puka Nacua in week 6.", masks) == {}
+    assert sentence_shapes("Start Puka Nacua in week 6 of 2026.", masks) != {}
+
+
+def test_a_lower_case_word_that_spells_a_surname_is_kept() -> None:
+    masks = ShapeMasks.of(("Jordan Love",))
+    assert next(iter(sentence_shapes("He would love a game against a soft defense this week.", masks))).startswith(
+        "he would love"
+    )
 
 
 def test_a_call_is_required() -> None:

@@ -7,7 +7,7 @@ gone with the sportsbook register (the prep-site ruling): the page's modules no 
 """
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Final
 
@@ -21,6 +21,7 @@ from research.capsules.facts.model import (
     RookieEvidence,
     ShareEvidence,
 )
+from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.sentences import split_sentences
 from research.capsules.validate import grounding_of, validate_narrative_slot
 from research.capsules.voice_rules import in_fantasy_words
@@ -30,6 +31,16 @@ if TYPE_CHECKING:
 
 CALL_WORDS: Final = 30
 MODULE_WORDS: Final = 40
+# A sentence's shape (Lane 265, Lane 261's bake-off normalization): the marks its names, clubs and numbers
+# become, spelled so `normalize_sentence` keeps each one word, and the words the correction ask shows for each.
+PLAYER_MARK: Final = "zzplayer"
+CLUB_MARK: Final = "zzclub"
+NUMBER_MARK: Final = "zznum"
+_SHOWN_MARKS: Final = {PLAYER_MARK: "[name]", CLUB_MARK: "[club]", NUMBER_MARK: "[number]"}
+# A number with its ordinal suffix, so "23rd" and "24th" are one shape.
+_SHAPE_NUMBER: Final = re.compile(r"\d+(?:[.,]\d+)*(?:st|nd|rd|th)?")
+_POSSESSIVE: Final = re.compile(r"['\u2019]s$")
+_NAME_SUFFIXES: Final = frozenset({"Jr.", "Jr", "Sr.", "Sr", "II", "III", "IV", "V"})
 
 
 def why_group_slot_key(group_key: str) -> str:
@@ -59,6 +70,70 @@ def held_sentences(bodies: Sequence[str], min_words: int) -> set[str]:
     """A page's sentences held to uniqueness across pages: normalized, `min_words` long or longer."""
     normalized = {normalize_sentence(s) for body in bodies for s in sentences_verbatim(body)}
     return {s for s in normalized if len(s.split()) >= min_words}
+
+
+def player_spellings(names: Iterable[str]) -> tuple[str, ...]:
+    """Each player's full name and his last name (the name's last word that is not a suffix)."""
+    spellings: set[str] = set()
+    for name in names:
+        words = name.split()
+        if not words:
+            continue
+        spellings.add(name)
+        spellings.add(next((w for w in reversed(words) if w not in _NAME_SUFFIXES), words[-1]))
+    return tuple(sorted(spellings))
+
+
+def club_spellings() -> tuple[str, ...]:
+    """Every club spelling a read may use: the code, the city, the nickname and the two together."""
+    spellings: set[str] = set()
+    for code, (city, nickname) in NFL_TEAM_NAMES.items():
+        spellings.update((code, city, nickname, f"{city} {nickname}"))
+    return tuple(sorted(spellings))
+
+
+@dataclass(frozen=True, slots=True)
+class ShapeMasks:
+    """The spellings a sentence's shape replaces, longest first so a full name goes before its last name."""
+
+    pattern: re.Pattern[str]
+    clubs: frozenset[str]
+
+    @classmethod
+    def of(cls, players: Iterable[str], clubs: Iterable[str] | None = None) -> "ShapeMasks":
+        """Masks for `players`' names (full and last) and `clubs` (every club spelling by default)."""
+        club_set = frozenset(club_spellings() if clubs is None else clubs)
+        words = sorted({*player_spellings(players), *club_set}, key=lambda w: (-len(w), w))
+        alternatives = "|".join(re.escape(w) for w in words) or r"(?!)"
+        return cls(re.compile(rf"(?<![\w'])(?:{alternatives})(?:['\u2019]s)?(?![\w'])"), club_set)
+
+    def shape(self, sentence: str) -> str:
+        """`sentence` with names, clubs and numbers masked, then normalized. Names match case-sensitively,
+        so a lower-case word that spells a surname is kept."""
+
+        def mark(match: re.Match[str]) -> str:
+            bare = _POSSESSIVE.sub("", match.group(0))
+            return f" {CLUB_MARK} " if bare in self.clubs else f" {PLAYER_MARK} "
+
+        masked = _SHAPE_NUMBER.sub(f" {NUMBER_MARK} ", self.pattern.sub(mark, sentence))
+        return normalize_sentence(masked)
+
+
+def held_shapes(bodies: Sequence[str], masks: ShapeMasks, min_words: int) -> dict[str, str]:
+    """Each sentence shape of `bodies` held to one page, `min_words` long or longer, to its first sentence
+    as written."""
+    out: dict[str, str] = {}
+    for body in bodies:
+        for sentence in sentences_verbatim(body):
+            shape = masks.shape(sentence)
+            if len(shape.split()) >= min_words:
+                out.setdefault(shape, sentence)
+    return out
+
+
+def shown_shape(shape: str) -> str:
+    """A shape as a correction ask shows it: "[name] is on injured reserve in week [number]"."""
+    return " ".join(_SHOWN_MARKS.get(word, word) for word in shape.split())
 
 
 @dataclass(frozen=True, slots=True)

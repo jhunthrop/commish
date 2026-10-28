@@ -3464,14 +3464,19 @@ export interface components {
 			/** @description the words the page shows once the live read prints another; absent on a run from before */
 			movedCaption?: string;
 		};
-		/** @description the coming week and the night its reads are written in one pass, when the week rolls over */
+		/** @description the coming week and the nightly that writes its reads in one pass, when the week rolls over */
 		RunReadsDue: {
 			week: number;
 			/**
-			 * @description the Central night of the nightly that writes them
+			 * @description the night of the nightly that writes them, kept one deploy for the clients before Lane 265, which name it from at
 			 * @enum {string}
 			 */
-			night: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+			night?: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+			/**
+			 * Format: date-time
+			 * @description the nightly that writes them (Lane 265): the clients name its night on the Eastern clock and stop promising it once their clock passes it; absent on a run from before
+			 */
+			at?: string;
 		};
 		/** @description a stat line in the research store's names; a field is null when the records do not carry it */
 		RunStatLine: {
