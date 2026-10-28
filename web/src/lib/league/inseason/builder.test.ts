@@ -4,13 +4,21 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, TradeCheck, TradeRow, TradeTeam } from './api.ts';
 import {
+	ANALYZER_LINES,
+	BAR_FLOOR,
 	BUILDER_LINES,
 	MAX_A_SIDE,
 	builtFrom,
 	checkInput,
 	checkWords,
+	fillsBoth,
+	gainBars,
+	openingPicks,
 	pickPrompt,
 	pickable,
+	presetsFrom,
+	samePicks,
+	shareText,
 	teamChoice,
 	toggle
 } from './builder.ts';
@@ -259,9 +267,97 @@ void test("a team is chosen by its name and record, the standings' people", () =
 	);
 });
 
+/** A team with its roster and its trades, best first as the API sends them. */
+const team = (id: number, name: string, trades: TradeRow[]): TradeTeam => ({
+	roster_id: id,
+	name,
+	owner: name.toLowerCase(),
+	record: { wins: 3, losses: 2, ties: 0 },
+	roster: [],
+	trades,
+	note: null
+});
+
+void test('our ideas are the best trade with each team, best first, each loading its picks', () => {
+	const muttdogs = team(4, 'Muttdogs', [
+		row({ my_gain: 1.8, their_gain: 0.5, close_for_them: false }),
+		row({ my_gain: 9, their_gain: 0.1, close_for_them: true })
+	]);
+	const rangers = team(9, 'Bower Rangers', [
+		row({
+			give: [line('Jeremiyah Love')],
+			get: [line('Tre Tucker', 'WR'), line('MarShawn Lloyd')],
+			my_gain: 2.7,
+			their_gain: 0.6,
+			close_for_them: false
+		})
+	]);
+	const empty = team(2, 'Ball Snatchers', []);
+	const presets = presetsFrom([muttdogs, rangers, empty]);
+	assert.deepEqual(
+		presets.map((p) => [p.team.name, p.deal, p.gains, p.mark]),
+		[
+			[
+				'Bower Rangers',
+				'Love for Tucker and Lloyd',
+				'+2.7 a week for your lineup, +0.6 for theirs',
+				'Best'
+			],
+			['Muttdogs', 'Williams for Collins', '+1.8 a week for your lineup, +0.5 for theirs', null]
+		]
+	);
+	assert.deepEqual(presets[0]?.picks, {
+		team: 9,
+		give: ['h-Jeremiyah Love'],
+		get: ['h-Tre Tucker', 'h-MarShawn Lloyd']
+	});
+	// A lone idea is not called Best: there is nothing to be best among.
+	assert.equal(presetsFrom([muttdogs])[0]?.mark, null);
+	// A trade holding a player the host names no id for cannot be ticked: no preset.
+	const unnamed = team(5, 'Nameless', [row({ get: [line('X', 'WR', { host_id: '' })] })]);
+	assert.deepEqual(presetsFrom([unnamed]), []);
+});
+
+void test('the screen opens on the team our best idea names with nothing ticked, or no team', () => {
+	const presets = presetsFrom([team(9, 'Bower Rangers', [row({ close_for_them: false })])]);
+	assert.deepEqual(openingPicks(presets), { team: 9, give: [], get: [] });
+	assert.deepEqual(openingPicks([]), { team: null, give: [], get: [] });
+	assert.equal(
+		ANALYZER_LINES.noTeam,
+		'Pick a team to trade with, then tick a player on each side.'
+	);
+});
+
+void test('a preset is pressed while the ticks hold its trade, in any order', () => {
+	const a = { team: 9, give: ['x'], get: ['y', 'z'] };
+	assert.ok(samePicks(a, { team: 9, give: ['x'], get: ['z', 'y'] }));
+	assert.ok(!samePicks(a, { team: 8, give: ['x'], get: ['y', 'z'] }));
+	assert.ok(!samePicks(a, { team: 9, give: ['x'], get: ['y'] }));
+	assert.ok(!samePicks(a, { team: 9, give: ['x', 'w'], get: ['y', 'z'] }));
+});
+
+void test('each side draws a bar as a share of the longer gain, small gains short', () => {
+	assert.deepEqual(gainBars(4, -2), { yours: 1, theirs: 0.5 });
+	assert.deepEqual(gainBars(0.5, 0.25), { yours: 0.5 / BAR_FLOOR, theirs: 0.25 / BAR_FLOOR });
+	assert.deepEqual(gainBars(null, null), { yours: 0, theirs: 0 });
+});
+
+void test('Share copies the trade in our words, and only a trade both rosters can make is shared', () => {
+	assert.equal(
+		shareText({ name: 'Muttdogs' }, check({ drop: line('Jaxson Dart', 'QB') })),
+		'Trade with Muttdogs: Kyren Williams (RB TB) for Nico Collins (WR TB). Your lineup gains 2.1 points over replacement a week, theirs loses 0.8. You drop Jaxson Dart to make room.'
+	);
+	assert.ok(fillsBoth(check()));
+	assert.ok(!fillsBoth(check({}, { yours: false, yours_open: 'RB2' })));
+	assert.ok(!fillsBoth(check({}, { theirs_room: false })));
+});
+
 void test('copy guard: the builder says no trading words, dashes or semicolons', () => {
 	const said = [
 		...Object.values(BUILDER_LINES),
+		...Object.values(ANALYZER_LINES),
+		shareText({ name: 'Muttdogs' }, check()),
+		...presetsFrom([team(4, 'Muttdogs', [row()])]).flatMap((p) => [p.deal, p.gains]),
 		checkWords(check()),
 		checkWords(check({ my_gain: 1, their_gain: 1, close_for_them: false })),
 		checkWords(check({}, { yours: false, yours_open: 'Flex' }))

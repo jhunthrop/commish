@@ -485,7 +485,7 @@ const LEAGUE_SCREENS: readonly LeagueScreen[] = [
 	{
 		name: 'trades',
 		path: `${LEAGUE}/trades`,
-		ready: 'worth proposing',
+		ready: 'Our ideas',
 		check: (page, at) => checkNoWeekFigure(page, at, TRADES.projForYou)
 	}
 ];

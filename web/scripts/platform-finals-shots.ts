@@ -88,16 +88,14 @@ interface Screen {
 	/** Whether the basis says the platform's points count on this clock; null, not checked (Trades,
 	 * whose closed basis draws no Avg or Last). */
 	platform: boolean | null;
-	/** What the shot opens first: a trade in the finder, or the builder, whose phone rows draw Avg
-	 * and Last (Lane 115 fix round 1, HIGH-1). */
-	open?: 'trade' | 'builder';
+	/** The builder, whose phone rows draw Avg and Last (Lane 115 fix round 1, HIGH-1), waited for. */
+	open?: 'builder';
 	/** Shot for its Team row and its footer's lines (the league home, Lane 121): its words are not
 	 * the box screens', so check() is not asked of them. */
 	teamOnly?: boolean;
 }
 
-/** The opened trade's and the builder's words once drawn. */
-const OPENED_READY = 'Build from this';
+/** The builder's words once drawn. */
 const BUILDER_READY = 'Pick one or two of your players and one or two of theirs.';
 
 /** The four league screens with Avg and Last, and the league's Players, on a clock. */
@@ -106,18 +104,10 @@ function leagueScreens(platform: boolean): Screen[] {
 		{ name: 'lineup', path: `${LEAGUE}/start`, ready: 'Week 6', platform },
 		{ name: 'matchup', path: `${LEAGUE}/matchup`, ready: 'Week 6', platform },
 		{ name: 'waivers', path: `${LEAGUE}/waivers`, ready: 'Open Sleeper waivers', platform },
-		{ name: 'trades', path: `${LEAGUE}/trades`, ready: 'worth proposing', platform: null },
 		{
-			name: 'trades-opened',
+			name: 'trades',
 			path: `${LEAGUE}/trades`,
-			ready: 'worth proposing',
-			platform,
-			open: 'trade'
-		},
-		{
-			name: 'trades-builder',
-			path: `${LEAGUE}/trades`,
-			ready: 'worth proposing',
+			ready: 'Our ideas',
 			platform,
 			open: 'builder'
 		},
@@ -228,7 +218,7 @@ const SCREENS: Readonly<Record<Day, readonly Screen[]>> = {
 	monday: leagueScreens(true),
 	tuesday: leagueScreens(true),
 	wednesday: leagueScreens(false),
-	thursday: [{ name: 'trades', path: `${LEAGUE}/trades`, ready: 'worth proposing', platform: null }]
+	thursday: [{ name: 'trades', path: `${LEAGUE}/trades`, ready: 'Our ideas', platform: null }]
 };
 
 const running = (await fixtureApiClock(API_ORIGIN)).clock;
@@ -383,14 +373,8 @@ for (const theme of THEMES)
 			try {
 				await page.goto(`${web}${screen.path}`);
 				await ready(page, screen.ready);
-				if (screen.open === 'trade') {
-					await page.locator('table.finder button.why').first().click();
-					await ready(page, OPENED_READY);
-				}
-				if (screen.open === 'builder') {
-					await page.getByRole('button', { name: 'Build a trade' }).click();
-					await ready(page, BUILDER_READY);
-				}
+				// The Trades screen is its builder, open as it loads (Lane 260).
+				if (screen.open === 'builder') await ready(page, BUILDER_READY);
 				const team = await teamFaults(page, screen);
 				measures.push(
 					`${at}: bug Final ${[...(await bugFinals(page, screen)).entries()].map(([n, f]) => `${n}=${String(f)}`).join(', ')}`

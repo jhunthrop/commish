@@ -1,10 +1,13 @@
-/** The trade builder (Lane 61): the member picks one or two of their players and one or two of
- * another team's, and the API answers what each lineup gains or loses on the finder's own reckoning.
- * Pure, so every pick and sentence the panel shows is tested here. No price, no grade: the two
- * lineups' change is the whole answer. */
+/** The trade builder (Lane 61), the Trades screen itself since Lane 260: the member picks one or two
+ * of their players and one or two of another team's, and the API answers what each lineup gains or
+ * loses on the finder's own reckoning. The finder's trades are presets above the rosters, one tap each
+ * to load into the ticks. Pure, so every pick and sentence the screen shows is tested here. No price,
+ * no grade: the two lineups' change is the whole answer. */
 import { fixed } from '#lib/format/number.ts';
 import { listWords } from '#lib/format/list.ts';
 import { onReserve } from '../box/box.ts';
+import { stripMark } from '../box/strip.ts';
+import { finderRows, gainWord, offerText, shortSide, TRADES } from '../box/trades.ts';
 import type { PlayerLine, TradeCheck, TradeCheckInput, TradeRow, TradeTeam } from './api.ts';
 import { GAIN_DECIMALS, gainAmount, perGameWords, teamAside } from './words.ts';
 
@@ -148,4 +151,92 @@ export const BUILDER_LINES = {
 	notNow: 'Not now',
 	/** A side already holding two: said over its rows, which wait for one put back. */
 	full: 'Two picked, tap one to put him back'
+} as const;
+
+/** One of our ideas above the rosters (Lane 260): the finder's best trade with a team, the picks it
+ * loads, and the words its button draws. */
+export interface Preset {
+	key: string;
+	team: TradeTeam;
+	row: TradeRow;
+	picks: Picks;
+	/** "Best" over the first of more than one, as a strip marks its lead; null on the rest. */
+	mark: string | null;
+	/** "Rodgers for Skattebo and Strong". */
+	deal: string;
+	/** "+5.7 a week for your lineup, +0.7 for theirs". */
+	gains: string;
+}
+
+/** Our ideas: the finder's best trade with each team, in the finder's order (the trades the other
+ * team gains from first, each by your gain), each one whose players can all be ticked. */
+export function presetsFrom(teams: readonly TradeTeam[]): Preset[] {
+	const loadable = finderRows(teams, false).flatMap((entry) => {
+		const picks = builtFrom(entry.team, entry.row);
+		return picks === null ? [] : [{ ...entry, picks }];
+	});
+	return loadable.map((entry, i) => ({
+		key: entry.key,
+		team: entry.team,
+		row: entry.row,
+		picks: entry.picks,
+		mark: stripMark(i, loadable.length),
+		deal: `${shortSide(entry.row.give)} for ${shortSide(entry.row.get)}`,
+		gains: `${gainWord(entry.row.my_gain)} ${TRADES.aWeekForYou}, ${gainWord(entry.row.their_gain)} ${TRADES.forTheirs}`
+	}));
+}
+
+/** The picks the screen opens with: the team our best idea names and nothing ticked, so the member's
+ * own idea is a tick a player; no team when we have no idea. */
+export function openingPicks(presets: readonly Preset[]): Picks {
+	return { team: presets[0]?.team.roster_id ?? null, give: [], get: [] };
+}
+
+/** Whether two picks are the same trade, in any order of ticks: the preset the ticks hold is pressed. */
+export function samePicks(a: Picks, b: Picks): boolean {
+	const same = (x: readonly string[], y: readonly string[]): boolean =>
+		x.length === y.length && x.every((id) => y.includes(id));
+	return a.team === b.team && same(a.give, b.give) && same(a.get, b.get);
+}
+
+/** The least a full bar stands for, in points a week, so a trade of small gains draws short bars. */
+export const BAR_FLOOR = 1;
+
+/** Each side's bar under its gain, as a share of the longer one (at least BAR_FLOOR), 0 to 1. */
+export function gainBars(
+	myGain: number | null,
+	theirGain: number | null
+): { yours: number; theirs: number } {
+	const mine = Math.abs(myGain ?? 0);
+	const theirs = Math.abs(theirGain ?? 0);
+	const full = Math.max(mine, theirs, BAR_FLOOR);
+	return { yours: mine / full, theirs: theirs / full };
+}
+
+/** Whether the check answered a trade both rosters can make: the one a member can share. */
+export function fillsBoth(check: Pick<TradeCheck, 'fills'>): boolean {
+	const { fills } = check;
+	return fills.yours && fills.theirs && fills.yours_room && fills.theirs_room;
+}
+
+/** The trade as Share copies it, in our words: the offer, then each lineup's change and the drop.
+ * "Trade with Max_Jensen10: Aaron Rodgers (QB PIT) for Cam Skattebo (RB NYG). Your lineup gains 5.7
+ * points over replacement a week, theirs gains 0.7." */
+export function shareText(team: Pick<TradeTeam, 'name'>, check: Pick<TradeCheck, 'trade'>): string {
+	const { trade } = check;
+	const drop = trade.drop ? ` You drop ${trade.drop.player.name} to make room.` : '';
+	return `${offerText(team, trade)} ${changeWords(trade)}${drop}`;
+}
+
+/** The screen's own words the apps do not draw yet (Lane 260; the apps follow from this screen). */
+export const ANALYZER_LINES = {
+	/** Over the presets: the finder's trades, one tap each to load. */
+	ideas: 'Our ideas',
+	/** The verb that copies the built trade as text. */
+	share: 'Share',
+	shared: 'Copied the trade as text.',
+	/** The team choice before one is chosen. */
+	pickTeam: 'Pick a team',
+	/** The answer line with no team chosen. */
+	noTeam: 'Pick a team to trade with, then tick a player on each side.'
 } as const;
