@@ -4,12 +4,26 @@
 # Migrations run as their own Cloud Run job before any new revision
 # takes traffic, never at container start.
 name: api
+# The sheet's parity fixture and the web's CSV encoder it is written from trigger it too, so the export's
+# byte parity test (api/internal/sheets/csv_parity_test.go) runs when the web's file changes (Lane 254).
 on:
   push:
     branches: [main]
-    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', '.github/workflows/api.yml']
+    paths:
+      - 'api/**'
+      - 'go.work'
+      - 'web/src/lib/api/types.ts'
+      - 'shared/fixtures/parity/sheet.json'
+      - 'web/src/lib/sheet/csv.ts'
+      - '.github/workflows/api.yml'
   pull_request:
-    paths: ['api/**', 'go.work', 'web/src/lib/api/types.ts', '.github/workflows/api.yml']
+    paths:
+      - 'api/**'
+      - 'go.work'
+      - 'web/src/lib/api/types.ts'
+      - 'shared/fixtures/parity/sheet.json'
+      - 'web/src/lib/sheet/csv.ts'
+      - '.github/workflows/api.yml'
   workflow_dispatch:
 
 # Deploys run one at a time and never cancel each other mid-migration.

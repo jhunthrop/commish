@@ -62,6 +62,8 @@ packages:
     path: Packages/Features/Companion
   MockRoom:
     path: Packages/Features/MockRoom
+  Sheet:
+    path: Packages/Features/Sheet
 targets:
   Commish:
     type: application
@@ -87,6 +89,7 @@ targets:
       - package: Reference
       - package: Companion
       - package: MockRoom
+      - package: Sheet
     entitlements:
       path: Commish/Commish.entitlements
       properties:
