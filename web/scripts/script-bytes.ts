@@ -75,14 +75,43 @@ function pageFiles(htmlPath: string): Set<string> {
 	return files;
 }
 
-/** Each page, its built HTML and the budget Lighthouse holds it to (lighthouserc.cjs's matrix). */
+/** The server manifest the build writes beside the Worker: each route's layout and leaf nodes. */
+const MANIFEST = '.svelte-kit/output/server/manifest-full.js';
+/** A route's page nodes in the manifest: `page: { layouts: [0,4,], errors: [1,,], leaf: 28 }`, read
+ * within the route's own entry (an endpoint's has no page, and the match never runs into the next). */
+const ROUTE_PAGE =
+	/id: "([^"]+)",(?:(?!id: ")[\s\S])*?page: \{ layouts: \[([\d,\s]*)\], errors: [^\]]*\], leaf: (\d+) \}/g;
+
+/** A page the browser draws (no prerendered HTML: a league's pages, ssr off): the app's entries, as
+ * the prerendered front door names them, and the nodes the manifest gives its route, its layouts and
+ * its leaf (Lane 257). */
+function clientFiles(route: string): Set<string> {
+	const manifest = readFileSync(MANIFEST, 'utf8');
+	const found = [...manifest.matchAll(ROUTE_PAGE)].find((match) => match[1] === route);
+	if (found === undefined) throw new Error(`${MANIFEST} has no page for ${route}`);
+	const ids = [...(found[2] ?? '').split(','), found[3] ?? ''].filter((id) => id.trim() !== '');
+	const files = new Set<string>();
+	const html = readFileSync(join(OUTPUT, 'index.html'), 'utf8');
+	for (const match of html.matchAll(ENTRY)) {
+		const entry = match[1];
+		if (entry) collectStaticImports(join(OUTPUT, entry), files);
+	}
+	for (const id of ids) collectStaticImports(nodeFile(Number(id)), files);
+	return files;
+}
+
+/** Each page, its built HTML (or, for a page the browser draws, its route) and the budget Lighthouse
+ * holds it to (lighthouserc.cjs's matrix). */
 const pages: [route: string, html: string, budget: keyof ScriptBudgets][] = [
 	['/', 'index.html', 'reading'],
 	['/board', 'board.html', 'reading'],
 	[`/players/${slug}`, `players/${slug}.html`, 'reading'],
 	['/record', 'record.html', 'reading'],
 	['/sheet', 'sheet.html', 'tool'],
-	['/account', 'account.html', 'tool']
+	['/account', 'account.html', 'tool'],
+	['/league/[id]/[screen]', '', 'tool'],
+	['/league/[id]', '', 'tool'],
+	['/league', '', 'tool']
 ];
 
 function line(text: string): void {
@@ -93,8 +122,8 @@ const weights = new Map<string, number>();
 const over: string[] = [];
 for (const [route, html, budget] of pages) {
 	const path = join(OUTPUT, html);
-	if (!existsSync(path)) throw new Error(`${path} is not in the build`);
-	const files = pageFiles(path);
+	if (html !== '' && !existsSync(path)) throw new Error(`${path} is not in the build`);
+	const files = html === '' ? clientFiles(route) : pageFiles(path);
 	let total = 0;
 	for (const file of files) {
 		const bytes = gzipped(file);

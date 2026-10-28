@@ -43,6 +43,9 @@
 		/** Whether the verb sits beside the decision on a wide screen; false where the strip carries a
 		 * verb on each card (Waivers, Lane 66f), the verb pinned on a phone alone. */
 		deskVerb?: boolean;
+		/** Whether the verb pins above the tab bar on a phone; false on a page whose own verb is the one
+		 * verb (the every-league Lineup, Lane 257), where the screen draws no verb on a phone. */
+		pin?: boolean;
 		/** The decision drawn as a strip (the Lineup's swaps as chips, Lane 66e) in place of its
 		 * sentence; the sentence stays the strip's name for a screen reader. */
 		summary?: Snippet;
@@ -65,6 +68,7 @@
 		verbFoot,
 		footSays = true,
 		deskVerb = true,
+		pin = true,
 		children
 	}: Props = $props();
 
@@ -110,7 +114,7 @@
 {@render move?.()}
 {#if basis !== null}<Basis {basis} />{/if}
 {@render children()}
-{#if !asideForMove && (verb !== null || (verbFoot !== undefined && footSays) || hostNote !== null)}
+{#if pin && !asideForMove && (verb !== null || (verbFoot !== undefined && footSays) || hostNote !== null)}
 	<div class="pin" {@attach hostTab(href)}>
 		{@render action(true)}
 		{@render foot(true)}

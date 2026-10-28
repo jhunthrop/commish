@@ -37,6 +37,10 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 		reads: 2,
 		why: "a screen's clock, set at each read"
 	},
+	'src/lib/league/inseason/LineupBlock.svelte': {
+		reads: 1,
+		why: "a league's Lineup on the every-league page: its own clock, set at each read"
+	},
 	'src/lib/front/FrontWeek.svelte': { reads: 1, why: "the front door's week, drawn once" },
 	'src/routes/(run)/+page.svelte': {
 		reads: 1,
