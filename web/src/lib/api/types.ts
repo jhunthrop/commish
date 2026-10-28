@@ -1710,7 +1710,7 @@ export interface paths {
 			cookie?: never;
 		};
 		get?: never;
-		/** An app registers its push token on its own device (Lane 262, spec §5.3): APNs for iOS, FCM for Android (or an iOS app that registers through FCM). Only the app asking, by its own device token (the session scope) and its own id; any other id is 404, the extension's token 403 (it lacks the session scope), a browser session 401. A token belongs to one device: registering moves it here from any other, and registering again replaces the device's earlier token; unpairing the device removes it. 30 a minute a device. */
+		/** An app registers its push token on its own device (Lane 262, spec §5.3): APNs for iOS, FCM for Android (or an iOS app that registers through FCM). Only the app asking, by its own device token (the session scope) and its own id; any other id is 404, the extension's token 403 (it lacks the session scope), a browser session 401. A token belongs to one device: registering moves it here from the account's other devices, and registering again replaces the device's earlier token; unpairing the device removes it. A token another member's device holds and still uses (inside the session's 30 days) is 409 and moves nothing; one past that moves. Only a device used within the session's 30 days receives pushes. 30 a minute a device. */
 		put: operations['registerPush'];
 		post?: never;
 		/** The app's own device stops receiving pushes: its token is removed. Answered data null whether a token was registered or not. The same rules as PUT for whose device it is. */
@@ -1729,7 +1729,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** The starter status producer (Lane 262): the hourly capture calls it after each pass with its Google identity. The API compares the two newest injury captures that read and, for each player whose status changed (out, doubtful, cleared of a week's designation, injured reserve, activated from a season-long list), queues one push for every account with a registered device and the kind switched on whose followed league starts him. One row per account, player and change: a call again adds nothing. Nothing sends here; the notify job delivers. A Google-signed identity token for the API's own URL, from a caller on INTERNAL_CALLERS; anything else is 401. 6 a minute. */
+		/** The starter status producer (Lane 262): the hourly capture calls it after each pass with its Google identity. The call records the request and answers 202; the producer runs off the request, one run at a time across instances. It compares every consecutive pair of readable injury captures from the last three hours and, for each player whose status changed (out, doubtful, cleared of a week's designation, injured reserve, activated from a season-long list), queues one push for every account with an active registered device and the kind switched on whose followed league starts him. One row per account, player and change: a call again adds nothing, and a run that was missed is caught up by the next. Nothing sends here; the notify job delivers. A Google-signed RS256 identity token for the API's own URL, from a caller on INTERNAL_CALLERS; anything else is 401. 6 a minute a caller, 60 a minute an address. */
 		post: operations['produceStarterStatus'];
 		delete?: never;
 		options?: never;
@@ -5341,16 +5341,12 @@ export interface components {
 			/** Format: date-time */
 			registered_at: string;
 		};
-		StarterStatusProduced: {
-			/** @description the players whose status changed between the two newest captures */
-			changes: number;
-			/** @description the pushes queued now */
-			queued: number;
+		StarterStatusAccepted: {
 			/**
 			 * Format: date-time
-			 * @description the newer capture compared, null when fewer than two captures read or the newer is too old
+			 * @description when the run was requested
 			 */
-			newer_at: string | null;
+			requested_at: string;
 		};
 		/** @description one switch per kind of push, every one on by default */
 		NotificationKinds: {
@@ -8599,6 +8595,7 @@ export interface operations {
 			401: components['responses']['ErrorResponse'];
 			403: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
 		};
 	};
 	removePush: {
@@ -8627,16 +8624,17 @@ export interface operations {
 		};
 		requestBody?: never;
 		responses: {
-			/** @description what was queued */
-			200: {
+			/** @description the run is requested */
+			202: {
 				headers: Record<string, unknown>;
 				content: {
 					'application/json': components['schemas']['Envelope'] & {
-						data?: components['schemas']['StarterStatusProduced'];
+						data?: components['schemas']['StarterStatusAccepted'];
 					};
 				};
 			};
 			401: components['responses']['ErrorResponse'];
+			429: components['responses']['ErrorResponse'];
 		};
 	};
 	listHostConnections: {

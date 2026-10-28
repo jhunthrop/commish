@@ -45,11 +45,10 @@ env:
   # The plain settings every api process gets (internal/config). ALLOWED_HOSTS locks the run.app URL:
   # the api answers its routes only on these hosts (space-separated), the probes on any. FREE_SEASON is the
   # repository variable (2026 for the free 2026 season, empty for the paid tiers): every member holds every
-  # feature and checkout stays shut. FCM_PROJECT_ID is the Firebase project push sends through; INTERNAL_CALLERS
-  # the service accounts whose identity tokens open the internal routes (Lane 262). Overwrite strategy: a
-  # hand-set service variable is lost at the next deploy.
+  # feature and checkout stays shut. FCM_PROJECT_ID is the Firebase project push sends through (Lane 262).
+  # Overwrite strategy: a hand-set service variable is lost at the next deploy.
   API_ENV_VARS: >-
-    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,CORS_ORIGINS=${{ vars.CORS_ORIGINS || 'https://trycommish.app' }},TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }},STRIPE_ENVIRONMENT=${{ vars.STRIPE_ENVIRONMENT || 'test' }},STRIPE_AUTOMATIC_TAX=${{ vars.STRIPE_AUTOMATIC_TAX || 'false' }},R2_ACCOUNT_ID=${{ vars.CLOUDFLARE_ACCOUNT_ID }},R2_EXPORTS_BUCKET=commish-exports,ROOM_BASE_URL=wss://room.trycommish.app,ADVISOR_URL=${{ vars.ADVISOR_URL }},BOARDS_URL=${{ vars.BOARDS_URL }},BOARD_SCHEMA=${{ vars.BOARD_SCHEMA || 'research' }},HOST_FFPC_ENABLED=${{ vars.HOST_FFPC_ENABLED || 'true' }},HOST_YAHOO_ENABLED=${{ vars.HOST_YAHOO_ENABLED || 'true' }},HOST_ESPN_ENABLED=${{ vars.HOST_ESPN_ENABLED || 'true' }},HOST_WRITES_ESPN_LINEUP=${{ vars.HOST_WRITES_ESPN_LINEUP || 'false' }},HOST_WRITES_ESPN_CLAIM=${{ vars.HOST_WRITES_ESPN_CLAIM || 'false' }},HOST_WRITES_MFL_LINEUP=${{ vars.HOST_WRITES_MFL_LINEUP || 'false' }},HOST_CREDENTIALS_KEY_VERSION=1,ALLOWED_HOSTS=${{ vars.ALLOWED_HOSTS || 'api.trycommish.app' }},FREE_SEASON=${{ vars.FREE_SEASON }},FCM_PROJECT_ID=${{ vars.FCM_PROJECT_ID || 'trycommish' }},INTERNAL_CALLERS=${{ vars.INTERNAL_CALLERS || 'research-runtime@trycommish.iam.gserviceaccount.com' }}
+    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,CORS_ORIGINS=${{ vars.CORS_ORIGINS || 'https://trycommish.app' }},TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }},STRIPE_ENVIRONMENT=${{ vars.STRIPE_ENVIRONMENT || 'test' }},STRIPE_AUTOMATIC_TAX=${{ vars.STRIPE_AUTOMATIC_TAX || 'false' }},R2_ACCOUNT_ID=${{ vars.CLOUDFLARE_ACCOUNT_ID }},R2_EXPORTS_BUCKET=commish-exports,ROOM_BASE_URL=wss://room.trycommish.app,ADVISOR_URL=${{ vars.ADVISOR_URL }},BOARDS_URL=${{ vars.BOARDS_URL }},BOARD_SCHEMA=${{ vars.BOARD_SCHEMA || 'research' }},HOST_FFPC_ENABLED=${{ vars.HOST_FFPC_ENABLED || 'true' }},HOST_YAHOO_ENABLED=${{ vars.HOST_YAHOO_ENABLED || 'true' }},HOST_ESPN_ENABLED=${{ vars.HOST_ESPN_ENABLED || 'true' }},HOST_WRITES_ESPN_LINEUP=${{ vars.HOST_WRITES_ESPN_LINEUP || 'false' }},HOST_WRITES_ESPN_CLAIM=${{ vars.HOST_WRITES_ESPN_CLAIM || 'false' }},HOST_WRITES_MFL_LINEUP=${{ vars.HOST_WRITES_MFL_LINEUP || 'false' }},HOST_CREDENTIALS_KEY_VERSION=1,ALLOWED_HOSTS=${{ vars.ALLOWED_HOSTS || 'api.trycommish.app' }},FREE_SEASON=${{ vars.FREE_SEASON }},FCM_PROJECT_ID=${{ vars.FCM_PROJECT_ID || 'trycommish' }}
   # Secret Manager references, NAME=secret:version.
   API_SECRETS: >-
     DATABASE_URL=DATABASE_URL:latest,WORKOS_CLIENT_ID=WORKOS_CLIENT_ID:latest,WORKOS_API_KEY=WORKOS_API_KEY:latest,WORKOS_COOKIE_PASSWORD=WORKOS_COOKIE_PASSWORD:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,R2_ACCESS_KEY_ID=R2_ACCESS_KEY_ID:latest,R2_SECRET_ACCESS_KEY=R2_SECRET_ACCESS_KEY:latest,SHARE_LINK_KEYS=SHARE_LINK_KEYS:latest,HOST_CREDENTIALS_KEY=HOST_CREDENTIALS_KEY:1,YAHOO_CLIENT_ID=YAHOO_CLIENT_ID:latest,YAHOO_CLIENT_SECRET=YAHOO_CLIENT_SECRET:latest
@@ -175,7 +174,10 @@ jobs:
           service: api
           region: ${{ vars.GCP_REGION }}
           image: ${{ env.IMAGE }}
-          env_vars: ${{ env.API_ENV_VARS }}
+          # INTERNAL_CALLERS (Lane 262), the service accounts whose identity tokens open the internal routes, is
+          # the service's alone and quoted, so a list of several, comma or space separated, never splits the
+          # variables (the action keeps a quoted value whole).
+          env_vars: ${{ env.API_ENV_VARS }},INTERNAL_CALLERS="${{ vars.INTERNAL_CALLERS || 'research-runtime@trycommish.iam.gserviceaccount.com' }}"
           env_vars_update_strategy: overwrite
           secrets: ${{ env.API_SECRETS }},${{ env.RUNS_SECRETS }}
           secrets_update_strategy: overwrite
@@ -217,14 +219,18 @@ jobs:
               --max-retries 1 --task-timeout 600s --quiet
           done
           # The push outbox's drain (Lane 262), every minute in season: no retry of the execution (the
-          # next minute's run is the retry, and rows are leased), and a timeout well under the lease.
-          # FCM sends as the runtime (roles/firebasecloudmessaging.admin); APNs waits on APNS_KEY_ID,
-          # APNS_TEAM_ID and APNS_KEY in Secret Manager, added to this job's secrets once they exist.
+          # next minute's run is the retry, and rows are leased), and a timeout well under the lease (the
+          # drain keeps its own budget too). It mounts the database alone (security review L5): FCM sends as
+          # the runtime (roles/firebasecloudmessaging.admin); APNs waits on APNS_KEY_ID, APNS_TEAM_ID and
+          # APNS_KEY in Secret Manager, added to these secrets once they exist. Cloud Scheduler runs it as
+          # research-runtime, the research schedule's caller, which holds run.invoker on this job alone.
           gcloud run jobs deploy api-notify --image "$IMAGE" --region "$REGION" \
             --command /api --args notify --service-account "$RUNTIME_SA" \
             --set-cloudsql-instances "$CLOUDSQL_INSTANCE" \
-            --set-env-vars "$API_ENV_VARS" --set-secrets "$API_SECRETS" \
+            --set-env-vars "$API_ENV_VARS" --set-secrets "DATABASE_URL=DATABASE_URL:latest" \
             --max-retries 0 --task-timeout 90s --quiet
+          gcloud run jobs add-iam-policy-binding api-notify --region "$REGION" \
+            --member "serviceAccount:research-runtime@trycommish.iam.gserviceaccount.com" --role roles/run.invoker --quiet
 
         # Both services answer their readiness (the database reached) at the public names, or the
         # deploy goes red: one retry after 30 s for the new revision's cold start.

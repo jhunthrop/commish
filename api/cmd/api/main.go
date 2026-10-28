@@ -229,7 +229,8 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	// identity (Lane 262): the two newest injury captures compared, a push
 	// queued for each account whose followed league starts a changed player.
 	internal := &notify.Internal{
-		Verifier: notify.GoogleIdentity{Audience: cfg.HTTP.APIBaseURL}, Callers: cfg.Push.InternalCallers, Log: log,
+		Verifier: notify.GoogleIdentity{Audience: cfg.HTTP.APIBaseURL}, Callers: cfg.Push.InternalCallers,
+		Marks: notifyStore, Context: ctx, Now: now, Log: log,
 		StarterStatus: &notify.StarterStatus{
 			Designations: draftBoards.Schedule, Lineups: leagueSync, Queue: notifyStore, Now: now, Log: log,
 		},

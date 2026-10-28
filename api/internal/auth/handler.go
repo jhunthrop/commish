@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -56,7 +57,9 @@ type AccountStore interface {
 	UpsertAccount(ctx context.Context, id Identity) (Account, error)
 	CreateSession(ctx context.Context, accountID uuid.UUID, tokenHash []byte, workosSID, userAgent string, now time.Time) error
 	DeleteSession(ctx context.Context, tokenHash []byte) (string, error)
-	SetHandle(ctx context.Context, id uuid.UUID, handle string) (Account, error)
+	// UpdateAccount writes the handle, when set, and runs also in the same
+	// transaction.
+	UpdateAccount(ctx context.Context, id uuid.UUID, handle *string, also func(context.Context, pgx.Tx) error) (Account, error)
 }
 
 // AppCodes mints the pairing code an app's sign-in hands back to the
@@ -100,7 +103,7 @@ type Handler struct {
 // notify.Settings implements it.
 type NotificationSettings interface {
 	CheckNotifications(u apitypes.NotificationSettingsUpdate) map[string]string
-	UpdateNotifications(ctx context.Context, accountID uuid.UUID, u apitypes.NotificationSettingsUpdate) error
+	UpdateNotificationsIn(ctx context.Context, tx pgx.Tx, accountID uuid.UUID, u apitypes.NotificationSettingsUpdate) error
 }
 
 // DeletionQueue is the queue of deleted accounts' WorkOS users.
@@ -415,26 +418,24 @@ func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, faults)
 		return
 	}
-	if in.Handle != nil {
-		updated, err := h.Store.SetHandle(r.Context(), a.ID, *in.Handle)
-		switch {
-		case errors.Is(err, ErrHandleTaken):
-			httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "That name is taken",
-				map[string]string{"handle": "That name is taken"})
-			return
-		case err != nil:
-			httpx.WriteInternal(w, r, h.Log, "auth: set handle", err)
-			return
-		}
-		a = updated
-	}
+	var also func(context.Context, pgx.Tx) error
 	if in.Notifications != nil {
-		if err := h.Notifications.UpdateNotifications(r.Context(), a.ID, *in.Notifications); err != nil {
-			httpx.WriteInternal(w, r, h.Log, "auth: set notifications", err)
-			return
+		update := *in.Notifications
+		also = func(ctx context.Context, tx pgx.Tx) error {
+			return h.Notifications.UpdateNotificationsIn(ctx, tx, a.ID, update)
 		}
 	}
-	h.writeAccount(w, r, a)
+	updated, err := h.Store.UpdateAccount(r.Context(), a.ID, in.Handle, also)
+	switch {
+	case errors.Is(err, ErrHandleTaken):
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, "That name is taken",
+			map[string]string{"handle": "That name is taken"})
+		return
+	case err != nil:
+		httpx.WriteInternal(w, r, h.Log, "auth: update account", err)
+		return
+	}
+	h.writeAccount(w, r, updated)
 }
 
 // Refusals of an update that changes nothing.

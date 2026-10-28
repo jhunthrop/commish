@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -60,11 +61,33 @@ func verifyES256(t *testing.T, pub *ecdsa.PublicKey, token string) (map[string]a
 	return header, claims
 }
 
+// memoryTokens is the provider token store in memory.
+type memoryTokens struct {
+	mu     sync.Mutex
+	token  string
+	at     time.Time
+	writes int
+}
+
+func (m *memoryTokens) ProviderToken(context.Context, string) (string, time.Time, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.token, m.at, m.token != "", nil
+}
+
+func (m *memoryTokens) PutProviderToken(_ context.Context, _, token string, at time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.token, m.at = token, at
+	m.writes++
+	return nil
+}
+
 // The APNs provider answers not configured, and tries nothing, until the
 // whole key is here; a key that is here and does not read is an error.
 func TestAPNsNotConfigured(t *testing.T) {
 	for _, cfg := range []APNsConfig{{}, {KeyID: "K", TeamID: "T", Topic: "app.trycommish.ios"}} {
-		s, err := NewAPNs(cfg, nil, time.Now)
+		s, err := NewAPNs(cfg, nil, &memoryTokens{}, time.Now)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -72,15 +95,16 @@ func TestAPNsNotConfigured(t *testing.T) {
 			t.Fatalf("%+v: %v", cfg, err)
 		}
 	}
-	if _, err := NewAPNs(APNsConfig{KeyID: "K", TeamID: "T", Key: "not a key", Topic: "app.trycommish.ios"}, nil, time.Now); err == nil {
+	if _, err := NewAPNs(APNsConfig{KeyID: "K", TeamID: "T", Key: "not a key", Topic: "app.trycommish.ios"}, nil, &memoryTokens{}, time.Now); err == nil {
 		t.Fatal("a broken key was taken")
 	}
 }
 
 // Configured, APNs posts the alert with a signed provider token, the
 // topic and the push type, and reads Apple's answers: 410 and
-// BadDeviceToken are dead tokens, another 400 a refused message, a 5xx
-// worth a retry.
+// Unregistered are dead tokens; BadDeviceToken (a sandbox token on
+// production) and another 400 a refused message, the token kept (review
+// M2); a 5xx worth a retry.
 func TestAPNsSends(t *testing.T) {
 	key, pemKey := p8(t)
 	answers := map[string]struct {
@@ -88,6 +112,7 @@ func TestAPNsSends(t *testing.T) {
 		reason string
 	}{
 		"gone" + iosToken:        {http.StatusGone, "Unregistered"},
+		"unreg" + iosToken:       {http.StatusBadRequest, "Unregistered"},
 		"bad" + iosToken:         {http.StatusBadRequest, "BadDeviceToken"},
 		"refused" + iosToken:     {http.StatusBadRequest, "PayloadTooLarge"},
 		"unavailable" + iosToken: {http.StatusServiceUnavailable, "ServiceUnavailable"},
@@ -108,7 +133,7 @@ func TestAPNsSends(t *testing.T) {
 	defer srv.Close()
 	now := time.Date(2026, 10, 25, 16, 0, 0, 0, time.UTC)
 	s, err := NewAPNs(APNsConfig{KeyID: "KEY123", TeamID: "TEAM45", Key: pemKey, Topic: "app.trycommish.ios", Origin: srv.URL},
-		srv.Client(), func() time.Time { return now })
+		srv.Client(), &memoryTokens{}, func() time.Time { return now })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +157,7 @@ func TestAPNsSends(t *testing.T) {
 		t.Fatalf("body %v", bodies[0])
 	}
 
-	for prefix, want := range map[string]error{"gone": ErrDeadToken, "bad": ErrDeadToken, "refused": ErrRejected} {
+	for prefix, want := range map[string]error{"gone": ErrDeadToken, "unreg": ErrDeadToken, "bad": ErrRejected, "refused": ErrRejected} {
 		if err := s.Send(context.Background(), Message{Token: prefix + iosToken}); !errors.Is(err, want) {
 			t.Fatalf("%s: %v", prefix, err)
 		}
@@ -144,9 +169,9 @@ func TestAPNsSends(t *testing.T) {
 }
 
 // FCM posts the v1 message for the project, and reads its answers:
-// UNREGISTERED (and a 404) are dead tokens, another 400 a refused
-// message, a 429 or 5xx worth a retry. No project named is not
-// configured.
+// UNREGISTERED alone is a dead token, a bare 404 (a wrong project id)
+// worth a retry like a 429 or 5xx (review H1), another 400 a refused
+// message. No project named is not configured.
 func TestFCMSends(t *testing.T) {
 	var paths []string
 	var bodies []fcmRequest
@@ -162,6 +187,9 @@ func TestFCMSends(t *testing.T) {
 		case "refused":
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(`{"error":{"code":400,"status":"INVALID_ARGUMENT","details":[{"errorCode":"INVALID_ARGUMENT"}]}}`))
+		case "wrong-project":
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"error":{"code":404,"status":"NOT_FOUND"}}`))
 		case "busy":
 			w.WriteHeader(http.StatusTooManyRequests)
 			_, _ = w.Write([]byte(`{"error":{"code":429,"status":"RESOURCE_EXHAUSTED"}}`))
@@ -186,8 +214,10 @@ func TestFCMSends(t *testing.T) {
 			t.Fatalf("%s: %v", token, err)
 		}
 	}
-	if err := f.Send(context.Background(), Message{Token: "busy"}); err == nil || errors.Is(err, ErrDeadToken) || errors.Is(err, ErrRejected) {
-		t.Fatalf("a 429 is worth a retry: %v", err)
+	for _, token := range []string{"busy", "wrong-project"} {
+		if err := f.Send(context.Background(), Message{Token: token}); err == nil || errors.Is(err, ErrDeadToken) || errors.Is(err, ErrRejected) {
+			t.Fatalf("%s is worth a retry: %v", token, err)
+		}
 	}
 
 	none, err := NewFCM(context.Background(), "")
@@ -196,5 +226,64 @@ func TestFCMSends(t *testing.T) {
 	}
 	if err := none.Send(context.Background(), m); !errors.Is(err, ErrNotConfigured) {
 		t.Fatalf("no project: %v", err)
+	}
+}
+
+// A transport failure's error never carries the URL, which holds the
+// APNs device token (security review M2).
+func TestAPNsFailureKeepsTheTokenOutOfTheError(t *testing.T) {
+	_, pemKey := p8(t)
+	failing := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("connection reset by peer")
+	})}
+	s, err := NewAPNs(APNsConfig{KeyID: "K", TeamID: "T", Key: pemKey, Topic: "app.trycommish.ios", Origin: "https://apns.example.invalid"},
+		failing, &memoryTokens{}, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Send(context.Background(), Message{Token: iosToken})
+	if err == nil || strings.Contains(err.Error(), iosToken) || strings.Contains(err.Error(), "/3/device") {
+		t.Fatalf("the error carried the URL: %v", err)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// The provider token is signed once and reused by every sender built
+// within its life, each a new run's (review M7); past its life a new one
+// is signed and kept.
+func TestAPNsProviderTokenIsSharedAcrossRuns(t *testing.T) {
+	_, pemKey := p8(t)
+	var auths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		auths = append(auths, r.Header.Get("authorization"))
+	}))
+	defer srv.Close()
+	kept := &memoryTokens{}
+	at := time.Date(2026, 10, 25, 16, 0, 0, 0, time.UTC)
+	run := func() {
+		s, err := NewAPNs(APNsConfig{KeyID: "K", TeamID: "T", Key: pemKey, Topic: "app.trycommish.ios", Origin: srv.URL},
+			srv.Client(), kept, func() time.Time { return at })
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Send(context.Background(), Message{Token: iosToken}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run()
+	at = at.Add(time.Minute)
+	run()
+	at = at.Add(30 * time.Minute)
+	run()
+	if kept.writes != 1 || auths[0] != auths[1] || auths[1] != auths[2] {
+		t.Fatalf("%d signings within the life", kept.writes)
+	}
+	at = at.Add(apnsTokenLife)
+	run()
+	if kept.writes != 2 || auths[3] == auths[2] {
+		t.Fatalf("no new token past the life: %d", kept.writes)
 	}
 }

@@ -56,7 +56,30 @@ create table app.notification_preferences (
   updated_at  timestamptz not null default now()
 );
 
+-- The APNs provider token (the ES256 JWT signed with the .p8), one per key
+-- id: every notify run is a new process, and Apple refuses a token
+-- refreshed more often than every twenty minutes, so the runs share it
+-- here and sign a new one only when it is older than its life.
+create table app.apns_provider_tokens (
+  key_id    text primary key check (char_length(key_id) between 1 and 40),
+  token     text not null check (char_length(token) between 1 and 2048),
+  issued_at timestamptz not null
+);
+
+-- The producers' marks: when a producer was last asked to run, and the
+-- newest input it has finished (the starter status producer's newest
+-- capture compared). The internal route writes requested_at and answers;
+-- the work runs off the request, one instance at a time.
+create table app.notify_marks (
+  producer     text primary key check (producer in ('starter_status')),
+  requested_at timestamptz,
+  finished_at  timestamptz,
+  done_through timestamptz
+);
+
 -- +goose Down
+drop table app.notify_marks;
+drop table app.apns_provider_tokens;
 drop table app.notification_preferences;
 drop table app.notifications;
 drop index app.devices_push_token_key;

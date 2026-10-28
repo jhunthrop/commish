@@ -5656,16 +5656,10 @@ type SiteSeason struct {
 // SiteSeasonPhase defines model for SiteSeason.Phase.
 type SiteSeasonPhase string
 
-// StarterStatusProduced defines model for StarterStatusProduced.
-type StarterStatusProduced struct {
-	// Changes the players whose status changed between the two newest captures
-	Changes int `json:"changes"`
-
-	// NewerAt the newer capture compared, null when fewer than two captures read or the newer is too old
-	NewerAt *time.Time `json:"newer_at"`
-
-	// Queued the pushes queued now
-	Queued int `json:"queued"`
+// StarterStatusAccepted defines model for StarterStatusAccepted.
+type StarterStatusAccepted struct {
+	// RequestedAt when the run was requested
+	RequestedAt time.Time `json:"requested_at"`
 }
 
 // StatusRead the injury capture a board's statuses come from, absent when none was read

@@ -1,13 +1,15 @@
 """THE STARTER STATUS PUSH: after each hourly capture, ask the API to queue its pushes (Lane 262).
 
-The API compares the two newest injury captures itself and queues one push per account, player and
-change for the members whose followed league starts a changed player; a call again queues nothing new.
+The API records the request, answers 202 and does the work off the request: it compares every pair of
+injury captures from the last three hours and queues one push per account, player and change for the
+members whose followed league starts a changed player, so a call that fails is caught up by the next.
 This module only calls `POST /internal/notifications/starter-status` with the job's own Google identity:
 an OIDC identity token from the Cloud Run metadata server whose audience is the API's URL, which the API
 verifies against INTERNAL_CALLERS. No key file, no secret.
 
-`COMMISH_API_URL` (https://api.trycommish.app in production) names the API; unset, the call is skipped
-with a line, so a run before the route deploys, or on a laptop, never fails for it.
+The call is advisory, like the week-ahead reads: its line is logged and the capture's verdict never
+depends on it (review M5); the API's side alerts when no run lands. `COMMISH_API_URL`
+(https://api.trycommish.app in production) names the API and must be https; unset, the call is skipped.
 """
 
 import os
@@ -20,6 +22,7 @@ STARTER_STATUS_PATH: Final = "/internal/notifications/starter-status"
 # The metadata server's identity endpoint (Cloud Run, as on Compute Engine).
 METADATA_IDENTITY: Final = "http://metadata.google.internal/computeMetadata/v1/instance/service-account/identity"
 TIMEOUT_SECONDS: Final = 30.0
+ACCEPTED: Final = (httpx.codes.OK, httpx.codes.ACCEPTED)
 
 
 def identity_token(client: httpx.Client, audience: str) -> str:
@@ -31,23 +34,23 @@ def identity_token(client: httpx.Client, audience: str) -> str:
     return response.text.strip()
 
 
-def notify_starter_status(client: httpx.Client | None = None, api_url: str | None = None) -> tuple[bool, str]:
-    """Ask the API to queue the starter status pushes; (ok, the line to log). Skipped, and ok, when
-    no API is named."""
+def notify_starter_status(client: httpx.Client | None = None, api_url: str | None = None) -> str:
+    """Ask the API to run the starter status producer; the line to log, whatever happened."""
     base = (api_url if api_url is not None else os.environ.get(API_URL_ENV, "")).strip().rstrip("/")
     if not base:
-        return True, f"starter-status push: skipped, {API_URL_ENV} is not set"
+        return f"starter-status push: skipped, {API_URL_ENV} is not set"
+    if not base.startswith("https://"):
+        return f"starter-status push: skipped, {API_URL_ENV} must be an https URL"
     own = client is None
     http = client or httpx.Client(timeout=TIMEOUT_SECONDS)
     try:
         token = identity_token(http, base)
         response = http.post(base + STARTER_STATUS_PATH, headers={"Authorization": f"Bearer {token}"})
-        if response.status_code != httpx.codes.OK:
-            return False, f"starter-status push: FAILED, the API answered {response.status_code}"
-        data = response.json().get("data") or {}
-        return True, f"starter-status push: {data.get('changes', 0)} changes, {data.get('queued', 0)} queued"
-    except (httpx.HTTPError, ValueError) as err:
-        return False, f"starter-status push: FAILED, {type(err).__name__}: {err}"
+        if response.status_code not in ACCEPTED:
+            return f"starter-status push: not requested, the API answered {response.status_code}"
+        return "starter-status push: requested"
+    except httpx.HTTPError as err:
+        return f"starter-status push: not requested, {type(err).__name__}: {err}"
     finally:
         if own:
             http.close()

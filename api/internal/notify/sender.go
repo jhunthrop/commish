@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -71,13 +72,15 @@ func (n NotConfigured) Send(context.Context, Message) error {
 }
 
 // post sends one JSON request and answers the status and up to
-// maxErrorBody of a body that is not a 200's.
+// maxErrorBody of a body that is not a 200's. A transport failure is
+// answered without its URL: APNs carries the device token in the path,
+// and a send's error is logged (security review M2).
 func post(ctx context.Context, client *http.Client, req *http.Request) (int, []byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
 	defer cancel()
 	res, err := client.Do(req.WithContext(ctx))
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, withoutURL(err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode == http.StatusOK {
@@ -88,12 +91,23 @@ func post(ctx context.Context, client *http.Client, req *http.Request) (int, []b
 	return res.StatusCode, body, err
 }
 
+// withoutURL is a request's error with the URL taken out: its operation
+// and the underlying error only.
+func withoutURL(err error) error {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		return fmt.Errorf("%s request: %w", ue.Op, ue.Err)
+	}
+	return err
+}
+
 // payload is the data a device receives: the row's data without the
-// producer's dedupe key, and the kind.
+// outbox's own fields (the dedupe key, the topic and its time), and the
+// kind.
 func payload(m Message) map[string]string {
 	out := make(map[string]string, len(m.Data)+1)
 	for k, v := range m.Data {
-		if k != DedupeKey {
+		if k != DedupeKey && k != TopicKey && k != TopicAtKey {
 			out[k] = v
 		}
 	}

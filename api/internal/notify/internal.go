@@ -2,12 +2,16 @@ package notify
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"google.golang.org/api/idtoken"
 
@@ -15,15 +19,26 @@ import (
 	"github.com/jhunthrop/commish/api/internal/httpx"
 )
 
-// limitInternalPerMinute bounds the internal routes: the hourly capture
-// calls once a pass.
-const limitInternalPerMinute = 6
+// The internal route's limits: a coarse one by address in front of the
+// identity check, and the real one by the verified caller behind it, so
+// a stranger sharing the job's egress address cannot spend the job's
+// (security review L2).
+const (
+	limitInternalPerAddress = 60
+	limitInternalPerCaller  = 6
+)
 
 // StarterStatusPath is the route the hourly capture calls after each pass.
 const StarterStatusPath = "/internal/notifications/starter-status"
 
 // maxIdentityHeader bounds the Authorization header read.
 const maxIdentityHeader = 4096
+
+// produceTimeout bounds one producer run off the request.
+const produceTimeout = 10 * time.Minute
+
+// googleIssuers are the issuers of a Google-signed identity token.
+var googleIssuers = []string{"https://accounts.google.com", "accounts.google.com"}
 
 // IdentityVerifier checks a caller's identity token and answers its
 // verified email.
@@ -33,15 +48,27 @@ type IdentityVerifier interface {
 
 // GoogleIdentity verifies Google-signed OIDC identity tokens for one
 // audience, the API's own URL: what a Cloud Run job's service account
-// mints from its metadata server.
+// mints from its metadata server. RS256 only, a Google issuer only, an
+// audience always (security review L1).
 type GoogleIdentity struct{ Audience string }
 
-// Verify checks the token's signature, expiry and audience, and answers
-// its email when Google verified it.
+// Verify checks the token's algorithm before anything else (the ES256
+// path of the library is never reached by a forged header), then its
+// signature, expiry and audience, then its issuer, and answers its email
+// when Google verified it.
 func (g GoogleIdentity) Verify(ctx context.Context, token string) (string, error) {
+	if g.Audience == "" {
+		return "", errors.New("notify: no audience to verify identity tokens for")
+	}
+	if alg, err := tokenAlg(token); err != nil || alg != "RS256" {
+		return "", fmt.Errorf("notify: identity token algorithm %q refused: %v", alg, err)
+	}
 	payload, err := idtoken.Validate(ctx, token, g.Audience)
 	if err != nil {
 		return "", fmt.Errorf("notify: identity token: %w", err)
+	}
+	if !slices.Contains(googleIssuers, payload.Issuer) {
+		return "", fmt.Errorf("notify: identity token issuer %q refused", payload.Issuer)
 	}
 	email, _ := payload.Claims["email"].(string)
 	verified, _ := payload.Claims["email_verified"].(bool)
@@ -51,53 +78,130 @@ func (g GoogleIdentity) Verify(ctx context.Context, token string) (string, error
 	return email, nil
 }
 
+// tokenAlg is a JWT's header algorithm.
+func tokenAlg(token string) (string, error) {
+	head, _, ok := strings.Cut(token, ".")
+	if !ok {
+		return "", errors.New("not a JWT")
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(head)
+	if err != nil {
+		return "", err
+	}
+	var h struct {
+		Alg string `json:"alg"`
+	}
+	if err := json.Unmarshal(raw, &h); err != nil {
+		return "", err
+	}
+	return h.Alg, nil
+}
+
+// Marks is the part of Store the internal route and its runner use.
+type Marks interface {
+	RequestRun(ctx context.Context, producer string, at time.Time) error
+	RunExclusive(ctx context.Context, producer string, fn func(context.Context) (time.Time, error)) (bool, error)
+}
+
 // Internal serves the routes our own jobs call: a verified identity on
-// Callers, never a member.
+// Callers, never a member. The route records the request and answers
+// 202; the producer runs off the request on Context, the process's, one
+// run at a time in this process and, by the mark's advisory lock, across
+// instances (review M6). A run cut short (a deploy, an instance stopped)
+// is caught up by the next, which walks every capture pair in the window.
 type Internal struct {
 	Verifier IdentityVerifier
 	// Callers are the service accounts allowed (INTERNAL_CALLERS); none
 	// refuses every call.
 	Callers       []string
 	StarterStatus *StarterStatus
+	Marks         Marks
+	Context       context.Context
+	Now           func() time.Time
 	Log           *slog.Logger
+
+	running atomic.Bool
+	// done, when set, is called after each run (tests wait on it).
+	done func()
 }
+
+type callerKey struct{}
 
 // Routes is every internal route. Webhook access: no session, no CSRF;
 // the handler checks the identity itself.
 func (h *Internal) Routes() []httpx.Route {
+	perCaller := httpx.RateLimit(httpx.NewLimiter(httpx.PerMinute(limitInternalPerCaller), h.Now), func(r *http.Request) string {
+		email, _ := r.Context().Value(callerKey{}).(string)
+		return "internal:" + email
+	})(http.HandlerFunc(h.starterStatus))
 	return []httpx.Route{
 		{Method: http.MethodPost, Path: StarterStatusPath, Access: httpx.Webhook,
-			Limit: httpx.PerMinute(limitInternalPerMinute), Handler: h.starterStatus},
+			Limit: httpx.PerMinute(limitInternalPerAddress), Handler: h.verified(perCaller)},
 	}
 }
 
-// caller is the verified caller's email, or a 401 answered.
-func (h *Internal) caller(w http.ResponseWriter, r *http.Request) (string, bool) {
-	raw := r.Header.Get("Authorization")
-	token, ok := strings.CutPrefix(raw, "Bearer ")
-	if !ok || token == "" || len(raw) > maxIdentityHeader || h.Verifier == nil || len(h.Callers) == 0 {
-		httpx.WriteError(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "An internal caller's identity is required", nil)
-		return "", false
+// verified answers 401 unless the caller's identity verifies and is on
+// Callers, and hands the next handler the caller's email.
+func (h *Internal) verified(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		raw := r.Header.Get("Authorization")
+		token, ok := strings.CutPrefix(raw, "Bearer ")
+		if !ok || token == "" || len(raw) > maxIdentityHeader || h.Verifier == nil || len(h.Callers) == 0 {
+			unauthorized(w, r)
+			return
+		}
+		email, err := h.Verifier.Verify(r.Context(), token)
+		if err != nil || !slices.Contains(h.Callers, email) {
+			h.Log.Warn("notify: internal call refused", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
+			unauthorized(w, r)
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, email)))
 	}
-	email, err := h.Verifier.Verify(r.Context(), token)
-	if err != nil || !slices.Contains(h.Callers, email) {
-		h.Log.Warn("notify: internal call refused", "request_id", httpx.RequestIDFrom(r.Context()), "email", email, "err", err)
-		httpx.WriteError(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "An internal caller's identity is required", nil)
-		return "", false
-	}
-	return email, true
+}
+
+func unauthorized(w http.ResponseWriter, r *http.Request) {
+	httpx.WriteError(w, r, http.StatusUnauthorized, httpx.CodeUnauthorized, "An internal caller's identity is required", nil)
 }
 
 func (h *Internal) starterStatus(w http.ResponseWriter, r *http.Request) {
-	email, ok := h.caller(w, r)
-	if !ok {
+	at := h.Now()
+	if err := h.Marks.RequestRun(r.Context(), markStarterStatus, at); err != nil {
+		httpx.WriteInternal(w, r, h.Log, "notify: request starter status", err)
 		return
 	}
-	got, err := h.StarterStatus.Produce(r.Context())
-	if err != nil {
-		httpx.WriteInternal(w, r, h.Log, "notify: starter status", err)
+	email, _ := r.Context().Value(callerKey{}).(string)
+	h.Log.Info("notify: starter status requested", "caller", email)
+	h.kick()
+	httpx.WriteOK(w, r, http.StatusAccepted, apitypes.StarterStatusAccepted{RequestedAt: at})
+}
+
+// kick starts a producer run unless one is running in this process.
+func (h *Internal) kick() {
+	if !h.running.CompareAndSwap(false, true) {
 		return
 	}
-	h.Log.Info("notify: starter status produced", "caller", email, "changes", got.Changes, "queued", got.Queued)
-	httpx.WriteOK(w, r, http.StatusOK, apitypes.StarterStatusProduced{Changes: got.Changes, Queued: got.Queued, NewerAt: got.NewerAt})
+	go func() {
+		defer h.running.Store(false)
+		if h.done != nil {
+			defer h.done()
+		}
+		ctx, cancel := context.WithTimeout(h.Context, produceTimeout)
+		defer cancel()
+		ran, err := h.Marks.RunExclusive(ctx, markStarterStatus, func(ctx context.Context) (time.Time, error) {
+			got, err := h.StarterStatus.Produce(ctx)
+			h.Log.Info("notify: starter status produced", "pairs", got.Pairs, "changes", got.Changes,
+				"queued", got.Queued, "skipped", got.Skipped, "err", err)
+			if got.NewerAt == nil {
+				return time.Time{}, err
+			}
+			return *got.NewerAt, err
+		})
+		switch {
+		case err != nil:
+			h.Log.Error("notify: starter status run failed", "err", err)
+		case !ran:
+			h.Log.Info("notify: starter status already running on another instance")
+		}
+	}()
 }

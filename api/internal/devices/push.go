@@ -33,6 +33,7 @@ const (
 const (
 	badPlatform  = "Register as apns or fcm"
 	badPushToken = "Send the platform's token for this install as it gave it"
+	tokenTaken   = "Another signed-in account holds this push token. Sign out there, or ask the platform for a new token"
 )
 
 // PushRepository is the part of Store the push routes use.
@@ -96,11 +97,14 @@ func (s *Service) putPush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	at, err := s.Push.PutPush(r.Context(), dev.AccountID, dev.ID, string(in.Platform), in.Token, s.Now())
-	if errors.Is(err, ErrNotFound) {
+	switch {
+	case errors.Is(err, ErrNotFound):
 		httpx.WriteNotFound(w, r)
 		return
-	}
-	if err != nil {
+	case errors.Is(err, ErrTokenTaken):
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, tokenTaken, map[string]string{"token": tokenTaken})
+		return
+	case err != nil:
 		httpx.WriteInternal(w, r, s.Log, "devices: put push", err)
 		return
 	}

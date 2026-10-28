@@ -2,6 +2,7 @@ package auth_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,9 +11,11 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/names"
 )
 
@@ -29,9 +32,16 @@ type handleStore struct {
 	set []string
 }
 
-func (s *handleStore) SetHandle(_ context.Context, id uuid.UUID, handle string) (auth.Account, error) {
-	s.set = append(s.set, handle)
-	return auth.Account{ID: id, Handle: &handle}, nil
+func (s *handleStore) UpdateAccount(ctx context.Context, id uuid.UUID, handle *string, also func(context.Context, pgx.Tx) error) (auth.Account, error) {
+	if handle != nil {
+		s.set = append(s.set, *handle)
+	}
+	if also != nil {
+		if err := also(ctx, nil); err != nil {
+			return auth.Account{}, err
+		}
+	}
+	return auth.Account{ID: id, Handle: handle}, nil
 }
 
 // pushSettings refuses a quiet_start of "bad" and records each update.
@@ -46,7 +56,7 @@ func (p *pushSettings) CheckNotifications(u apitypes.NotificationSettingsUpdate)
 	return nil
 }
 
-func (p *pushSettings) UpdateNotifications(_ context.Context, _ uuid.UUID, u apitypes.NotificationSettingsUpdate) error {
+func (p *pushSettings) UpdateNotificationsIn(_ context.Context, _ pgx.Tx, _ uuid.UUID, u apitypes.NotificationSettingsUpdate) error {
 	p.updates = append(p.updates, u)
 	return nil
 }
@@ -101,5 +111,30 @@ func TestUpdateMeHandleAndNotifications(t *testing.T) {
 	}
 	if len(store.set) != 1 || store.set[0] != "Gridiron_Gus" || len(push.updates) != 1 {
 		t.Fatalf("wrote %v %+v", store.set, push.updates)
+	}
+}
+
+// The handle and what rides with it land in one transaction: a failure
+// in the second leaves the handle as it was (review L4).
+func TestUpdateAccountIsOneTransaction(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	store := &auth.Store{Pool: pool}
+	a, err := store.UpsertAccount(ctx, auth.Identity{UserID: "user_tx", Email: "tx@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handle := "Gridiron_Gus"
+	failing := func(context.Context, pgx.Tx) error { return errors.New("the settings write failed") }
+	if _, err := store.UpdateAccount(ctx, a.ID, &handle, failing); err == nil {
+		t.Fatal("the failure was swallowed")
+	}
+	if got, err := store.UpdateAccount(ctx, a.ID, nil, nil); err != nil || got.Handle != nil {
+		t.Fatalf("the handle landed without its settings: %v %v", got.Handle, err)
+	}
+	ran := false
+	got, err := store.UpdateAccount(ctx, a.ID, &handle, func(context.Context, pgx.Tx) error { ran = true; return nil })
+	if err != nil || !ran || got.Handle == nil || *got.Handle != handle {
+		t.Fatalf("update %v %v %v", got.Handle, ran, err)
 	}
 }

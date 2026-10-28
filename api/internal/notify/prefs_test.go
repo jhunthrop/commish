@@ -2,8 +2,11 @@ package notify
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 )
@@ -107,10 +110,13 @@ func TestSettingsRoundTrip(t *testing.T) {
 	if err != nil || got != DefaultPreferences().Wire() || got.QuietStart != "23:00" || got.QuietEnd != "08:00" || !got.Kinds.WeekReads {
 		t.Fatalf("defaults %+v %v", got, err)
 	}
-	if err := s.UpdateNotifications(ctx, f.acct, apitypes.NotificationSettingsUpdate{TimeZone: strp("America/Los_Angeles")}); err != nil {
+	update := func(u apitypes.NotificationSettingsUpdate) error {
+		return pgx.BeginFunc(ctx, f.pool, func(tx pgx.Tx) error { return s.UpdateNotificationsIn(ctx, tx, f.acct, u) })
+	}
+	if err := update(apitypes.NotificationSettingsUpdate{TimeZone: strp("America/Los_Angeles")}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateNotifications(ctx, f.acct, apitypes.NotificationSettingsUpdate{
+	if err := update(apitypes.NotificationSettingsUpdate{
 		Kinds: &apitypes.NotificationKindsUpdate{WeekReads: boolp(false)}, QuietStart: strp("21:15"),
 	}); err != nil {
 		t.Fatal(err)
@@ -122,5 +128,27 @@ func TestSettingsRoundTrip(t *testing.T) {
 	}
 	if faults := s.CheckNotifications(apitypes.NotificationSettingsUpdate{QuietEnd: strp("8")}); faults["notifications.quiet_end"] == "" {
 		t.Fatalf("faults %v", faults)
+	}
+
+	// Two devices each switching a different kind at once: both land
+	// (review L4).
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	for i, u := range []apitypes.NotificationSettingsUpdate{
+		{Kinds: &apitypes.NotificationKindsUpdate{StarterStatus: boolp(false)}},
+		{Kinds: &apitypes.NotificationKindsUpdate{WaiverClaims: boolp(false)}},
+	} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs[i] = update(u)
+		}()
+	}
+	wg.Wait()
+	if errs[0] != nil || errs[1] != nil {
+		t.Fatal(errs)
+	}
+	if got, err = s.Notifications(ctx, f.acct); err != nil || got.Kinds.StarterStatus || got.Kinds.WaiverClaims || got.Kinds.WeekReads {
+		t.Fatalf("after two at once %+v %v", got.Kinds, err)
 	}
 }

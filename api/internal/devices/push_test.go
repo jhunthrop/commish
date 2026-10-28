@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -127,5 +128,36 @@ func TestPushRegistrationIsTheAppsOwn(t *testing.T) {
 	}
 	if _, tok := h.pushOf(phone.Device.Id); tok != nil {
 		t.Fatalf("a refused registration wrote %v", *tok)
+	}
+}
+
+// Another member's active device keeps its token: registering it here is
+// 409 and moves nothing (security review L4); once that device is past
+// the session's life the token moves, so a phone that changed hands is
+// not locked out.
+func TestPushTokenAcrossAccounts(t *testing.T) {
+	h, alice, bob := newHarness(t)
+	alicePhone := h.pairApp(alice, auth.KindAndroid)
+	bobPhone := h.pairApp(bob, auth.KindAndroid)
+	if status, _ := h.register(alicePhone.Token, alicePhone.Device.Id, apitypes.PushPlatformFcm, fcmToken); status != http.StatusOK {
+		t.Fatalf("alice registers: %d", status)
+	}
+	if status, _ := h.register(bobPhone.Token, bobPhone.Device.Id, apitypes.PushPlatformFcm, fcmToken); status != http.StatusConflict {
+		t.Fatalf("bob took alice's token: %d", status)
+	}
+	if _, tok := h.pushOf(alicePhone.Device.Id); tok == nil || *tok != fcmToken {
+		t.Fatal("alice lost her token to a refused registration")
+	}
+	pool := h.svc.Push.(*Store).Pool
+	idle := h.clock.now.Add(-auth.SessionTTL - time.Hour)
+	if _, err := pool.Exec(context.Background(), `update app.devices set last_used_at = $2, created_at = $2 where id = $1`,
+		alicePhone.Device.Id, idle); err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := h.register(bobPhone.Token, bobPhone.Device.Id, apitypes.PushPlatformFcm, fcmToken); status != http.StatusOK {
+		t.Fatalf("bob after alice's phone lapsed: %d", status)
+	}
+	if _, tok := h.pushOf(alicePhone.Device.Id); tok != nil {
+		t.Fatal("the lapsed device kept the token")
 	}
 }

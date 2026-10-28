@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jhunthrop/commish/api/internal/auth"
@@ -21,6 +22,9 @@ var (
 	ErrNotFound = errors.New("devices: not found")
 	// ErrTooMany is a pairing past MaxDevices live devices.
 	ErrTooMany = errors.New("devices: too many devices")
+	// ErrTokenTaken is a push token another member's active device holds,
+	// or one a registration racing this one took.
+	ErrTokenTaken = errors.New("devices: push token held elsewhere")
 )
 
 // Bounds.
@@ -269,12 +273,27 @@ func (s *Store) SweepCodes(ctx context.Context, now time.Time) (int64, error) {
 
 // PutPush registers a push token on one of the account's live app
 // devices, replacing its earlier one, and answers when. A token belongs
-// to one device: any other device holding it lets it go in the same
-// transaction (the app reinstalled and signed in again, or signed in as
-// another member on the same phone).
+// to one device. Another device of the same account holding it lets it go
+// in the same transaction (the app reinstalled and paired again). A
+// device of another account still active (live, used within the
+// session's life) keeps it, and the registration is ErrTokenTaken (Lane
+// 262 security review L4: no taking a member's token without the phone);
+// one past its life lets it go, so a phone that changed hands is not
+// locked out. A registration that races another for the token is
+// ErrTokenTaken too (review L5), never a 500.
 func (s *Store) PutPush(ctx context.Context, accountID, id uuid.UUID, platform, token string, now time.Time) (time.Time, error) {
 	var at time.Time
 	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		var held bool
+		if err := tx.QueryRow(ctx, `select exists (select 1 from app.devices
+			where push_platform = $1 and push_token = $2 and id <> $3 and account_id <> $4
+				and revoked_at is null and coalesce(last_used_at, created_at) > $5)`,
+			platform, token, id, accountID, now.Add(-auth.SessionTTL)).Scan(&held); err != nil {
+			return err
+		}
+		if held {
+			return ErrTokenTaken
+		}
 		if _, err := tx.Exec(ctx, `update app.devices set push_platform = null, push_token = null, push_registered_at = null
 			where push_platform = $1 and push_token = $2 and id <> $3`, platform, token, id); err != nil {
 			return err
@@ -287,14 +306,20 @@ func (s *Store) PutPush(ctx context.Context, accountID, id uuid.UUID, platform, 
 		}
 		return err
 	})
-	if errors.Is(err, ErrNotFound) {
+	var pgErr *pgconn.PgError
+	switch {
+	case errors.Is(err, ErrNotFound), errors.Is(err, ErrTokenTaken):
 		return time.Time{}, err
-	}
-	if err != nil {
+	case errors.As(err, &pgErr) && pgErr.Code == uniqueViolation:
+		return time.Time{}, ErrTokenTaken
+	case err != nil:
 		return time.Time{}, fmt.Errorf("devices: put push %s: %w", id, err)
 	}
 	return at, nil
 }
+
+// uniqueViolation is Postgres's unique_violation.
+const uniqueViolation = "23505"
 
 // DeletePush removes the push token of one of the account's live
 // devices, if it holds one.

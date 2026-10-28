@@ -17,19 +17,21 @@ import (
 // own identity; APNs answers not configured until its key is in Secret
 // Manager, and those rows are given up and logged.
 func runNotify(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpool.Pool, _ []string) error {
-	senders, err := pushSenders(ctx, cfg.Push, log)
+	store := &notify.Store{Pool: pool}
+	senders, err := pushSenders(ctx, cfg.Push, store, log)
 	if err != nil {
 		return err
 	}
-	d := &notify.Drainer{Outbox: &notify.Store{Pool: pool}, Senders: senders, Now: time.Now, Log: log}
+	d := &notify.Drainer{Outbox: store, Senders: senders, Now: time.Now, Log: log}
 	n, err := d.Run(ctx)
-	log.Info("notified", "sent", n.Sent, "retried", n.Retried, "dead", n.Dead, "dropped_tokens", n.DroppedTokens)
+	log.Info("notified", "sent", n.Sent, "retried", n.Retried, "dead", n.Dead, "dropped_tokens", n.DroppedTokens,
+		"released", n.Released, "lost", n.Lost)
 	return err
 }
 
 // pushSenders is each platform's sender, the not-configured one where its
 // credentials are not here.
-func pushSenders(ctx context.Context, cfg config.Push, log *slog.Logger) (map[notify.Platform]notify.Sender, error) {
+func pushSenders(ctx context.Context, cfg config.Push, tokens notify.ProviderTokens, log *slog.Logger) (map[notify.Platform]notify.Sender, error) {
 	fcm, err := notify.NewFCM(ctx, cfg.FCMProjectID)
 	if err != nil {
 		return nil, err
@@ -40,7 +42,7 @@ func pushSenders(ctx context.Context, cfg config.Push, log *slog.Logger) (map[no
 	}
 	apns, err := notify.NewAPNs(notify.APNsConfig{
 		KeyID: cfg.APNsKeyID, TeamID: cfg.APNsTeamID, Key: cfg.APNsKey, Topic: cfg.APNsTopic, Origin: origin,
-	}, &http.Client{}, time.Now)
+	}, &http.Client{}, tokens, time.Now)
 	if err != nil {
 		return nil, err
 	}

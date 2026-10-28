@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 )
@@ -30,17 +31,11 @@ func (s *Settings) CheckNotifications(u apitypes.NotificationSettingsUpdate) map
 	return faults
 }
 
-// UpdateNotifications applies a checked update to the account's settings.
-func (s *Settings) UpdateNotifications(ctx context.Context, accountID uuid.UUID, u apitypes.NotificationSettingsUpdate) error {
-	p, err := s.Store.Preferences(ctx, accountID)
-	if err != nil {
-		return err
-	}
-	next, faults := Apply(p, u)
-	if faults != nil {
-		return &FaultError{Faults: faults}
-	}
-	return s.Store.PutPreferences(ctx, accountID, next)
+// UpdateNotificationsIn applies a checked update to the account's
+// settings inside the caller's transaction (PATCH /me's, with the
+// handle), the row locked from read to write.
+func (s *Settings) UpdateNotificationsIn(ctx context.Context, tx pgx.Tx, accountID uuid.UUID, u apitypes.NotificationSettingsUpdate) error {
+	return UpdatePreferences(ctx, tx, accountID, func(p Preferences) (Preferences, map[string]string) { return Apply(p, u) })
 }
 
 // FaultError is an update that did not read, by field.

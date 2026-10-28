@@ -273,10 +273,10 @@ def _capture_harvest(now: datetime) -> bool:
     market = _touchdown_market(now, season)
     charts = _slot_depth_charts(now, season)
     _week_reads(now)
-    # The API queues the starter status pushes from the captures just committed (Lane 262).
-    pushed, push_line = notify_starter_status()
-    _line(push_line)
-    return not failed and dated_ok and facts_ok and status.ok and returns_ok and parsed and market and charts and pushed
+    # The API queues the starter status pushes from the captures just committed (Lane 262): advisory, never
+    # the capture's verdict.
+    _line(notify_starter_status())
+    return not failed and dated_ok and facts_ok and status.ok and returns_ok and parsed and market and charts
 
 
 def _capture_status(now: datetime) -> bool:

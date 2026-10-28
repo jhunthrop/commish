@@ -23,10 +23,10 @@ func injList(codes map[string]string, filler int) string {
 	return `{"injList": [` + strings.Join(entries, ", ") + `]}`
 }
 
-// The pair is the two newest captures that read; a cut-short list between
-// them is passed over, never read as everyone cleared; a source with one
-// capture has no pair.
-func TestDesignationPair(t *testing.T) {
+// The pairs are each two consecutive captures that read, oldest first,
+// from the window; a cut-short list between them is passed over, never
+// read as everyone cleared; a source with one capture has no pair.
+func TestDesignationPairs(t *testing.T) {
 	pool := dbtest.Pool(t)
 	ctx := context.Background()
 	const schema = "lane262_pair"
@@ -50,15 +50,23 @@ func TestDesignationPair(t *testing.T) {
 	}
 
 	insert(injList(map[string]string{"p1": "Q"}, 20), at)
-	if _, ok, err := src.DesignationPair(ctx); err != nil || ok {
-		t.Fatalf("one capture made a pair: %v %v", ok, err)
+	if pairs, err := src.DesignationPairs(ctx, time.Time{}); err != nil || len(pairs) != 0 {
+		t.Fatalf("one capture made pairs: %v %v", pairs, err)
 	}
 	insert(injList(map[string]string{"p2": "O"}, 0), at.Add(time.Hour)) // cut short: under half
 	insert(injList(map[string]string{"p1": "Q", "p2": "O"}, 20), at.Add(2*time.Hour))
+	insert(injList(map[string]string{"p2": "O"}, 20), at.Add(3*time.Hour))
 
-	pair, ok, err := src.DesignationPair(ctx)
-	if err != nil || !ok {
-		t.Fatalf("pair %v %v", ok, err)
+	pairs, err := src.DesignationPairs(ctx, time.Time{})
+	if err != nil || len(pairs) != 2 {
+		t.Fatalf("pairs %v %v", len(pairs), err)
+	}
+	pair, last := pairs[0], pairs[1]
+	if !last.OlderAt.Equal(at.Add(2*time.Hour)) || !last.NewerAt.Equal(at.Add(3*time.Hour)) {
+		t.Fatalf("the newest pair compared %v with %v", last.NewerAt, last.OlderAt)
+	}
+	if within, err := src.DesignationPairs(ctx, at.Add(150*time.Minute)); err != nil || len(within) != 1 || !within[0].NewerAt.Equal(last.NewerAt) {
+		t.Fatalf("the window kept %d pairs %v", len(within), err)
 	}
 	if !pair.NewerAt.Equal(at.Add(2*time.Hour)) || !pair.OlderAt.Equal(at) {
 		t.Fatalf("compared %v with %v", pair.NewerAt, pair.OlderAt)

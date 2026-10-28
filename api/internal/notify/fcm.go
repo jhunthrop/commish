@@ -74,8 +74,10 @@ type fcmError struct {
 	} `json:"error"`
 }
 
-// Send posts one message. UNREGISTERED is a dead token; another 400 is a
-// message FCM refuses; 401, 403, 429 and 5xx are worth a retry.
+// Send posts one message. Only an UNREGISTERED detail is a dead token: a
+// bare 404 is also FCM's answer to a wrong project id or path, and must
+// never remove registrations (review H1), so it is retried like 401, 403,
+// 429 and 5xx; another 400 is a message FCM refuses.
 func (f *FCM) Send(ctx context.Context, m Message) error {
 	body, err := json.Marshal(fcmRequest{Message: fcmMessage{
 		Token: m.Token, Notification: fcmNotification{Title: m.Title, Body: m.Body},
@@ -108,9 +110,6 @@ func fcmOutcome(status int, body []byte) error {
 		if d.ErrorCode == fcmUnregistered {
 			return fmt.Errorf("%w: fcm %d %s", ErrDeadToken, status, d.ErrorCode)
 		}
-	}
-	if status == http.StatusNotFound {
-		return fmt.Errorf("%w: fcm %d %s", ErrDeadToken, status, e.Error.Status)
 	}
 	if status == http.StatusBadRequest {
 		return fmt.Errorf("%w: fcm %d %s", ErrRejected, status, e.Error.Status)
