@@ -11,6 +11,7 @@ import {
 	builtFrom,
 	checkInput,
 	checkWords,
+	countWords,
 	fillsBoth,
 	gainBars,
 	openingPicks,
@@ -326,6 +327,12 @@ void test('the screen opens on the team our best idea names with nothing ticked,
 		ANALYZER_LINES.noTeam,
 		'Pick a team to trade with, then tick a player on each side.'
 	);
+});
+
+void test("the roster switch counts each side's ticks after its name, nothing for none", () => {
+	assert.equal(countWords([]), '');
+	assert.equal(countWords(['a']), ', 1');
+	assert.equal(countWords(['a', 'b']), ', 2');
 });
 
 void test('a preset is pressed while the ticks hold its trade, in any order', () => {

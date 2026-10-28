@@ -31,6 +31,8 @@ const OWN_WORDS = /\bover repl\b|\b(price|market|buy|sell|grade)\b/i;
 const IDEA_GAINS = /^[+−]\d+\.\d a week for your lineup, [+−]\d+\.\d for theirs$/;
 const VERDICT = /^(Your lineup|Both lineups|Neither lineup|Your roster|Their roster)/;
 const KEEP_RULE = 'A player we rank first at his position goes only for';
+/** At this width and under, the rosters stack and the switch draws one at a time (TradeBuilder). */
+const STACKS_AT = 1180;
 /** The idea the shots load: the second, so the screen visibly changes team and ticks. */
 const LOADED_IDEA = 1;
 
@@ -144,20 +146,33 @@ for (const theme of THEMES) {
 		await shoot(page, `trades-${theme}-${String(width)}-open.png`, width);
 
 		// The member's own idea: his RB2 for their WR1, a tap each, the verdict with no submit.
+		// Where the rosters stack, theirs is a tap on the switch away, never a scroll past his roster.
+		const stacked = width <= STACKS_AT;
 		const give = await tickAt(page, true, 'RB', 2);
+		if (stacked) await page.locator('main .switch button').nth(1).click();
 		const get = await tickAt(page, false, 'WR', 1);
+		const tapCount = stacked ? 3 : 2;
 		await verdict(page);
 		const built = await seen(page);
-		check(built.ticked === 2, `${where}: ${String(built.ticked)} ticked after two taps`);
+		check(built.ticked === 2, `${where}: ${String(built.ticked)} ticked after two ticks`);
 		check(built.bars.length === 2, `${where}: ${String(built.bars.length)} bars`);
-		taps.push(`${where}: 2 taps, ${give} for ${get} with ${open.team}: ${built.line}`);
-		if (width === WIDTHS[0]) {
-			// The verdict held at the window's foot while the rosters scroll.
-			await page.screenshot({
-				path: new URL(`trades-${theme}-${String(width)}-built-window.png`, out).pathname
-			});
-		}
+		taps.push(
+			`${where}: ${String(tapCount)} taps, ${give} for ${get} with ${open.team}: ${built.line}`
+		);
+		// The window as the member sees it: at a desk the verdict held at its foot while the rosters
+		// scroll, on a phone their roster under the switch with the gains pinned.
+		await page.screenshot({
+			path: new URL(`trades-${theme}-${String(width)}-built-window.png`, out).pathname
+		});
 		await shoot(page, `trades-${theme}-${String(width)}-built.png`, width);
+		if (stacked) {
+			// The ticks hold across the switch: back to yours, his tick is still on.
+			await page.locator('main .switch button').nth(0).click();
+			const mine = await page
+				.locator('main table.box.mine button.tick[aria-pressed="true"]')
+				.count();
+			check(mine === 1, `${where}: ${String(mine)} of yours ticked after the switch`);
+		}
 
 		// Share copies the trade in our words.
 		await page.getByRole('button', { name: ANALYZER_LINES.share }).click();

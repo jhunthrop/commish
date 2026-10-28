@@ -238,5 +238,13 @@ export const ANALYZER_LINES = {
 	/** The team choice before one is chosen. */
 	pickTeam: 'Pick a team',
 	/** The answer line with no team chosen. */
-	noTeam: 'Pick a team to trade with, then tick a player on each side.'
+	noTeam: 'Pick a team to trade with, then tick a player on each side.',
+	/** The switch between the two rosters where they stack: its name and the member's side. */
+	rosters: 'Rosters',
+	you: 'You'
 } as const;
+
+/** A side's ticks after its name on the roster switch: ", 1", nothing while none is ticked. */
+export function countWords(side: readonly string[]): string {
+	return side.length === 0 ? '' : `, ${String(side.length)}`;
+}

@@ -208,8 +208,6 @@
 
 	@media (max-width: 760px) {
 		.holds {
-			flex-basis: 100%;
-			margin-left: 0;
 			white-space: normal;
 		}
 

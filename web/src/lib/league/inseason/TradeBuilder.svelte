@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import Chip from '#lib/ui/Chip.svelte';
+	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
@@ -33,6 +35,7 @@
 		MAX_A_SIDE,
 		checkInput,
 		checkWords,
+		countWords,
 		fillsBoth,
 		gainBars,
 		pickPrompt,
@@ -119,6 +122,8 @@
 	let problem = $state<string | null>(null);
 	let copied = $state<CopiedTrade | null>(null);
 	let shared = $state<string | null>(null);
+	/** The roster drawn where the two stack (a phone): yours first. */
+	let drawn = $state<'give' | 'get'>('give');
 
 	// svelte-ignore state_referenced_locally
 	const asking = new Narrowing(check);
@@ -236,7 +241,9 @@
 </script>
 
 {#snippet action(fill: boolean)}
-	<span class="act" {@attach hostTab(page)}>
+	<!-- Made again with each answer: before one the verb is a button, after it a link that takes its
+	     new tab. -->
+	<span class="act" {@attach hostTab(answer === null ? '' : page)}>
 		<Verb
 			href={page === '' ? undefined : page}
 			disabled={page === '' || answer === null}
@@ -290,25 +297,43 @@
 					</ul>
 				</div>
 			{/if}
+			{#if team}
+				<!-- Where the rosters stack, one at a time: a tap between yours and theirs, never a scroll
+				     past twenty rows (fix round 1). The ticks are the picks, so they hold across the switch. -->
+				<div class="switch">
+					<ChipGroup label={ANALYZER_LINES.rosters}>
+						<Chip pressed={drawn === 'give'} onclick={() => (drawn = 'give')}
+							>{ANALYZER_LINES.you}{countWords(picks.give)}</Chip
+						>
+						<Chip pressed={drawn === 'get'} onclick={() => (drawn = 'get')}
+							>{team.name}{countWords(picks.get)}</Chip
+						>
+					</ChipGroup>
+				</div>
+			{/if}
 			<div class="boxes">
-				<TradeBox
-					team={me.name}
-					mine
-					aside={me.aside}
-					holds={holdsWords('give')}
-					lines={roster}
-					pickOf={tickOf('give')}
-					{now}
-				/>
-				{#if team}
+				<div class="side" class:away={drawn !== 'give'}>
 					<TradeBox
-						team={team.name}
-						aside={teamAside(team)}
-						holds={holdsWords('get')}
-						lines={team.roster}
-						pickOf={tickOf('get')}
+						team={me.name}
+						mine
+						aside={me.aside}
+						holds={holdsWords('give')}
+						lines={roster}
+						pickOf={tickOf('give')}
 						{now}
 					/>
+				</div>
+				{#if team}
+					<div class="side" class:away={drawn !== 'get'}>
+						<TradeBox
+							team={team.name}
+							aside={teamAside(team)}
+							holds={holdsWords('get')}
+							lines={team.roster}
+							pickOf={tickOf('get')}
+							{now}
+						/>
+					</div>
 				{/if}
 			</div>
 			<div class="verdict">
@@ -558,6 +583,11 @@
 		align-items: start;
 	}
 
+	/* The switch between the rosters shows only where they stack. */
+	.switch {
+		display: none;
+	}
+
 	/* The verdict under the rosters stays in sight at a desk as the ticks change, held to the foot of
 	   the window. */
 	.verdict {
@@ -582,6 +612,14 @@
 			grid-template-columns: minmax(0, 1fr);
 		}
 
+		.switch {
+			display: flex;
+		}
+
+		.away {
+			display: none;
+		}
+
 		/* The scoreboard stacks here: the verdict sits under the rosters in its place. */
 		.verdict {
 			position: static;
@@ -592,8 +630,28 @@
 	}
 
 	@media (max-width: 760px) {
+		/* One row on a phone: the team choice and Share, so the first roster row clears the pin; the
+		   panel keeps its name for a screen reader. */
+		.head {
+			flex-wrap: nowrap;
+			gap: var(--s-2);
+		}
+
 		h2 {
-			font-size: var(--t-xl);
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
+
+		.head :global(.pick) {
+			flex: 1;
+		}
+
+		.head :global(select) {
+			flex: 1;
 		}
 
 		.line {
@@ -601,7 +659,7 @@
 		}
 
 		.idea {
-			width: 13.5rem;
+			width: 16rem;
 		}
 
 		.ideas {
