@@ -37,7 +37,7 @@ import os
 from collections import deque
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import datetime, time
+from datetime import UTC, datetime, time
 from typing import Final
 
 import httpx
@@ -68,7 +68,7 @@ from research.capsules.week.validate import week_masks
 from research.capsules.week.write import MAX_TOKENS, WeekReadResult, write_week_read
 from research.nightly.capsule_step import checked_price
 from research.nightly.steps import StepRecord
-from research.nightly.week_read_demotion import demote_shared, read_shapes
+from research.nightly.week_read_demotion import demote_shared, player_names, read_shapes
 from research.season import PRODUCT_SEASON
 
 STEP: Final = "week-reads"
@@ -96,7 +96,7 @@ NIGHTLY_BUDGET_USD: Final = 2.50
 # or was demoted for a shared sentence; one still unwritten is asked again on the next nightly.
 ROLLOVER_ROUNDS: Final = 3
 HOURLY_BUDGET_USD: Final = 0.05
-HOURLY_DAY_USD: Final = 0.60
+HOURLY_DAY_USD: Final = 1.50  # 0.60 before the game-day status passes (Lane 263): headroom over $0.93 of waves
 # The heaviest prompt a week read's ask carries (a correction with its ledger and every line's stamp), for a
 # read's worst case against what is left of the budget. Measured on Lane 117's replay of 40 production
 # sheets of week 7 after the four-rule prompt: 8,506 prompt tokens at 17,643 characters, the fewest
@@ -155,19 +155,21 @@ class WeekReadSpend:
         """The step's status: "partial" while a read it was due to write is still unwritten."""
         return PARTIAL if self.unwritten else "ran"
 
-    def line(self) -> str:
+    def line(self, tail: str | None = None) -> str:
+        """The pass's tally, then `tail` (an hourly pass's reads left unread), then the unwritten reads' names
+        one a line; their count is the step line's head (`head`), said once."""
         due = ", ".join(f"{reason} {count}" for reason, count in sorted(self.due.items())) or "none"
         fell = "" if not self.fell else f"; {len(self.fell)} fell to their facts blocks: {'; '.join(self.fell)}"
         body = (
             f"{sum(self.due.values())} reads due ({due}), {self.written} written, {self.facts_blocks} facts blocks, "
             f"{self.budget_stopped} stopped by the budget, {self.rounds} rounds, {self.calls} calls, "
             f"{self.prompt_tokens} prompt and {self.completion_tokens} completion tokens, ${self.cost_usd:.6f}, "
-            f"{self.demoted} demoted for a sentence on two pages{fell}"
+            f"{self.demoted} demoted for a sentence on two pages{fell}{'' if tail is None else f'; {tail}'}"
         )
         if not self.unwritten:
             return f"every due read written; {body}"
         names = "".join(f"\n  {name}" for name in self.unwritten)
-        return f"{len(self.unwritten)} still unwritten, asked again on the next pass; {body}; unwritten:{names}"
+        return f"{body}; unwritten, asked again on the next pass:{names}"
 
     def head(self) -> str:
         """The count the step line leads with, before the night's facts."""
@@ -190,11 +192,12 @@ def step_budget(price: ModelPrice, usd: float) -> RunBudget:
 
 
 class _Board:
-    """The week's sentence shapes as reads land (masked with every sheet's names, `week_masks`): who carries
+    """The week's sentence shapes as reads land (masked with every board player's name, `week_masks`): who carries
     each, and tonight's newest sentences to quote."""
 
-    def __init__(self, stored: Mapping[tuple[str, int], StoredWeekRead], masks: ShapeMasks) -> None:
-        self.masks = masks
+    def __init__(self, stored: Mapping[tuple[str, int], StoredWeekRead], masks: ShapeMasks | None = None) -> None:
+        # No masks: the clubs' alone, the word shape holding every name (the writer bake-off's harness).
+        self.masks = ShapeMasks.of(()) if masks is None else masks
         self.carriers: dict[int, dict[str, set[str]]] = {}
         self.recent: dict[int, deque[str]] = {}
         for (player_id, week), read in stored.items():
@@ -242,6 +245,9 @@ class _Night:
     stored: Mapping[tuple[str, int], StoredWeekRead]
     board_week: int
     rollover: Rollover
+    # The week's shapes' masks: every board player's name and every stored read's player's, with every
+    # sheet's (the Lane 265 review's M1: a read whose player has no sheet tonight is masked by name too).
+    masks: ShapeMasks
 
 
 def _read_night(engine: Engine, now: datetime, facts: FactsPassMemo) -> _Night | None:
@@ -255,7 +261,9 @@ def _read_night(engine: Engine, now: datetime, facts: FactsPassMemo) -> _Night |
         # The board week's sheets alone (`collect.read_week_facts`): a player whose game of it has kicked off
         # has his next week ahead, written when that week rolls over (Lane 256), never trickled in before it.
         sheets = tuple(collect_week_sheets(week_facts, subjects, stored))
-        return _Night(sheets, stored, week, week_facts.rollover)
+        board = [subject.facts.identity.name for subject in subjects]
+        masks = week_masks(sheets, (*board, *player_names(conn, (pid for pid, _ in stored))))
+        return _Night(sheets, stored, week, week_facts.rollover, masks)
 
 
 def _write(  # noqa: PLR0913 - the pass's parts
@@ -324,11 +332,10 @@ def _write_rounds(  # noqa: PLR0913 - the pass's parts
     most `rounds` times while the budget has room; those still unwritten are named on `spend`."""
     stored: Mapping[tuple[str, int], StoredWeekRead] = night.stored
     batch = list(due)
-    masks = week_masks(night.sheets)
     while batch and spend.rounds < rounds and room():
         spend.rounds += 1
-        _write(engine, gateway, stored, batch, room=room, spend=spend, masks=masks, judge=judge)
-        spend.demoted_reads |= demote_shared(engine, night.sheets, night.board_week, now)
+        _write(engine, gateway, stored, batch, room=room, spend=spend, masks=night.masks, judge=judge)
+        spend.demoted_reads |= demote_shared(engine, night.sheets, night.board_week, now, night.masks)
         stored = _reread(engine, night.board_week)
         batch = [(sheet, UNWRITTEN) for sheet in _unwritten(night, due, stored)]
     spend.unwritten = [sheet.name for sheet in _unwritten(night, due, stored)]
@@ -362,17 +369,49 @@ def _budget_usd(engine: Engine, now: datetime, hourly: bool) -> float:
 
 
 def _due(night: _Night, now: datetime, hourly: bool) -> list[tuple[WeekSheet, str]]:
-    """Every board-week read the cadence says is due, in board order."""
-    return [
+    """Every board-week read the cadence says is due, in board order; an hourly pass (the game-day status
+    passes among them) soonest kickoff first, so when its budget stops the reads the 13:00 starters are written
+    before the 16:25 ones (Lane 263). Stable: board order within a kickoff."""
+    due = [
         (sheet, reason)
         for sheet in night.sheets
         if (reason := due_reason(sheet, night.stored.get((sheet.player_id, sheet.week)), now, hourly=hourly))
         is not None
     ]
+    return sorted(due, key=lambda item: _kickoff_of(item[0])) if hourly else due
 
 
-def run_week_read_step(
-    engine: Engine, now: datetime, log: Log, facts: FactsPassMemo, *, hourly: bool = False
+def _kickoff_of(sheet: WeekSheet) -> datetime:
+    return datetime.max.replace(tzinfo=UTC) if sheet.game is None else sheet.game.kickoff
+
+
+def left_unread(due: Sequence[tuple[WeekSheet, str]], stopped: int) -> str | None:
+    """What the budget left of an hourly pass's reads: how many, and the soonest kickoff among them (the reads
+    stopped are the tail of the kickoff-ordered `due`), else None."""
+    stopped = min(stopped, len(due))
+    if stopped <= 0:
+        return None
+    left = due[len(due) - stopped :]
+    soonest = min(_kickoff_of(sheet) for sheet, _ in left)
+    return f"{len(left)} reads left unread, the next kickoff among them {soonest.astimezone(CENTRAL):%a %H:%M} Central"
+
+
+# The line the alert "Research game-day reads left unread" matches (`infra/research-alerts.sh`; a test holds the two).
+WARNING_MARKER: Final = f"{STEP} WARNING:"
+
+
+def _warn_spent_day(engine: Engine, now: datetime, log: Log, facts: FactsPassMemo) -> None:
+    """At a game-day window's last pass with the day's dollars spent, nothing was written: every due read is left."""
+    night = _read_night(engine, now, facts)
+    if night is None or not night.rollover.ready:
+        return
+    due = _due(night, now, True)
+    if (left := left_unread(due, len(due))) is not None:
+        log(f"{WARNING_MARKER} {left} at the game-day window's last pass, the day's hourly dollars spent")
+
+
+def run_week_read_step(  # noqa: PLR0913 - the pass's parts
+    engine: Engine, now: datetime, log: Log, facts: FactsPassMemo, *, hourly: bool = False, last_pass: bool = False
 ) -> StepRecord:
     """The pass's record: what was due, written, demoted and spent; skipped by name without the key, before the
     board week's roll-over is due, and for an hourly pass once the day's hourly dollars are spent."""
@@ -382,6 +421,8 @@ def run_week_read_step(
         return StepRecord(STEP, "skipped", f"{CAPSULE_CONFIG.gateway.api_key_variable} is not set, nothing written")
     usd = _budget_usd(engine, now, hourly)
     if usd <= 0:
+        if hourly and last_pass:
+            _warn_spent_day(engine, now, log, facts)
         return StepRecord(STEP, "skipped", f"the hourly passes' ${HOURLY_DAY_USD:.2f} for the day is spent")
     night = _read_night(engine, now, facts)
     if night is None:
@@ -410,9 +451,12 @@ def run_week_read_step(
     finally:
         # Whatever the pass spent is on the day's ledger even when it raised (the re-review's F6).
         record_spend(engine, now, mode, spend, budget)
+    left = left_unread(due, spend.budget_stopped) if hourly else None
+    if left is not None and last_pass:
+        log(f"{WARNING_MARKER} {left} at the game-day window's last pass")
     line = (
         f"{spend.head()}{head}, {len(night.sheets)} board players with a week {night.board_week} ahead, "
-        f"{budget.line()}; {spend.line()}"
+        f"{budget.line()}; {spend.line(left)}"
     )
     log(f"{STEP}: {line}")
     return StepRecord(STEP, spend.status, line)

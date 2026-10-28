@@ -336,6 +336,8 @@ jobs:
           # and the memory and time of the board's facts pass (about 200 MB, a minute) beside the capture.
           capture="$db,TANK01_API_KEY=TANK01_API_KEY:latest,AI_GATEWAY_API_KEY=AI_GATEWAY_API_KEY:latest"
           deploy inseason-capture "research.inseason,--task,capture-harvest" "$capture" 1 2Gi 20m
+          # The game-day status pass (Lane 263): the same secrets and week reads, two provider requests.
+          deploy inseason-status "research.inseason,--task,capture-status" "$capture" 1 2Gi 20m
           # Our headshot copies (Lane 241): about 1,500 fetches at two a second on the first fill, each
           # converted to eight webp widths; the token must write commish-images as well as commish-runs.
           deploy headshots "research.headshots,sync" "$db,CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest" 1 1Gi 1h

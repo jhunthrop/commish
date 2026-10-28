@@ -9,11 +9,14 @@ the season: a read names it once, so a bare week after the first season a read n
 season's (`with_season`) before the writer's rules see it. The week's rules follow (`rules`).
 
 Lane 62's rule binds as the read is written, on sentence shapes (the review's M4; Lane 265 on Lane 261's
-bake-off normalization): a sentence whose shape, with every player name (full or last), club spelling and
-number a placeholder (`narrative.ShapeMasks`), runs six words or more and is on another page's read this
-week is refused here (`sentence_shapes`), the correction ask showing the shape; one that still lands on two
-pages is demoted after the night. A read is masked with the names its own sheet may print
-(`week_masks`), the week's board with every sheet's: a read prints no name its sheet does not carry.
+bake-off normalization): a sentence is held by two shapes (`narrative.held_shapes`), its placeholder shape
+(every player name, full or last, every club spelling, a plural's possessive among them, and every number a
+placeholder, `narrative.ShapeMasks`, six words or more) and main's word shape (every capitalised word and
+number masked, four words or more), so the check is never weaker than the one before it. A sentence either
+shape puts on another page's read this week is refused here (`sentence_shapes`), the correction ask showing
+the shape; one that still lands on two pages is demoted after the night. A read is masked with the names
+its own sheet may print; the week's stored reads with every board player's (`week_masks`), so a read whose
+player has no sheet tonight is still masked by name (the Lane 265 review's M1).
 """
 
 import re
@@ -40,18 +43,25 @@ _BARE_WEEK: Final = re.compile(
 )
 
 
-def _names(sheet: WeekSheet) -> tuple[str, ...]:
+def sheet_names(sheet: WeekSheet) -> tuple[str, ...]:
+    """The names a sheet lets its read print: his and his teammates' on the chart."""
     return (sheet.name, *(() if sheet.depth is None else (name for name, _ in sheet.depth.around)))
 
 
-def week_masks(sheets: Iterable[WeekSheet]) -> ShapeMasks:
-    """The names a week's shapes mask: each sheet's player and the teammates it names, and every club."""
-    return ShapeMasks.of(name for sheet in sheets for name in _names(sheet))
+def week_masks(sheets: Iterable[WeekSheet], players: Iterable[str] = ()) -> ShapeMasks:
+    """The names a week's shapes mask: `players` (every board player's, for the week's stored reads), each
+    sheet's player and the teammates it names, and every club."""
+    return ShapeMasks.of((*players, *(name for sheet in sheets for name in sheet_names(sheet))))
 
 
 def sentence_shapes(text: str, masks: ShapeMasks) -> dict[str, str]:
-    """Each held sentence's shape (`shared_shape_min_words` or more) to the sentence as written."""
-    return held_shapes((text,), masks, CAPSULE_CONFIG.shared_shape_min_words)
+    """Each held sentence's shapes (`narrative.held_shapes`) to the sentence as written."""
+    return held_shapes(
+        (text,),
+        masks,
+        name_words=CAPSULE_CONFIG.shared_shape_min_words,
+        word_words=CAPSULE_CONFIG.shared_sentence_min_words,
+    )
 
 
 def with_season(text: str, season: int) -> str:

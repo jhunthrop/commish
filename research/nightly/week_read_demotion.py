@@ -7,11 +7,11 @@ the board week is covered (H1): a read whose player has no sheet tonight (a club
 has kicked off, now writing its next week) is demoted to the facts block its own row can state.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import Final
 
-from sqlalchemy import Engine
+from sqlalchemy import Connection, Engine, select
 
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.narrative import ShapeMasks
@@ -19,7 +19,8 @@ from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.week.render import render_week_facts_block
 from research.capsules.week.sheet import STATUS_WORDS, WeekSheet, points_text
 from research.capsules.week.store import StoredWeekRead, stored_week_reads, upsert_week_read
-from research.capsules.week.validate import sentence_shapes, week_masks
+from research.capsules.week.validate import sentence_shapes
+from research.db.schema import PLAYERS
 from research.nightly.capsule_demotion import Target, demotion_targets
 from research.nightly.capsule_gate import SharedSentence
 from research.season import PRODUCT_SEASON
@@ -63,16 +64,24 @@ def _demoted(read: StoredWeekRead, block: str, at: datetime) -> StoredWeekRead:
     )  # fmt: skip
 
 
+def player_names(conn: Connection, ids: Iterable[str]) -> list[str]:
+    """The names of the players `ids` names, for masking their stored reads (`week_masks`)."""
+    wanted = sorted(set(ids))
+    if not wanted:
+        return []
+    return [str(name) for name in conn.execute(select(PLAYERS.c.name).where(PLAYERS.c.id.in_(wanted))).scalars()]
+
+
 def demote_shared(
-    engine: Engine, sheets: Sequence[WeekSheet], board_week: int, at: datetime
+    engine: Engine, sheets: Sequence[WeekSheet], board_week: int, at: datetime, masks: ShapeMasks
 ) -> frozenset[tuple[str, int]]:
     """Every written read of the board week and of tonight's weeks but the first carrier in board order
-    (`sheets`' order, then the rest by player) of a shape another carries, written as its facts block.
-    Returns the reads demoted, (player, week)."""
+    (`sheets`' order, then the rest by player) of a shape another carries (`masks`, every board player's
+    name, so a carrier with no sheet tonight is masked too), written as its facts block. Returns the reads
+    demoted, (player, week)."""
     by_id = {(sheet.player_id, sheet.week): sheet for sheet in sheets}
     order = list(dict.fromkeys(sheet.player_id for sheet in sheets))
     weeks = sorted({board_week, *(sheet.week for sheet in sheets)})
-    masks = week_masks(sheets)
     demoted: set[tuple[str, int]] = set()
     with engine.begin() as conn:
         stored = stored_week_reads(conn, PRODUCT_SEASON, weeks)

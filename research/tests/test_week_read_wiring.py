@@ -7,18 +7,21 @@ PARITY_DATABASE_URL (a server where the harness may create `parity_*` databases)
 
 import os
 from collections.abc import Iterator
-from datetime import UTC, date, datetime
-from typing import Final
+from datetime import UTC, date, datetime, timedelta
+from types import SimpleNamespace
+from typing import Final, cast
 
 import pytest
 from sqlalchemy import Engine, insert
 
-from research.capsules.week.collect import read_week_facts
+from research.capsules.sweep import Subject
+from research.capsules.week.collect import collect_week_sheets, read_week_facts
 from research.capsules.week.rollover import ReadsDue
 from research.db.engine import make_engine
 from research.db.schema import (
     CAPTURE_SNAPSHOTS,
     PROVIDER_GAMES,
+    PROVIDER_PLAYERS,
     PUBLISHED_BOARDS,
     TANK01_PROJECTION_ROWS,
     TEAM_WEEK_OBSERVATIONS,
@@ -41,7 +44,15 @@ _GAMES: Final = (
     ("20261101_SEA@HOU", 8, "HOU", "SEA", date(2026, 11, 1), "1:00p"),
     ("20261108_ARI@LAR", 9, "LAR", "ARI", date(2026, 11, 8), "1:00p"),
     ("20261108_HOU@SEA", 9, "SEA", "HOU", date(2026, 11, 8), "4:05p"),
+    # Seattle and Houston play every week from 1 (a slate short of 18 weeks names no bye), so
+    # Seattle's slate reads and his season block is built (`season_block`); each final by the Tuesday before week 7.
+    ("20261018_ARI@LAR", 6, "LAR", "ARI", date(2026, 10, 18), "1:00p"),
+    *(
+        (f"2026091{week}_HOU@SEA", week, "SEA", "HOU", date(2026, 9, 6) + timedelta(days=7 * (week - 1)), "1:00p")
+        for week in range(1, 7)
+    ),
 )
+_EARLY_FINALS: Final = (*((week, team) for week in range(1, 7) for team in ("SEA", "HOU")), (6, "LA"), (6, "ARI"))
 _FINALS_HELD: Final = datetime(2026, 10, 27, 4, 0, tzinfo=UTC)
 _BOARD_PUBLISHED: Final = datetime(2026, 10, 27, 6, 30, tzinfo=UTC)
 _PROJECTION_CAPTURED: Final = datetime(2026, 10, 27, 10, 0, tzinfo=UTC)
@@ -51,8 +62,20 @@ _AFTER_THURSDAY_KICKOFF: Final = datetime(2026, 10, 30, 1, 0, tzinfo=UTC)
 _PLAYER: Final = "00-0039075"
 
 
+def _subject() -> Subject:
+    """A board subject as the facts pass hands it over, the fields the week's facts read (no depth chart)."""
+    identity = SimpleNamespace(id=_PLAYER, name="Kenneth Walker III", position="RB", team="SEA")
+    return cast(
+        "Subject",
+        SimpleNamespace(
+            facts=SimpleNamespace(identity=identity, depth=SimpleNamespace(depth_chart=None)), universe_id=_PLAYER
+        ),
+    )
+
+
 def _seed(engine: Engine) -> None:
     with engine.begin() as conn:
+        conn.execute(insert(PROVIDER_PLAYERS).values(id=_PLAYER, name="Kenneth Walker III", position="RB", team="SEA"))
         conn.execute(
             insert(PROVIDER_GAMES),
             [
@@ -68,6 +91,10 @@ def _seed(engine: Engine) -> None:
                 {"season": _SEASON, "week": 7, "team": team, "source": "nflverse_kickoff", "metric": "game_result",
                  "value": value, "as_of": _FINALS_HELD}
                 for team, value in (("LA", 1), ("ARI", 0), ("SEA", 1), ("HOU", 0))
+            ] + [
+                {"season": _SEASON, "week": week, "team": team, "source": "nflverse_kickoff",
+                 "metric": "game_result", "value": 1, "as_of": _FINALS_HELD}
+                for week, team in _EARLY_FINALS
             ],
         )  # fmt: skip
         conn.execute(
@@ -155,3 +182,18 @@ def test_the_assembly_judges_the_promise_at_the_steps_instant(engine: Engine) ->
         states = _states(conn, games, later)
         judged = _served_week(conn, later, games, states, _WEEK, [], _TUESDAY_RUN)
     assert judged.due == ReadsDue(_WEEK, _WEDNESDAY_RUN)
+
+
+def test_a_board_players_sheet_is_built_from_the_real_rows_with_the_weeks_projection(engine: Engine) -> None:
+    """The review's L5 (Lane 265 fix round 1): with a subject, `collect_week_sheets` runs on the real rows and the
+    narrowed weeks' reads (the board week's projection among them): Seattle's back has his week 8 sheet with the
+    15.2 published after Tuesday 10:00 UTC, and none of it before."""
+    subject = _subject()
+    with engine.connect() as conn:
+        tuesday = read_week_facts(conn, _SEASON, [subject], _TUESDAY_RUN)
+        wednesday = read_week_facts(conn, _SEASON, [subject], _WEDNESDAY_RUN)
+    assert tuesday is not None and wednesday is not None
+    (before,) = collect_week_sheets(tuesday, [subject], {})
+    (after,) = collect_week_sheets(wednesday, [subject], {})
+    assert (before.week, before.team, before.projection) == (_WEEK, "SEA", None)
+    assert after.week == _WEEK and after.projection is not None and after.projection.points == 15.2  # noqa: PLR2004

@@ -299,7 +299,7 @@ def test_the_worst_prompt_bound_holds_the_heaviest_correction() -> None:
     chars = len(WEEK_RULES) + len(user)
     assert chars / MIN_CHARS_PER_TOKEN <= WORST_PROMPT_TOKENS, chars
     assert step_budget(ModelPrice("m", None, None, "unread", None), HOURLY_BUDGET_USD).max_calls == int(0.05 / 0.00065)
-    assert pytest.approx(3.10) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
+    assert pytest.approx(4.00) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
 
 
 _NOW = WRITTEN_AT
@@ -374,7 +374,8 @@ def test_a_sentence_shape_on_two_pages_keeps_its_first_carrier_in_board_order() 
         ),
     }
     sentences = shared_week_sentences(reads, ShapeMasks.of(("Puka Nacua", "Rome Odunze", "Jahmyr Gibbs")))
-    assert [s.player_ids for s in sentences] == [("a", "b")]
+    # Both shapes of the sentence (the placeholder and the word shape) name the same two pages.
+    assert {s.player_ids for s in sentences} == {("a", "b")}
     assert [pid for pid, _ in week_demotions(sentences, ["b", "a", "c"])] == ["a"]
 
 

@@ -306,7 +306,9 @@ def test_a_read_still_unwritten_after_the_rounds_is_named_for_the_next_pass(
     # The review's L1: a partial board says so in its status and at the head of its line, a name a line.
     assert record.status == week_reads.PARTIAL
     assert record.summary.startswith("1 still unwritten; nightly, board week 6")
-    assert record.summary.endswith("; unwritten:\n  Puka Nacua")
+    assert record.summary.endswith("; unwritten, asked again on the next pass:\n  Puka Nacua")
+    # Lane 265 fix round 1 (L4): the count is said once, at the head.
+    assert record.summary.count("still unwritten") == 1
 
 
 def test_a_board_the_budget_cut_short_is_partial_and_names_who_waits(
@@ -320,7 +322,25 @@ def test_a_board_the_budget_cut_short_is_partial_and_names_who_waits(
     assert set(reads) == {(starter().player_id, _BOARD_WEEK)}
     assert record.status == week_reads.PARTIAL and "1 stopped by the budget" in record.summary
     assert record.summary.startswith("1 still unwritten; ")
-    assert record.summary.endswith("; unwritten:\n  Bijan Robinson")
+    assert record.summary.endswith("; unwritten, asked again on the next pass:\n  Bijan Robinson")
+
+
+def test_an_hourly_pass_the_budget_cut_short_says_what_it_left_before_the_names(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Lane 263's reads-left-unread note and Lane 265's names on one line (the Lane 265 review's M3): the note
+    sits in the tally, before the names, never on the last name's line."""
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    monkeypatch.setattr(week_reads, "HOURLY_BUDGET_USD", week_reads.worst_read_usd(_PRICE) + 0.0001)
+    moved = [
+        replace(starter(), status=Status("questionable", REPORT)),
+        replace(questionable(), status=Status("out", REPORT)),
+    ]
+    record = _step(engine, monkeypatch, moved, _Writer(), hourly=True)
+    assert record.status == week_reads.PARTIAL and record.summary.startswith("1 still unwritten; hourly, ")
+    tally, names = record.summary.split("; unwritten, asked again on the next pass:")
+    assert "1 reads left unread, the next kickoff among them" in tally
+    assert names.count("\n  ") == 1 and "reads left unread" not in names
 
 
 def test_mid_week_a_status_change_rewrites_that_player_alone(engine: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
