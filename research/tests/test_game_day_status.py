@@ -302,3 +302,18 @@ def test_a_spent_day_at_the_windows_last_pass_logs_the_warning(monkeypatch: pyte
 def test_left_unread_is_clamped_to_the_reads_due() -> None:
     due = [(_sheet_kicking_off("a", _eastern(25, 13)), "status")]
     assert week_reads.left_unread(due, 5) == "1 reads left unread, the next kickoff among them Sun 12:00 Central"
+
+
+def test_a_spent_day_with_only_a_read_still_unwritten_logs_no_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The Lane 276 review's M2: the game-day alert counts status rewrites alone, never the hourly retries."""
+    _stub_night(monkeypatch, spent=True)
+    monkeypatch.setattr(week_reads, "due_reason", lambda *_a, **_k: "unwritten")
+    assert _step(last_pass=True) == []
+
+
+def test_the_retries_stop_names_the_budget_that_bound_them() -> None:
+    """The re-review's N2: the pass's own dollars or the retries' share of the day, never the day's for the pass's."""
+    by_pass = week_reads._left_line([], 0, 2, 0.05, retries_by_pass=True)
+    by_day = week_reads._left_line([], 0, 2, 0.05)
+    assert by_pass == "2 unwritten reads not asked, the pass's $0.05 spent"
+    assert by_day is not None and "the retries' share of the day's hourly $1.50 spent" in by_day

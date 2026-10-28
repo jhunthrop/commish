@@ -13,9 +13,9 @@ passes' daily cap reads (`hourly_spend_since`).
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Final
 
-from sqlalchemy import Connection, insert, text
+from sqlalchemy import Connection, and_, insert, text
 from sqlalchemy.dialects.postgresql import insert as upsert
 
 from research.db.schema import PLAYER_WEEK_READ_RUNS, PLAYER_WEEK_READS
@@ -93,9 +93,11 @@ def served_week_reads(
     return {r.player_id: _row(r) for r in rows}
 
 
-def upsert_week_read(conn: Connection, row: StoredWeekRead) -> None:
-    """One row per player and week: a rewrite replaces it whole."""
-    values = {
+_KEYS: Final = ("player_id", "season", "week")
+
+
+def _values(row: StoredWeekRead) -> dict[str, object]:
+    return {
         "player_id": row.player_id,
         "season": row.season,
         "week": row.week,
@@ -112,13 +114,36 @@ def upsert_week_read(conn: Connection, row: StoredWeekRead) -> None:
         "attempt_day": row.attempt_day,
         "attempts": row.attempts,
     }
+
+
+def upsert_week_read(conn: Connection, row: StoredWeekRead) -> None:
+    """One row per player and week: a rewrite replaces it whole."""
+    values = _values(row)
     statement = upsert(PLAYER_WEEK_READS).values(values)
-    keys = ("player_id", "season", "week")
     conn.execute(
         statement.on_conflict_do_update(
-            index_elements=list(keys), set_={k: statement.excluded[k] for k in values if k not in keys}
+            index_elements=list(_KEYS), set_={k: statement.excluded[k] for k in values if k not in _KEYS}
         )
     )
+
+
+def replace_week_read(conn: Connection, row: StoredWeekRead, before: StoredWeekRead | None) -> bool:
+    """`row` over the row a pass read (`before`, None for no row), only while that row still stands: its source
+    and written instant unchanged (Lane 276 re-review N1, an hourly pass overlapping the nightly). False when
+    another pass replaced it meanwhile, and nothing is written."""
+    values = _values(row)
+    statement = upsert(PLAYER_WEEK_READS).values(values)
+    table = PLAYER_WEEK_READS.c
+    if before is None:
+        guarded = statement.on_conflict_do_nothing(index_elements=list(_KEYS))
+    else:
+        guarded = statement.on_conflict_do_update(
+            index_elements=list(_KEYS),
+            set_={k: statement.excluded[k] for k in values if k not in _KEYS},
+            where=and_(table.source == before.source, table.written_at == before.written_at),
+        )
+    # The row back when it was written (the driver states no row count for an upsert).
+    return conn.execute(guarded.returning(table.player_id)).first() is not None
 
 
 def record_run(conn: Connection, run: WeekReadRun) -> None:

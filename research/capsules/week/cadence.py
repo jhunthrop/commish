@@ -3,13 +3,13 @@ nightly pass (Lane 256, `rollover`), and after it an hourly pass after the statu
 rewrite only the reads whose week moved.
 
 - No read for his week yet (the roll-over, or a player new to the board since): `FIRST`, nightly.
-- The last one fell to its facts block (the writer could not serve him, or it was demoted for a shared
-  sentence): `UNWRITTEN`, nightly, and at most once an hour and three times a Central day (`RETRY_GAP`,
-  `RETRIES_A_DAY`), so a read that keeps failing never spends a day's budget. Within the roll-over pass a
+- The last one fell to its facts block (every writer failed him, or it was demoted for a shared sentence):
+  `UNWRITTEN`, nightly and hourly, at most once an hour (`RETRY_GAP`) until one is written (Lane 276), the
+  day's hourly dollars the only stop (`nightly.week_reads.HOURLY_DAY_USD`). Within the roll-over pass a
   fallen read is asked again at once (`nightly.week_reads.ROLLOVER_ROUNDS`).
 - His status changed since it was written (Lane 63's capture marks it): `STATUS_CHANGED`, nightly and hourly.
   A rewrite that falls keeps the written read (Lane 275 fix round 1, `kept_read`), so its status still differs;
-  the rewrites that fell since that read was written are capped at `RETRIES_A_DAY` a Central day
+  the rewrites that fell since that read was written are capped at `STATUS_REWRITES_A_DAY` a Central day
   (`status_rewrite_capped`, fix round 2), and a written read's attempts restart at one, so a success never
   spends the next change's tries. A capped read is asked again at the first pass of the next Central day.
 - The written read breaks a rule the writer holds reads to now (`RULE_STALE`, Lane 275 fix round 1: a read
@@ -37,15 +37,30 @@ from research.capsules.week.sheet import CENTRAL, WeekSheet
 from research.capsules.week.store import StoredWeekRead
 
 RETRY_GAP: Final = timedelta(hours=1)
-RETRIES_A_DAY: Final = 3
+# Lane 276 (the founder, 2026-10-28: "we should always show a read"): a fallen read is asked every hour of a
+# Central day, so the count is the day's hours and the gap and the dollars are what hold it. The worst day: a
+# read may spend its six asks (the writer's and the judge's) and the retry writer's draft with the judge's ask on
+# it: 6 x (9,000 x $0.15 + 600 x $0.50) / 1M = $0.0099, plus (9,000 x $0.075 + 600 x $0.30) / 1M = $0.0009 and a
+# judge's ask of about $0.0004, so $0.011. A pass admits a read at two asks (`week_reads.worst_read_usd`); the
+# gateway's reservation, not that check, holds a read in flight to the rest. With the whole board of 536 fallen,
+# 536 x 20 passes (the capture's hours) x $0.011 = $118 asked, which the hourly pass's $0.05 and the retries'
+# share of the day hold to $0.50 (`week_reads.HOURLY_DAY_USD` $1.50, unchanged, less the status share
+# `HOURLY_STATUS_RESERVE_USD` $1.00 the retries never draw on). The day expected: about 2 reads in 100 fall on
+# the roll-over night, 11 of 536, at the dearest night's $0.0021 a read for 20 passes, $0.46.
+RETRIES_A_DAY: Final = 24
+# A written read's status rewrites that fell (Lane 275 fix round 2), its own cap: a held read's row keeps its
+# written instant, so no gap holds its rewrites to one an hour, and the quarter-hour game-day passes would ask it
+# up to four times an hour under the retries' 24 (Lane 276 merge). Lane 275's three a Central day stands.
+STATUS_REWRITES_A_DAY: Final = 3
 FIRST: Final = "first"
 UNWRITTEN: Final = "unwritten"
 STATUS_CHANGED: Final = "status"
 RULE_STALE: Final = "rule"
 # The order a nightly writes its due reads in, so a budget stop leaves the rule-stale rewrites for the next night.
 PRIORITY: Final = (FIRST, UNWRITTEN, STATUS_CHANGED, RULE_STALE)
-# What an hourly pass writes: only the reads whose status moved (the coordinator's M3).
-HOURLY_REASONS: Final = frozenset({STATUS_CHANGED})
+# What an hourly pass writes: the reads whose status moved (the coordinator's M3), and a read still unwritten,
+# asked every hour until one is written (Lane 276).
+HOURLY_REASONS: Final = frozenset({STATUS_CHANGED, UNWRITTEN})
 
 
 def central_day(instant: datetime) -> date:
@@ -69,7 +84,7 @@ def falls_since_written(stored: StoredWeekRead, now: datetime) -> int:
 
 def status_rewrite_capped(stored: StoredWeekRead, now: datetime) -> bool:
     """Whether a written read's status rewrites are spent for `now`'s Central day (Lane 275 fix round 2)."""
-    return stored.source == WRITTEN_SOURCE and falls_since_written(stored, now) >= RETRIES_A_DAY
+    return stored.source == WRITTEN_SOURCE and falls_since_written(stored, now) >= STATUS_REWRITES_A_DAY
 
 
 def kept_read(before: StoredWeekRead, at: datetime) -> StoredWeekRead:
