@@ -118,7 +118,8 @@ def test_the_nights_pool_lands_each_read_with_its_stamps_call_and_attempt(engine
     assert puka.stamps == first.stamps() and puka.facts_at == first.facts_at
     assert (puka.attempt_day, puka.attempts) == (date(2026, 10, 16), 1)
     assert stored[(second.player_id, 6)].reason == STATUS_CHANGED
-    assert '"Start him with confidence."' in asked[1]
+    # The first read's sentences, quoted to the second as the shapes the check compares (Lane 264).
+    assert '- "x him with confidence"' in asked[1]
 
 
 def test_a_read_that_keeps_quoting_a_figure_off_the_page_falls_and_the_pass_says_why(engine: Engine) -> None:
