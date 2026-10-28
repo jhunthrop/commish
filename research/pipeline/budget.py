@@ -7,9 +7,15 @@ ceiling; the nightly chain (phase D) decides where a durable daily ledger lives.
 """
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Final, Protocol
 
 from research.errors import ResearchError
+
+# THE PROVIDER PLAN (memory tank01-paid-tier-approved: ULTRA, $25 a month): requests a day the plan includes,
+# and the monthly ceiling we hold ourselves to (STATS_MONTHLY_REQUEST_BUDGET). The one place either is stated;
+# `tests/test_game_day_status.py` sums every request kind against them.
+PROVIDER_DAILY_REQUEST_QUOTA: Final = 15_000
+PROVIDER_MONTHLY_REQUEST_CEILING: Final = 30_000
 
 
 @dataclass(frozen=True)

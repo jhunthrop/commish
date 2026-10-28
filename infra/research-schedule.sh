@@ -29,7 +29,7 @@ SCHEDULE=(
   "research-status-sun|15,30,45 10-20 * 1,2,9-12 0|America/New_York|inseason-status|The game-day status capture (Lane 263), Sunday 10:15-20:45 ET at :15, :30, :45 (the hourly harvest is the :00): inactives land about 90 minutes before a kickoff, so 10:00 holds the 9:30 game abroad's and 20:45 follows the night game's kickoff"
   "research-status-thu|15,30,45 18-19 * 1,2,9-12 4|America/New_York|inseason-status|The game-day status capture (Lane 263), Thursday 18:15-19:45 ET, the first of the two hours before the 20:15 night game"
   "research-status-thu-kickoff|15 20 * 1,2,9-12 4|America/New_York|inseason-status|The game-day status capture (Lane 263), Thursday 20:15 ET, the night game's kickoff"
-  "research-status-mon|15,30,45 17-19 * 1,2,9-12 1|America/New_York|inseason-status|The game-day status capture (Lane 263), Monday 17:15-19:45 ET, the two hours before a 19:15 first kickoff"
+  "research-status-mon|15,30,45 17-19 * 1,2,9-12 1|America/New_York|inseason-status|The game-day status capture (Lane 263), Monday 17:15-19:45 ET, the passes up to the 20:15 night game (17:15 is two hours before a 19:15 opener in a doubleheader week)"
   "research-status-mon-kickoff|15 20 * 1,2,9-12 1|America/New_York|inseason-status|The game-day status capture (Lane 263), Monday 20:15 ET, the night game's kickoff"
   "research-headshots-august|0 4 * 8 *|America/New_York|headshots|Our headshot copies (research.headshots sync), daily in August, 04:00 ET"
   "research-headshots-weekly|0 4 * 1,2,9-12 3|America/New_York|headshots|Our headshot copies (research.headshots sync), weekly in season, Wednesday 04:00 ET"

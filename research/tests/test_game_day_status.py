@@ -11,7 +11,7 @@ import os
 import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 from zoneinfo import ZoneInfo
@@ -22,13 +22,17 @@ from sqlalchemy import Engine
 from research.db.engine import make_engine
 from research.db.url import sqlalchemy_url
 from research.parity import databases
+from research.pipeline.budget import PROVIDER_DAILY_REQUEST_QUOTA, PROVIDER_MONTHLY_REQUEST_CEILING
 from research.pipeline.http import HttpResponse
 from research.pipeline.kickoff_slots import LEAD, Slot, kickoff_slots
 from research.pipeline.kickoffs import TeamKickoff
 from research.pipeline.tank01.capture import (
     CAPTURE_HARVEST_REQUEST_BUDGET,
     CAPTURE_STATUS_REQUEST_BUDGET,
+    PLAYER_LIST_REQUESTS,
+    STATUS_FEED_SOURCES,
     CaptureContext,
+    _due,
     run_capture_status,
     status_feeds,
 )
@@ -39,9 +43,6 @@ _EASTERN: Final = ZoneInfo("America/New_York")
 _DATABASE: Final = "parity_test_game_day_status"
 SEASON: Final = 2026
 STEP: Final = timedelta(minutes=15)
-# The plan's requests a day (memory: tank01-paid-tier-approved) and the self-imposed monthly ceiling.
-DAILY_QUOTA: Final = 15_000
-MONTHLY_CEILING: Final = 30_000
 HARVEST_PASSES_A_DAY: Final = 20  # 00:00, 02:00 and 06:00 through 23:00
 DAYS_A_MONTH: Final = 31
 
@@ -149,14 +150,33 @@ def test_the_status_capture_asks_the_status_feeds_only() -> None:
     assert len(paths) == CAPTURE_STATUS_REQUEST_BUDGET
 
 
-def test_a_weeks_extra_requests_stay_inside_the_daily_quota_and_the_monthly_ceiling() -> None:
-    per_day = [len(_status_fires(_eastern(day, 0))) * CAPTURE_STATUS_REQUEST_BUDGET for day in range(19, 26 + 1)]
-    extra_a_week = sum(per_day[:7])
-    busiest = max(per_day)
+def test_every_kind_of_request_stays_inside_the_provider_plan() -> None:
+    """The busiest day (a Thursday: the weekly pass's player list, a Sunday's 66 status requests are the larger)
+    and the month, every kind: the hourly harvest (its ten include the game statuses, box scores and the
+    player list), the nightly's capture, the Thursday pass's player list, and the status passes."""
+    per_day = [len(_status_fires(_eastern(day, 0))) * CAPTURE_STATUS_REQUEST_BUDGET for day in range(19, 26)]
+    status_a_week = sum(per_day)
     harvest_a_day = HARVEST_PASSES_A_DAY * CAPTURE_HARVEST_REQUEST_BUDGET
-    assert (busiest, extra_a_week) == (66, 100)
-    assert busiest + harvest_a_day <= DAILY_QUOTA
-    assert DAYS_A_MONTH * harvest_a_day + extra_a_week * 5 <= MONTHLY_CEILING
+    nightly_a_day = CAPTURE_HARVEST_REQUEST_BUDGET
+    busiest_day = harvest_a_day + nightly_a_day + PLAYER_LIST_REQUESTS + max(per_day)
+    month = DAYS_A_MONTH * (harvest_a_day + nightly_a_day) + 5 * (PLAYER_LIST_REQUESTS + status_a_week)
+    assert (max(per_day), status_a_week) == (66, 100)
+    assert busiest_day <= PROVIDER_DAILY_REQUEST_QUOTA
+    assert month <= PROVIDER_MONTHLY_REQUEST_CEILING
+
+
+@pytest.mark.parametrize(
+    "fired_at",
+    [
+        datetime(2026, 10, 27, 0, 15, tzinfo=UTC),  # Monday 20:15 EDT, already Tuesday in UTC
+        datetime(2026, 11, 3, 1, 15, tzinfo=UTC),  # Monday 20:15 EST (after the clocks change on Nov 1)
+        datetime(2026, 11, 3, 0, 45, tzinfo=UTC),  # Monday 19:45 EST
+    ],
+)
+def test_the_inactives_are_asked_on_a_monday_evening_in_utc_tuesday(fired_at: datetime) -> None:
+    due, skipped = _due(status_feeds(), fired_at, lambda _key: False, CaptureContext(SEASON, 8, "20261027", ("KC",)))
+    assert [feed.source for feed in due] == sorted(STATUS_FEED_SOURCES, key=lambda s: s != "tank01_injuries_by_date")
+    assert skipped == []
 
 
 @dataclass

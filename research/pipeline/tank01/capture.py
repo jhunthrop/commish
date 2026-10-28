@@ -16,7 +16,7 @@ whose designation or headlines moved) is a capsule concern and lands with the ca
 
 import hashlib
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time
 from typing import Final, Literal
 from zoneinfo import ZoneInfo
@@ -160,7 +160,9 @@ STATUS_FEED_SOURCES: Final = frozenset({"tank01_injuries_by_date", "tank01_inact
 
 
 def status_feeds(feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS) -> list[CaptureFeed]:
-    return [feed for feed in feeds if feed.source in STATUS_FEED_SOURCES]
+    """The status feeds, each always due: the pass is only fired in a game-day window, and `cadence_allows` reads
+    the game day on the UTC instant, where Monday 20:15 Eastern is already Tuesday (Lane 263, review H1)."""
+    return [replace(feed, cadence="daily") for feed in feeds if feed.source in STATUS_FEED_SOURCES]
 
 
 def harvest_feeds(feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS) -> list[CaptureFeed]:
