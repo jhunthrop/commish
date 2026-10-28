@@ -8,7 +8,7 @@ is an ask spent. The answer is the read and the writer's call for it (`prompt.pa
 that breaks a rule is handed back with every rule broken so far and its sentence (`rule_notes`), up to
 `MAX_CALLS_PER_READ` asks in all. A read whose writer's asks are spent without a written read is asked once
 more of the retry writer (Lane 276, `retry_model`, the setting `config.RETRY_WRITER_MODEL`): the correction of
-the writer's last draft, already in his voice, or the first ask when no draft was answered, held to the same
+the writer's last draft with his voice's reminder (Lane 282), or the first ask when no draft was answered, held to the same
 rules and the same judge. Only a read that every writer failed is his facts block (`render_week_facts_block`),
 labelled facts and no prose.
 """
@@ -243,7 +243,7 @@ def _validation_why(attempts: Sequence[WeekAttempt]) -> str:
 
 def _retry_prompt(sheet: WeekSheet, attempts: Sequence[WeekAttempt], avoid: Sequence[str]) -> str:
     """The retry writer's ask: the correction of the writer's last answered draft with every rule broken so
-    far (the draft already in his voice), or the first ask, voice and all, when no draft was answered."""
+    far and his voice's reminder (Lane 282), or the first ask, voice and all, when no draft was answered."""
     drafts = [attempt for attempt in attempts if attempt.body]
     if not drafts:
         return week_prompt(sheet, avoid)
