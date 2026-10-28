@@ -4,12 +4,14 @@
 	import { TRADES, type BugFigures } from './trades.ts';
 
 	/** The trade builder's scoreboard (Lane 66g), lit like the Matchup's bug: each side's this-week
-	 * Proj and rest-of-season strength before and after the trade with the change, and its room; the
-	 * verb between them. */
+	 * Proj and rest-of-season strength before and after the trade with the change, a bar of its gain
+	 * against the other side's (Lane 260), and its room; the verb between them. */
 	interface Side {
 		name: string;
 		figures: BugFigures;
 		room: string;
+		/** The side's gain as a share of the longer one, 0 to 1 (gainBars). */
+		bar: number;
 	}
 
 	interface Props {
@@ -46,6 +48,9 @@
 			></span
 		>
 		<span class="room"><small>{TRADES.room}</small><span>{side.room}</span></span>
+		<span class="bar {side.figures.seasonTone}" aria-hidden="true"
+			><span style:width="{String(Math.round(side.bar * 100))}%"></span></span
+		>
 	</div>
 {/snippet}
 
@@ -166,6 +171,37 @@
 		color: var(--scoreboard-loss-ink);
 	}
 
+	/* Each side's gain as a bar, the longer side full, in the board's gain and loss inks. */
+	.bar {
+		grid-column: 1 / -1;
+		height: 6px;
+		border-radius: 3px;
+		background: var(--scoreboard-line);
+		overflow: hidden;
+	}
+
+	.bar > span {
+		display: block;
+		height: 100%;
+		border-radius: inherit;
+		background: var(--scoreboard-ink-2);
+		transition: width 160ms ease-out;
+	}
+
+	.bar.gain > span {
+		background: var(--scoreboard-gain-ink);
+	}
+
+	.bar.loss > span {
+		background: var(--scoreboard-loss-ink);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.bar > span {
+			transition: none;
+		}
+	}
+
 	.room > span {
 		font-size: var(--t-sm);
 		font-weight: 600;
@@ -201,11 +237,10 @@
 			border-top: 1px solid var(--scoreboard-line);
 		}
 
+		/* The verb is pinned under the builder wherever the scoreboard stacks (fix round 2), so one verb
+		   shows. */
 		.mid {
-			order: 3;
-			max-width: none;
-			border-left: 0;
-			border-top: 1px solid var(--scoreboard-line);
+			display: none;
 		}
 	}
 
@@ -230,11 +265,6 @@
 
 		em {
 			font-size: var(--t-sm);
-		}
-
-		/* The verb is pinned under the builder on a phone. */
-		.mid {
-			display: none;
 		}
 	}
 </style>

@@ -102,7 +102,6 @@
 					{now}
 					{host}
 					me={{ name: league?.team_name ?? '', aside: league ? standingWords(league) : '' }}
-					narrow={(player: string) => inSeasonApi.trades(id, player)}
 					check={(trade: TradeCheckInput) => inSeasonApi.checkTrade(id, trade)}
 				/>
 			{/snippet}

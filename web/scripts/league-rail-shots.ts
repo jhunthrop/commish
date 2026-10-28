@@ -40,7 +40,7 @@ const PAGES = [
 	{ name: 'lineup', path: `/league/${id}/start`, lit: 'Lineup', ready: 'Copy the lineup' },
 	{ name: 'matchup', path: `/league/${id}/matchup`, lit: 'Matchup', ready: 'Week 6' },
 	{ name: 'waivers', path: `/league/${id}/waivers`, lit: 'Waivers', ready: 'Open Sleeper waivers' },
-	{ name: 'trades', path: `/league/${id}/trades`, lit: 'Trades', ready: 'worth proposing' }
+	{ name: 'trades', path: `/league/${id}/trades`, lit: 'Trades', ready: 'Our ideas' }
 ] as const;
 
 /** The playoffs, whose phone rail must still reach every screen: each fixture phase, the rail it

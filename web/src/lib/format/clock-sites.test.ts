@@ -62,10 +62,6 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 		reads: 1,
 		why: "a narrowed read's clock, set when the narrowed answer lands"
 	},
-	'src/lib/league/inseason/TradeScreen.svelte': {
-		reads: 1,
-		why: "a narrowed read's clock, set when the narrowed answer lands"
-	},
 	'src/lib/context/LeagueMenu.svelte': {
 		reads: 1,
 		why: "the league switch's phase words, said when the leagues are read"

@@ -1,27 +1,25 @@
-// Screenshots of the Trades screen (Lane 103) at 1280 and 390 in both themes, on the fixture API's
-// clock, the strip and the finder as a member sees them. Each asserts what it shows:
-//   the head over the gains reads "Gain a week" (no "over repl."), the line under the heads says what a
-//   Gain is in once ("points over replacement in each lineup, weeks ..."); each card's gains read
-//   "+3.5 a week for your lineup, +0.8 for theirs"; the first card's verb solid and the rest quiet,
-//   the first of two saying Best (strip.ts, Lane 115, B87); the trade listed only for the need it fills says so ("Fills your empty TE ...") and
-//   no other row does; the footer says the keep rule; and the page's copy passes the one guard
-//   (copy-scan.ts).
+// Screenshots of the Trades screen as one experience (Lane 260, after Lane 103) at 1280 and 390 in
+// both themes, on the fixture API's clock: the screen as it opens, a trade the member builds by tick
+// (his own RB2 for the other team's WR1), the verdict held in sight at a desk, and one of our ideas
+// loaded. Each asserts what it shows:
+//   our ideas are drawn above the rosters, the first marked Best and its gains in a player's words
+//   ("+5.7 a week for your lineup, +0.7 for theirs"); the team picker opens on the team the first idea
+//   names, nothing ticked; a tick on each side reads the verdict with no submit: each side's figures and
+//   a bar, the answer line naming the lineups' change; the taps from the page to that verdict are
+//   counted; a preset's one tap ticks its players and is pressed; Share copies the trade in our words;
+//   the footer says the keep rule; and the page's copy passes the one guard (copy-scan.ts).
 // Against the built site and the fixture API (scripts/inseason-fixture/serve.ts) on the fixture
-// week's clock, whose trades carry each need (trade-needs.ts):
+// week's clock:
 //
 //   node scripts/trades-shots.ts [web origin] [out dir]
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
 import { copyFault, watchData } from './copy-scan.ts';
 import { STRIP } from '../src/lib/league/box/strip.ts';
-import { TRADES } from '../src/lib/league/box/trades.ts';
+import { ANALYZER_LINES } from '../src/lib/league/inseason/builder.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { fixtureApiClock, installFixtureApiClock } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
-import { KEPT_STAND_IN } from './inseason-fixture/trade-needs.ts';
-import { KEEP_GAIN } from './inseason-fixture/week.ts';
-import { lastName } from '../src/lib/format/draft.ts';
-import { MINUS } from '../src/lib/format/number.ts';
 
 const THEMES = ['light', 'dark'] as const;
 const WIDTHS = [1280, 390] as const;
@@ -29,14 +27,14 @@ const VIEWPORT_HEIGHT = 900;
 const ZONE = 'America/Chicago';
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
-const OWN_WORDS = /\bover repl\b/i;
-const GAIN_BASIS = /^points over replacement in each lineup, weeks? \d+/;
-const CARD_GAINS = /[+−]\d+\.\d a week for your lineup, [+−]\d+\.\d for theirs/;
-const NEED = /^Fills your empty \S+ (this week|in week \d+|while \S+ sits on bye)\.$/;
+const OWN_WORDS = /\bover repl\b|\b(price|market|buy|sell|grade)\b/i;
+const IDEA_GAINS = /^[+−]\d+\.\d a week for your lineup, [+−]\d+\.\d for theirs$/;
+const VERDICT = /^(Your lineup|Both lineups|Neither lineup|Your roster|Their roster)/;
 const KEEP_RULE = 'A player we rank first at his position goes only for';
-
-/** A signed figure as its cell prints it: "+0.7", "−0.3". */
-const signedValue = (s: string): number => Number(s.replace(MINUS, '-'));
+/** At this width and under, the rosters stack and the switch draws one at a time (TradeBuilder). */
+const STACKS_AT = 1180;
+/** The idea the shots load: the second, so the screen visibly changes team and ticks. */
+const LOADED_IDEA = 1;
 
 const web = process.argv[2] ?? 'http://localhost:4173';
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
@@ -44,97 +42,115 @@ const clock = (await fixtureApiClock(API_ORIGIN)).clock;
 if (clock === null) throw new Error(`The fixture API at ${API_ORIGIN} runs on the real clock.`);
 const out = new URL(process.argv[3] ?? '../screenshots/trades/', import.meta.url);
 
-interface Seen {
-	gainHead: string;
-	gainBasis: string[];
-	cards: string[];
-	verbLooks: string[];
-	/** Each finder row and strip card: what the member gives, his gain, and the needs it says. */
-	trades: { give: string; gain: string; needs: string[] }[];
-	basis: string;
-}
-
-async function seen(page: Page): Promise<Seen> {
-	return page.evaluate(() => {
-		const shown = (el: Element): boolean => (el as HTMLElement).offsetParent !== null;
-		const text = (el: Element): string => (el as HTMLElement).innerText.trim();
-		return {
-			gainHead: document.querySelector('main table.finder .gh')?.textContent.trim() ?? '',
-			gainBasis: [...document.querySelectorAll('main table.finder thead tr.gain-basis td.gb')]
-				.filter(shown)
-				.map(text),
-			cards: [...document.querySelectorAll('main .card')].map(text),
-			verbLooks: [...document.querySelectorAll('main .card .act .action')].map((a) => a.className),
-			trades: [
-				...[...document.querySelectorAll('main table.finder > tbody > tr.trade')].map((tr) => ({
-					give: tr.querySelector('td.give')?.textContent ?? '',
-					gain: tr.querySelector('td.g.first')?.textContent.trim() ?? '',
-					needs: [...tr.querySelectorAll('.need, .ph-need')].filter(shown).map(text)
-				})),
-				...[...document.querySelectorAll('main .card')].map((card) => ({
-					give: card.querySelector('.deal b')?.textContent ?? '',
-					gain: card.querySelector('em.mine')?.textContent.trim() ?? '',
-					needs: [...card.querySelectorAll('.need')].filter(shown).map(text)
-				}))
-			],
-			basis: document.querySelector('main [data-basis]')?.textContent.trim() ?? ''
-		};
-	});
-}
-
 const failures: string[] = [];
 const check = (ok: boolean, what: string): void => {
 	if (!ok) failures.push(what);
 };
 
-function checkSeen(s: Seen, where: string, width: number): void {
-	// A phone drops the group heads (TradeFinder), its gain heads saying the gain.
-	if (width > 900) check(s.gainHead === TRADES.gainHead, `${where}: gain head "${s.gainHead}"`);
-	check(
-		s.gainBasis.length === 1 && GAIN_BASIS.test(s.gainBasis[0] ?? ''),
-		`${where}: gain basis ${s.gainBasis.join(' | ')}`
+/** What the screen shows: the ideas, the chosen team, the ticks on, the verdict and the basis. */
+async function seen(page: Page) {
+	return page.evaluate(() => {
+		const text = (el: Element | null): string => (el as HTMLElement | null)?.innerText.trim() ?? '';
+		return {
+			ideas: [...document.querySelectorAll('main .idea')].map((b) => ({
+				mark: text(b.querySelector('.mark')),
+				gains: text(b.querySelector('.gains')),
+				pressed: b.getAttribute('aria-pressed') === 'true'
+			})),
+			team: document.querySelector('main .builder select option:checked')?.textContent.trim() ?? '',
+			ticked: document.querySelectorAll('main .builder button.tick[aria-pressed="true"]').length,
+			line: text(document.querySelector('main .builder .words .line')),
+			bars: [...document.querySelectorAll('main .bug .bar > span')].map(
+				(s) => (s as HTMLElement).style.width
+			),
+			basis: text(document.querySelector('main [data-basis]:not([data-basis="builder"])'))
+		};
+	});
+}
+
+/** The tick of the nth player at a position in a box, by his pill: "RB" 2 is the box's RB2. */
+async function tickAt(page: Page, mine: boolean, position: string, nth: number): Promise<string> {
+	const box = page.locator(mine ? 'main table.box.mine' : 'main table.box:not(.mine)');
+	const rows = box.locator('tbody tr').filter({
+		has: page.locator('.pos', { hasText: new RegExp(`^${position}\\b`) })
+	});
+	const row = rows.nth(nth - 1);
+	const name = (await row.locator('td.player').innerText()).split('\n')[0] ?? '';
+	await row.locator('button.tick').click();
+	return name;
+}
+
+/** Waits for the verdict to read an answer (the answer line names a lineup's change). */
+async function verdict(page: Page): Promise<void> {
+	await page.waitForFunction(
+		(pattern) =>
+			new RegExp(pattern).test(
+				document.querySelector<HTMLElement>('main .builder .words .line')?.innerText ?? ''
+			),
+		VERDICT.source,
+		{ timeout: READY_TIMEOUT_MS }
 	);
-	check(s.cards.length > 0 && s.cards.length <= 2, `${where}: ${String(s.cards.length)} cards`);
-	for (const card of s.cards)
-		check(CARD_GAINS.test(card), `${where}: card ${card.replace(/\s+/g, ' ')}`);
-	const [lead, ...rest] = s.verbLooks.map((looks) =>
-		looks.split(' ').includes('verb') ? 'verb' : 'quiet'
-	);
-	check(
-		lead === 'verb' && rest.every((looks) => looks === 'quiet'),
-		`${where}: card verbs ${s.verbLooks.join(' | ')}`
-	);
-	if (s.cards.length > 1)
-		check(
-			s.cards[0]?.toLowerCase().startsWith(STRIP.best.toLowerCase()) === true,
-			`${where}: the first card not Best`
+}
+
+/** The trade check's route, held back by holdChecks so a read is still out when the verbs are read. */
+const CHECK_ROUTE = '**/trades/check';
+const HOLD_MS = 1500;
+
+/** Holds every trade check for HOLD_MS before it goes on. */
+async function holdChecks(page: Page): Promise<void> {
+	await page.route(CHECK_ROUTE, async (route) => {
+		await new Promise((done) => setTimeout(done, HOLD_MS));
+		await route.continue();
+	});
+}
+
+/** Whether Propose (the drawn verb is a link) and Share (enabled) act now. */
+async function verbs(page: Page): Promise<{ propose: boolean; share: boolean }> {
+	return page.evaluate((shareWord) => {
+		const acts = [...document.querySelectorAll<HTMLElement>('main .builder .act')].filter(
+			(el) => el.offsetParent !== null
 		);
-	// The need is said only where it lists the trade (fix round 1, HIGH-1): the top-ranked stand-in
-	// given for under 1.0 a week, on one line at each width, and on no other row.
-	const listedForANeed = s.trades.filter(
-		(t) => t.give.includes(lastName(KEPT_STAND_IN)) && signedValue(t.gain) < KEEP_GAIN
+		const share = [
+			...document.querySelectorAll<HTMLButtonElement>('main .builder .share button')
+		].find((b) => b.innerText.trim() === shareWord);
+		return {
+			propose: acts.some((el) => el.querySelector('a') !== null),
+			share: share !== undefined && !share.disabled
+		};
+	}, ANALYZER_LINES.share);
+}
+
+/** Waits for Propose and Share to come live on the answer for the ticks. */
+async function waitLive(page: Page): Promise<void> {
+	await page.waitForFunction(
+		() =>
+			[...document.querySelectorAll<HTMLElement>('main .builder .act')].some(
+				(el) => el.offsetParent !== null && el.querySelector('a') !== null
+			),
+		undefined,
+		{ timeout: READY_TIMEOUT_MS }
 	);
-	check(listedForANeed.length > 0, `${where}: no trade listed for its need`);
-	for (const t of s.trades) {
-		const wants = listedForANeed.includes(t);
-		check(
-			t.needs.length === (wants ? 1 : 0) && t.needs.every((need) => NEED.test(need)),
-			`${where}: ${t.give.trim()} ${t.gain} says ${JSON.stringify(t.needs)}`
-		);
-	}
-	check(s.basis.includes(KEEP_RULE), `${where}: the footer leaves out the keep rule`);
-	check(!s.basis.includes('over replacement'), `${where}: the footer says what a Gain is`);
+}
+
+/** The whole page at its height, so the verdict sits in its place rather than over the rows. */
+async function shoot(page: Page, name: string, width: number): Promise<void> {
+	const height = await page.evaluate(() => document.documentElement.scrollHeight);
+	await page.setViewportSize({ width, height });
+	await page.screenshot({ path: new URL(name, out).pathname });
+	await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
 }
 
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
+const taps: string[] = [];
 for (const theme of THEMES) {
 	for (const width of WIDTHS) {
 		const where = `${theme} ${String(width)}`;
 		const ctx = await browser.newContext({
 			viewport: { width, height: VIEWPORT_HEIGHT },
 			colorScheme: theme,
-			timezoneId: ZONE
+			timezoneId: ZONE,
+			permissions: ['clipboard-read', 'clipboard-write']
 		});
 		watchData(ctx);
 		await installFixtureApiClock(ctx, API_ORIGIN);
@@ -146,25 +162,92 @@ for (const theme of THEMES) {
 		const page = await ctx.newPage();
 		await page.goto(`${web}/league/${FIXTURE_IDS.league}/trades`, { waitUntil: 'networkidle' });
 		try {
-			await page.getByText('worth proposing').first().waitFor({ timeout: READY_TIMEOUT_MS });
+			await page.getByText(ANALYZER_LINES.ideas).first().waitFor({ timeout: READY_TIMEOUT_MS });
 		} catch (error: unknown) {
-			// What the page drew instead, beside the shots, for the report.
 			await page.screenshot({ path: new URL(`not-ready-${where}.png`, out).pathname });
 			throw error;
 		}
 		await page.evaluate(() => document.fonts.ready);
 		await page.waitForLoadState('networkidle');
-		checkSeen(await seen(page), where, width);
+
+		// As it opens: our ideas, the first's team chosen, nothing ticked.
+		const open = await seen(page);
+		check(open.ideas.length > 1, `${where}: ${String(open.ideas.length)} ideas`);
+		check(open.ideas[0]?.mark.toLowerCase() === STRIP.best.toLowerCase(), `${where}: no Best`);
+		check(
+			open.ideas.every((i) => IDEA_GAINS.test(i.gains)),
+			`${where}: idea gains ${open.ideas.map((i) => i.gains).join(' | ')}`
+		);
+		check(open.ticked === 0, `${where}: ${String(open.ticked)} ticked on opening`);
+		check(open.team.length > 0, `${where}: no team chosen on opening`);
+		check(open.basis.includes(KEEP_RULE), `${where}: the footer leaves out the keep rule`);
 		const banned = await copyFault(page, OWN_WORDS, 'main');
 		check(banned === null, `${where}: says ${banned ?? ''}`);
+		await shoot(page, `trades-${theme}-${String(width)}-open.png`, width);
+
+		// The member's own idea: his RB2 for their WR1, a tap each, the verdict with no submit.
+		// Where the rosters stack, theirs is a tap on the switch away, never a scroll past his roster.
+		const stacked = width <= STACKS_AT;
+		const give = await tickAt(page, true, 'RB', 2);
+		if (stacked) await page.locator('main .switch button').nth(1).click();
+		const get = await tickAt(page, false, 'WR', 1);
+		const tapCount = stacked ? 3 : 2;
+		await verdict(page);
+		const built = await seen(page);
+		check(built.ticked === 2, `${where}: ${String(built.ticked)} ticked after two ticks`);
+		check(built.bars.length === 2, `${where}: ${String(built.bars.length)} bars`);
+		taps.push(
+			`${where}: ${String(tapCount)} taps, ${give} for ${get} with ${open.team}: ${built.line}`
+		);
+		// The window as the member sees it: at a desk the verdict held at its foot while the rosters
+		// scroll, on a phone their roster under the switch with the gains pinned.
 		await page.screenshot({
-			path: new URL(`trades-${theme}-${String(width)}.png`, out).pathname,
-			fullPage: true
+			path: new URL(`trades-${theme}-${String(width)}-built-window.png`, out).pathname
 		});
+		await shoot(page, `trades-${theme}-${String(width)}-built.png`, width);
+		if (stacked) {
+			// The ticks hold across the switch: back to yours, his tick is still on.
+			await page.locator('main .switch button').nth(0).click();
+			const mine = await page
+				.locator('main table.box.mine button.tick[aria-pressed="true"]')
+				.count();
+			check(mine === 1, `${where}: ${String(mine)} of yours ticked after the switch`);
+		}
+
+		// Share copies the trade in our words.
+		await page.getByRole('button', { name: ANALYZER_LINES.share }).click();
+		await page.getByText(ANALYZER_LINES.shared).waitFor({ timeout: READY_TIMEOUT_MS });
+		const copied = await page.evaluate(() => navigator.clipboard.readText());
+		check(copied.startsWith('Trade with '), `${where}: shared "${copied}"`);
+
+		// One tap loads an idea: its team chosen, its players ticked, the preset pressed. Its check is
+		// held back, so the race (review H1) is seen: while it is read, the last answer (another team's
+		// trade) stays drawn and no verb acts on it.
+		await holdChecks(page);
+		await page.locator('main .idea').nth(LOADED_IDEA).click();
+		const racing = await verbs(page);
+		check(!racing.propose && !racing.share, `${where}: a verb live while an idea is read`);
+		await verdict(page);
+		await waitLive(page);
+		const loaded = await seen(page);
+		check(loaded.ideas[LOADED_IDEA]?.pressed === true, `${where}: the loaded idea not pressed`);
+		check(loaded.ticked >= 2, `${where}: ${String(loaded.ticked)} ticked after an idea`);
+		await shoot(page, `trades-${theme}-${String(width)}-idea.png`, width);
+		// Another tick on the same team while its check is read: the answer is for the idea's trade,
+		// the ticks hold one more, so no verb acts until the new answer lands.
+		if (stacked) await page.locator('main .switch button').first().click();
+		await page
+			.locator('main table.box.mine button.tick[aria-pressed="false"]:not([disabled])')
+			.first()
+			.click();
+		const ticking = await verbs(page);
+		check(!ticking.propose && !ticking.share, `${where}: a verb live while a tick is read`);
+		await page.unroute(CHECK_ROUTE);
 		await ctx.close();
 	}
 }
 await browser.close();
+process.stdout.write(`${taps.join('\n')}\n`);
 if (failures.length > 0) {
 	process.stderr.write(`${failures.join('\n')}\n`);
 	process.exit(1);

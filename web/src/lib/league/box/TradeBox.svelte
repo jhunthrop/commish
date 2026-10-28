@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { memberZone } from '#lib/format/clock.ts';
 	import type { PlayerLine } from '../inseason/api.ts';
+	import { rosterRow } from '../inseason/builder.ts';
 	import { BOX, boxRow, type BoxPick } from './box.ts';
 	import BoxLine from './BoxLine.svelte';
 	import TeamAvatar from './TeamAvatar.svelte';
 	import { rosterOrder, TRADES } from './trades.ts';
 
 	/** One roster of the trade builder as a box score (Lane 66g): the team over the columns (a tick,
-	 * the player with his game under his name, Proj, Opp rank, Avg, Last, Rest of season), each row a
-	 * tap that picks him for the trade. */
+	 * the player with his position and our rank under his name (Lane 260) and his game, Proj, Opp rank,
+	 * Avg, Last, Rest of season), each row a tap that picks him for the trade. */
 	interface Props {
 		team: string;
 		mine?: boolean;
@@ -67,7 +68,7 @@
 			<BoxLine
 				phoneFacts={false}
 				phoneOpp={false}
-				row={boxRow(line, '', zone, false, now)}
+				row={rosterRow(boxRow(line, '', zone, true, now))}
 				compact
 				evidence
 				season
@@ -208,8 +209,6 @@
 
 	@media (max-width: 760px) {
 		.holds {
-			flex-basis: 100%;
-			margin-left: 0;
 			white-space: normal;
 		}
 

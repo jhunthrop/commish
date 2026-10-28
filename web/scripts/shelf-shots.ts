@@ -126,7 +126,7 @@ const SCREENS: readonly Screen[] = [
 		name: 'trades',
 		path: `/league/${id}/trades`,
 		signedIn: true,
-		ready: 'worth proposing',
+		ready: 'Our ideas',
 		verb: /./,
 		shot: false
 	}

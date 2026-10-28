@@ -61,7 +61,7 @@ const PAGES = [
 	{
 		name: 'trades',
 		path: `/league/${id}/trades`,
-		ready: 'worth proposing',
+		ready: 'Our ideas',
 		phone: false
 	},
 	{ name: 'matchup', path: `/league/${id}/matchup`, ready: 'Week 6', phone: true }
@@ -202,8 +202,7 @@ for (const { name, path, ready, phone } of PAGES) {
 			const page = await ctx.newPage();
 			try {
 				await open(page, path, ready);
-				// The Trades table shows its game cells in an opened trade (Lane 66g).
-				if (name === 'trades') await page.locator('table.finder button.why').first().click();
+				// The Trades screen shows its game cells in its two rosters, open as it loads (Lane 260).
 				{
 					const cells = await boxFacts(page);
 					// The opened trade's rows keep to the opponent and kickoff on a phone (Lane 66g).

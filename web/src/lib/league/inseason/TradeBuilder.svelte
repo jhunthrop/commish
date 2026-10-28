@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import Chip from '#lib/ui/Chip.svelte';
+	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
@@ -28,28 +30,40 @@
 		TradeTeam
 	} from './api.ts';
 	import {
+		ANALYZER_LINES,
 		BUILDER_LINES,
 		MAX_A_SIDE,
 		checkInput,
 		checkWords,
+		countWords,
+		fillsBoth,
+		gainBars,
 		pickPrompt,
 		pickable,
+		proposable,
+		samePicks,
+		shareText,
 		teamChoice,
 		toggle,
-		type Picks
+		type Answered,
+		type Picks,
+		type Preset
 	} from './builder.ts';
 	import PickSelect, { type PickGroup } from './PickSelect.svelte';
 	import { focusOnOpen, hostTab } from './attach.ts';
 	import { Narrowing } from './state.ts';
 	import { CLOSE_FOR_THEM, teamAside } from './words.ts';
 
-	/** The trade builder (Lane 61) as two box scores (Lane 66g): the other team chosen by name and
-	 * record; a scoreboard of each side's this-week Proj and rest-of-season strength before and after
-	 * the trade, its room, and the verb between them; the answer line and the honesty line; then your
-	 * roster beside theirs, each a box score with a tick on every row, two a side at most. The answer
-	 * is read again as you pick, on the finder's own reckoning. The verb follows the moves rule:
-	 * Propose on the platform where it takes a proposal from here, else Open its trades, which copies
-	 * the offer. We never send one. On a phone the boxes stack and the gains with the verb are pinned. */
+	/** The Trades screen's one surface (Lane 61, Lane 66g, one experience since Lane 260): the other
+	 * team chosen by name and record at the top; our ideas (the finder's best trade with each team) as
+	 * presets, one tap each to load into the ticks; your roster beside theirs, each a box score with a
+	 * tick and our rank on every row, two a side at most; then the verdict, read again on every tick
+	 * with no submit: a scoreboard of each side's this-week Proj and rest-of-season strength before
+	 * and after with a bar per side and the verb between them, the answer line naming the players
+	 * changing hands, and the honesty line. The verdict stays in sight at a desk and is pinned on a
+	 * phone. The verb follows the moves rule: Propose on the platform where it takes a proposal from
+	 * here, else Open its trades, which copies the offer; Share copies the trade as text. We never send
+	 * one. */
 	interface Props {
 		id: string;
 		/** Every other team, with its roster. */
@@ -60,8 +74,12 @@
 		me: { name: string; aside: string };
 		host: LeagueHost;
 		moves: TradeMoves;
-		/** The picks it opens with: a finder row's trade, or a team alone. */
+		/** Our ideas, best first: each loads its trade into the ticks. */
+		presets: readonly Preset[];
+		/** The picks it opens with: the best idea's team alone, or a player the member asked for. */
 		start: Picks;
+		/** Whether it takes the focus as it opens: when a verb elsewhere opened it, not on the page's load. */
+		focus: boolean;
 		/** The builder's own line, from the finder's answer, until the first check says it. */
 		basis: string;
 		/** The page's basis, which says what the figures are: "What the figures are" links to it. */
@@ -72,7 +90,8 @@
 		check: (trade: TradeCheckInput) => Promise<TradeCheck>;
 		/** Copies the trade's offer, answering the line under the verb. */
 		propose: (team: TradeTeam, row: Pick<TradeRow, 'give' | 'get'>) => Promise<CopiedTrade>;
-		onclose: () => void;
+		/** Copies the trade as text in our words; false when the browser would not. */
+		share: (text: string) => Promise<boolean>;
 		/** The instant the answer was read, in ms: the page's clock the rows draw at. */
 		now: number;
 	}
@@ -84,60 +103,75 @@
 		me,
 		host,
 		moves,
+		presets,
 		start,
+		focus,
 		basis,
 		basisHref,
 		href,
 		hostNote,
 		check,
 		propose,
-		onclose,
+		share,
 		now
 	}: Props = $props();
 
-	// The panel is made again for each trade it opens with ({#key} in the screen).
+	// The surface is made again for each opening a verb elsewhere asks for ({#key} in the screen).
 	// svelte-ignore state_referenced_locally
 	let picks = $state<Picks>(start);
-	let answer = $state<TradeCheck | null>(null);
+	/** The last answer with the picks it was read for: drawn, quieter, while the next is read, but the
+	 * verbs act on it only while the picks are still the ones it answers (proposable). */
+	let answered = $state<Answered | null>(null);
+	const answer = $derived(answered?.check ?? null);
 	let reading = $state(false);
 	let problem = $state<string | null>(null);
 	let copied = $state<CopiedTrade | null>(null);
+	let shared = $state<string | null>(null);
+	/** The roster drawn where the two stack (a phone): yours first. */
+	let drawn = $state<'give' | 'get'>('give');
 
 	// svelte-ignore state_referenced_locally
 	const asking = new Narrowing(check);
 
 	const team = $derived(teams.find((t) => t.roster_id === picks.team) ?? null);
-	const sentence = $derived(answer === null ? pickPrompt(picks) : checkWords(answer));
+	const sentence = $derived(
+		team === null ? ANALYZER_LINES.noTeam : answer === null ? pickPrompt(picks) : checkWords(answer)
+	);
 	const close = $derived(
-		answer !== null &&
-			answer.fills.yours &&
-			answer.fills.theirs &&
-			answer.fills.yours_room &&
-			answer.fills.theirs_room &&
-			answer.trade.my_gain > 0
+		answer !== null && fillsBoth(answer) && answer.trade.my_gain > 0
 			? answer.trade.close_for_them && answer.trade.their_gain > 0
 			: false
 	);
 	const verb = $derived(proposeVerb(moves, host));
-	/** The teams as the picker names them: name, owner and record. */
+	/** The teams as the picker names them: name, owner and record, after a first choice while none is
+	 * chosen. */
 	const teamGroups = $derived<PickGroup[]>([
 		{
 			label: null,
-			options: teams.map((t) => ({ value: String(t.roster_id), label: teamChoice(t) }))
+			options: [
+				...(picks.team === null ? [{ value: '', label: ANALYZER_LINES.pickTeam }] : []),
+				...teams.map((t) => ({ value: String(t.roster_id), label: teamChoice(t) }))
+			]
 		}
 	]);
 	const page = $derived(answer?.host_trades_url ?? href);
 	const room = $derived(answer ? checkRoom(answer) : { yours: '', theirs: '' });
+	const bars = $derived(gainBars(answer?.trade.my_gain ?? null, answer?.trade.their_gain ?? null));
 	const dropId = $derived(answer?.trade.drop?.player.host_id ?? null);
+	/** Propose and Share act on the answer only for the team and ticks it was read for, on a trade
+	 * both rosters can make. */
+	const live = $derived(team !== null && proposable(answered, picks));
 
 	/** Reads the answer for the picks, keeping only the latest; the last answer stays, quieter, while
 	 * the next is read. */
 	async function ask(): Promise<void> {
-		const input = checkInput(picks);
+		const asked = picks;
+		const input = checkInput(asked);
 		problem = null;
 		copied = null;
+		shared = null;
 		if (input === null) {
-			answer = null;
+			answered = null;
 			reading = false;
 			void asking.choose(null);
 			return;
@@ -147,20 +181,30 @@
 		if (outcome.kind === 'overtaken') return;
 		reading = false;
 		// No change this week on a trade moving a player whose game has kicked off (Lane 85).
-		if (outcome.kind === 'answer') answer = heldCheck(outcome.answer, now);
+		if (outcome.kind === 'answer')
+			answered = { picks: asked, check: heldCheck(outcome.answer, now) };
 		if (outcome.kind === 'failed') {
-			answer = null;
+			answered = null;
 			problem = outcome.sentence;
 		}
 	}
 
+	/** Another team: the last answer was for the last team, so it goes (review H1). */
 	function choose(rosterId: number): void {
+		answered = null;
 		picks = { team: rosterId, give: picks.give, get: [] };
 		void ask();
 	}
 
 	function tap(side: 'give' | 'get', hostId: string): void {
 		picks = { ...picks, [side]: toggle(picks[side], hostId) };
+		void ask();
+	}
+
+	/** One tap loads an idea into the ticks; the member changes it freely from there. */
+	function load(preset: Preset): void {
+		if (preset.picks.team !== picks.team) answered = null;
+		picks = preset.picks;
 		void ask();
 	}
 
@@ -189,8 +233,19 @@
 	}
 
 	async function press(): Promise<void> {
-		if (team === null || answer === null) return;
-		copied = await propose(team, answer.trade);
+		if (team === null || answered === null || !live) return;
+		copied = await propose(team, answered.check.trade);
+	}
+
+	async function shareTrade(): Promise<void> {
+		if (team === null || answered === null || !live) return;
+		const text = shareText(team, answered.check);
+		shared = (await share(text)) ? ANALYZER_LINES.shared : TRADES.copyFailed;
+	}
+
+	/** Takes the focus as it opens when a verb elsewhere opened it. */
+	function takeFocus(node: HTMLElement): void {
+		if (focus) focusOnOpen(node);
 	}
 
 	onMount(() => {
@@ -199,17 +254,19 @@
 </script>
 
 {#snippet action(fill: boolean)}
-	<span class="act" {@attach hostTab(page)}>
+	<!-- Made again as the verb comes live: before, it is a disabled button, after, a link that takes
+	     its new tab. -->
+	<span class="act" {@attach hostTab(live ? page : '')}>
 		<Verb
 			href={page === '' ? undefined : page}
-			disabled={page === '' || answer === null}
+			disabled={page === '' || !live}
 			{fill}
 			onclick={() => void press()}>{verb}</Verb
 		>
 	</span>
 {/snippet}
 
-<div {id} class="builder" tabindex="-1" {@attach focusOnOpen}>
+<div {id} class="builder" tabindex="-1" {@attach takeFocus}>
 	<Panel as="section" label={BUILDER_LINES.open} edge="accent">
 		<div class="body">
 			<header class="head">
@@ -218,78 +275,131 @@
 					label={BUILDER_LINES.team}
 					value={picks.team === null ? '' : String(picks.team)}
 					groups={teamGroups}
-					onchange={(value: string) => choose(Number(value))}
+					onchange={(value: string) => {
+						if (value !== '') choose(Number(value));
+					}}
 				/>
-				<span class="not-now"><Quiet onclick={onclose}>{BUILDER_LINES.notNow}</Quiet></span>
+				<span class="share">
+					{#if shared}<span class="said" role="status">{shared}</span>{/if}
+					<Quiet size="sm" disabled={!live} onclick={() => void shareTrade()}
+						>{ANALYZER_LINES.share}</Quiet
+					>
+				</span>
 			</header>
-			<div class:reading>
-				<TradeBug
-					gainHead={TRADES.gainHead}
-					yours={{
-						name: me.name,
-						figures: bugFigures(
-							answer?.totals.yours ?? null,
-							answer?.trade.my_gain ?? null,
-							answer?.trade.my_proj_change ?? null
-						),
-						room: room.yours
-					}}
-					theirs={{
-						name: team?.name ?? '',
-						figures: bugFigures(
-							answer?.totals.theirs ?? null,
-							answer?.trade.their_gain ?? null,
-							answer?.trade.their_proj_change ?? null
-						),
-						room: room.theirs
-					}}
-				>
-					{#snippet verb()}
-						{@render action(true)}
-						{#if copied}<TradeCopied line={copied} href={page} />{:else if moves.reason}<span
-								>{moves.reason}</span
-							>{:else if hostNote}<span>{hostNote}</span>{/if}
-					{/snippet}
-				</TradeBug>
-			</div>
-			<div class="words" aria-live="polite" aria-busy={reading}>
-				{#if problem}
-					<ProblemLine>{problem}</ProblemLine>
-				{:else}
-					<p class="line" class:quiet={answer === null} class:reading>{sentence}</p>
+			{#if presets.length > 0}
+				<div class="ideas" role="group" aria-label={ANALYZER_LINES.ideas}>
+					<span class="ideas-head">{ANALYZER_LINES.ideas}</span>
+					<ul>
+						{#each presets as preset (preset.key)}
+							<li>
+								<button
+									type="button"
+									class="idea"
+									aria-pressed={samePicks(picks, preset.picks)}
+									onclick={() => load(preset)}
+								>
+									<span class="with"
+										>{#if preset.mark}<b class="mark">{preset.mark}</b>{/if}{TRADES.with}
+										{preset.team.name}</span
+									>
+									<span class="deal">{preset.deal}</span>
+									<span class="gains">{preset.gains}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+			{#if team}
+				<!-- Where the rosters stack, one at a time: a tap between yours and theirs, never a scroll
+				     past twenty rows (fix round 1). The ticks are the picks, so they hold across the switch. -->
+				<div class="switch">
+					<ChipGroup label={ANALYZER_LINES.rosters}>
+						<Chip pressed={drawn === 'give'} onclick={() => (drawn = 'give')}
+							>{ANALYZER_LINES.you}{countWords(picks.give)}</Chip
+						>
+						<Chip pressed={drawn === 'get'} onclick={() => (drawn = 'get')}
+							>{team.name}{countWords(picks.get)}</Chip
+						>
+					</ChipGroup>
+				</div>
+			{/if}
+			<div class="boxes">
+				<div class="side" class:away={drawn !== 'give'}>
+					<TradeBox
+						team={me.name}
+						mine
+						aside={me.aside}
+						holds={holdsWords('give')}
+						lines={roster}
+						pickOf={tickOf('give')}
+						{now}
+					/>
+				</div>
+				{#if team}
+					<div class="side" class:away={drawn !== 'get'}>
+						<TradeBox
+							team={team.name}
+							aside={teamAside(team)}
+							holds={holdsWords('get')}
+							lines={team.roster}
+							pickOf={tickOf('get')}
+							{now}
+						/>
+					</div>
 				{/if}
-				{#if close}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip>{/if}
+			</div>
+			<div class="verdict">
+				<div class:reading>
+					<TradeBug
+						gainHead={TRADES.gainHead}
+						yours={{
+							name: me.name,
+							figures: bugFigures(
+								answer?.totals.yours ?? null,
+								answer?.trade.my_gain ?? null,
+								answer?.trade.my_proj_change ?? null
+							),
+							room: room.yours,
+							bar: bars.yours
+						}}
+						theirs={{
+							name: team?.name ?? '',
+							figures: bugFigures(
+								answer?.totals.theirs ?? null,
+								answer?.trade.their_gain ?? null,
+								answer?.trade.their_proj_change ?? null
+							),
+							room: room.theirs,
+							bar: bars.theirs
+						}}
+					>
+						{#snippet verb()}
+							{@render action(true)}
+							{#if copied}<TradeCopied line={copied} href={page} />{:else if moves.reason}<span
+									>{moves.reason}</span
+								>{:else if hostNote}<span>{hostNote}</span>{/if}
+						{/snippet}
+					</TradeBug>
+				</div>
+				<div class="words" aria-live="polite" aria-busy={reading}>
+					{#if problem}
+						<ProblemLine>{problem}</ProblemLine>
+					{:else}
+						<p class="line" class:quiet={answer === null} class:reading>{sentence}</p>
+					{/if}
+					{#if close}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip>{/if}
+				</div>
 			</div>
 			<p class="own" data-basis="builder">
 				{answer?.basis ?? basis}
 				<a href={basisHref}>{BUILDER_LINES.figures}</a>
 			</p>
-			<div class="boxes">
-				<TradeBox
-					team={me.name}
-					mine
-					aside={me.aside}
-					holds={holdsWords('give')}
-					lines={roster}
-					pickOf={tickOf('give')}
-					{now}
-				/>
-				{#if team}
-					<TradeBox
-						team={team.name}
-						aside={teamAside(team)}
-						holds={holdsWords('get')}
-						lines={team.roster}
-						pickOf={tickOf('get')}
-						{now}
-					/>
-				{/if}
-			</div>
 			<!-- On a phone the gains and the verb are pinned above the tab bar, so each tap's answer stays in
 			     sight. -->
 			<div class="pin">
-				<span class="pin-gains"
-					>{#if answer}<b>{gainWord(answer.trade.my_gain)}</b>
+				<span class="pin-gains" class:reading
+					>{#if answer && fillsBoth(answer)}<b>{gainWord(answer.trade.my_gain)}</b>
 						{TRADES.aWeekForYou}, {gainWord(answer.trade.their_gain)}
 						{TRADES.forTheirs}{:else}{sentence}{/if}</span
 				>
@@ -329,8 +439,112 @@
 		letter-spacing: 0.01em;
 	}
 
-	.not-now {
+	.share {
+		display: flex;
+		align-items: center;
+		gap: var(--s-2);
 		margin-left: auto;
+	}
+
+	.said {
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+	}
+
+	/* Our ideas: one row of presets that scrolls sideways, each a tap that loads its trade. */
+	.ideas {
+		display: flex;
+		align-items: stretch;
+		gap: var(--s-3);
+		min-width: 0;
+	}
+
+	.ideas-head {
+		flex: none;
+		align-self: center;
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--ink-3);
+	}
+
+	.ideas ul {
+		display: flex;
+		gap: var(--s-2);
+		margin: 0;
+		padding: 2px;
+		list-style: none;
+		overflow-x: auto;
+		scroll-snap-type: x proximity;
+		min-width: 0;
+	}
+
+	.ideas li {
+		flex: none;
+		scroll-snap-align: start;
+	}
+
+	.idea {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 2px;
+		width: 15.5rem;
+		height: 100%;
+		padding: var(--s-2) var(--s-3);
+		border: 1px solid var(--line);
+		border-radius: var(--r-md);
+		background: var(--surface);
+		color: var(--ink);
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.idea:hover {
+		border-color: var(--line-strong);
+	}
+
+	.idea[aria-pressed='true'] {
+		border-color: var(--accent);
+		box-shadow: inset 0 0 0 1px var(--accent);
+	}
+
+	.idea:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+
+	.with {
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+	}
+
+	.mark {
+		margin-right: 6px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--accent-text);
+	}
+
+	.deal {
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-weight: 700;
+		font-size: var(--t-sm);
+	}
+
+	.gains {
+		font-size: var(--t-xs);
+		color: var(--ink-2);
 	}
 
 	.words {
@@ -382,6 +596,26 @@
 		align-items: start;
 	}
 
+	/* The switch between the rosters shows only where they stack. */
+	.switch {
+		display: none;
+	}
+
+	/* The verdict under the rosters stays in sight at a desk as the ticks change, held to the foot of
+	   the window. */
+	.verdict {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+		position: sticky;
+		bottom: 0;
+		z-index: 5;
+		margin: 0 calc(var(--s-4) * -1);
+		padding: var(--s-3) var(--s-4);
+		background: var(--surface);
+		border-top: 1px solid var(--line-strong);
+	}
+
 	.pin {
 		display: none;
 	}
@@ -390,15 +624,23 @@
 		.boxes {
 			grid-template-columns: minmax(0, 1fr);
 		}
-	}
 
-	@media (max-width: 760px) {
-		h2 {
-			font-size: var(--t-xl);
+		.switch {
+			display: flex;
 		}
 
-		.line {
-			font-size: var(--t-sm);
+		.away {
+			display: none;
+		}
+
+		/* The scoreboard stacks here: the verdict sits under the rosters in its place, and the gains with
+		   the verb are pinned to the window's foot, so a tick on one roster reads its answer in sight
+		   (fix round 2: the switch shows one roster from here down). */
+		.verdict {
+			position: static;
+			margin: 0;
+			padding: 0;
+			border-top: 0;
 		}
 
 		.pin {
@@ -408,7 +650,7 @@
 			justify-content: space-between;
 			gap: var(--s-1) var(--s-2);
 			position: sticky;
-			bottom: calc(var(--tab-bar-h) + env(safe-area-inset-bottom, 0px));
+			bottom: env(safe-area-inset-bottom, 0px);
 			z-index: 10;
 			margin: 0 calc(var(--s-4) * -1) calc(var(--s-4) * -1);
 			padding: var(--s-2) var(--s-3);
@@ -434,6 +676,54 @@
 
 		.pin-said :global(a) {
 			color: var(--scoreboard-ink);
+		}
+	}
+
+	@media (max-width: 760px) {
+		/* One row on a phone: the team choice and Share, so the first roster row clears the pin; the
+		   panel keeps its name for a screen reader. */
+		.head {
+			flex-wrap: nowrap;
+			gap: var(--s-2);
+		}
+
+		h2 {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
+
+		.head :global(.pick) {
+			flex: 1;
+		}
+
+		.head :global(select) {
+			flex: 1;
+		}
+
+		.line {
+			font-size: var(--t-sm);
+		}
+
+		.idea {
+			width: 16rem;
+		}
+
+		.ideas {
+			flex-direction: column;
+			gap: var(--s-1);
+		}
+
+		.ideas-head {
+			align-self: flex-start;
+		}
+
+		/* Above the tab bar on a phone. */
+		.pin {
+			bottom: calc(var(--tab-bar-h) + env(safe-area-inset-bottom, 0px));
 		}
 	}
 </style>
