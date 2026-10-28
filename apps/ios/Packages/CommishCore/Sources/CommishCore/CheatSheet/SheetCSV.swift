@@ -122,8 +122,10 @@ public enum SheetCSV {
                 }
                 record = []
                 return char == "\r" && next == "\n"
-            case " ", "\t" where fieldStart && field.isEmpty:
-                break // A read trims leading space, as the API's does.
+            // A read trims leading space, as the API's does; only at a field's start (each pattern carries its
+            // own guard: a `where` covers the last pattern of a case alone).
+            case " " where fieldStart && field.isEmpty, "\t" where fieldStart && field.isEmpty:
+                break
             default:
                 field.unicodeScalars.append(char)
                 fieldStart = false

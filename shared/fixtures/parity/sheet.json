@@ -385,6 +385,29 @@
 			"skipped": []
 		},
 		{
+			"text": "rank,player_id,name,position,tags\n1,a b,Spaced id,QB,\n2,ab,Closed id,QB,\n3,a b,Spaced twin,RB,\n4,c,Long tag,RB,abcdefghij klmnopqrst\n5,d,Split position,W R,\n6,e,  Lead space,WR,  Late round\n",
+			"header": null,
+			"ids": [
+				"a b",
+				"ab",
+				"e"
+			],
+			"skipped": [
+				{
+					"line": 4,
+					"reason": "This player is already on an earlier line"
+				},
+				{
+					"line": 5,
+					"reason": "A tag is 1 to 20 letters or numbers"
+				},
+				{
+					"line": 6,
+					"reason": "The position is not QB, RB, WR, TE, K or DST"
+				}
+			]
+		},
+		{
 			"text": "rank,player_id,name,position\n0,a,Zero,QB\n1,b,Linebacker,LB\n2,,No id,RB\n",
 			"header": null,
 			"ids": [],

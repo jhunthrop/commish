@@ -154,7 +154,17 @@ public final class CheatSheetViewModel {
             if let latest = try await api.sheets().first {
                 fresh = try await api.sheet(id: latest.id)
             }
+            // A write on its way answers with the account's sheet itself; the read is left to it, so its
+            // edits are not held against rows it is about to replace and sent a second time.
+            guard save != .saving else {
+                return
+            }
             merge(into: fresh)
+            // Every unsaved edit already on the account (or its row taken off there): nothing is left
+            // unsaved, so the head stops saying so.
+            if edits.isEmpty, case .failed = save {
+                save = .idle
+            }
             show(fresh, stamp: clock.now, stale: false)
             await keep()
         } catch where APIError.signsOut(error) {

@@ -191,12 +191,39 @@ struct CheatSheetViewModelTests {
         await stub.editElsewhere("4689114", tags: [], note: "Backup only")
         await viewModel.load()
         let row = try #require(viewModel.model?.lines[5])
-        #expect(row.tags.map(\.label) == ["Sleeper"])
+        #expect(row.tags.map(\.label) == ["Sleeper"], "the unsaved edit stays on top of the merged row")
         #expect(row.note == "Backup only")
+        #expect(row.save == .unsaved(SheetWords.offline), "and still says it is not saved")
         await viewModel.retry()
         let written = try #require(await stub.writes.last?.rows[5])
         #expect(written.tags == ["sleeper"])
         #expect(written.note == "Backup only")
+    }
+
+    @Test func aPullToRefreshThatFindsTheEditOnTheAccountStopsSayingNotSaved() async throws {
+        let (stub, viewModel) = try await Self.loaded()
+        await stub.set(offline: true)
+        await viewModel.setNote("4689114", "Stash")
+        await stub.set(offline: false)
+        await stub.editElsewhere("4689114", tags: [], note: "Stash")
+        await viewModel.load()
+        #expect(!viewModel.unsaved)
+        #expect(viewModel.save == .idle)
+        #expect(viewModel.model?.line.contains(SheetWords.offline) == false)
+        #expect(viewModel.model?.lines[5].save == .saved)
+    }
+
+    @Test func aReadWhileAWriteIsOnItsWayLeavesTheEditsToIt() async throws {
+        let (stub, viewModel) = try await Self.loaded()
+        await stub.set(offline: true)
+        await viewModel.setNote("4689114", "Stash")
+        let held = viewModel.edits
+        await stub.set(offline: false)
+        await stub.editElsewhere("4689114", tags: ["sleeper"], note: nil)
+        viewModel.save = .saving
+        await viewModel.load()
+        #expect(viewModel.edits == held, "the edits keep the base the write carries")
+        #expect(viewModel.model?.lines[5].tags.isEmpty == true, "the rows wait for the write's answer")
     }
 
     @Test func aRowTakenOffElsewhereDropsThePhonesEditToIt() async throws {

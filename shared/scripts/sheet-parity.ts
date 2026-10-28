@@ -105,12 +105,24 @@ function facts(
 
 /** Files an import is given: a pasted list of names, nothing, the fixture's own CSV, a header with no
  * line a player reads from, and one line of each reason a line is skipped beside lines kept out of rank
- * order (a byte order mark, an alias, a defused cell, CRLF, an unterminated quote at the end). */
+ * order (a byte order mark, an alias, a defused cell, CRLF, an unterminated quote at the end), and
+ * unquoted cells with spaces inside them, which a read keeps (an id and its closed-up twin, a tag one
+ * character too long, a position split in two) and only trims at a cell's start. */
 const READS: readonly string[] = [
 	"1. Puka Nacua\n2. Ja'Marr Chase, WR",
 	'',
 	"name,team\nJa'Marr Chase,CIN\n",
 	encodeCsv(SHEET_ROWS),
+	[
+		'rank,player_id,name,position,tags',
+		'1,a b,Spaced id,QB,',
+		'2,ab,Closed id,QB,',
+		'3,a b,Spaced twin,RB,',
+		'4,c,Long tag,RB,abcdefghij klmnopqrst',
+		'5,d,Split position,W R,',
+		'6,e,  Lead space,WR,  Late round',
+		''
+	].join('\n'),
 	'rank,player_id,name,position\n0,a,Zero,QB\n1,b,Linebacker,LB\n2,,No id,RB\n',
 	[
 		'\uFEFFRANK,Player_ID,Name,Position,Tier,Tag,Note,Team\r',
