@@ -98,9 +98,15 @@ void test('the marks', () => {
 	);
 });
 
-void test('the short capture for a board basis says the read, and how old past a day and a half', () => {
+void test('the short capture for a board basis says the read, the hour on the member’s own day, and how old past a day and a half', () => {
 	const capture = { readAt: LISTED, checkedAt: CHECKED };
-	assert.equal(captureShort(capture, SOON, CENTRAL), 'Status read Oct 16.');
+	assert.equal(captureShort(capture, SOON, CENTRAL), 'Status read today 9:05 am CT.');
+	const nextDay = Date.parse(CHECKED) + 20 * 60 * 60 * 1000;
+	assert.equal(
+		captureShort(capture, nextDay, CENTRAL),
+		'Status read Oct 16.',
+		'an earlier day keeps its date'
+	);
 	assert.equal(
 		captureShort({ readAt: LISTED, checkedAt: null }, SOON, CENTRAL),
 		'Status as of Oct 12, over 36 hours ago.'
@@ -128,5 +134,8 @@ void test('the board dates its statuses by the newer of the run’s capture and 
 	assert.equal(newerCapture(run, live), live, 'live newer');
 	assert.equal(newerCapture(live, run), live, 'live older: the run’s stands');
 	assert.equal(newerCapture(live, { ...live }), live, 'a tie keeps the run’s');
-	assert.equal(captureShort(newerCapture(run, live) ?? run, SOON, CENTRAL), 'Status read Oct 16.');
+	assert.equal(
+		captureShort(newerCapture(run, live) ?? run, SOON, CENTRAL),
+		'Status read today 9:05 am CT.'
+	);
 });

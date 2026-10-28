@@ -21,16 +21,17 @@ type OrderRow = components['schemas']['OrderRow'];
 /** The largest view of the order the API answers (api inseason MaxOrderRows). */
 export const ORDER_MAX_ROWS = 400;
 
+/** After the count of our board's players an uncut order omits, drawn from the board (Lane 280,
+ * B257), in the screen's own words: "our board" and "our order". */
+const FROM_RUN = 'from our board, not in our order right now';
+
 /** A page's words about the order it draws (Lane 224 review M2): when one read of the order reaches
  * fewer players than the board ranks, how many of them the page draws. */
-/** After the count of the run's players an uncut order omits, drawn from the run (Lane 280, B257). */
-const FROM_RUN = 'from the run, not in the live order';
-
 export const LIVE_ORDER_WORDS = {
 	reach: (shown: number, total: number): string =>
 		`The first ${String(shown)} of the ${String(total)} players on our board, in our order.`,
 	fromRun: FROM_RUN,
-	/** "2 players from the run, not in the live order.", said once and only when there are any. */
+	/** "2 players from our board, not in our order right now.", said once and only when there are any. */
 	fromRunLine: (count: number): string | null =>
 		count > 0 ? `${plural(count, 'player', 'players')} ${FROM_RUN}.` : null
 } as const;

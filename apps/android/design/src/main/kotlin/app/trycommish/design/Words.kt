@@ -307,6 +307,7 @@ object Words {
         const val status = "Status"
         const val read = "read"
         const val asOf = "as of"
+        const val today = "today"
         const val old = "over 36 hours ago"
     }
 
@@ -963,7 +964,7 @@ object Words {
     }
 
     object LiveOrder {
-        const val fromRun = "from the run, not in the live order"
+        const val fromRun = "from our board, not in our order right now"
     }
 
     object ClubOrder {

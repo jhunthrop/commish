@@ -1,5 +1,5 @@
 {
-	"fromRun": "from the run, not in the live order",
+	"fromRun": "from our board, not in our order right now",
 	"functions": [
 		"reach",
 		"fromRunLine"

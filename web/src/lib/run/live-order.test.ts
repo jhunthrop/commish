@@ -126,8 +126,14 @@ void test("a page says the run's time on the run's rows and the order's lead on 
 
 void test('the run’s players an uncut order omits are counted once, only when there are any (Lane 280)', () => {
 	assert.equal(LIVE_ORDER_WORDS.fromRunLine(0), null);
-	assert.equal(LIVE_ORDER_WORDS.fromRunLine(1), '1 player from the run, not in the live order.');
-	assert.equal(LIVE_ORDER_WORDS.fromRunLine(3), '3 players from the run, not in the live order.');
+	assert.equal(
+		LIVE_ORDER_WORDS.fromRunLine(1),
+		'1 player from our board, not in our order right now.'
+	);
+	assert.equal(
+		LIVE_ORDER_WORDS.fromRunLine(3),
+		'3 players from our board, not in our order right now.'
+	);
 });
 
 void test('the answer’s status read is its capture, none from an older answer (Lane 280)', () => {

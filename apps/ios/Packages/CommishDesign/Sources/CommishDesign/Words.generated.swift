@@ -305,6 +305,7 @@ public enum Words {
         public static let status = "Status"
         public static let read = "read"
         public static let asOf = "as of"
+        public static let today = "today"
         public static let old = "over 36 hours ago"
     }
 
@@ -961,7 +962,7 @@ public enum Words {
     }
 
     public enum LiveOrder {
-        public static let fromRun = "from the run, not in the live order"
+        public static let fromRun = "from our board, not in our order right now"
     }
 
     public enum ClubOrder {

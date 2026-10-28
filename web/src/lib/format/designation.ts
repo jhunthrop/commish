@@ -2,7 +2,16 @@
  * screens' week mark, and the board and player pages' status. The statuses are the API's
  * (`DesignationStatus`) and the run's (`designations.json`). */
 import type { components } from '#lib/api/types.ts';
-import { memberZone, monthDay, shortDay, stampAt, weekdayTime } from './clock.ts';
+import {
+	memberZone,
+	monthDay,
+	sameDay,
+	shortDay,
+	stampAt,
+	timeOfDay,
+	weekdayTime,
+	zoneShort
+} from './clock.ts';
 
 export type DesignationStatus = components['schemas']['DesignationStatus'];
 
@@ -135,6 +144,7 @@ export const CAPTURE_WORDS = {
 	status: 'Status',
 	read: 'read',
 	asOf: 'as of',
+	today: 'today',
 	old: 'over 36 hours ago'
 } as const;
 
@@ -155,14 +165,18 @@ export function newerCapture(
 }
 
 /** The capture in the few words a page of board rows has left in its five-line basis (Lane 66n):
- * "Status read Oct 16.", "as of" its last change with no check, and past
- * CAPTURE_BEHIND_MS how old it is. The player page keeps captureLine's fuller words. */
+ * "Status read Oct 16.", "as of" its last change with no check, the hour on the member's own day
+ * ("Status read today 9:15 am CT."), and past CAPTURE_BEHIND_MS how old it is. The player page keeps captureLine's fuller words. */
 export function captureShort(
 	capture: CaptureStamp,
 	now: number,
 	zone: string = memberZone()
 ): string {
-	const stamp = (iso: string): string => shortDay(iso, zone);
+	// On the member's own day the hour tells this hour's capture from last night's (Lane 280).
+	const stamp = (iso: string): string =>
+		sameDay(new Date(iso), new Date(now), zone)
+			? `${CAPTURE_WORDS.today} ${timeOfDay(iso, zone)} ${zoneShort(iso, zone)}`
+			: shortDay(iso, zone);
 	const when =
 		capture.checkedAt === null
 			? `${CAPTURE_WORDS.asOf} ${stamp(capture.readAt)}`

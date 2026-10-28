@@ -320,6 +320,10 @@ function liveStamps(designations: Designations): unknown[] {
       live: { readAt: shifted(run.now, -3), checkedAt: null },
     },
     {
+      name: "live-newer-earlier-day",
+      live: { readAt: shifted(run.now, -30), checkedAt: shifted(run.now, -26) },
+    },
+    {
       name: "live-older",
       live: { readAt: shifted(last, -30), checkedAt: shifted(last, -6) },
     },
