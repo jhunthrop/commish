@@ -4118,6 +4118,36 @@ export interface components {
 			rest_from_week?: number | null;
 			/** @description on his bye in week (line.facts.bye), his club's next game in the same scoring as line (Lane 100, B30): the card's Opp rank and Proj tiles read it, as no tile of the bye week holds a figure; null off a bye or with no game left, absent from an older answer */
 			after_bye?: components['schemas']['PlayerAfterBye'] | null;
+			/** @description the newest written week read for him and the board week (Lane 284), so a read the hourly pass rewrote or the retry writer rescued shows before the next nightly carries it; the clients show it in place of the run's when it was written after the run's. Absent when the store holds no written read for that week, once his game of that week has kicked off (the run's own rule), when the read failed (bounded to a second, the failure kept a minute so no request waits on it again) and from an answer older than the field */
+			weekRead?: components['schemas']['PlayerWeekRead'];
+		};
+		/** @description the week read as the research store holds it (player_week_reads), the run's RunWeekRead with its source. Kept a minute. The caption is the write's own; the clients judge his status against the read as they judge the run's */
+		PlayerWeekRead: {
+			week: number;
+			body: string;
+			/** @description Written Wed Oct 28, 9:00 am CT, for week 8 */
+			caption: string;
+			/** @description the status it was written against */
+			status: string | null;
+			/** @enum {string|null} */
+			call: 'start' | 'sit' | 'hold' | 'none' | null;
+			/** Format: date-time */
+			writtenAt: string;
+			/**
+			 * Format: date-time
+			 * @description the newest stamp of the facts it was written from
+			 */
+			factsAt: string | null;
+			/**
+			 * Format: double
+			 * @description the published projection it was written with, in PPR, to the tenth; null with none
+			 */
+			projection: number | null;
+			/**
+			 * @description the writer's; a facts block is never served, as the run serves none
+			 * @enum {string}
+			 */
+			source: 'llm';
 		};
 		PlayerAfterBye: {
 			/** @description the week of his club's next game after the bye */
