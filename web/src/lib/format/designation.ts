@@ -197,13 +197,3 @@ export function calendarDay(day: string, weekday = false): string {
 export function returningMark(returning: string): string {
 	return `Due back ${calendarDay(returning, true)}`;
 }
-
-/** The return word of a tight row's chip (the trade rows, Lane 268): "Back Sun", "Back Nov 8". */
-export const BACK_WORD = 'Back';
-
-/** "Back Sun" for a player due back this week, "Back Nov 8" for a list's later return: the return day
- * in the few characters a tight row's chip has; returningMark and seasonLongMark say it in full. */
-export function returningShort(returning: string, thisWeek: boolean): string {
-	const day = calendarDay(returning, thisWeek);
-	return `${BACK_WORD} ${thisWeek ? day.slice(0, 3) : day}`;
-}

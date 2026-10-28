@@ -14,13 +14,13 @@ import {
 	designationWord,
 	rankWord,
 	returningMark,
-	returningShort,
 	seasonLongMark,
 	seasonLongStatus,
 	sitsHim,
 	type DesignationStatus
 } from '#lib/format/designation.ts';
 import type { StatusView } from '#lib/run/status-view.ts';
+import { returningShort } from '../inseason/short-status.ts';
 import { POSITIONS, type Position } from '#lib/types/player.ts';
 import { GAME_STATE_WORDS, halves, PRECIPITATION_NAMED_FROM } from '#lib/format/game-facts.ts';
 import { fixed, ordinal, signed } from '#lib/format/number.ts';
