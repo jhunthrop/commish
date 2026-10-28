@@ -208,3 +208,5 @@ daily list inserts none) and the remediation the register's grade names.
 | `stats:capture` | every capture feed into `capture_snapshots` | `pipeline.tank01.capture.capture_once` (phase A, parity `tank01-capture-all`) |
 | `stats:ingest` (the live-scoring worker tick) | Tank01 box scores during a live week, then league settlement, lineups and score pushes | not ported: league platform machinery. The box-score write it shares with the seed is ported as `ingest_roster_and_lines`; phase D decides whether the nightly needs an in-season box-score cadence |
 | `projections:*:fit`, `projections:preseason:persist`, `projections:register:*` | fits, the board, the register | `research.model` (phase B) |
+
+`inseason-status` windows are fixed for an ordinary Sunday, Thursday night and Monday night. Holiday slates (Thanksgiving, Christmas), flexed games and Saturday games sit outside them and keep the hourly cadence.

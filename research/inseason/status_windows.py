@@ -16,7 +16,7 @@ LAST_STATUS_PASS: Final = {1: time(20, 15), 4: time(20, 15), 7: time(20, 45)}
 
 
 def is_last_status_pass(at: datetime) -> bool:
-    """Whether `at` is the last status fire of its Eastern day's window, or later in that day."""
+    """Whether `at` falls in the last status fire's own quarter hour of its Eastern day's window."""
     local = at.astimezone(_EASTERN)
     last = LAST_STATUS_PASS.get(local.isoweekday())
-    return last is not None and (local.hour, local.minute) >= (last.hour, last.minute)
+    return last is not None and local.hour == last.hour and last.minute <= local.minute < last.minute + 15

@@ -360,11 +360,26 @@ def _kickoff_of(sheet: WeekSheet) -> datetime:
 def left_unread(due: Sequence[tuple[WeekSheet, str]], stopped: int) -> str | None:
     """What the budget left of an hourly pass's reads: how many, and the soonest kickoff among them (the reads
     stopped are the tail of the kickoff-ordered `due`), else None."""
+    stopped = min(stopped, len(due))
     if stopped <= 0:
         return None
     left = due[len(due) - stopped :]
     soonest = min(_kickoff_of(sheet) for sheet, _ in left)
     return f"{len(left)} reads left unread, the next kickoff among them {soonest.astimezone(CENTRAL):%a %H:%M} Central"
+
+
+# The line the alert "Research game-day reads left unread" matches (`infra/research-alerts.sh`; a test holds the two).
+WARNING_MARKER: Final = f"{STEP} WARNING:"
+
+
+def _warn_spent_day(engine: Engine, now: datetime, log: Log, facts: FactsPassMemo) -> None:
+    """At a game-day window's last pass with the day's dollars spent, nothing was written: every due read is left."""
+    night = _read_night(engine, now, facts)
+    if night is None or not night.rollover.ready:
+        return
+    due = _due(night, now, True)
+    if (left := left_unread(due, len(due))) is not None:
+        log(f"{WARNING_MARKER} {left} at the game-day window's last pass, the day's hourly dollars spent")
 
 
 def run_week_read_step(  # noqa: PLR0913 - the pass's parts
@@ -378,6 +393,8 @@ def run_week_read_step(  # noqa: PLR0913 - the pass's parts
         return StepRecord(STEP, "skipped", f"{CAPSULE_CONFIG.gateway.api_key_variable} is not set, nothing written")
     usd = _budget_usd(engine, now, hourly)
     if usd <= 0:
+        if hourly and last_pass:
+            _warn_spent_day(engine, now, log, facts)
         return StepRecord(STEP, "skipped", f"the hourly passes' ${HOURLY_DAY_USD:.2f} for the day is spent")
     night = _read_night(engine, now, facts)
     if night is None:
@@ -407,9 +424,9 @@ def run_week_read_step(  # noqa: PLR0913 - the pass's parts
         # Whatever the pass spent is on the day's ledger even when it raised (the re-review's F6).
         record_spend(engine, now, mode, spend, budget)
     line = f"{head}, {len(night.sheets)} board players with a week {night.board_week} ahead, {budget.line()}; {spend.line()}"
-    if (left := left_unread(due, spend.budget_stopped)) is not None:
+    if hourly and (left := left_unread(due, spend.budget_stopped)) is not None:
         line += f"; {left}"
         if last_pass:
-            log(f"{STEP} WARNING: {left} at the game-day window's last pass")
+            log(f"{WARNING_MARKER} {left} at the game-day window's last pass")
     log(f"{STEP}: {line}")
     return StepRecord(STEP, "ran", line)

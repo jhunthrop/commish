@@ -13,6 +13,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Final
 from zoneinfo import ZoneInfo
 
@@ -260,3 +261,43 @@ def test_due_reads_of_an_hourly_pass_run_soonest_kickoff_first_and_the_left_ones
     due = week_reads._due(night, _eastern(25, 11), hourly=True)
     assert week_reads.left_unread(due, 0) is None
     assert week_reads.left_unread(due, 2) == "2 reads left unread, the next kickoff among them Sun 15:25 Central"
+
+
+def test_only_the_last_passs_own_quarter_hour_is_the_last_pass() -> None:
+    assert is_last_status_pass(_eastern(26, 20, 15)) and is_last_status_pass(_eastern(26, 20, 29))
+    assert not is_last_status_pass(_eastern(26, 20, 30)) and not is_last_status_pass(_eastern(26, 23))
+
+
+def test_the_alert_filter_matches_the_warning_the_pass_logs() -> None:
+    script = (REPO_ROOT / "infra" / "research-alerts.sh").read_text()
+    assert f'textPayload : "{week_reads.WARNING_MARKER}"' in script
+    assert week_reads.WARNING_MARKER.startswith(week_reads.STEP)
+
+
+def _stub_night(monkeypatch: pytest.MonkeyPatch, spent: bool) -> week_reads._Night:
+    sheets = (_sheet_kicking_off("a", _eastern(25, 13)), _sheet_kicking_off("b", _eastern(25, 16, 25)))
+    night = week_reads._Night(sheets, {}, 7, SimpleNamespace(ready=True, line=lambda: "ready"))  # type: ignore[arg-type]
+    monkeypatch.setenv("AI_GATEWAY_API_KEY", "k")
+    monkeypatch.setattr(week_reads, "_budget_usd", lambda *_a: 0.0 if spent else 0.05)
+    monkeypatch.setattr(week_reads, "_read_night", lambda *_a: night)
+    monkeypatch.setattr(week_reads, "due_reason", lambda *_a, **_k: "status")
+    return night
+
+
+def _step(last_pass: bool, hourly: bool = True) -> list[str]:
+    lines: list[str] = []
+    week_reads.run_week_read_step(None, _eastern(25, 20, 45), lines.append, None, hourly=hourly, last_pass=last_pass)  # type: ignore[arg-type]
+    return lines
+
+
+def test_a_spent_day_at_the_windows_last_pass_logs_the_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+    _stub_night(monkeypatch, spent=True)
+    (line,) = _step(last_pass=True)
+    assert line.startswith(week_reads.WARNING_MARKER) and "2 reads left unread" in line
+    assert _step(last_pass=False) == []
+    assert _step(last_pass=True, hourly=False) == []
+
+
+def test_left_unread_is_clamped_to_the_reads_due() -> None:
+    due = [(_sheet_kicking_off("a", _eastern(25, 13)), "status")]
+    assert week_reads.left_unread(due, 5) == "1 reads left unread, the next kickoff among them Sun 12:00 Central"
