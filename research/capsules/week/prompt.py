@@ -23,6 +23,7 @@ from research.capsules.week.render import render_week_sheet
 from research.capsules.week.rules import MAX_FIGURES, MAX_SENTENCES, MIN_SENTENCES, shown_week_words
 from research.capsules.week.sheet import PROJECTION_BASIS, WeekSheet
 from research.capsules.week.validate import WEEK_BAND
+from research.capsules.week.voices import voice_section
 
 _LOW, _HIGH = WEEK_BAND
 # The words to aim at, well under the cap (80 at Lane 100, B44; 95 since Lane 117 fix round 3): the recorded model ran 91 to 104 words
@@ -142,6 +143,7 @@ def week_prompt(sheet: WeekSheet, avoid: Sequence[str]) -> str:
         [
             f"Facts for the week:\n{render_week_sheet(sheet)}",
             *_avoid_section(avoid),
+            *voice_section(sheet),
             f"Write the week-ahead read for {sheet.name} for {week_of(sheet.week, sheet.season)}. {_RETURN}",
         ]
     )
