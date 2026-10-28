@@ -13,7 +13,7 @@ import json
 import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -24,6 +24,7 @@ from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient
 from research.capsules.gateway_ledger import ModelPrice
+from research.capsules.narrative import ShapeMasks
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.week.collect import board_week
 from research.capsules.week.prompt import answer_json
@@ -207,11 +208,15 @@ class _Writer:
 
     fail_first: int = 0
     asked: list[str] | None = None
+    # The model each ask went to (Lane 276), when the test reads them.
+    models: list[str] | None = None
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
-        user = json.loads(request.content)["messages"][-1]["content"]
+        body = json.loads(request.content)
+        user = body["messages"][-1]["content"]
         who = user.split("\n", 2)[1]
         (self.asked if self.asked is not None else []).append(who)
+        (self.models if self.models is not None else []).append(body["model"])
         if "Puka Nacua" in who:
             if self.fail_first > 0:
                 self.fail_first -= 1
@@ -234,9 +239,14 @@ def _step(  # noqa: PLR0913 - the step's stubs
     *,
     ready: bool = True,
     hourly: bool = False,
+    retry: str = "",
+    at: datetime = WRITTEN_AT,
+    lines: list[str] | None = None,
 ) -> StepRecord:
-    """`run_week_read_step` on the given board-week sheets, with the gateway stubbed by `writer`."""
+    """`run_week_read_step` at `at` on the given board-week sheets, with the gateway stubbed by `writer` and the
+    retry writer `retry` (off when empty, as the tests before Lane 276 ran)."""
     monkeypatch.setenv(CAPSULE_CONFIG.gateway.api_key_variable, "test-key")
+    monkeypatch.setenv(CAPSULE_CONFIG.gateway.retry_model_variable, retry)
     monkeypatch.setattr(week_reads, "checked_price", lambda *_args: _PRICE)
     state = Rollover(_BOARD_WEEK, ready, () if ready else ("week 6's published projection",))
     monkeypatch.setattr(week_reads, "read_week_facts", lambda *_args: _WeekFacts(_BOARD_WEEK, state))
@@ -251,7 +261,8 @@ def _step(  # noqa: PLR0913 - the step's stubs
 
     monkeypatch.setattr(week_reads, "GatewayClient", _Client)
     facts: Callable[..., tuple[()]] = lambda _conn, _now: ()  # noqa: E731 - the facts pass the stubs ignore
-    return week_reads.run_week_read_step(engine, _PASS, lambda _line: None, facts, hourly=hourly)  # type: ignore[arg-type]
+    log = (lines if lines is not None else []).append
+    return week_reads.run_week_read_step(engine, at, log, facts, hourly=hourly)  # type: ignore[arg-type]
 
 
 def _reads(engine: Engine) -> dict[tuple[str, int], StoredWeekRead]:
@@ -357,3 +368,99 @@ def test_mid_week_a_status_change_rewrites_that_player_alone(engine: Engine, mon
     bijan = (questionable().player_id, _BOARD_WEEK)
     assert after[bijan] == before[bijan]
     assert after[(starter().player_id, _BOARD_WEEK)].status == "questionable"
+
+
+# THE RETRY WRITER AND THE HOURLY RETRIES (Lane 276).
+
+_RETRY = "r/retry"
+_YESTERDAY = date(2026, 10, 15)
+
+
+def test_a_read_the_writer_could_not_write_is_rescued_by_the_retry_writer_within_the_first_round(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    models: list[str] = []
+    writer = _Writer(fail_first=MAX_CALLS_PER_READ, models=models)
+    record = _step(engine, monkeypatch, [starter(), questionable()], writer, retry=_RETRY)
+    puka = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert (puka.source, puka.body, puka.model, puka.attempts) == (WRITTEN_SOURCE, STARTER_READ, _RETRY, 1)
+    assert models.count(_RETRY) == 1 and models[MAX_CALLS_PER_READ] == _RETRY  # his fifth ask, after the writer's four
+    assert "1 rounds" in record.summary and "every due read written" in record.summary
+    assert f"1 asked of the retry writer {_RETRY}, 1 rescued" in record.summary
+
+
+def test_the_hourly_pass_asks_a_fallen_read_again_every_hour_until_it_is_written(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The roll-over's rounds all fell; the next hour's pass asks him again (writer and retry writer), within the
+    hour's gap, and writes him; the pass after that has nothing to ask."""
+    sheets = [starter(), questionable()]
+    writer = _Writer(fail_first=(MAX_CALLS_PER_READ + 1) * week_reads.ROLLOVER_ROUNDS)
+    _step(engine, monkeypatch, sheets, writer, retry=_RETRY)
+    assert _reads(engine)[(starter().player_id, _BOARD_WEEK)].source == FACTS_SOURCE
+    soon = _step(engine, monkeypatch, sheets, writer, retry=_RETRY, hourly=True, at=_PASS + timedelta(minutes=30))
+    assert "0 reads due" in soon.summary
+    asked: list[str] = []
+    writer.asked = asked
+    hour = _step(engine, monkeypatch, sheets, writer, retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=1))
+    assert "1 reads due (unwritten 1), 1 written" in hour.summary
+    assert asked and all("Puka Nacua" in who for who in asked)
+    assert _reads(engine)[(starter().player_id, _BOARD_WEEK)].source == WRITTEN_SOURCE
+    after = _step(engine, monkeypatch, sheets, writer, retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=2))
+    assert "0 reads due" in after.summary
+
+
+def _hourly_spent(engine: Engine, usd: float, at: datetime = _PASS - timedelta(minutes=5)) -> None:
+    """The day's hourly passes so far spent `usd` (an earlier pass's row on `player_week_read_runs`)."""
+    with engine.begin() as conn:
+        conn.execute(
+            insert(PLAYER_WEEK_READ_RUNS).values(
+                ran_at=at, mode="hourly", calls=1, cost_usd=usd, written=0,
+                facts_blocks=0, demoted=0,
+            )
+        )  # fmt: skip
+
+
+def test_an_hourly_pass_at_the_days_cap_stops_asking_and_says_so(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A fallen read due on an hourly pass whose day has less left than a read's worst case: nothing is asked,
+    the read stands as it was, and the line says the day's hourly dollars stopped it. The cap is never raised."""
+    sheets = [starter(), questionable()]
+    writer = _Writer(fail_first=(MAX_CALLS_PER_READ + 1) * week_reads.ROLLOVER_ROUNDS)
+    _step(engine, monkeypatch, sheets, writer, retry=_RETRY)
+    with engine.begin() as conn:
+        conn.execute(delete(PLAYER_WEEK_READ_RUNS))
+    _hourly_spent(engine, week_reads.HOURLY_DAY_USD - 0.001)
+    asked: list[str] = []
+    writer.asked = asked
+    hour = _step(engine, monkeypatch, sheets, writer, retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=1))
+    assert asked == [] and "1 stopped by the budget" in hour.summary
+    assert "1 reads left unread, the next kickoff among them" in hour.summary
+    assert f"stopped at the day's hourly ${week_reads.HOURLY_DAY_USD:.2f}" in hour.summary
+    assert _reads(engine)[(starter().player_id, _BOARD_WEEK)].source == FACTS_SOURCE
+    _hourly_spent(engine, 0.001, _PASS + timedelta(minutes=65))
+    spent = _step(engine, monkeypatch, sheets, writer, retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=2))
+    assert spent.status == "skipped" and f"${week_reads.HOURLY_DAY_USD:.2f} for the day is spent" in spent.summary
+    assert asked == []
+
+
+def test_an_hourly_pass_writes_a_status_that_moved_before_a_read_still_unwritten() -> None:
+    """Lane 276: the hourly retries never take the dollars a status rewrite needs."""
+    sheets = (starter(), questionable())
+    stored = {
+        (starter().player_id, _BOARD_WEEK): StoredWeekRead(
+            starter().player_id, _SEASON, _BOARD_WEEK, FACTS_SOURCE, "Week: 6 of 2026", None,
+            _PASS - timedelta(hours=2), None, {}, 18.4, starter().status.status, "first", None, _YESTERDAY, 1,
+        ),
+        (questionable().player_id, _BOARD_WEEK): StoredWeekRead(
+            questionable().player_id, _SEASON, _BOARD_WEEK, WRITTEN_SOURCE, "A read.", "m/x",
+            _PASS - timedelta(hours=2), None, {}, 15.2, "out", "first", "hold", _YESTERDAY, 1,
+        ),
+    }  # fmt: skip
+    night = week_reads._Night(sheets, stored, _BOARD_WEEK, Rollover(_BOARD_WEEK, True), ShapeMasks.of(()))
+    due = week_reads._due(night, _PASS, hourly=True)
+    assert [(sheet.name, reason) for sheet, reason in due] == [
+        ("Bijan Robinson", "status"),
+        ("Puka Nacua", "unwritten"),
+    ]

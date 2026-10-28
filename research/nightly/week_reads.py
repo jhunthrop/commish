@@ -12,16 +12,19 @@ Two modes on one pass (`run_week_read_step`), both on the board week alone (`col
   its own, and asked again on the next nightly. After it, a nightly writes only
   what the cadence says moved (`capsules.week.cadence`: a status, the published projection the card prints,
   a read still unwritten, a player new to the board).
-- **Hourly**, after the in-season job's status capture (`research.inseason --task capture-harvest`): only
-  the reads whose status moved, under `HOURLY_BUDGET_USD` a pass and `HOURLY_DAY_USD` across a Central day's
-  passes (`player_week_read_runs`).
+- **Hourly**, after the in-season job's status capture (`research.inseason --task capture-harvest`): the
+  reads whose status moved, then every read still unwritten (Lane 276, asked each hour until one is written),
+  under `HOURLY_BUDGET_USD` a pass and `HOURLY_DAY_USD` across a Central day's passes (`player_week_read_runs`);
+  a pass the day's dollars stop says so in its line.
 
 A player whose board-week game has kicked off has his next week ahead, which is not the board week, so no read
 is written for a game under way, and none for the week after it before that week rolls over.
 
-The writing is the season writer's pool (`GatewayClient.rolling`, its bucket and throttle waits), the model
-checked against the gateway's list before any call (`capsule_step.checked_price`), and the run's dollar
-budget a hard stop at the gateway (`run_budget`): no read starts once its worst case would pass what is
+The writing is the season writer's pool (`GatewayClient.rolling`, its bucket and throttle waits), and a read
+the writer's asks could not write is asked once more of the retry writer (`config.RETRY_WRITER_MODEL`, Lane
+276) before it falls to its facts block; every model is checked against the gateway's list before any call
+(`capsule_step.checked_price`), and the run's dollar budget, reserved at the dearest model's price, a hard stop
+at the gateway (`run_budget`): no read starts once its worst case would pass what is
 left, and a read the budget stopped writes nothing, so a written read is never overwritten by a facts
 block for want of budget. Each read is told the sentences the pass's latest reads landed and held to every
 sentence shape another page carries for its week, and lands in its own transaction. Then the demotion
@@ -131,9 +134,15 @@ class WeekReadSpend:
     fell: list[str] = field(default_factory=list)
     # The players the pass was due to write whose read is still not written at its end (Lane 256).
     unwritten: list[str] = field(default_factory=list)
+    # The retry writer's model (None when the setting turns it off), its drafts asked and the reads it wrote.
+    retry_model: str | None = None
+    retry_asks: int = 0
+    rescued: int = 0
 
     def add(self, result: WeekReadResult) -> None:
         self.landed += 1
+        self.retry_asks += result.retry_asks
+        self.rescued += result.rescued
         self.written += result.source == WRITTEN_SOURCE
         self.facts_blocks += result.source == FACTS_SOURCE
         self.calls += result.calls
@@ -162,7 +171,8 @@ class WeekReadSpend:
         fell = "" if not self.fell else f"; {len(self.fell)} fell to their facts blocks: {'; '.join(self.fell)}"
         body = (
             f"{sum(self.due.values())} reads due ({due}), {self.written} written, {self.facts_blocks} facts blocks, "
-            f"{self.budget_stopped} stopped by the budget, {self.rounds} rounds, {self.calls} calls, "
+            f"{self.budget_stopped} stopped by the budget, {self.rounds} rounds, {self.retry_line()}, "
+            f"{self.calls} calls, "
             f"{self.prompt_tokens} prompt and {self.completion_tokens} completion tokens, ${self.cost_usd:.6f}, "
             f"{self.demoted} demoted for a sentence on two pages{fell}{'' if tail is None else f'; {tail}'}"
         )
@@ -174,6 +184,22 @@ class WeekReadSpend:
     def head(self) -> str:
         """The count the step line leads with, before the night's facts."""
         return "" if not self.unwritten else f"{len(self.unwritten)} still unwritten; "
+
+    def retry_line(self) -> str:
+        if self.retry_model is None:
+            return "the retry writer off"
+        return f"{self.retry_asks} asked of the retry writer {self.retry_model}, {self.rescued} rescued"
+
+
+def dearest_price(prices: Sequence[ModelPrice]) -> ModelPrice:
+    """The dearest list price in and out across the pass's models, so a call is never reserved below its
+    model's; a model with no list price leaves the pass's budget in calls (`step_budget`)."""
+    ins = [p.input_usd_per_million for p in prices]
+    outs = [p.output_usd_per_million for p in prices]
+    dearest_in = None if None in ins else max(i for i in ins if i is not None)
+    dearest_out = None if None in outs else max(o for o in outs if o is not None)
+    models = "+".join(p.model for p in prices)
+    return ModelPrice(models, dearest_in, dearest_out, "the dearest of the pass's models' list prices", True)
 
 
 def worst_read_usd(price: ModelPrice) -> float:
@@ -277,14 +303,16 @@ def _write(  # noqa: PLR0913 - the pass's parts
     masks: ShapeMasks,
     judge: str = JUDGE_MODEL,
 ) -> None:
-    """The due reads on the writer's pool, each landed in its own transaction, tallied on `spend`."""
+    """The due reads on the writer's pool, each landed in its own transaction, tallied on `spend` (whose
+    `retry_model` is the retry writer the reads may ask)."""
     board = _Board(stored, masks)
     landed = spend.landed
+    retry = spend.retry_model
 
     def start(item: tuple[WeekSheet, str]) -> Callable[[GatewayClient], WeekReadResult]:
         sheet = item[0]
         avoid, taken = board.avoid(sheet.week), board.taken(sheet)
-        return lambda scoped: write_week_read(sheet, scoped, avoid, taken, judge)
+        return lambda scoped: write_week_read(sheet, scoped, avoid, taken, judge, retry_model=retry)
 
     def land(item: tuple[WeekSheet, str], result: WeekReadResult) -> None:
         spend.add(result)
@@ -329,9 +357,13 @@ def _write_rounds(  # noqa: PLR0913 - the pass's parts
     judge: str = JUDGE_MODEL,
 ) -> None:
     """The due reads, then the demotion over the board week, then again for every due read still unwritten, at
-    most `rounds` times while the budget has room; those still unwritten are named on `spend`."""
+    most `rounds` times while the budget has room; those still unwritten are named on `spend`. A pass whose budget
+    has no room for its first read asks nothing and counts every due read as stopped by it (Lane 276), so its line
+    says why."""
     stored: Mapping[tuple[str, int], StoredWeekRead] = night.stored
     batch = list(due)
+    if batch and not room():
+        spend.budget_stopped += len(batch)
     while batch and spend.rounds < rounds and room():
         spend.rounds += 1
         _write(engine, gateway, stored, batch, room=room, spend=spend, masks=night.masks, judge=judge)
@@ -371,14 +403,15 @@ def _budget_usd(engine: Engine, now: datetime, hourly: bool) -> float:
 def _due(night: _Night, now: datetime, hourly: bool) -> list[tuple[WeekSheet, str]]:
     """Every board-week read the cadence says is due, in board order; an hourly pass (the game-day status
     passes among them) soonest kickoff first, so when its budget stops the reads the 13:00 starters are written
-    before the 16:25 ones (Lane 263). Stable: board order within a kickoff."""
+    before the 16:25 ones (Lane 263), and a status that moved before a read still unwritten (Lane 276), so the
+    hourly retries never take the dollars a status rewrite needs. Stable: board order within a kickoff."""
     due = [
         (sheet, reason)
         for sheet in night.sheets
         if (reason := due_reason(sheet, night.stored.get((sheet.player_id, sheet.week)), now, hourly=hourly))
         is not None
     ]
-    return sorted(due, key=lambda item: _kickoff_of(item[0])) if hourly else due
+    return sorted(due, key=lambda item: (item[1] == UNWRITTEN, _kickoff_of(item[0]))) if hourly else due
 
 
 def _kickoff_of(sheet: WeekSheet) -> datetime:
@@ -433,16 +466,18 @@ def run_week_read_step(  # noqa: PLR0913 - the pass's parts
         log(f"{STEP}: {line}")
         return StepRecord(STEP, "skipped", line)
     due = _due(night, now, hourly)
-    spend = WeekReadSpend()
+    settings = writer_settings(os.environ)
+    spend = WeekReadSpend(retry_model=settings.retry_model)
     for _, reason in due:
         spend.due[reason] = spend.due.get(reason, 0) + 1
     budget: RunBudget | None = None
-    settings = writer_settings(os.environ)
     try:
         with httpx.Client() as http:
-            price = checked_price(http, key, settings)
             judge = judge_model(os.environ)
-            checked_price(http, key, replace(settings, model=judge))  # the judge's model is listed too
+            # The judge's model and the retry writer's are listed too, and the budget reserves at the dearest.
+            others = [judge, *([] if settings.retry_model is None else [settings.retry_model])]
+            prices = [checked_price(http, key, replace(settings, model=m)) for m in [settings.model, *others]]
+            price = dearest_price(prices)
             budget = step_budget(price, usd)
             room = _room(budget, worst_read_usd(price))
             gateway = GatewayClient.for_run(key, http, settings).with_budget(budget)
@@ -454,6 +489,8 @@ def run_week_read_step(  # noqa: PLR0913 - the pass's parts
     left = left_unread(due, spend.budget_stopped) if hourly else None
     if left is not None and last_pass:
         log(f"{WARNING_MARKER} {left} at the game-day window's last pass")
+    if left is not None and usd < HOURLY_BUDGET_USD:
+        left += f", stopped at the day's hourly ${HOURLY_DAY_USD:.2f}"
     line = (
         f"{spend.head()}{head}, {len(night.sheets)} board players with a week {night.board_week} ahead, "
         f"{budget.line()}; {spend.line(left)}"

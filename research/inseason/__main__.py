@@ -41,8 +41,8 @@ after 06:00 Eastern from the day after the previous week's last kickoff until th
 (Lane 97, `pipeline/tank01/projections.py` `daily_capture_due`), and, in a kickoff slot's window, the
 slot week's projection, the anytime-touchdown market (the weekly round 4's two benchmarks, `pipeline/kickoff_slots.py`) and the
 season's dated depth charts again. Last, after the status capture, the hourly week-ahead reads pass
-(Lane 72, `nightly/week_reads.py`): the reads whose status the hour moved (a projection move is the nightly's),
-under the hourly dollar budget; advisory, its own line, never the job's verdict.
+(Lane 72, `nightly/week_reads.py`): the reads whose status the hour moved (a projection move is the nightly's)
+and the reads still unwritten (Lane 276), under the hourly dollar budget; advisory, its own line, never the job's verdict.
 
 Exit status 1 when any step failed (or the capture was refused), 0 otherwise. Provider keys come
 from the environment: TANK01_API_KEY for the capture, ODDS_API_KEY for the props snapshot and the

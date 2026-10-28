@@ -11,6 +11,7 @@ from typing import Self
 
 import pytest
 
+from research.capsules.config import RETRY_WRITER_MODEL, writer_settings
 from research.capsules.gateway import Completion, GenerationError
 from research.capsules.gateway_ledger import ModelPrice, Usage
 from research.capsules.narrative import ShapeMasks
@@ -20,6 +21,7 @@ from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.week.cadence import (
     FIRST,
     PROJECTION_MOVED,
+    RETRIES_A_DAY,
     STATUS_CHANGED,
     UNWRITTEN,
     due_reason,
@@ -35,7 +37,13 @@ from research.capsules.week.prompt import (
 from research.capsules.week.sheet import Status
 from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
-from research.capsules.week.write import MAX_ASKS_PER_READ, MAX_CALLS_PER_READ, OVER_CAP_FALL, write_week_read
+from research.capsules.week.write import (
+    MAX_ASKS_PER_READ,
+    MAX_ASKS_WITH_RETRY,
+    MAX_CALLS_PER_READ,
+    OVER_CAP_FALL,
+    write_week_read,
+)
 from research.nightly.week_read_demotion import shared_week_sentences, stored_facts_block, week_demotions
 from research.nightly.week_reads import (
     HOURLY_BUDGET_USD,
@@ -43,6 +51,8 @@ from research.nightly.week_reads import (
     MIN_CHARS_PER_TOKEN,
     NIGHTLY_BUDGET_USD,
     WORST_PROMPT_TOKENS,
+    WeekReadSpend,
+    dearest_price,
     step_budget,
     worst_read_usd,
 )
@@ -68,6 +78,8 @@ class _StubGateway:
         self.calls = 0
         self.slept: list[float] = []
         self.asked: list[list[dict[str, str]]] = []
+        # The model each ask went to, shared with every view (`with_model`), in the order asked.
+        self.models: list[str] = []
         self.waits = RunWaits()
 
     def ask_waits(self) -> AskWaits:
@@ -78,6 +90,7 @@ class _StubGateway:
     ) -> Completion:
         self.calls += 1
         self.asked.append(messages)
+        self.models.append(self.model)
         item = next(self.script)
         if isinstance(item, GenerationError):
             raise item
@@ -345,19 +358,26 @@ def test_the_cadence_writes_a_first_read_a_status_change_and_a_projection_past_t
     assert due_reason(sheet, _stored(source="facts"), _NOW) == UNWRITTEN
 
 
-def test_a_failed_read_is_retried_at_most_once_an_hour_and_three_times_a_day() -> None:
+def test_a_failed_read_is_retried_at_most_once_an_hour_and_every_hour_of_a_central_day() -> None:
+    """Lane 276: the day's count is the day's hours, so after the roll-over's rounds a fallen read is still
+    asked every hour; the gap holds it to one ask an hour."""
     sheet, today = questionable(), date(2026, 10, 16)  # 9:00 pm Central on Friday the 16th
+    assert RETRIES_A_DAY == 24  # noqa: PLR2004 - the hours of a Central day
     assert due_reason(sheet, _stored(source="facts", written_at=_NOW - timedelta(minutes=30)), _NOW) is None
-    assert due_reason(sheet, _stored(source="facts", attempt_day=today, attempts=3), _NOW) is None
-    assert due_reason(sheet, _stored(source="facts", attempt_day=today, attempts=2), _NOW) == UNWRITTEN
+    assert due_reason(sheet, _stored(source="facts", attempt_day=today, attempts=RETRIES_A_DAY), _NOW) is None
+    late = _stored(source="facts", attempt_day=today, attempts=RETRIES_A_DAY - 1)
+    assert due_reason(sheet, late, _NOW) == UNWRITTEN
+    assert due_reason(sheet, late, _NOW, hourly=True) == UNWRITTEN
+    yesterday = _stored(source="facts", attempt_day=today - timedelta(days=1), attempts=RETRIES_A_DAY)
+    assert due_reason(sheet, yesterday, _NOW, hourly=True) == UNWRITTEN
 
 
-def test_the_hourly_pass_writes_only_a_status_that_moved() -> None:
+def test_the_hourly_pass_writes_a_status_that_moved_and_a_read_still_unwritten() -> None:
     """The coordinator's ruling (Lane 66v review, finding 1): the page is prerendered, so a projection move is
-    the nightly's to rewrite, never the hourly pass's."""
+    the nightly's to rewrite, never the hourly pass's. Lane 276: a fallen read is the hourly pass's too."""
     sheet = questionable()
     assert due_reason(sheet, None, _NOW, hourly=True) is None
-    assert due_reason(sheet, _stored(source="facts"), _NOW, hourly=True) is None
+    assert due_reason(sheet, _stored(source="facts"), _NOW, hourly=True) == UNWRITTEN
     assert due_reason(replace(sheet, status=Status("out", REPORT)), _stored(), _NOW, hourly=True) == STATUS_CHANGED
     assert due_reason(sheet, _stored(projection_points=13.0), _NOW, hourly=True) is None
     assert due_reason(sheet, _stored(projection_points=15.8), _NOW, hourly=True) is None
@@ -395,3 +415,101 @@ def test_a_status_that_keeps_him_out_means_he_cannot_play(status: str) -> None:
 
 def test_the_written_instant_is_utc_aware() -> None:
     assert starter().written_at.tzinfo is UTC
+
+
+# THE RETRY WRITER (Lane 276): one more draft of a read the writer's asks could not write.
+
+_RETRY = "r/retry"
+_JUDGED_NO = Completion("No", _USAGE, "provider", "stop")
+_JUDGED_YES = Completion("Yes", _USAGE, "provider", "stop")
+_BROKEN_BYE = BYE_READ.replace(" this week", " this week, a safe bet", 1)
+
+
+def test_the_retry_writer_is_asked_only_after_the_writers_asks_are_spent_and_its_rescue_is_written() -> None:
+    gateway = _StubGateway([*[_answer(_BROKEN)] * MAX_CALLS_PER_READ, _answer(STARTER_READ)])
+    result = write_week_read(starter(), gateway, retry_model=_RETRY)  # type: ignore[arg-type]
+    assert gateway.models == ["m/x"] * MAX_CALLS_PER_READ + [_RETRY]
+    assert (result.source, result.text, result.model, result.fallback) == ("llm", STARTER_READ, _RETRY, None)
+    assert (result.calls, result.retry_asks, result.rescued) == (MAX_CALLS_PER_READ + 1, 1, True)
+    # The retry writer is handed the correction of the writer's last draft, every rule broken so far named.
+    correction = gateway.asked[-1][-1]["content"]
+    assert "It is a safe bet he scores." in correction and "betting word" in correction
+    assert gateway.asked[-1][0]["content"] == WEEK_RULES
+
+
+def test_a_read_the_writer_writes_never_asks_the_retry_writer() -> None:
+    gateway = _StubGateway([_answer(_BROKEN), _answer(STARTER_READ)])
+    result = write_week_read(starter(), gateway, retry_model=_RETRY)  # type: ignore[arg-type]
+    assert _RETRY not in gateway.models
+    assert (result.source, result.retry_asks, result.rescued) == ("llm", 0, False)
+
+
+def test_a_gateway_fall_never_asks_the_retry_writer() -> None:
+    """A spent budget ends the read at once, retry writer and all (a read the budget stopped writes nothing)."""
+    gateway = _StubGateway([BudgetSpentError("the run's budget is spent")])
+    result = write_week_read(starter(), gateway, retry_model=_RETRY)  # type: ignore[arg-type]
+    assert gateway.models == ["m/x"] and result.retry_asks == 0
+    assert result.fallback == "the run's budget is spent"
+
+
+def test_with_no_retry_writer_the_read_falls_within_the_writers_ceiling() -> None:
+    gateway = _StubGateway([_answer(_BROKEN)] * (MAX_CALLS_PER_READ + 1))
+    result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
+    assert (result.source, result.calls, result.retry_asks) == ("facts", MAX_CALLS_PER_READ, 0)
+
+
+def test_the_retry_writer_is_a_setting_its_default_the_measured_build_and_empty_turns_it_off() -> None:
+    assert writer_settings({}).retry_model == RETRY_WRITER_MODEL == "deepseek/deepseek-v4.1-flash-1017"
+    assert writer_settings({"RETRY_WRITER_MODEL": ""}).retry_model is None
+    assert writer_settings({"RETRY_WRITER_MODEL": "  "}).retry_model is None
+    assert writer_settings({"RETRY_WRITER_MODEL": " a/b "}).retry_model == "a/b"
+
+
+def test_a_retry_draft_that_breaks_a_rule_is_the_facts_block_named_for_it() -> None:
+    gateway = _StubGateway([_answer(_BROKEN)] * (MAX_CALLS_PER_READ + 1))
+    result = write_week_read(starter(), gateway, retry_model=_RETRY)  # type: ignore[arg-type]
+    assert (result.source, result.model, result.retry_asks, result.rescued) == ("facts", None, 1, False)
+    assert result.calls == MAX_CALLS_PER_READ + 1 and len(result.attempts) == MAX_CALLS_PER_READ + 1
+    assert result.fallback is not None and result.fallback.startswith("failed validation")
+    assert result.text.startswith("Week: 6 of 2026")
+
+
+def test_a_bye_players_rescue_goes_to_the_same_judge() -> None:
+    """The writer's four drafts break a rule; the retry writer's honest bye read is judged by the judge's model
+    (no: written as the retry writer's; yes: the facts block), its ask beyond the writer's ceiling."""
+    drafts = [_answer(_BROKEN_BYE, "sit")] * MAX_CALLS_PER_READ
+    gateway = _StubGateway([*drafts, _answer(BYE_READ, "sit"), _JUDGED_NO])
+    result = write_week_read(on_bye(), gateway, judge_model="j/judge", retry_model=_RETRY)  # type: ignore[arg-type]
+    assert gateway.models[-2:] == [_RETRY, "j/judge"]
+    assert (result.source, result.model, result.rescued) == ("llm", _RETRY, True)
+    assert result.calls == MAX_CALLS_PER_READ + 2
+    refused_gateway = _StubGateway([*drafts, _answer(BYE_READ, "sit"), _JUDGED_YES])
+    refused = write_week_read(on_bye(), refused_gateway, retry_model=_RETRY)  # type: ignore[arg-type]
+    assert (refused.source, refused.rescued) == ("facts", False)
+    assert refused.fallback is not None and refused.fallback.startswith("failed validation")
+
+
+def test_a_reads_worst_case_with_the_retry_writer_is_its_ceiling_and_two_asks() -> None:
+    """The overrun's draft and its judge, then the retry writer's draft and the judge on it: never more."""
+    drafts = [*[_answer(_BROKEN_BYE, "sit")] * (MAX_CALLS_PER_READ - 1), _answer(_bye_over_the_cap(), "sit")]
+    script = [*drafts, _answer(BYE_READ, "sit"), _JUDGED_YES, _answer(BYE_READ, "sit"), _JUDGED_NO]
+    result = write_week_read(on_bye(), _StubGateway(script), retry_model=_RETRY)  # type: ignore[arg-type]
+    assert (result.source, result.calls, result.rescued) == ("llm", MAX_ASKS_WITH_RETRY, True)
+
+
+def test_the_pass_line_counts_the_retry_writers_asks_and_rescues() -> None:
+    spend = WeekReadSpend(retry_model=_RETRY)
+    rescued = _StubGateway([*[_answer(_BROKEN)] * MAX_CALLS_PER_READ, _answer(STARTER_READ)])
+    spend.add(write_week_read(starter(), rescued, retry_model=_RETRY))  # type: ignore[arg-type]
+    fallen = _StubGateway([_answer(_BROKEN)] * (MAX_CALLS_PER_READ + 1))
+    spend.add(write_week_read(starter(), fallen, retry_model=_RETRY))  # type: ignore[arg-type]
+    assert "2 asked of the retry writer r/retry, 1 rescued" in spend.line()
+    assert "the retry writer off" in WeekReadSpend().line()
+
+
+def test_the_pass_budget_reserves_at_the_dearest_models_price() -> None:
+    cheaper = ModelPrice(_RETRY, 0.075, 0.30, "test", True)
+    dearest = dearest_price([cheaper, _PRICE])
+    assert (dearest.input_usd_per_million, dearest.output_usd_per_million) == (0.15, 0.50)
+    unread = dearest_price([_PRICE, ModelPrice(_RETRY, None, None, "unread", None)])
+    assert step_budget(unread, HOURLY_BUDGET_USD).max_usd is None

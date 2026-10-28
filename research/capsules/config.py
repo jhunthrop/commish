@@ -21,6 +21,12 @@ from research.pipeline.nflverse.pfr_advstats import PFR_SOURCE
 # The writer's model, the gateway's slug. A setting: `CAPSULE_MODEL` in the environment overrides it
 # (`writer_settings`); Lane 24 measured the candidates and the coordinator ruled it stays (2026-10-15).
 CAPSULE_MODEL: Final = "zai/glm-5.3-flash"
+# The week read's retry writer (Lane 276), asked one more draft of a read the writer's asks could not write
+# before it falls to its facts block (`capsules.week.write`). A setting: `RETRY_WRITER_MODEL` in the
+# environment names another model, and set empty turns the retry writer off. Lane 264 measured this build
+# writing the corrections after GLM's drafts on 519 sheets of week 8 of 2026: as many reads written as GLM
+# alone, at 63% of the cost per read.
+RETRY_WRITER_MODEL: Final = "deepseek/deepseek-v4.1-flash-1017"
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +67,8 @@ class Gateway:
     # The gateway's providers a call may be served by, comma separated (`providerOptions.gateway.only`);
     # unset lets the gateway route. Lane 24 pinned a rapid host with it for the measurement.
     providers_variable: str = "CAPSULE_PROVIDERS"
+    # The week read's retry writer's model (`RETRY_WRITER_MODEL`): unset is the default, empty is none.
+    retry_model_variable: str = "RETRY_WRITER_MODEL"
     # The writer does not think before it writes (measured: more written, none throttled, cheaper).
     thinking: bool = False
 
@@ -287,6 +295,8 @@ class WriterSettings:
     concurrency: int
     calls_per_minute: int
     providers: tuple[str, ...] = ()
+    # The week read's retry writer (`RETRY_WRITER_MODEL`), None when the setting turns it off.
+    retry_model: str | None = RETRY_WRITER_MODEL
 
     def line(self) -> str:
         routed = ", ".join(self.providers) if self.providers else "the gateway's routing"
@@ -321,4 +331,13 @@ def writer_settings(environ: Mapping[str, str], gateway: Gateway = CAPSULE_CONFI
         _positive(environ, gateway.concurrency_variable, gateway.concurrency, gateway.max_concurrency),
         _positive(environ, gateway.calls_per_minute_variable, gateway.calls_per_minute),
         providers,
+        _retry_model(environ, gateway),
     )
+
+
+def _retry_model(environ: Mapping[str, str], gateway: Gateway) -> str | None:
+    """The retry writer's model: the default when the setting is unset, none when it is set empty."""
+    raw = environ.get(gateway.retry_model_variable)
+    if raw is None:
+        return RETRY_WRITER_MODEL
+    return raw.strip() or None
