@@ -17,7 +17,7 @@ struct LobbyRunTests {
         let connector = ScriptedConnector([[LobbySocketTests.welcome(rows[0]), .end]])
         let viewModel = LobbySocketTests.viewModel(api, connector, timer: RecordingTimer())
         await viewModel.run()
-        #expect(viewModel.state == .failed(Words.Mock.unreachable, final: false))
+        #expect(viewModel.state == .failed(Words.Mock.unreachablePhone, final: false))
         #expect(await connector.tokens.isEmpty)
         // Try again: the screen runs the room again, which reads it afresh and opens its socket.
         await api.setRefusal(nil)

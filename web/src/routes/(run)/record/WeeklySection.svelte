@@ -72,7 +72,7 @@
 	const pending = $derived(head === null ? null : weeklyPending(record, next));
 	const headline = $derived(recordHeadline(record, unplayed));
 	const standing = $derived(standingWords(record));
-	const gaps = $derived(gapWords(record, unplayed));
+	const gaps = $derived(gapWords(record, unplayed, pending === null ? null : (next?.week ?? null)));
 	const before = $derived(fromWeek === null ? null : beforeLine(fromWeek));
 	/** The same weeks on a phone: a chip a week, never the set rule's paragraph (Lane 209). */
 	const chips = $derived(fromWeek === null ? [] : beforeChips(fromWeek));

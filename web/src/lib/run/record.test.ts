@@ -175,6 +175,8 @@ void test('the headline says how many played weeks are graded and why the rest a
 		"Week 6 grades once every game's stats are in."
 	);
 	assert.equal(gapWords(mondayNight, [6]), missed);
+	// A drawn "when" line says the rule for its week, so the gap sentence drops it (B260).
+	assert.equal(gapWords(mondayNight, [], 6), missed);
 	const headline = recordHeadline(mondayNight);
 	assert.equal(headline.standing, 'Graded 2 of 5 weeks played');
 	assert.deepEqual(headline.starters, { value: '50 of 84', caption: 'ADP 50 of 84' });

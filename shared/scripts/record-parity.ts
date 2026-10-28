@@ -211,7 +211,7 @@ function weeklySection(
 	const toDateAll = allLine(record.toDate);
 	const pending = weekly ? weeklyPending(record, next) : null;
 	const headline = recordHeadline(record, unplayed);
-	const gaps = gapWords(record, unplayed);
+	const gaps = gapWords(record, unplayed, pending === null ? null : (next?.week ?? null));
 	const before = fromWeek === null ? null : beforeLine(fromWeek);
 	const rows = weekly
 		? weeklyLines(record.weeks, unplayed, underway)

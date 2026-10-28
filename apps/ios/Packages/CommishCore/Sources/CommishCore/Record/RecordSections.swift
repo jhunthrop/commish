@@ -58,7 +58,8 @@ enum RecordSections {
         let gaps = RecordLines.gaps(book, unplayed: states.unplayed)
         guard let all = book.toDate.first(where: { $0.position.value1 == .all }) else {
             if weekly, let pending = RecordLines.pending(book, next: next) {
-                return .pending(title: pending.title, when: pending.when, gaps: gaps)
+                let pendingGaps = RecordLines.gaps(book, unplayed: states.unplayed, whenWeek: next?.week)
+                return .pending(title: pending.title, when: pending.when, gaps: pendingGaps)
             }
             let headline = RecordLines.headline(book)
             return .headline(value: headline.value, caption: headline.caption, gaps: gaps)

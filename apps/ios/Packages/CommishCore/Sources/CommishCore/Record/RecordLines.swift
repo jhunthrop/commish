@@ -25,8 +25,9 @@ enum RecordLines {
         return played == 0 ? nil : "Graded \(graded) of \(Formatting.plural(played, "week")) played"
     }
 
-    /// record.ts gapWords: why the played weeks not graded are not.
-    static func gaps(_ book: RecordBook, unplayed: [Int]) -> String {
+    /// record.ts gapWords: why the played weeks not graded are not. `whenWeek` is the week a drawn "when"
+    /// line already says the rule for (B260), so its waiting sentence is dropped.
+    static func gaps(_ book: RecordBook, unplayed: [Int], whenWeek: Int? = nil) -> String {
         let missed = RecordWords.runs(book.weeks)
             .filter { RecordBook.status($0[0]) == .missed }
             .map { run in
@@ -36,7 +37,7 @@ enum RecordLines {
                     : "\(lead) were not set before kickoff, so they cannot be graded."
             }
         let waiting = book.weeks
-            .filter { RecordBook.status($0) == .frozen && !unplayed.contains($0.week) }
+            .filter { RecordBook.status($0) == .frozen && !unplayed.contains($0.week) && $0.week != whenWeek }
             .map { week in
                 let lead = RecordWords.lead([week])
                 return "\(lead) \(gradesWhen(week.gradesFrom.map(RecordWords.weekdayWord)))."

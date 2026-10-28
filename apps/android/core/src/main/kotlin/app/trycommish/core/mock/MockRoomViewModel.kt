@@ -133,7 +133,7 @@ class MockRoomViewModel(
     fun staleWords(state: MockRoomState = this.state.value): String? {
         if ((state as? MockRoomState.Room)?.stale != true) return null
         return listOfNotNull(
-            Words.Mock.unreachable,
+            Words.Mock.unreachablePhone,
             stamp?.let { "${AppWords.lastRead} ${Format.weekdayTime(it, zone)}" },
         ).joinToString(" ")
     }
@@ -511,6 +511,6 @@ class MockRoomViewModel(
         fun shareLink(code: String): String = "${SiteLinks.ORIGIN}/mock/share/$code"
 
         /** The API's own sentence where it sent one, else the app's for no connection or anything else. */
-        fun sentence(error: Exception): String = (error as? ApiFailure)?.message?.takeIf { it.isNotEmpty() } ?: Words.Mock.unreachable
+        fun sentence(error: Exception): String = (error as? ApiFailure)?.message?.takeIf { it.isNotEmpty() } ?: Words.Mock.unreachablePhone
     }
 }

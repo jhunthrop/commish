@@ -34,7 +34,7 @@ class MockScenesTest {
     @Test
     fun theOfflineRoomSaysWhenItWasRead() {
         val vm = MockSceneReads(scheduler).room(MockScene.Offline)
-        assertEquals("${Words.Mock.unreachable} Last read Sun 4:00 pm", vm.staleWords())
+        assertEquals("${Words.Mock.unreachablePhone} Last read Sun 4:00 pm", vm.staleWords())
         assertFalse((vm.state.value as MockRoomState.Room).canWrite)
     }
 

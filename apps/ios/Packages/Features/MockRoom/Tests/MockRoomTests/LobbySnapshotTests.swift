@@ -84,7 +84,7 @@ struct LobbySnapshotTests {
         case .failed:
             let height = MockRoomSnapshotTests.room(item.device)
             return framed(
-                LobbyFailedView(sentence: Words.Mock.unreachable, retry: {}, back: {}).frame(height: height),
+                LobbyFailedView(sentence: Words.Mock.unreachablePhone, retry: {}, back: {}).frame(height: height),
                 item
             )
         case .reportFirst, .reportDown:

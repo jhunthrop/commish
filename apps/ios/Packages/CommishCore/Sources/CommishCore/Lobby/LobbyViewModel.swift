@@ -25,7 +25,7 @@ public enum LobbyRefusal {
         sentence(status: status(error)) ?? {
             switch error {
             case let APIError.envelope(_, message) where !message.isEmpty: message
-            default: Words.Mock.unreachable
+            default: Words.Mock.unreachablePhone
             }
         }()
     }

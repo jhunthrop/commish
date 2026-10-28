@@ -83,7 +83,10 @@ internal object RecordSections {
         val all = book.toDate.firstOrNull { it.position == RunRecordPosition.All }
         if (all == null) {
             val pending = if (weekly) RecordLines.pending(book, next) else null
-            if (pending != null) return RecordBug.Pending(pending.first, pending.second, gaps)
+            if (pending != null) {
+                val pendingGaps = RecordLines.gaps(book, states.unplayed, next?.week)
+                return RecordBug.Pending(pending.first, pending.second, pendingGaps)
+            }
             val headline = RecordLines.headline(book)
             return RecordBug.Headline(headline.first, headline.second, gaps)
         }

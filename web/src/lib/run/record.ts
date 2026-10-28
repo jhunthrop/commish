@@ -112,15 +112,22 @@ function runsOf(weeks: readonly RecordWeek[]): RecordWeek[][] {
 
 /** Why the played weeks not graded are not: "Weeks 3 to 5 were not set before kickoff, so they
  * cannot be graded. Week 6 grades once every game's stats are in, usually Wednesday." `unplayed` names the set weeks not
- * played yet, which wait on nothing. */
-export function gapWords(record: RunRecord, unplayed: readonly number[] = []): string {
+ * played yet, which wait on nothing. `whenWeek` is the week a drawn "when" line already says the rule
+ * for (B260): its waiting sentence is dropped, so the rule is said once. */
+export function gapWords(
+	record: RunRecord,
+	unplayed: readonly number[] = [],
+	whenWeek: number | null = null
+): string {
 	const missed = runsOf(record.weeks)
 		.filter((run) => run[0]?.status === 'missed')
 		.map((run) =>
 			run.length === 1 ? RECORD_WORDS.missedOne(lead(run)) : RECORD_WORDS.missedMany(lead(run))
 		);
 	const waiting = record.weeks
-		.filter((week) => week.status === 'frozen' && !unplayed.includes(week.week))
+		.filter(
+			(week) => week.status === 'frozen' && !unplayed.includes(week.week) && week.week !== whenWeek
+		)
 		.map((week) =>
 			RECORD_WORDS.waiting(
 				lead([week]),

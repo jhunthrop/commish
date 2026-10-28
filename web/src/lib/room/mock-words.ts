@@ -40,6 +40,8 @@ export const MOCK = {
 	reshuffled: 'the bots',
 	/** A room read that could not reach the API. */
 	unreachable: 'The room could not be reached. Check the connection and reload.',
+	/** The same failure on the phones, which have no reload: the retry control is the verb (B258). */
+	unreachablePhone: 'The room could not be reached. Try again.',
 	sharedNote:
 		'It starts from the first pick with the same settings and bots, so they draft the same way until a pick of yours changes the board.'
 } as const;
