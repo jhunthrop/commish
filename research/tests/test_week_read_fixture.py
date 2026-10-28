@@ -26,6 +26,7 @@ import pytest
 
 from research.capsules.gateway import Completion
 from research.capsules.gateway_ledger import Usage
+from research.capsules.narrative import ShapeMasks
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.sentences import split_sentences
 from research.capsules.throttle_waits import AskWaits, RunWaits
@@ -222,7 +223,8 @@ def test_the_bye_read_says_he_does_not_play_and_recommends_nothing_for_the_week(
 
 @pytest.mark.parametrize("reads", [[p["read"] for p in _RECORDED], [read for read, _ in HAND_WRITTEN.values()]])
 def test_no_sentence_shape_sits_on_two_of_the_reads(reads: list[str]) -> None:
-    held = [set(sentence_shapes(read)) for read in reads]
+    masks = ShapeMasks.of((*(p["sheet"]["name"] for p in _RECORDED), *HAND_WRITTEN))
+    held = [set(sentence_shapes(read, masks)) for read in reads]
     for i, mine in enumerate(held):
         for theirs in held[i + 1 :]:
             assert not (mine & theirs)

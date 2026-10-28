@@ -13,6 +13,7 @@ import pytest
 
 from research.capsules.gateway import Completion, GenerationError
 from research.capsules.gateway_ledger import ModelPrice, Usage
+from research.capsules.narrative import ShapeMasks
 from research.capsules.rule_notes import notes_of
 from research.capsules.run_budget import BudgetSpentError
 from research.capsules.throttle_waits import AskWaits, RunWaits
@@ -23,6 +24,8 @@ from research.capsules.week.cadence import (
     STATUS_CHANGED,
     UNWRITTEN,
     due_reason,
+    kept_read,
+    status_rewrite_capped,
 )
 from research.capsules.week.prompt import (
     WEEK_RULES,
@@ -35,7 +38,13 @@ from research.capsules.week.prompt import (
 from research.capsules.week.sheet import Status
 from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
-from research.capsules.week.write import MAX_ASKS_PER_READ, MAX_CALLS_PER_READ, OVER_CAP_FALL, write_week_read
+from research.capsules.week.write import (
+    MAX_ASKS_PER_READ,
+    MAX_CALLS_PER_READ,
+    OVER_CAP_FALL,
+    WeekReadResult,
+    write_week_read,
+)
 from research.db.schema.boards import WEEK_READ_REASONS
 from research.nightly.week_read_demotion import shared_week_sentences, stored_facts_block, week_demotions
 from research.nightly.week_reads import (
@@ -45,6 +54,7 @@ from research.nightly.week_reads import (
     NIGHTLY_BUDGET_USD,
     WORST_PROMPT_TOKENS,
     step_budget,
+    stored_row,
     worst_read_usd,
 )
 from research.tests.test_week_read_rules import BYE_READ, STARTER_READ
@@ -382,12 +392,30 @@ def test_a_written_read_the_rules_now_refuse_is_due_once_a_day_at_the_nightly() 
     assert due_reason(sheet, _stored(body=_STALE_BODY, source="facts"), tomorrow) == UNWRITTEN
 
 
-def test_a_status_rewrite_is_asked_at_most_three_times_a_day() -> None:
-    """A fallen status rewrite keeps the written read, whose status still differs: the day's attempts stop it."""
-    moved, today = replace(questionable(), status=Status("out", REPORT)), date(2026, 10, 16)
-    assert due_reason(moved, _stored(attempt_day=today, attempts=2), _NOW, hourly=True) == STATUS_CHANGED
-    assert due_reason(moved, _stored(attempt_day=today, attempts=3), _NOW, hourly=True) is None
-    assert due_reason(moved, _stored(attempt_day=today, attempts=3), _NOW + timedelta(days=1)) == STATUS_CHANGED
+def test_the_status_cap_counts_only_the_falls_since_the_written_read() -> None:
+    """Lane 275 fix round 2 (review H2): a change, two fallen rewrites, a success, then a second change the same
+    Central day gets its own three tries; three falls since the written read spend the day's."""
+    at = _NOW  # Fri Oct 16, 9:00 pm Central
+    out, active = replace(questionable(), status=Status("out", REPORT)), questionable()
+    written = _stored(attempt_day=date(2026, 10, 16), attempts=1)
+    assert due_reason(out, written, at, hourly=True) == STATUS_CHANGED
+    once = kept_read(written, at)
+    twice = kept_read(once, at)
+    assert (once.attempts, twice.attempts) == (2, 3)
+    assert due_reason(out, twice, at, hourly=True) == STATUS_CHANGED
+    rewritten = stored_row(out, _written_result(), STATUS_CHANGED, twice, at)
+    assert rewritten.attempts == 1 and rewritten.status == "out"
+    assert due_reason(active, rewritten, at, hourly=True) == STATUS_CHANGED
+    spent = kept_read(kept_read(kept_read(rewritten, at), at), at)
+    assert status_rewrite_capped(spent, at) and due_reason(active, spent, at, hourly=True) is None
+    # The next Central day starts its tries again; a read written on an earlier day counts its write as one.
+    assert due_reason(active, spent, at + timedelta(days=1)) == STATUS_CHANGED
+    yesterday = _stored(attempt_day=date(2026, 10, 15), attempts=3)
+    assert kept_read(yesterday, at).attempts == 2  # noqa: PLR2004 - its write and the fall
+
+
+def _written_result() -> WeekReadResult:
+    return WeekReadResult("A new read.", "llm", "hold", "m/x", None, 1, (), None)
 
 
 def test_the_nightly_writes_its_due_reads_in_the_cadences_priority() -> None:
@@ -405,8 +433,9 @@ def test_a_sentence_shape_on_two_pages_keeps_its_first_carrier_in_board_order() 
             player_id="d", body="A facts block. The Lions lean on Jahmyr Gibbs every single week.", source="facts"
         ),
     }
-    sentences = shared_week_sentences(reads)
-    assert [s.player_ids for s in sentences] == [("a", "b")]
+    sentences = shared_week_sentences(reads, ShapeMasks.of(("Puka Nacua", "Rome Odunze", "Jahmyr Gibbs")))
+    # Both shapes of the sentence (the placeholder and the word shape) name the same two pages.
+    assert {s.player_ids for s in sentences} == {("a", "b")}
     assert [pid for pid, _ in week_demotions(sentences, ["b", "a", "c"])] == ["a"]
 
 

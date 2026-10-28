@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from sqlalchemy import Engine
 
+from research.capsules.narrative import ShapeMasks
 from research.capsules.week.sheet import WeekSheet
 from research.db.engine import make_engine
 from research.db.url import sqlalchemy_url
@@ -253,7 +254,7 @@ def test_due_reads_of_an_hourly_pass_run_soonest_kickoff_first_and_the_left_ones
         _sheet_kicking_off("early-a", _eastern(25, 13)),
     )
     monkeypatch.setattr(week_reads, "due_reason", lambda *_a, **_k: "status")
-    night = week_reads._Night(sheets, {}, 7, None)  # type: ignore[arg-type]
+    night = week_reads._Night(sheets, {}, 7, None, ShapeMasks.of(()))  # type: ignore[arg-type]
     hourly = [s.name for s, _ in week_reads._due(night, _eastern(25, 11), hourly=True)]
     nightly = [s.name for s, _ in week_reads._due(night, _eastern(25, 11), hourly=False)]
     assert hourly == ["early-b", "early-a", "late", "bye"]  # board order within a kickoff, no game last
@@ -276,7 +277,7 @@ def test_the_alert_filter_matches_the_warning_the_pass_logs() -> None:
 
 def _stub_night(monkeypatch: pytest.MonkeyPatch, spent: bool) -> week_reads._Night:
     sheets = (_sheet_kicking_off("a", _eastern(25, 13)), _sheet_kicking_off("b", _eastern(25, 16, 25)))
-    night = week_reads._Night(sheets, {}, 7, SimpleNamespace(ready=True, line=lambda: "ready"))  # type: ignore[arg-type]
+    night = week_reads._Night(sheets, {}, 7, SimpleNamespace(ready=True, line=lambda: "ready"), ShapeMasks.of(()))  # type: ignore[arg-type]
     monkeypatch.setenv("AI_GATEWAY_API_KEY", "k")
     monkeypatch.setattr(week_reads, "_budget_usd", lambda *_a: 0.0 if spent else 0.05)
     monkeypatch.setattr(week_reads, "_read_night", lambda *_a: night)

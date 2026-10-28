@@ -5,7 +5,7 @@ goes on to write its report (the oracle's `runStep`). The capsule step's gate is
 is stored, so a crashed sweep still gates the board as it stands.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final
@@ -66,6 +66,8 @@ class StepOutcome:
     page_reasons: tuple[str, ...] = ()
     spend: CapsuleSpend | None = None
     demoted: tuple[Demotion, ...] = ()
+    # The instant the step judged at (the week-reads step's, which the assembly judges the roll-over at).
+    at: datetime | None = None
 
 
 def _isolated(name: str, body: Callable[[], StepOutcome], log: Log) -> StepOutcome:
@@ -143,8 +145,23 @@ def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
             findings = page_findings(conn, at, facts)
         steps[-1] = StepOutcome(capsule.record, gate, tuple(findings.reasons))
     # The week-ahead reads, on the capsule step's instant and facts pass (Lane 72); advisory to the verdict.
-    steps.append(_isolated(WEEK_READS, lambda: StepOutcome(StepRecord(WEEK_READS, "skipped", "skipped by --skip") if WEEK_READS in skip else run_week_read_step(engine, capsule_clock(), log, facts)), log))  # fmt: skip
+    steps.append(_isolated(WEEK_READS, lambda: _week_reads(engine, capsule_clock(), log, facts, WEEK_READS in skip), log))  # fmt: skip
     return steps
+
+
+def _week_reads(engine: Engine, at: datetime, log: Log, facts: FactsPassMemo, skipped: bool) -> StepOutcome:
+    """The week-reads step's outcome with the instant it judged the roll-over at (Lane 265, L5)."""
+    record = (
+        StepRecord(WEEK_READS, "skipped", "skipped by --skip")
+        if skipped
+        else run_week_read_step(engine, at, log, facts)
+    )
+    return StepOutcome(record, at=at)
+
+
+def rollover_instant(steps: Sequence[StepOutcome]) -> datetime | None:
+    """The instant the week-reads step judged the roll-over at, for the assembly's promise; None when it raised."""
+    return next((s.at for s in steps if s.record.name == WEEK_READS and s.at is not None), None)
 
 
 def held_out(engine: Engine, store: RunStore) -> tuple[list[HeldOutScore], Mapping[int, float] | None]:

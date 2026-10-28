@@ -14,7 +14,8 @@ from datetime import datetime, time, timedelta
 from typing import Final
 from zoneinfo import ZoneInfo
 
-from research.capsules.week.sheet import central_stamp
+from research.capsules.week.rollover import next_nightly
+from research.capsules.week.sheet import CENTRAL, central_stamp
 
 EASTERN: Final = ZoneInfo("America/New_York")
 # The hourly capture's hours, Eastern (`research-capture-harvest`, "0 0,2,6-23 * * *" America/New_York): the
@@ -40,9 +41,17 @@ def next_hourly_pass(after: datetime) -> datetime:
     raise AssertionError("unreachable: every day has a pass")
 
 
-def status_changed_caption(as_of: datetime) -> str:
-    """The caption over a week read his status has moved past, with the next write."""
-    due = central_stamp(next_hourly_pass(as_of))
+def first_pass_of_next_day(as_of: datetime) -> datetime:
+    """The first pass, hourly or nightly, on the Central day after `as_of`'s: when a read whose status rewrites
+    are spent for the day (`cadence.status_rewrite_capped`) is asked again."""
+    midnight = datetime.combine(as_of.astimezone(CENTRAL).date() + timedelta(days=1), time(), CENTRAL)
+    return min(next_hourly_pass(midnight), next_nightly(midnight))
+
+
+def status_changed_caption(as_of: datetime, capped: bool = False) -> str:
+    """The caption over a week read his status has moved past, with the next write: the next hourly pass, or,
+    once the day's status rewrites are spent (`capped`, Lane 275 fix round 2), the next day's first pass."""
+    due = central_stamp(first_pass_of_next_day(as_of) if capped else next_hourly_pass(as_of))
     return f"His status changed since this read was written. A new read is due by {due}."
 
 

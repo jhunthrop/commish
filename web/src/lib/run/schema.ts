@@ -276,10 +276,16 @@ export const weekReadSchema = z.object({
 export type WeekRead = z.infer<typeof weekReadSchema>;
 
 /** While the coming week's reads are not written (Lane 256, the roll-over writes every board player's
- * in one pass), the week and the night they are written ("Tuesday"), on a page that serves no read. */
+ * in one pass), the week and the nightly that writes them, on a page that serves no read. `at` is that
+ * nightly's instant (Lane 265), whose night the page names and which the page stops promising once its
+ * clock passes it; absent on a run from before. `night` is the run's own name for it, kept one deploy for
+ * the web before Lane 265 and never read here. */
 export const readsDueSchema = z.object({
 	week: z.number().int().min(1),
-	night: z.enum(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+	night: z
+		.enum(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+		.optional(),
+	at: isoTime.optional()
 });
 
 export type ReadsDue = z.infer<typeof readsDueSchema>;

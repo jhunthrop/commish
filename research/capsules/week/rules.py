@@ -87,6 +87,11 @@ _OURS: Final = re.compile(
 _NAMES_PROJECTION: Final = re.compile(
     r"\bpublished\b|(?<!rest-of-season )(?<!rest of season )\bprojections?\b|\bprojected\b", re.IGNORECASE
 )
+# The card and its cells by name, and the week's number by a name of its own (Lane 275 fix round 2, review M2):
+# "his Wk figure looks light" grades the published projection without its words.
+_NAMES_THE_CARD: Final = re.compile(
+    r"\b(?:cards?|cells?|tiles?|wk|proj)\b|\b(?:the|this) week(?:'|\u2019)?s (?:number|figure)\b", re.IGNORECASE
+)
 _DOES_NOT_PLAY: Final = re.compile(
     r"\bbye\b|\b(?:does not|doesn't|will not|won't|cannot|can't) play\b|\bno game\b|\bruled out\b|"
     r"\binjured reserve\b|\bsits? out\b|\bis out\b",
@@ -197,7 +202,7 @@ def _stated(sentence: str, season: int) -> list[tuple[str, float, str, str]]:
 _NAME_AS_THE_CELL: Final = (
     "Name each figure as its cell does: his points a game are his Avg, his last game's points are Last's, a "
     "game's points are that game's, his rest-of-season points are the Rest of season tile's, and the opponent's "
-    "rank is Opp rank's. The week's published projection is the Wk cell's alone: never quote it."
+    "rank is Opp rank's. The week's published projection is the card's alone: never quote it."
 )
 
 
@@ -272,15 +277,16 @@ def _published_figures(sheet: WeekSheet) -> set[float]:
 
 
 _LEAVE_IT_OUT: Final = (
-    "The card's Wk cell prints the published projection: leave it, its figure and its change out of the read, "
+    "The card prints the published projection: leave it, its figure, its change and the card out of the read, "
     "and say what you see in his status, his role, the matchup or his rate."
 )
 
 
 def names_the_projection(text: str) -> bool:
-    """Whether a read names the published projection or calls a weekly number ours (H4's words, on the text
-    alone): the cadence's check for a read written under the rule before Lane 275 (`cadence.RULE_STALE`)."""
-    return any(_NAMES_PROJECTION.search(s) or _OURS.search(s) for s in split_sentences(text.strip()))
+    """Whether a read names the published projection or the card, or calls a weekly number ours (H4's words, on
+    the text alone): the cadence's check for a read written under the rule before Lane 275 (`cadence.RULE_STALE`)."""
+    patterns = (_NAMES_PROJECTION, _NAMES_THE_CARD, _OURS)
+    return any(pattern.search(s) for s in split_sentences(text.strip()) for pattern in patterns)
 
 
 def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
@@ -298,6 +304,9 @@ def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[s
         named = _NAMES_PROJECTION.search(s)
         if named is not None:
             out.append(_sentence_violation(f'names the published projection ("{named.group(0)}")', s, _LEAVE_IT_OUT))
+        card = _NAMES_THE_CARD.search(s)
+        if card is not None:
+            out.append(_sentence_violation(f'names the card ("{card.group(0)}")', s, _LEAVE_IT_OUT))
         stated = [raw for raw, value, _, _ in _stated(s, sheet.season) if page_tenth(value) in figures]
         if stated:
             quoted = ", ".join(f'"{raw}"' for raw in stated)

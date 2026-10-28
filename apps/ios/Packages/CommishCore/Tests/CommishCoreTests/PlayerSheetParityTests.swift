@@ -33,6 +33,8 @@ struct PlayerSheetParityTests {
     struct NoRead: Decodable {
         let state: String?
         let due: RunReadsDue?
+        /// The screen's clock, nil for a screen that has read none yet (any instant before the nightly).
+        let now: Date?
         let words: String
     }
 
@@ -148,7 +150,7 @@ struct PlayerSheetParityTests {
     @Test func withNoReadThePlaceNamesHisNextGameOnlyWhileItIsToCome() {
         for test in Self.parity.noRead {
             #expect(
-                WeekReads.noRead(Self.state(test.state), due: test.due) == test.words,
+                WeekReads.noRead(Self.state(test.state), due: test.due, now: test.now ?? .distantPast) == test.words,
                 "\(test.state ?? "none") \(test.due.map { "week \($0.week)" } ?? "no roll-over due")"
             )
         }

@@ -2,7 +2,9 @@
 
 Each read takes only what was stamped at or before the instant:
 - the week: his club's first game still to kick off (a club on its bye that week has its bye and its next
-  game), from the stored schedule the player page reads (`nightly.reads.schedule`);
+  game), from the stored schedule the player page reads (`nightly.reads.schedule`), and only a club whose
+  week is the board week (`board_week`): a club whose board-week game has kicked off has its next week
+  ahead, written when that week rolls over (Lane 256), so no sheet, projection or figure is read for it;
 - the published projection: the newest two snapshots of his week captured by then
   (`tank01_projection_rows`, PPR points), the provider never named, each as the card serves it (the cents,
   then the tenth);
@@ -372,7 +374,11 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         return None
     held = projection_held(conn, season, the_board_week, as_of)
     current = pending[0]
-    weeks = {club: cw for club, slate in context.games.items() if (cw := club_week(slate, current, as_of)) is not None}
+    weeks = {
+        club: cw
+        for club, slate in context.games.items()
+        if (cw := club_week(slate, current, as_of)) is not None and cw.week == the_board_week
+    }
     wanted = sorted({cw.week for cw in weeks.values()} | {cw.game.week for cw in weeks.values() if cw.game is not None})
     stamp = _lines_stamp(conn, season, as_of)
     blocks = _blocks(context, players)

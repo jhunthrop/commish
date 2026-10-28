@@ -14,12 +14,13 @@ from datetime import UTC, datetime
 
 import pytest
 
+from research.capsules.narrative import NAMES_KIND, WORDS_KIND, ShapeMasks
 from research.capsules.season_voice import SeasonClock, time_frame_hits
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.rank_words import rank_words
 from research.capsules.week.render import render_week_facts_block, render_week_sheet
-from research.capsules.week.rules import WEEK_NEVER_WORDS, stated_figures, week_rule_violations
+from research.capsules.week.rules import WEEK_NEVER_WORDS, names_the_projection, stated_figures, week_rule_violations
 from research.capsules.week.sheet import (
     Allowed,
     BoardPlace,
@@ -32,7 +33,7 @@ from research.capsules.week.sheet import (
     WeekSheet,
 )
 from research.capsules.week.start_advice import start_advice_in
-from research.capsules.week.validate import sentence_shapes, validate_week_read, with_season
+from research.capsules.week.validate import sentence_shapes, validate_week_read, week_masks, with_season
 from research.tests.week_read_fixtures import (
     BEFORE,
     BOARD,
@@ -234,6 +235,24 @@ def test_the_published_projections_figure_is_refused_with_or_without_a_unit(figu
     assert any(f'states the published projection\'s figure "{raw}"' in v for v in violations), violations
 
 
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "The number on his card undersells him this week.",
+        "His Wk figure looks light for this matchup.",
+        "The week's number feels conservative for him.",
+        "The Wk cell sells him short.",
+        "The Proj tile is too cautious about him.",
+    ],
+)
+def test_a_sentence_naming_the_card_is_refused(sentence: str) -> None:
+    """Lane 275 fix round 2 (review M2): the card, its cells and the week's number by name grade the published
+    projection without its words; the read never names them, and the cadence counts such a read stale."""
+    text = STARTER_READ.replace("The Rams play indoors", f"{sentence} The Rams play indoors")
+    assert any("names the card" in v for v in week_rule_violations(text, starter(), "start"))
+    assert names_the_projection(text) and not names_the_projection(STARTER_READ)
+
+
 def test_a_figure_another_cell_prints_too_is_that_cells_to_quote() -> None:
     """A last game of 18.4 points is the game log's figure, whatever the projection prints (Lane 275)."""
     sheet = replace(starter(), last_games=(GameLine(5, "SF", False, 18.4), *starter().last_games[1:]))
@@ -338,9 +357,79 @@ def test_a_read_runs_three_to_five_sentences(count: int) -> None:
 def test_a_sentence_shaped_like_one_on_another_page_is_refused() -> None:
     """The review's M4: the same skeleton with another name and other numbers is the same sentence."""
     theirs = "The Bears play indoors, so nothing about the weather gets in his way."
-    taken = frozenset(sentence_shapes(theirs))
+    taken = frozenset(sentence_shapes(theirs, week_masks((starter(),))))
     result = validate_week_read(STARTER_READ, starter(), taken, call="start")
     assert any("shaped like one another page carries" in v for v in result.violations), result.violations
+    # The ask shows the shape, its names, clubs and numbers as placeholders.
+    assert any('"the [club] play indoors so nothing about the weather gets in his way"' in v for v in result.violations)
+
+
+def _named(text: str, masks: ShapeMasks) -> set[str]:
+    return {shape for shape in sentence_shapes(text, masks) if shape.startswith(NAMES_KIND)}
+
+
+def test_the_same_shape_with_a_longer_name_or_another_ordinal_is_the_same_shape() -> None:
+    """Lane 265: a name is one placeholder however many words it runs (a word-by-word mask counted them),
+    and an ordinal's suffix goes with its number."""
+    masks = ShapeMasks.of(("Puka Nacua", "Amon-Ra St. Brown"))
+    ours = "Puka Nacua faces the Cardinals, who rank 26th of 32 against receivers this year."
+    theirs = "Amon-Ra St. Brown faces the New York Jets, who rank 23rd of 32 against receivers this year."
+    assert _named(ours, masks) == _named(theirs, masks)
+    assert _named("St. Brown's matchup is the best on the board this week.", masks) == _named(
+        "Nacua's matchup is the best on the board this week.", masks
+    )
+
+
+@pytest.mark.parametrize(
+    ("ours", "theirs"),
+    [
+        # The Lane 265 review's H1: a club's plural possessive, straight or curled, and a player's.
+        (
+            "The Rams' defense allows 21 points a game to receivers this year.",
+            "The Bears\u2019 defense allows 18 points a game to receivers this year.",
+        ),
+        (
+            "Jones' role grew to 9 targets a game over his last 3 games.",
+            "Nacua's role grew to 11 targets a game over his last 4 games.",
+        ),
+    ],
+)
+def test_a_possessive_name_or_club_is_its_placeholder(ours: str, theirs: str) -> None:
+    masks = ShapeMasks.of(("Puka Nacua", "Aaron Jones"))
+    assert _named(ours, masks) == _named(theirs, masks) != set()
+
+
+def test_a_placeholder_shape_under_six_words_is_held_only_by_its_word_shape() -> None:
+    """The call's vocabulary ("Start Puka Nacua in week 6.") is no placeholder shape; main's word shape, four
+    words or more, still holds it, as main did."""
+    masks = ShapeMasks.of(("Puka Nacua",))
+    assert set(sentence_shapes("Start Puka Nacua in week 6.", masks)) == {f"{WORDS_KIND}x x x in week"}
+    assert _named("Start Puka Nacua in week 6 of 2026.", masks) != set()
+
+
+def test_a_lower_case_word_that_spells_a_surname_is_kept() -> None:
+    masks = ShapeMasks.of(("Jordan Love",))
+    assert _named("He would love a game against a soft defense this week.", masks) == {
+        f"{NAMES_KIND}he would love a game against a soft defense this week"
+    }
+
+
+@pytest.mark.parametrize(
+    ("ours", "theirs"),
+    [
+        # A pronoun against a name, a first name against a full one, a name off the board: main's word mask
+        # equates each pair, so the check does too (the Lane 265 review's L1).
+        ("He has drawn at least 9 targets in each of his last 3 games.",
+         "Nacua has drawn at least 7 targets in each of his last 4 games."),
+        ("Puka has drawn at least 9 targets in each of his last 3 games.",
+         "Puka Nacua has drawn at least 7 targets in each of his last 4 games."),
+        ("Smith has drawn at least 9 targets in each of his last 3 games.",
+         "Nacua has drawn at least 7 targets in each of his last 4 games."),
+    ],
+)  # fmt: skip
+def test_every_pair_mains_word_mask_equates_still_shares_a_shape(ours: str, theirs: str) -> None:
+    masks = ShapeMasks.of(("Puka Nacua",))
+    assert set(sentence_shapes(ours, masks)) & set(sentence_shapes(theirs, masks))
 
 
 def test_a_call_is_required() -> None:

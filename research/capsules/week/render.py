@@ -86,14 +86,14 @@ def _status_line(sheet: WeekSheet) -> str:
 
 def _projection_line(sheet: WeekSheet) -> str | None:
     """The week's published projection, for the writer to know his week by. The read never quotes it nor its
-    change (Lane 275): the card's Wk cell prints both, and the read stands when it moves."""
+    change (Lane 275): the card prints both, and the read stands when it moves."""
     p = sheet.projection
     if p is None or sheet.bye:
         return None
     return (
         f"Published projection for {week_of(sheet.week, sheet.season)}: {points_text(p.points)} points in PPR "
-        f"scoring{_as_of(p.captured_at)}. It is a projection published for the week, not ours. The card's Wk "
-        "cell prints it: never name it, its figure or its change in the read."
+        f"scoring{_as_of(p.captured_at)}. It is a projection published for the week, not ours. The card prints "
+        "it: never name it, its figure or its change in the read, and never the card."
     )
 
 

@@ -5,7 +5,7 @@ week's facts (`render.render_week_sheet`), the sentences other pages already car
 a correction quotes the attempt, how far it is from its length, and every rule broken on any attempt so
 far, each with its sentence (`rule_notes`, Lane 52). The prompt states the week, the kickoff (on the
 sheet), and that the week's number is a published projection, never ours, while `sheet.PROJECTION_BASIS`
-says so. The read never states it (Lane 275, the founder 2026-10-28): the card's Wk cell prints it, and a read
+says so. The read never states it (Lane 275, the founder 2026-10-28): the card prints it, and a read
 that quoted it went stale the moment it moved. The answer is one JSON object: the read, and the writer's own call for it in one word (`CALLS`),
 which the rules hold to the sheet (a player who may not be started is never "start", the review's H2).
 """
@@ -36,12 +36,13 @@ ASKED_WORDS: Final = (45, 70)
 # total (the Lane 117 replay).
 SENTENCE_WORDS: Final = 15
 # Lane 275 (the founder, 2026-10-28): the read never names the published projection, its figure or its move.
-# The card's Wk cell prints it, and the read stands when it moves.
+# The card prints it, and the read stands when it moves; the read never names the card (fix round 2).
 _NUMBER_RULE: Final = {
     "published": (
         "- The week's number is a published projection, never ours. Never state it, its figure, its change or a "
-        'judgment of it: the card\'s Wk cell prints it. Never "our projection", "our number", "our model" or '
-        '"we project" for this week. Say what you see in his status, his role, the matchup or his rate.'
+        "judgment of it: the card prints it. Never name the card, a cell or a tile, and never \"the week's "
+        'number", "our projection", "our number", "our model" or "we project" for this week. Say what you see in '
+        "his status, his role, the matchup or his rate."
     ),
 }
 # The four calls, defined (the re-review's F4): the page shows the call beside the read.
@@ -67,7 +68,7 @@ WEEK_RULES: Final = f"""You write the week-ahead read on one player's page for a
 
 THE FOUR RULES READS BREAK MOST
 - One figure to a sentence. The opponent's rank, his points a game and his last game's points each get a sentence of their own.
-- Never the published projection, its figure or its change: the card's Wk cell prints it. Never a sentence another player's page could carry with the names and numbers swapped.
+- Never the published projection, its figure or its change: the card prints it. Never a sentence another player's page could carry with the names and numbers swapped.
 - The season once, with the first week you name ("week 7 of 2026"), every later week without it. Never the year twice, never a week before the year is named.
 - The injury list in the facts' own words for it ("Friday's report"), never a day or a name the facts do not give.
 

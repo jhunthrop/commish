@@ -1,6 +1,6 @@
 """LANE 266, HOW VARIED THE READS SOUND: distinct sentence openers across a set of written reads.
 
-Each sentence is masked as the shape-duplicate rate masks it (`tally.ShapeMasks`: player names, clubs and
+Each sentence is masked as the shape-duplicate rate masks it (`research.capsules.narrative.ShapeMasks`: player names, clubs and
 numbers become placeholders) so "Start Nacua" and "Start Chase" are one opener. Two figures over the same
 reads: the distinct first words of every sentence, and the distinct first-three-word sequences, each also
 for the reads' first sentences alone (how the reads open), and each per 100 reads. Distinct counts grow
@@ -12,8 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final
 
-from research.capsules.narrative import sentences_verbatim
-from research.explore.writer_bakeoff.tally import ShapeMasks
+from research.capsules.narrative import ShapeMasks, sentences_verbatim
 
 OPENER_WORDS: Final = 3
 PER: Final = 100

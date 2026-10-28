@@ -5,25 +5,21 @@ import pytest
 
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway_ledger import Usage
+from research.capsules.narrative import (
+    CLUB_MARK,
+    NUMBER_MARK,
+    PLAYER_MARK,
+    ShapeMasks,
+    club_spellings,
+    player_spellings,
+)
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.week.judge import judge_violation
 from research.capsules.week.validate import SHARED_SENTENCE
 from research.capsules.week.write import WeekAttempt, WeekReadResult
 from research.explore.writer_bakeoff.results import SIDE_BY_SIDE, spread
 from research.explore.writer_bakeoff.run import NO_JUDGE_ASK, judged_drafts, outcome_of
-from research.explore.writer_bakeoff.tally import (
-    CLUB_MARK,
-    NUMBER_MARK,
-    PLAYER_MARK,
-    ReadOutcome,
-    ShapeMasks,
-    agreement,
-    club_spellings,
-    p95,
-    player_spellings,
-    shape_duplicates,
-    tally,
-)
+from research.explore.writer_bakeoff.tally import ReadOutcome, agreement, p95, shape_duplicates, tally
 from research.tests.week_read_fixtures import on_bye, starter
 
 _MODEL = "test/model"
@@ -119,10 +115,13 @@ def test_p95_is_nearest_rank() -> None:
 
 
 def test_player_spellings_take_the_last_name_past_a_suffix() -> None:
+    # The first name too (Lane 265 fix round 1): a read that calls him "Puka" is the same shape.
     assert set(player_spellings(["Marvin Harrison Jr.", "Puka Nacua"])) == {
         "Marvin Harrison Jr.",
+        "Marvin",
         "Harrison",
         "Puka Nacua",
+        "Puka",
         "Nacua",
     }
 

@@ -7,9 +7,11 @@ rewrite only the reads whose week moved.
   sentence): `UNWRITTEN`, nightly, and at most once an hour and three times a Central day (`RETRY_GAP`,
   `RETRIES_A_DAY`), so a read that keeps failing never spends a day's budget. Within the roll-over pass a
   fallen read is asked again at once (`nightly.week_reads.ROLLOVER_ROUNDS`).
-- His status changed since it was written (Lane 63's capture marks it): `STATUS_CHANGED`, nightly and hourly,
-  at most three attempts a Central day (`RETRIES_A_DAY`): a rewrite that falls keeps the written read (Lane 275
-  fix round 1, `nightly.week_reads`), so its status still differs and the cap is what stops it asking every hour.
+- His status changed since it was written (Lane 63's capture marks it): `STATUS_CHANGED`, nightly and hourly.
+  A rewrite that falls keeps the written read (Lane 275 fix round 1, `kept_read`), so its status still differs;
+  the rewrites that fell since that read was written are capped at `RETRIES_A_DAY` a Central day
+  (`status_rewrite_capped`, fix round 2), and a written read's attempts restart at one, so a success never
+  spends the next change's tries. A capped read is asked again at the first pass of the next Central day.
 - The written read breaks a rule the writer holds reads to now (`RULE_STALE`, Lane 275 fix round 1: a read
   written while the rules asked for the published projection names it, `rules.names_the_projection`), nightly
   only and at most once a Central day, after every other reason; a rewrite that falls keeps the old read shown.
@@ -25,6 +27,7 @@ Anything else (a new projection, a new forecast, a new depth chart) waits for on
 costs nothing.
 """
 
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 from typing import Final
 
@@ -58,6 +61,24 @@ def _retry_allowed(stored: StoredWeekRead, now: datetime) -> bool:
     return stored.written_at <= now - RETRY_GAP and attempts_today(stored, now) < RETRIES_A_DAY
 
 
+def falls_since_written(stored: StoredWeekRead, now: datetime) -> int:
+    """The rewrites that fell since a written read was written, on `now`'s Central day: a written row counts its
+    write as its one attempt (`nightly.week_reads.stored_row`) and each fallen rewrite after it (`kept_read`)."""
+    return max(0, attempts_today(stored, now) - 1)
+
+
+def status_rewrite_capped(stored: StoredWeekRead, now: datetime) -> bool:
+    """Whether a written read's status rewrites are spent for `now`'s Central day (Lane 275 fix round 2)."""
+    return stored.source == WRITTEN_SOURCE and falls_since_written(stored, now) >= RETRIES_A_DAY
+
+
+def kept_read(before: StoredWeekRead, at: datetime) -> StoredWeekRead:
+    """A written read kept over a rewrite that fell, or was demoted for a shared shape (Lane 275 fix rounds 1
+    and 2, the founder: "we should always show a read"): its body, call, status and stamps as written, one more
+    fall counted on `at`'s Central day (a read written on an earlier day counts its write as one)."""
+    return replace(before, attempt_day=central_day(at), attempts=max(attempts_today(before, at), 1) + 1)
+
+
 def _rule_stale(stored: StoredWeekRead, now: datetime) -> bool:
     """A written read the current rules refuse, not yet attempted on `now`'s Central day. The check is the rule
     that changed (H4), on the stored body alone: the full validator would read today's sheet, whose forecast
@@ -70,7 +91,7 @@ def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None, now: datetime, *
     if stored is None or stored.season != sheet.season or stored.week != sheet.week:
         reason: str | None = FIRST
     elif stored.status != sheet.status.status:
-        reason = STATUS_CHANGED if attempts_today(stored, now) < RETRIES_A_DAY else None
+        reason = None if status_rewrite_capped(stored, now) else STATUS_CHANGED
     elif stored.source != WRITTEN_SOURCE and _retry_allowed(stored, now):
         reason = UNWRITTEN
     elif _rule_stale(stored, now):
