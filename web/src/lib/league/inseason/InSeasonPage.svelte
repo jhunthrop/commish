@@ -44,12 +44,15 @@
 		read: () => Promise<T>;
 		/** How many rows to hold while the answer is read, so nothing moves when it lands. */
 		reserve: number;
+		/** The head as one line in body type, the member's team, record and the read stamp, with no
+		 * league title: the bar's switch names the league (the Trades screen, Lane 268). */
+		oneLine?: boolean;
 		/** The screen, from its answer, the league's host, the instant the answer was read, in
 		 * ms (the page's one clock, which the screen draws at), and a way to read the answer again. */
 		children: Snippet<[T, LeagueHost, number, () => void]>;
 	}
 
-	let { id, screen, title, stamp, read, reserve, children }: Props = $props();
+	let { id, screen, title, stamp, read, reserve, oneLine = false, children }: Props = $props();
 
 	/** The league as the page names it: from the switch's list, else from the account's leagues. */
 	type Head = Pick<AttachedLeague, 'host' | 'name' | 'team_name' | 'standing'>;
@@ -172,9 +175,11 @@
 			</EmptyState>
 		</div>
 	{:else}
-		<main class="league">
+		<main class="league" class:one-line={oneLine}>
 			<header class="lead">
-				<div class="title"><DisplayTitle size="page" wrap>{name}</DisplayTitle></div>
+				{#if !oneLine}<div class="title">
+						<DisplayTitle size="page" wrap>{name}</DisplayTitle>
+					</div>{/if}
 				<p class="sub">
 					<span class="standing">{standing}</span>
 					{#if advice}
@@ -240,6 +245,23 @@
 		font-size: var(--t-sm);
 	}
 
+	/* One line in body type over a dense screen (Lane 268): the rows take the height. */
+	.one-line {
+		gap: 6px;
+		padding-top: var(--s-2);
+	}
+
+	.one-line .sub {
+		margin: 0;
+		font-size: var(--t-sm);
+		line-height: 1.35;
+	}
+
+	.one-line .standing {
+		font-weight: 600;
+		color: var(--ink);
+	}
+
 	.refused {
 		display: flex;
 		flex-wrap: wrap;
@@ -277,6 +299,15 @@
 		/* The standing is the league page's: here the stamps say what the screen was read from. */
 		.standing {
 			display: none;
+		}
+
+		.one-line {
+			gap: var(--s-2);
+			padding-top: var(--s-2);
+		}
+
+		.one-line .read {
+			font-size: var(--t-xs);
 		}
 
 		.pad {

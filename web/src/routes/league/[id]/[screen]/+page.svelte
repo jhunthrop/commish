@@ -95,6 +95,7 @@
 			stamp={ordered}
 			read={() => inSeasonApi.trades(id)}
 			reserve={RESERVE_ROWS.trades}
+			oneLine
 		>
 			{#snippet children(advice, host, now)}
 				<TradeScreen

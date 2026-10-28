@@ -74,6 +74,11 @@
 		/** A player on injured reserve (Lane 98, B34): on the bench his game cell says why he is a drop,
 		 * in the IR slot it is empty; neither draws his matchup (Opp rank), the slot no points. */
 		reserve?: 'bench' | 'slot' | null;
+		/** The trade builder's tight row (Lane 268): the Lineup's row height with the pill on the club
+		 * line, so its cells sit a little closer, the club line holds his status in its short word and his
+		 * tags, the Game cell stacks the opponent over the kickoff without the expected score or weather,
+		 * and a phone's row is two lines without the evidence line. */
+		tight?: boolean;
 		/** A Waivers stash row's Game cell (Lane 118, B79): "Back week 9" in place of his game, with no
 		 * matchup, Proj or points, as an IR slot row draws none. */
 		away?: string | null;
@@ -103,6 +108,7 @@
 		projCells = true,
 		rankCell = false,
 		reserve = null,
+		tight = false,
 		away = null
 	}: Props = $props();
 	/** The row as drawn: an IR row, or a stash, without its matchup (reserveRow). */
@@ -150,6 +156,7 @@
 	class:compact
 	class:picked
 	class:dropped={pick?.state === 'drop'}
+	class:tight
 >
 	{#if pick}
 		<td class="tk">
@@ -180,6 +187,7 @@
 	{/if}
 	<td class="player">
 		<BoxPlayer
+			{tight}
 			row={drawn}
 			{tags}
 			{shortOnPhone}
@@ -204,7 +212,9 @@
 				>{/if}</td
 		>
 	{/if}
-	{#if !compact}<td class="game"><BoxGame row={drawn} {clears} {note} /></td>{/if}
+	{#if !compact}<td class="game"
+			><BoxGame row={drawn} facts={!tight} stacked={tight} {clears} {note} /></td
+		>{/if}
 	{#if projCells}<td class="n proj">{boxNumber(drawn.proj)}</td>{/if}
 	{#if ptsCell && !compact}<td class="n pts" class:none={drawn.pts === null}
 			>{boxNumber(drawn.pts)}</td
@@ -377,6 +387,11 @@
 		display: none;
 	}
 
+	/* The tight row (Lane 268): the Lineup's 52px with the pill on the club line. */
+	.tight td {
+		padding-block: 4px;
+	}
+
 	.slot {
 		font-family: var(--font-num);
 		font-size: var(--t-md);
@@ -513,6 +528,11 @@
 	@media (max-width: 760px) {
 		td {
 			padding: 7px 6px;
+		}
+
+		/* A tight row's evidence stays the desk's: the phone's row is two lines (Lane 268). */
+		.tight .phone-ev {
+			display: none;
 		}
 
 		tr {

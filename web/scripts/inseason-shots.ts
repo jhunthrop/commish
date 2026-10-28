@@ -269,13 +269,14 @@ async function boxFacts(page: Page): Promise<{
 const PER_GAME = /\d+\.\d a game/;
 const TRADE_BASIS_FIRST =
 	"Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot.";
-/** An idea's gains in a player's words (Lane 103, B42). */
-const IDEA_GAINS = /^[+−]\d+\.\d a week for your lineup, [+−]\d+\.\d for theirs$/;
+/** An idea's gains a week in its one line (Lane 268): "+5.7 yours, +0.7 theirs". */
+const IDEA_GAINS = /^[+−]\d+\.\d yours, [+−]\d+\.\d theirs$/;
 
 /** What the Trades screen draws wrong at a width (Lane 260): our ideas, the verb, the rosters and the
  * basis. */
 async function tradeFaults(page: Page): Promise<string[]> {
 	const seen = await page.evaluate(() => ({
+		more: document.querySelector<HTMLElement>('main .ideas .more')?.innerText.trim() ?? null,
 		ideas: [...document.querySelectorAll('main .idea')].map((b) => ({
 			mark: b.querySelector<HTMLElement>('.mark')?.innerText.trim() ?? '',
 			gains: b.querySelector<HTMLElement>('.gains')?.innerText.trim() ?? ''
@@ -288,6 +289,9 @@ async function tradeFaults(page: Page): Promise<string[]> {
 	}));
 	const faults: string[] = [];
 	if (seen.ideas.length === 0) faults.push('no ideas');
+	// The best three, the rest behind "N more" (Lane 268).
+	if (seen.ideas.length > 3) faults.push(`${String(seen.ideas.length)} ideas before N more`);
+	if (seen.more !== null && !/^\d+ more$/.test(seen.more)) faults.push(`more says "${seen.more}"`);
 	if (seen.ideas.length > 1 && !/^Best$/i.test(seen.ideas[0]?.mark ?? ''))
 		faults.push('the first idea does not say Best');
 	for (const idea of seen.ideas)
@@ -776,6 +780,8 @@ for (const theme of THEMES) {
 		const page = await ctx.newPage();
 		await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
 		await ready(page, 'Our ideas');
+		// The row shows the best three; "N more" shows the rest in place (Lane 268).
+		await page.locator('main .ideas .more').click();
 		const count = await page.locator('main .idea').count();
 		let last = '';
 		let starters = 0;
