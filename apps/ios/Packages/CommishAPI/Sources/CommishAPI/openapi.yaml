@@ -10399,7 +10399,7 @@ components:
         my_rest_of_season:
           type: number
           format: double
-          description: "the drafter's rest-of-season change (Lane 269): what the players he gets score on our order over the waiver level at their position, less the same for those he gives and drops, over the weeks gain_basis names, one decimal. The waiver level is the best free agent at the position in the league's last read (the pool the Waivers screen reads), so a bench player counts for what he scores over the one his side could pick up free, and a player at or under it counts none; where the league's free agents are not read, the last starter league-wide (rest_of_season_basis says which). Unlike my_gain it counts the bench; absent from an older answer"
+          description: "the drafter's rest-of-season change (Lane 269): what the players he gets score on our order over the waiver level at their position, less the same for those he gives and drops, over the weeks gain_basis names, one decimal. The waiver level is the best free agent at the position in the league's last read that the Waivers screen lists as a pickup (none on injured reserve, ruled out, suspended or on a season-long list), so a bench player counts for what he scores over the one his side could pick up and start, and a player at or under it counts none; at a position with no such free agent, or where the league's free agents are not read, the last starter league-wide (rest_of_season_basis names which). Unlike my_gain it counts the bench; absent from an older answer"
         their_rest_of_season:
           type: number
           format: double
