@@ -104,6 +104,30 @@ func TestESPNOffers(t *testing.T) {
 	}
 }
 
+// A SWID matches its owner id braced or bare, either way round and in any
+// case; an empty SWID matches nothing.
+func TestOwnsRosterComparesSWIDs(t *testing.T) {
+	bare := "0000000a-0000-4000-8000-00000000000a"
+	braced := "{0000000A-0000-4000-8000-00000000000A}"
+	cases := []struct {
+		name, owner, swid string
+		want              bool
+	}{
+		{"braced cookie, bare owner", bare, braced, true},
+		{"bare cookie, braced owner", braced, bare, true},
+		{"both braced", braced, braced, true},
+		{"another member", "{00000002-0000-4000-8000-000000000002}", braced, false},
+		{"no cookie", bare, "", false},
+		{"empty braces", "{}", "{}", false},
+	}
+	for _, c := range cases {
+		snap := Snapshot{Teams: []Team{{RosterID: 7, OwnerIDs: []string{c.owner}}}}
+		if got := ownsRoster(snap, 7, c.swid); got != c.want {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 // An ESPN team is picked at attach, so a roster the cookies' member does
 // not own in the league's read (another's, or one the read does not name)
 // reads no offers, and the queue is never asked.

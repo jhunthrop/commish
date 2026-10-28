@@ -15,7 +15,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -121,15 +120,16 @@ func (e ESPNOffers) Offers(ctx context.Context, accountID uuid.UUID, ref Ref, ro
 	return out, nil
 }
 
-// ownsRoster reports whether the read names the member (by their host
-// user id) among the roster's owners.
-func ownsRoster(snap Snapshot, roster int, member string) bool {
+// ownsRoster reports whether the read names the member's SWID among the
+// roster's owners, braced or bare, in any case (espn.SameSWID, as the
+// writes compare it).
+func ownsRoster(snap Snapshot, roster int, swid string) bool {
 	team, ok := snap.TeamByRoster(roster)
-	if !ok || strings.TrimSpace(member) == "" {
+	if !ok {
 		return false
 	}
 	for _, owner := range team.OwnerIDs {
-		if strings.EqualFold(owner, member) {
+		if espn.SameSWID(owner, swid) {
 			return true
 		}
 	}
