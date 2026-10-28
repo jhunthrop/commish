@@ -10,7 +10,7 @@
 		"prepare": "wrangler types && svelte-kit sync || echo ''",
 		"check": "wrangler types && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"lint": "prettier --check . && eslint .",
+		"lint": "prettier --check . && eslint . --concurrency=auto",
 		"test": "node --test 'src/**/*.test.ts' 'scripts/**/*.test.ts'",
 		"format": "prettier --write .",
 		"gen": "wrangler types",
