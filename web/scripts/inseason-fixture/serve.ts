@@ -165,7 +165,8 @@ const {
 	noTeam: NO_TEAM,
 	espnDone: ESPN_DONE,
 	espnRefused: ESPN_REFUSED,
-	espnPending: ESPN_PENDING
+	espnPending: ESPN_PENDING,
+	espnSet: ESPN_SET
 } = FIXTURE_IDS;
 /** The leagues the fixture answers as ESPN's, each with what its move comes to. */
 const ESPN_MOVES = new Map<string, 'done' | 'refused' | 'pending'>([
@@ -173,6 +174,33 @@ const ESPN_MOVES = new Map<string, 'done' | 'refused' | 'pending'>([
 	[ESPN_REFUSED, 'refused'],
 	[ESPN_PENDING, 'pending']
 ]);
+/** Whether the fixture answers a league as ESPN's: the three with a move, and the set one (Lane 257),
+ * which stays off the account's switch list (/me) so the apps' shared fixtures keep their leagues. */
+const isEspn = (id: string): boolean => ESPN_MOVES.has(id) || id === ESPN_SET;
+
+/** The fixture_attached cookie (Lane 257): the account's leagues, in its order, by their FIXTURE_IDS
+ * names ("espnDone,league,espnSet"), for the every-league Lineup's shots; without it every league but
+ * the set one, as before. */
+const ATTACHED_ASKED = /(?:^|; )fixture_attached=([^;]+)/;
+function attachedIds(cookie: string | undefined): string[] {
+	const asked = ATTACHED_ASKED.exec(cookie ?? '')?.[1];
+	if (asked === undefined) return Object.values(FIXTURE_IDS).filter((id) => id !== ESPN_SET);
+	if (asked === 'none') return [];
+	return decodeURIComponent(asked)
+		.split(',')
+		.map((name) => {
+			const id = (FIXTURE_IDS as Readonly<Record<string, string>>)[name];
+			if (id === undefined) throw new Error(`No fixture league is named ${name}.`);
+			return id;
+		});
+}
+
+/** The ESPN league whose lineup is already ours: the recorded lineup with every slot kept. */
+const setLineup = (advice: LineupAdvice): LineupAdvice => ({
+	...advice,
+	set: true,
+	slots: advice.slots.map((slot) => ({ ...slot, changed: false }))
+});
 /** The API's own sentences (api/internal/inseason): leaguesync.NoGamesWords and noTeamWords. */
 const NO_GAMES = 'Your league has no games this week.';
 const NO_TEAM_WORDS = "We could not find your team in this league's last read.";
@@ -666,7 +694,7 @@ function standInAsked(req: IncomingMessage, id: string): StandIn | null {
 			const week = sleeperAfter();
 			return { ...yahooStandIn(week), scoreboard: week.scoreboard, readAt: at };
 		}
-		if (ESPN_MOVES.has(id)) return { ...espnAfter(), readAt: at };
+		if (isEspn(id)) return { ...espnAfter(), readAt: at };
 		return id === LEAGUE ? { ...sleeperAfter(), readAt: at } : null;
 	}
 	const live = { scoreboard: scoreboardLive, readAt: SUNDAY };
@@ -675,7 +703,7 @@ function standInAsked(req: IncomingMessage, id: string): StandIn | null {
 			? { ...yahooOnSunday, ...live }
 			: { ...yahooWeek, scoreboard: scoreboardNow(), readAt: readAt() };
 	if (!sunday) return null;
-	if (ESPN_MOVES.has(id)) return { ...espnOnSunday, ...live };
+	if (isEspn(id)) return { ...espnOnSunday, ...live };
 	return id === LEAGUE ? { ...sleeperOnSunday, ...live } : null;
 }
 
@@ -983,11 +1011,11 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			req,
 			res,
 			HTTP.ok,
-			Object.values(FIXTURE_IDS).map((id) => {
+			attachedIds(req.headers.cookie).map((id) => {
 				const league = phased.get(id) ?? { ...contextLeague, name: sync.name };
 				return {
 					id,
-					host: ESPN_MOVES.has(id) ? 'espn' : (platformAsked(req, id) ?? sync.host),
+					host: isEspn(id) ? 'espn' : (platformAsked(req, id) ?? sync.host),
 					host_league_id: sync.host_league_id,
 					season: sync.season,
 					name: league.name,
@@ -1019,7 +1047,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			return;
 		}
 		send(req, res, HTTP.ok, {
-			...phaseSync(ESPN_MOVES.has(asked) ? espnSync(sync) : sync, asked),
+			...phaseSync(isEspn(asked) ? espnSync(sync) : sync, asked),
 			id: synced[1],
 			read_at: readAt()
 		});
@@ -1057,13 +1085,13 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		}
 		const id = leagueWeek?.[1] ?? null;
 		const league =
-			id === null ? null : { espn: ESPN_MOVES.has(id), moves: waivers.moves, readAt: readAt() };
+			id === null ? null : { espn: isEspn(id), moves: waivers.moves, readAt: readAt() };
 		send(req, res, HTTP.ok, weekOrderAnswer(weekOrders, position, league, now()));
 		return;
 	}
 	const leagueRecord = LEAGUE_RECORD.exec(url.pathname);
 	if (leagueRecord) {
-		send(req, res, HTTP.ok, leagueRecordAnswer(ESPN_MOVES.has(leagueRecord[1] ?? '')));
+		send(req, res, HTTP.ok, leagueRecordAnswer(isEspn(leagueRecord[1] ?? '')));
 		return;
 	}
 	if (LEAGUE_ORDER.test(url.pathname)) {
@@ -1103,7 +1131,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			id,
 			runIndex.get(id) ?? null,
 			true,
-			ESPN_MOVES.has(leaguePlayer[1] ?? '')
+			isEspn(leaguePlayer[1] ?? '')
 		);
 		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
 		else send(req, res, HTTP.ok, withRestAtClock(week, id, url.searchParams));
@@ -1140,12 +1168,12 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			return;
 		}
 		const bodies = {
-			lineup: ESPN_MOVES.has(id ?? '') ? espnLineup() : lineup,
-			matchup: ESPN_MOVES.has(id ?? '') ? espnMatchup(matchupBox) : matchupBox,
+			lineup: id === ESPN_SET ? setLineup(espnLineup()) : isEspn(id ?? '') ? espnLineup() : lineup,
+			matchup: isEspn(id ?? '') ? espnMatchup(matchupBox) : matchupBox,
 			// The ESPN leagues show the week on its Sunday afternoon, a stand-in (league.ts): the
 			// points are made up so the board's played states can be drawn.
-			scoreboard: ESPN_MOVES.has(id ?? '') ? scoreboardLive : scoreboardNow(),
-			waivers: ESPN_MOVES.has(id ?? '')
+			scoreboard: isEspn(id ?? '') ? scoreboardLive : scoreboardNow(),
+			waivers: isEspn(id ?? '')
 				? espnWaivers(url.searchParams.get('position'))
 				: platformed(waiversAt(url.searchParams.get('position')), platformNow()),
 			trades: platformed(tradesHolding(url.searchParams.get('player')), platformNow())

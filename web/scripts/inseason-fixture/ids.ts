@@ -15,6 +15,9 @@ export const FIXTURE_IDS = {
 	espnRefused: '6f1d1c52-2626-4a26-9a26-000000000036',
 	/** The ESPN league whose move ESPN took but the read-back did not show. */
 	espnPending: '6f1d1c52-2626-4a26-9a26-000000000037',
+	/** The ESPN league whose lineup is already ours: nothing to change (Lane 257). On the account only
+	 * where a request names it (serve.ts fixture_attached), so every other shot's list is unchanged. */
+	espnSet: '6f1d1c52-2626-4a26-9a26-000000000038',
 	/** Stand-ins of the league in the other season phases (phases.ts): before the draft, on draft
 	 * day, in the playoffs with waivers running and closed, and after the season. */
 	preDraft: '6f1d1c52-2626-4a26-9a26-000000000040',

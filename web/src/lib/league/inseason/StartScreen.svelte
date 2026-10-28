@@ -22,14 +22,8 @@
 	import MovePanel from './MovePanel.svelte';
 	import Screen from './Screen.svelte';
 	import type { HostMoveInput, HostMovePlan, HostMoveResult, LineupAdvice } from './api.ts';
-	import {
-		failedStep,
-		lineupMove,
-		planStep,
-		resultStep,
-		setsOnHost,
-		type MoveStep
-	} from './move.ts';
+	import { lineupMove, setsOnHost } from './move.ts';
+	import { LineupMover } from './lineup-mover.svelte.ts';
 	import { LINES, lineupDecision, lineupTitle } from './words.ts';
 	import { page } from '$app/state';
 	import { markAsked } from '../box/asked.ts';
@@ -58,6 +52,15 @@
 		copy?: (text: string) => Promise<void>;
 		/** The instant the answer was read, in ms: the page's clock the rows and the basis draw at. */
 		now: number;
+		/** The league, where the page names none (the every-league page, Lane 257); else the page's. */
+		league?: string;
+		/** The block this lineup is on a page of many (the every-league page): its ids and its player
+		 * shelf are its own. Left out on the league's own Lineup. */
+		scope?: string;
+		/** The move, where the page drives it too (the every-league page's one verb). */
+		mover?: LineupMover;
+		/** The page's verb confirms the move: the panel shows the move with no verb of its own. */
+		held?: boolean;
 	}
 
 	let {
@@ -67,7 +70,11 @@
 		make,
 		reread,
 		copy = (text) => navigator.clipboard.writeText(text),
-		now
+		now,
+		league,
+		scope,
+		mover: given,
+		held = false
 	}: Props = $props();
 	/** The answer with no change on a row whose game has kicked off or is final (Lane 85): every word,
 	 * the verb and the move read it. */
@@ -79,16 +86,19 @@
 	const box = $derived(lineupBox(advice, memberZone(), now));
 	/** A row's name opens his card over the lineup (Lane 113); its verb closes it onto his row, with his
 	 * swap under it when the advice makes one. */
+	// The block a page of many keys by its league, so its scope is fixed for the screen's life.
+	// svelte-ignore state_referenced_locally
 	const shelf = providePlayerShelf({
 		screen: 'lineup',
+		scope,
 		now: () => now,
-		league: () => ({ id: page.params.id ?? '', host }),
+		league: () => ({ id: league ?? page.params.id ?? '', host }),
 		offer: (row) => {
 			const { boardId } = row;
 			if (boardId === null) return null;
 			const swap = swapOf(box.swaps, row);
 			return backToLineupOffer(
-				() => void markAsked(document, boardId),
+				() => void markAsked(rows ?? document, boardId),
 				swap === null ? null : swapWords(swap)
 			);
 		},
@@ -107,10 +117,14 @@
 		...advice.reserve
 	]);
 
-	const MOVE_ID = 'lineup-move';
-	let step = $state<MoveStep>({ kind: 'closed' });
-	/** The move as it was planned: the one the token makes, whatever the page reads meanwhile. */
-	let planned: HostMoveInput | null = null;
+	/** This lineup's rows: a back-to-his-row from his card marks his row here, not another block's. */
+	let rows = $state<HTMLElement | null>(null);
+	// The page's own mover when it gives one, fixed for the screen's life.
+	// svelte-ignore state_referenced_locally
+	const mover = given ?? new LineupMover({ plan, make, reread });
+	const step = $derived(mover.step);
+	const MOVE_ID = $derived(scope === undefined ? 'lineup-move' : `lineup-move-${scope}`);
+	const at = $derived({ host, href: advice.host_lineup_url });
 	/** What the copy verb said, once pressed. */
 	let copied = $state<CopyLine | null>(null);
 
@@ -124,15 +138,8 @@
 		done !== null ? false : isSet ? advice.moves.lineup === 'available' : !onHost
 	);
 
-	async function open(): Promise<void> {
-		const move = lineupMove(advice);
-		planned = move;
-		step = { kind: 'planning' };
-		try {
-			step = planStep(await plan(move));
-		} catch (error) {
-			step = failedStep(error, host, 'plan', advice.host_lineup_url);
-		}
+	function open(): void {
+		void mover.open(lineupMove(advice), at);
 	}
 
 	async function copyLineup(): Promise<void> {
@@ -143,23 +150,6 @@
 			copied = copiedLine(host, false);
 		}
 	}
-
-	async function confirm(): Promise<void> {
-		if (step.kind !== 'confirm' || planned === null) return;
-		const { plan: ready } = step;
-		step = { kind: 'sending', plan: ready };
-		try {
-			step = resultStep(await make(planned, ready.confirm));
-			reread();
-		} catch (error) {
-			step = failedStep(error, host, 'make', advice.host_lineup_url);
-		}
-	}
-
-	function close(): void {
-		step = { kind: 'closed' };
-		planned = null;
-	}
 </script>
 
 <Screen
@@ -168,7 +158,7 @@
 	{footSays}
 	href={advice.host_lineup_url}
 	basis={null}
-	onverb={onHost ? () => void open() : () => void copyLineup()}
+	onverb={onHost ? open : () => void copyLineup()}
 	controls={onHost ? MOVE_ID : undefined}
 	expanded={onHost ? step.kind !== 'closed' : undefined}
 >
@@ -213,12 +203,21 @@
 				kind="lineup"
 				{step}
 				{host}
-				onconfirm={() => void confirm()}
-				onclose={close}
+				{held}
+				onconfirm={() => void mover.confirm(at)}
+				onclose={() => mover.close()}
 			/>
 		{/if}
 	{/snippet}
-	<LineupTable label={lineupTitle(advice.week)} {box} tagsOf={sheetTags} noBench={LINES.noBench} />
+	<div class="rows" bind:this={rows}>
+		<LineupTable
+			label={lineupTitle(advice.week)}
+			{box}
+			tagsOf={sheetTags}
+			noBench={LINES.noBench}
+			{scope}
+		/>
+	</div>
 	<PlayerShelfLayer host={shelf} />
 	<BoxBasis
 		byPlayer={advice.player_points}
@@ -237,6 +236,11 @@
 </Screen>
 
 <style>
+	/* The rows' own box for the marking only: the table lays out as it would without it. */
+	.rows {
+		display: contents;
+	}
+
 	.verb-line {
 		color: var(--ink-2);
 		font-size: var(--t-sm);

@@ -37,6 +37,9 @@
 		onbid?: (typed: string) => void;
 		/** The claim is planned again for a new bid: its verb waits. */
 		replanning?: boolean;
+		/** The page's one verb confirms this move with others (the every-league page, Lane 257): the
+		 * panel says the move, and while it is sent says so, with no verb of its own. */
+		held?: boolean;
 	}
 
 	let {
@@ -48,7 +51,8 @@
 		onclose,
 		typed = '',
 		onbid,
-		replanning = false
+		replanning = false,
+		held = false
 	}: Props = $props();
 
 	const verb = $derived(verbWords(kind === 'claim' ? 'waivers' : 'start', host));
@@ -83,12 +87,16 @@
 					</label>
 					{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 				{/if}
-				<div class="actions">
-					<Verb onclick={onconfirm} disabled={step.kind === 'sending' || waits}
-						>{step.kind === 'sending' ? settingWords(host, kind) : verb}</Verb
-					>
-					<Quiet onclick={onclose} disabled={step.kind === 'sending'}>{MOVE_LINES.notNow}</Quiet>
-				</div>
+				{#if held}
+					{#if step.kind === 'sending'}<p class="line quiet">{settingWords(host, kind)}</p>{/if}
+				{:else}
+					<div class="actions">
+						<Verb onclick={onconfirm} disabled={step.kind === 'sending' || waits}
+							>{step.kind === 'sending' ? settingWords(host, kind) : verb}</Verb
+						>
+						<Quiet onclick={onclose} disabled={step.kind === 'sending'}>{MOVE_LINES.notNow}</Quiet>
+					</div>
+				{/if}
 			{:else if step.kind === 'answered'}
 				<p class="line">{resultWords(host, step.result)}</p>
 				{#if step.result.outcome === 'refused' && step.result.host_words}

@@ -58,12 +58,25 @@ export function rowBySlug(rows: Iterable<BoxRow>, slug: string): BoxRow | null {
  * ?player=, which already names the player a link asks a league screen for by his board id (asked.ts). */
 export const SHELF_PARAM = 'card';
 
-/** The address with his card open (a slug) or closed (null), everything else kept. */
-export function shelfHref(href: string, slug: string | null): string {
+/** The address field naming the block a card is open in, on a page of many (Lane 257). */
+export const SHELF_SCOPE_PARAM = 'card_in';
+
+/** The address with his card open (a slug, in a block when given) or closed (null), everything else
+ * kept. */
+export function shelfHref(href: string, slug: string | null, scope?: string): string {
 	const url = new URL(href);
+	url.searchParams.delete(SHELF_SCOPE_PARAM);
 	if (slug === null) url.searchParams.delete(SHELF_PARAM);
-	else url.searchParams.set(SHELF_PARAM, slug);
+	else {
+		url.searchParams.set(SHELF_PARAM, slug);
+		if (scope !== undefined) url.searchParams.set(SHELF_SCOPE_PARAM, scope);
+	}
 	return url.href;
+}
+
+/** The block the address opens a card in, null with none named. */
+export function shelfScope(href: string): string | null {
+	return new URL(href).searchParams.get(SHELF_SCOPE_PARAM);
 }
 
 /** The slug whose card the address opens, null with none. */
@@ -109,6 +122,10 @@ export interface ShelfOptions {
 	offer: (row: BoxRow) => ScreenOffer | null;
 	/** His row on the screen by his slug, for a card reopened from the address (a reload). */
 	rowOf?: (slug: string) => BoxRow | null;
+	/** The block the screen is on a page of many (the every-league page's leagues, Lane 257): its card
+	 * opens over its own rows only, the block named in the page's state and in the address beside the
+	 * card. Left out, the page holds one screen. */
+	scope?: string;
 }
 
 /** A navigation's options as the shelf asks for them. */
@@ -124,6 +141,8 @@ export interface ShelfNav {
 	href: () => string;
 	/** The card the page's state holds open, by slug. */
 	card: () => string | undefined;
+	/** The block the page's state holds the card open in, on a page of many (Lane 257). */
+	cardIn?: () => string | undefined;
 	/** To an address: shallow with a state (the screen stays), a full navigation without. */
 	go: (href: string, options: ShelfGo) => void;
 	back: () => void;
@@ -167,7 +186,15 @@ export class ShelfHost implements ShelfOpener {
 
 	/** The slug whose card is open, null with none. */
 	get slug(): string | null {
+		const { scope } = this.options;
+		if (scope !== undefined && this.#nav.cardIn?.() !== scope) return null;
 		return this.#nav.card() ?? null;
+	}
+
+	/** The page's state with his card open, in this screen's block when it has one. */
+	#state(slug: string): App.PageState {
+		const { scope } = this.options;
+		return scope === undefined ? { card: slug } : { card: slug, cardIn: scope };
 	}
 
 	/** The row the card opened from, null when the screen holds none for him. */
@@ -189,7 +216,9 @@ export class ShelfHost implements ShelfOpener {
 		this.#taps.set(slug, { row, note });
 		this.#opener = focusable(event.currentTarget);
 		this.#pushed = true;
-		this.#nav.go(shelfHref(this.#nav.href(), slug), { state: { card: slug } });
+		this.#nav.go(shelfHref(this.#nav.href(), slug, this.options.scope), {
+			state: this.#state(slug)
+		});
 	};
 
 	/** Back to the screen: the history entry the open pushed, or the address without the card; the
@@ -215,8 +244,10 @@ export class ShelfHost implements ShelfOpener {
 	restore(): void {
 		const href = this.#nav.href();
 		const slug = shelfSlug(href);
+		const { scope } = this.options;
+		if (scope !== undefined && shelfScope(href) !== scope) return;
 		if (slug !== null && this.slug === null)
-			this.#nav.go(href, { state: { card: slug }, replace: true });
+			this.#nav.go(href, { state: this.#state(slug), replace: true });
 	}
 
 	/** The focus on what the verb opened, else back on the name that opened the card while it is
