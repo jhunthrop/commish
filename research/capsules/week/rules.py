@@ -277,6 +277,12 @@ _LEAVE_IT_OUT: Final = (
 )
 
 
+def names_the_projection(text: str) -> bool:
+    """Whether a read names the published projection or calls a weekly number ours (H4's words, on the text
+    alone): the cadence's check for a read written under the rule before Lane 275 (`cadence.RULE_STALE`)."""
+    return any(_NAMES_PROJECTION.search(s) or _OURS.search(s) for s in split_sentences(text.strip()))
+
+
 def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
     """H4 (Lane 275): no sentence names the published projection or states its figures; none calls a weekly
     number ours."""

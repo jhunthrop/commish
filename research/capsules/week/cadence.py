@@ -7,7 +7,12 @@ rewrite only the reads whose week moved.
   sentence): `UNWRITTEN`, nightly, and at most once an hour and three times a Central day (`RETRY_GAP`,
   `RETRIES_A_DAY`), so a read that keeps failing never spends a day's budget. Within the roll-over pass a
   fallen read is asked again at once (`nightly.week_reads.ROLLOVER_ROUNDS`).
-- His status changed since it was written (Lane 63's capture marks it): `STATUS_CHANGED`, nightly and hourly.
+- His status changed since it was written (Lane 63's capture marks it): `STATUS_CHANGED`, nightly and hourly,
+  at most three attempts a Central day (`RETRIES_A_DAY`): a rewrite that falls keeps the written read (Lane 275
+  fix round 1, `nightly.week_reads`), so its status still differs and the cap is what stops it asking every hour.
+- The written read breaks a rule the writer holds reads to now (`RULE_STALE`, Lane 275 fix round 1: a read
+  written while the rules asked for the published projection names it, `rules.names_the_projection`), nightly
+  only and at most once a Central day, after every other reason; a rewrite that falls keeps the old read shown.
 
 The read stands through a move of the published projection (Lane 275, the founder 2026-10-28: "it's normal for
 the projection to change on fantasy sites without the read changing"). The read never states the projection
@@ -24,6 +29,7 @@ from datetime import date, datetime, timedelta
 from typing import Final
 
 from research.capsules.store import WRITTEN_SOURCE
+from research.capsules.week.rules import names_the_projection
 from research.capsules.week.sheet import CENTRAL, WeekSheet
 from research.capsules.week.store import StoredWeekRead
 
@@ -32,6 +38,9 @@ RETRIES_A_DAY: Final = 3
 FIRST: Final = "first"
 UNWRITTEN: Final = "unwritten"
 STATUS_CHANGED: Final = "status"
+RULE_STALE: Final = "rule"
+# The order a nightly writes its due reads in, so a budget stop leaves the rule-stale rewrites for the next night.
+PRIORITY: Final = (FIRST, UNWRITTEN, STATUS_CHANGED, RULE_STALE)
 # What an hourly pass writes: only the reads whose status moved (the coordinator's M3).
 HOURLY_REASONS: Final = frozenset({STATUS_CHANGED})
 
@@ -49,14 +58,23 @@ def _retry_allowed(stored: StoredWeekRead, now: datetime) -> bool:
     return stored.written_at <= now - RETRY_GAP and attempts_today(stored, now) < RETRIES_A_DAY
 
 
+def _rule_stale(stored: StoredWeekRead, now: datetime) -> bool:
+    """A written read the current rules refuse, not yet attempted on `now`'s Central day. The check is the rule
+    that changed (H4), on the stored body alone: the full validator would read today's sheet, whose forecast
+    and status have moved since the write, and refuse reads that were right when written."""
+    return stored.source == WRITTEN_SOURCE and attempts_today(stored, now) == 0 and names_the_projection(stored.body)
+
+
 def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None, now: datetime, *, hourly: bool = False) -> str | None:
     """Why `sheet`'s read is written at `now`, or None when the stored read for his week stands."""
     if stored is None or stored.season != sheet.season or stored.week != sheet.week:
         reason: str | None = FIRST
     elif stored.status != sheet.status.status:
-        reason = STATUS_CHANGED
+        reason = STATUS_CHANGED if attempts_today(stored, now) < RETRIES_A_DAY else None
     elif stored.source != WRITTEN_SOURCE and _retry_allowed(stored, now):
         reason = UNWRITTEN
+    elif _rule_stale(stored, now):
+        reason = RULE_STALE
     else:
         reason = None
     return reason if not hourly or reason in HOURLY_REASONS else None

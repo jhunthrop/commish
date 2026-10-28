@@ -18,6 +18,8 @@ from research.capsules.run_budget import BudgetSpentError
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.week.cadence import (
     FIRST,
+    PRIORITY,
+    RULE_STALE,
     STATUS_CHANGED,
     UNWRITTEN,
     due_reason,
@@ -34,6 +36,7 @@ from research.capsules.week.sheet import Status
 from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
 from research.capsules.week.write import MAX_ASKS_PER_READ, MAX_CALLS_PER_READ, OVER_CAP_FALL, write_week_read
+from research.db.schema.boards import WEEK_READ_REASONS
 from research.nightly.week_read_demotion import shared_week_sentences, stored_facts_block, week_demotions
 from research.nightly.week_reads import (
     HOURLY_BUDGET_USD,
@@ -357,6 +360,40 @@ def test_the_hourly_pass_writes_only_a_status_that_moved() -> None:
     assert due_reason(replace(sheet, status=Status("out", REPORT)), _stored(), _NOW, hourly=True) == STATUS_CHANGED
     assert due_reason(sheet, _stored(projection_points=13.0), _NOW, hourly=True) is None
     assert due_reason(sheet, _stored(projection_points=15.8), _NOW, hourly=True) is None
+
+
+_STALE_BODY = "The published projection has him at 15.2 points. Hold him until Sunday."
+
+
+def test_a_written_read_the_rules_now_refuse_is_due_once_a_day_at_the_nightly() -> None:
+    """Lane 275 fix round 1: a read written while the rules asked it to name the published projection is
+    rewritten at the nightly, never hourly, and at most once a Central day (its attempt today stops it)."""
+    sheet, tomorrow = questionable(), _NOW + timedelta(days=1)
+    assert due_reason(sheet, _stored(body=_STALE_BODY), tomorrow) == RULE_STALE
+    assert due_reason(sheet, _stored(body="Our projection likes him. Hold him."), tomorrow) == RULE_STALE
+    assert due_reason(sheet, _stored(body=_STALE_BODY), tomorrow, hourly=True) is None
+    assert due_reason(sheet, _stored(body=_STALE_BODY), _NOW) is None  # attempted today already
+    assert due_reason(sheet, _stored(), tomorrow) is None
+    # His rest-of-season order is ours, never the week's published projection.
+    assert due_reason(sheet, _stored(body="He is RB4 in our rest-of-season order. Hold him."), tomorrow) is None
+    # A changed status comes first, and a facts block is the unwritten retry's.
+    moved = replace(sheet, status=Status("out", REPORT))
+    assert due_reason(moved, _stored(body=_STALE_BODY), tomorrow) == STATUS_CHANGED
+    assert due_reason(sheet, _stored(body=_STALE_BODY, source="facts"), tomorrow) == UNWRITTEN
+
+
+def test_a_status_rewrite_is_asked_at_most_three_times_a_day() -> None:
+    """A fallen status rewrite keeps the written read, whose status still differs: the day's attempts stop it."""
+    moved, today = replace(questionable(), status=Status("out", REPORT)), date(2026, 10, 16)
+    assert due_reason(moved, _stored(attempt_day=today, attempts=2), _NOW, hourly=True) == STATUS_CHANGED
+    assert due_reason(moved, _stored(attempt_day=today, attempts=3), _NOW, hourly=True) is None
+    assert due_reason(moved, _stored(attempt_day=today, attempts=3), _NOW + timedelta(days=1)) == STATUS_CHANGED
+
+
+def test_the_nightly_writes_its_due_reads_in_the_cadences_priority() -> None:
+    """A budget stop leaves the rule-stale rewrites, last in `PRIORITY`, for the next night."""
+    assert PRIORITY.index(RULE_STALE) == len(PRIORITY) - 1
+    assert set(PRIORITY) <= set(WEEK_READ_REASONS)
 
 
 def test_a_sentence_shape_on_two_pages_keeps_its_first_carrier_in_board_order() -> None:

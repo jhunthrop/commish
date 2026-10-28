@@ -20,7 +20,7 @@ from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.run_budget import RunBudget
-from research.capsules.week.cadence import FIRST, STATUS_CHANGED
+from research.capsules.week.cadence import FIRST, RULE_STALE, STATUS_CHANGED
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.store import (
     StoredWeekRead,
@@ -239,3 +239,49 @@ def test_a_refused_capture_leaves_the_page_and_the_web_on_the_same_status(engine
     web = designations_file(read, full)["players"]
     assert {pid: status_word(read, pid) for pid in full} == {pid: web[pid]["status"] for pid in full}
     assert status_word(read, "4426515") == "questionable"
+
+
+def test_a_status_rewrite_that_falls_keeps_the_written_read_and_counts_the_attempt(engine: Engine) -> None:
+    """Lane 275 fix round 1 (the founder: "we should always show a read"): a status change's rewrite that falls
+    to its facts block keeps the written row's body, call and status, so the page keeps it under the status
+    caption; the attempt is counted for the cadence's daily limit and the step line says held."""
+    pid = starter().player_id
+    written = replace(_row(pid, 6, "The read written before his status changed."), status="questionable", call="hold")
+    with engine.begin() as conn:
+        upsert_week_read(conn, written)
+    off_page = STARTER_READ.replace("25.9 PPR points", "25.6 PPR points")
+    spend = WeekReadSpend()
+    gateway = _gateway(lambda _request: _completion(off_page, "start"))
+    _write(engine, gateway, {(pid, 6): written}, [(starter(), STATUS_CHANGED)], room=lambda: True, spend=spend)
+    with engine.connect() as conn:
+        kept = stored_week_reads(conn, 2026, [6])[(pid, 6)]
+    assert (kept.source, kept.body, kept.call, kept.status) == ("llm", written.body, "hold", "questionable")
+    assert (kept.written_at, kept.reason) == (written.written_at, written.reason)
+    assert (kept.attempt_day, kept.attempts) == (date(2026, 10, 16), written.attempts + 1)
+    assert (spend.held, spend.facts_blocks, spend.written) == (1, 1, 0)
+    assert "1 facts blocks (1 held over the written read)" in spend.line()
+
+
+def test_a_first_read_that_falls_still_stores_its_facts_block(engine: Engine) -> None:
+    """With nothing written to keep, a fallen first read stores its facts block, as before."""
+    off_page = STARTER_READ.replace("25.9 PPR points", "25.6 PPR points")
+    spend = WeekReadSpend()
+    gateway = _gateway(lambda _request: _completion(off_page, "start"))
+    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend)
+    with engine.connect() as conn:
+        stored = stored_week_reads(conn, 2026, [6])[(starter().player_id, 6)]
+    assert stored.source == FACTS_SOURCE and spend.held == 0
+
+
+def test_a_rule_stale_rewrite_lands_with_its_reason(engine: Engine) -> None:
+    """Revision 0024: the table takes the cadence's `rule` reason."""
+    pid = starter().player_id
+    stale = _row(pid, 6, "The published projection has him at 18.4 points. Start him.")
+    with engine.begin() as conn:
+        upsert_week_read(conn, stale)
+    spend = WeekReadSpend()
+    gateway = _gateway(lambda _request: _completion(STARTER_READ, "start"))
+    _write(engine, gateway, {(pid, 6): stale}, [(starter(), RULE_STALE)], room=lambda: True, spend=spend)
+    with engine.connect() as conn:
+        landed = stored_week_reads(conn, 2026, [6])[(pid, 6)]
+    assert (landed.body, landed.reason) == (STARTER_READ, RULE_STALE)
