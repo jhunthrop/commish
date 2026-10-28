@@ -19,6 +19,8 @@
 	let { position, positionRank, status }: Props = $props();
 </script>
 
+<!-- The trade rows' tight cell (BoxPlayer tight, Lane 268) draws this pill's rank rule itself, beside
+     its short chip: a change to the rule here is made there too. -->
 <PositionPill
 	{position}
 	rank={positionRank === undefined ? (status?.rank ?? undefined) : pillRank(status, positionRank)}

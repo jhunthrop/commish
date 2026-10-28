@@ -1,9 +1,11 @@
-// Screenshots of the Trades screen as one experience (Lane 260, after Lane 103) at 1280 and 390 in
-// both themes, on the fixture API's clock: the screen as it opens, a trade the member builds by tick
-// (his own RB2 for the other team's WR1), the verdict held in sight at a desk, and one of our ideas
-// loaded. Each asserts what it shows:
-//   our ideas are drawn above the rosters, the first marked Best and its gains in a player's words
-//   ("+5.7 a week for your lineup, +0.7 for theirs"); the team picker opens on the team the first idea
+// Screenshots of the Trades screen as one experience (Lane 260, after Lane 103; dense since Lane 268)
+// at 1280 and 390 in both themes, on the fixture API's clock: the screen as it opens (and its window at
+// 1280 by 800 and 390 by 844, with the member's rows in sight counted: ten and seven at least), a trade
+// the member builds by tick (his own RB2 for the other team's WR1), the verdict held in sight at a
+// desk, and one of our ideas loaded. Each asserts what it shows:
+//   no decision line; our ideas by team drawn above the rosters, the best three and the rest behind
+//   "N more", the first marked Best and its gains in its one line ("+5.7 yours, +0.7 theirs"); the
+//   team picker at the head of their roster opens on the team the first idea
 //   names, nothing ticked; a tick on each side reads the verdict with no submit: each side's figures and
 //   a bar, the answer line naming the lineups' change; the taps from the page to that verdict are
 //   counted; a preset's one tap ticks its players and is pressed; Share copies the trade in our words;
@@ -28,7 +30,17 @@ const ZONE = 'America/Chicago';
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const OWN_WORDS = /\bover repl\b|\b(price|market|buy|sell|grade)\b/i;
-const IDEA_GAINS = /^[+−]\d+\.\d a week for your lineup, [+−]\d+\.\d for theirs$/;
+const IDEA_GAINS = /^[+−]\d+\.\d yours, [+−]\d+\.\d theirs$/;
+/** The ideas row's label, which names them as this league's teams (Lane 268). */
+const IDEAS_LABEL = 'Our ideas, by team';
+/** The best ideas the row shows before its "N more" (Lane 268). */
+const IDEAS_SHOWN = 3;
+/** The windows the rows are counted in (Lane 268): a desk at 1280 by 800, a phone at 390 by 844, and
+ * the fewest whole rows of the member's roster each must show above the verdict as the screen opens. */
+const ROW_WINDOWS = {
+	1280: { height: 800, rows: 10 },
+	390: { height: 844, rows: 7 }
+} as const;
 const VERDICT = /^(Your lineup|Both lineups|Neither lineup|Your roster|Their roster)/;
 const KEEP_RULE = 'A player we rank first at his position goes only for';
 /** At this width and under, the rosters stack and the switch draws one at a time (TradeBuilder). */
@@ -132,6 +144,89 @@ async function waitLive(page: Page): Promise<void> {
 	);
 }
 
+/** A side's roster rows wholly in sight as the screen opens: under the bar, over the verdict held at
+ * the window's foot (or, where the rosters stack, the pinned gains); with the side's whole roster. */
+async function rowsInSight(page: Page, mine: boolean): Promise<{ seen: number; roster: number }> {
+	return page.evaluate(
+		(box) => {
+			const held = [...document.querySelectorAll<HTMLElement>('main .verdict, main .pin')]
+				.filter((el) => el.offsetParent !== null && getComputedStyle(el).position === 'sticky')
+				.map((el) => el.getBoundingClientRect().top);
+			const floor = Math.min(innerHeight, ...held);
+			const top = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0;
+			const rows = [...document.querySelectorAll(`main ${box} tbody tr`)].map((row) =>
+				row.getBoundingClientRect()
+			);
+			return {
+				seen: rows.filter((r) => r.height > 0 && r.top >= top - 1 && r.bottom <= floor + 1).length,
+				roster: rows.length
+			};
+		},
+		mine ? 'table.box.mine' : 'table.box:not(.mine)'
+	);
+}
+
+/** The Lineup's row height, which every roster row keeps at a desk (Lane 268). */
+const ROW_HEIGHT = 52;
+
+/** Text the screen cuts (Lane 268 fix round 1, the box-score rule): an idea card or anything in it, a
+ * status chip, a verdict's team name, any drawn element whose words run past its box. */
+async function cutText(page: Page): Promise<string[]> {
+	return page.evaluate(() =>
+		[
+			...document.querySelectorAll<HTMLElement>(
+				'main .idea, main .idea *, main .status-chip, main .bug .name'
+			)
+		]
+			.filter((el) => el.offsetParent !== null && el.scrollWidth > el.clientWidth + 1)
+			.map((el) => el.innerText.trim())
+	);
+}
+
+/** The status chip's one line (Lane 268 fix round 2): a chip taller than this wrapped inside itself. */
+const CHIP_HEIGHT = 20;
+/** A phone's tallest roster row: his name, then his club, pill, short status and game, the game on a
+ * third short line where the second has no room for it. */
+const PHONE_ROW_MAX = 68;
+
+/** The status chips drawn taller than one line. */
+async function wrappedChips(page: Page): Promise<string[]> {
+	return page.evaluate(
+		(height) =>
+			[...document.querySelectorAll<HTMLElement>('main table.box .status-chip')]
+				.filter((el) => el.offsetParent !== null)
+				.filter((el) => Math.round(el.getBoundingClientRect().height) > height)
+				.map((el) => el.innerText.trim()),
+		CHIP_HEIGHT
+	);
+}
+
+/** The phone's roster rows taller than PHONE_ROW_MAX. */
+async function tallPhoneRows(page: Page): Promise<string[]> {
+	return page.evaluate(
+		(max) =>
+			[...document.querySelectorAll<HTMLElement>('main table.box tbody tr')]
+				.filter((row) => row.offsetParent !== null)
+				.filter((row) => Math.round(row.getBoundingClientRect().height) > max)
+				.map((row) => String(Math.round(row.getBoundingClientRect().height))),
+		PHONE_ROW_MAX
+	);
+}
+
+/** The roster rows at a desk whose height is not the Lineup's. */
+async function offHeightRows(page: Page): Promise<string[]> {
+	return page.evaluate(
+		(height) =>
+			[...document.querySelectorAll<HTMLElement>('main table.box tbody tr')]
+				.filter((row) => Math.round(row.getBoundingClientRect().height) !== height)
+				.map(
+					(row) =>
+						`${row.querySelector('td.player')?.textContent.trim().split('\n')[0] ?? ''} ${String(Math.round(row.getBoundingClientRect().height))}px`
+				),
+		ROW_HEIGHT
+	);
+}
+
 /** The whole page at its height, so the verdict sits in its place rather than over the rows. */
 async function shoot(page: Page, name: string, width: number): Promise<void> {
 	const height = await page.evaluate(() => document.documentElement.scrollHeight);
@@ -143,6 +238,7 @@ async function shoot(page: Page, name: string, width: number): Promise<void> {
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 const taps: string[] = [];
+const counts: string[] = [];
 for (const theme of THEMES) {
 	for (const width of WIDTHS) {
 		const where = `${theme} ${String(width)}`;
@@ -170,9 +266,93 @@ for (const theme of THEMES) {
 		await page.evaluate(() => document.fonts.ready);
 		await page.waitForLoadState('networkidle');
 
-		// As it opens: our ideas, the first's team chosen, nothing ticked.
+		// As it opens, the rosters take the window: the member's rows counted over the verdict (Lane 268).
+		const window = ROW_WINDOWS[width];
+		await page.setViewportSize({ width, height: window.height });
+		const yours = await rowsInSight(page, true);
+		counts.push(
+			`${where}: ${String(yours.seen)} of your ${String(yours.roster)} rows in sight at ${String(width)} by ${String(window.height)}`
+		);
+		check(
+			yours.seen >= window.rows,
+			`${where}: ${String(yours.seen)} rows in sight, want ${String(window.rows)}`
+		);
+		// The other side's rows at a desk, where both rosters show: as many as the first side's floor, or
+		// its whole roster when it has fewer.
+		if (width > STACKS_AT) {
+			const theirs = await rowsInSight(page, false);
+			counts.push(
+				`${where}: ${String(theirs.seen)} of their ${String(theirs.roster)} rows in sight`
+			);
+			check(
+				theirs.seen >= Math.min(window.rows, theirs.roster),
+				`${where}: ${String(theirs.seen)} of their ${String(theirs.roster)} rows in sight`
+			);
+			const off = await offHeightRows(page);
+			check(off.length === 0, `${where}: rows off ${String(ROW_HEIGHT)}px: ${off.join(', ')}`);
+		}
+		const cut = await cutText(page);
+		check(cut.length === 0, `${where}: cut text ${cut.join(' | ')}`);
+		const wrapped = await wrappedChips(page);
+		check(wrapped.length === 0, `${where}: chips on more than one line ${wrapped.join(' | ')}`);
+		if (width <= STACKS_AT) {
+			const tall = await tallPhoneRows(page);
+			check(
+				tall.length === 0,
+				`${where}: rows over ${String(PHONE_ROW_MAX)}px: ${tall.join(', ')}`
+			);
+		}
+		await page.screenshot({
+			path: new URL(`trades-${theme}-${String(width)}-open-window.png`, out).pathname
+		});
+		await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+
+		// As it opens: our ideas by team, the best three and the rest behind "N more", the first's team
+		// chosen, nothing ticked; no decision line over the screen (the Best idea is our best trade).
+		check(
+			(await page.getByText(IDEAS_LABEL, { exact: true }).count()) === 1,
+			`${where}: the ideas row is not labelled ${IDEAS_LABEL}`
+		);
+		check(
+			(await page.locator('main [role="status"] .line, main .decision').count()) === 0,
+			`${where}: a decision line over the screen`
+		);
+		const first = await seen(page);
+		check(
+			first.ideas.length === IDEAS_SHOWN,
+			`${where}: ${String(first.ideas.length)} ideas shown`
+		);
+		const more = (await page.locator('main .ideas .more').innerText()).trim();
+		check(/^\d+ more$/.test(more), `${where}: the ideas row's more says "${more}"`);
+		check(
+			(await page.locator('main .ideas .more').getAttribute('aria-expanded')) === 'false',
+			`${where}: N more carries no aria-expanded`
+		);
+		// By keyboard: Enter shows the rest in place and hands the focus to the first idea it adds.
+		await page.locator('main .ideas .more').focus();
+		await page.keyboard.press('Enter');
+		const focused = await page.evaluate(() => {
+			const el = document.activeElement;
+			const all = [...document.querySelectorAll('main .idea')];
+			return el === null ? -1 : all.indexOf(el);
+		});
+		check(focused === IDEAS_SHOWN, `${where}: N more left the focus on idea ${String(focused)}`);
+		// The Best card stays first and in sight once every idea shows (a phone's row wraps under it).
+		const bestInSight = await page.evaluate(() => {
+			const best = document.querySelector('main .idea')?.getBoundingClientRect();
+			return best !== undefined && best.left >= 0 && best.right <= innerWidth;
+		});
+		check(bestInSight, `${where}: the Best card is off the row once every idea shows`);
+		const shownCut = await cutText(page);
+		check(
+			shownCut.length === 0,
+			`${where}: cut text once every idea shows ${shownCut.join(' | ')}`
+		);
 		const open = await seen(page);
-		check(open.ideas.length > 1, `${where}: ${String(open.ideas.length)} ideas`);
+		check(
+			open.ideas.length === IDEAS_SHOWN + Number(more.split(' ')[0]),
+			`${where}: ${String(open.ideas.length)} ideas after ${more}`
+		);
 		check(open.ideas[0]?.mark.toLowerCase() === STRIP.best.toLowerCase(), `${where}: no Best`);
 		check(
 			open.ideas.every((i) => IDEA_GAINS.test(i.gains)),
@@ -194,6 +374,8 @@ for (const theme of THEMES) {
 		const tapCount = stacked ? 3 : 2;
 		await verdict(page);
 		const built = await seen(page);
+		const builtCut = await cutText(page);
+		check(builtCut.length === 0, `${where}: cut text in the verdict ${builtCut.join(' | ')}`);
 		check(built.ticked === 2, `${where}: ${String(built.ticked)} ticked after two ticks`);
 		check(built.bars.length === 2, `${where}: ${String(built.bars.length)} bars`);
 		taps.push(
@@ -216,7 +398,11 @@ for (const theme of THEMES) {
 
 		// Share copies the trade in our words.
 		await page.getByRole('button', { name: ANALYZER_LINES.share }).click();
-		await page.getByText(ANALYZER_LINES.shared).waitFor({ timeout: READY_TIMEOUT_MS });
+		await page
+			.getByText(ANALYZER_LINES.shared)
+			.filter({ visible: true })
+			.first()
+			.waitFor({ timeout: READY_TIMEOUT_MS });
 		const copied = await page.evaluate(() => navigator.clipboard.readText());
 		check(copied.startsWith('Trade with '), `${where}: shared "${copied}"`);
 
@@ -247,7 +433,7 @@ for (const theme of THEMES) {
 	}
 }
 await browser.close();
-process.stdout.write(`${taps.join('\n')}\n`);
+process.stdout.write(`${counts.join('\n')}\n${taps.join('\n')}\n`);
 if (failures.length > 0) {
 	process.stderr.write(`${failures.join('\n')}\n`);
 	process.exit(1);

@@ -8,6 +8,7 @@ import {
 	ANALYZER_LINES,
 	BAR_FLOOR,
 	BUILDER_LINES,
+	IDEAS_SHOWN,
 	MAX_A_SIDE,
 	builtFrom,
 	checkInput,
@@ -15,6 +16,7 @@ import {
 	countWords,
 	fillsBoth,
 	gainBars,
+	moreWords,
 	openingPicks,
 	pickPrompt,
 	pickable,
@@ -301,13 +303,8 @@ void test('our ideas are the best trade with each team, best first, each loading
 	assert.deepEqual(
 		presets.map((p) => [p.team.name, p.deal, p.gains, p.mark]),
 		[
-			[
-				'Bower Rangers',
-				'Love for Tucker and Lloyd',
-				'+2.7 a week for your lineup, +0.6 for theirs',
-				'Best'
-			],
-			['Muttdogs', 'Williams for Collins', '+1.8 a week for your lineup, +0.5 for theirs', null]
+			['Bower Rangers', 'Love for Tucker and Lloyd', '+2.7 yours, +0.6 theirs', 'Best'],
+			['Muttdogs', 'Williams for Collins', '+1.8 yours, +0.5 theirs', null]
 		]
 	);
 	assert.deepEqual(presets[0]?.picks, {
@@ -320,6 +317,12 @@ void test('our ideas are the best trade with each team, best first, each loading
 	// A trade holding a player the host names no id for cannot be ticked: no preset.
 	const unnamed = team(5, 'Nameless', [row({ get: [line('X', 'WR', { host_id: '' })] })]);
 	assert.deepEqual(presetsFrom([unnamed]), []);
+});
+
+void test("the ideas row names its cards as this league's teams, the best three and the rest behind N more", () => {
+	assert.equal(ANALYZER_LINES.ideas, 'Our ideas, by team');
+	assert.equal(IDEAS_SHOWN, 3);
+	assert.equal(moreWords(8), '8 more');
 });
 
 void test('the screen opens on the team our best idea names with nothing ticked, or no team', () => {

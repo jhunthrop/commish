@@ -3,9 +3,11 @@
 	import TeamAvatar from './TeamAvatar.svelte';
 	import { TRADES, type BugFigures } from './trades.ts';
 
-	/** The trade builder's scoreboard (Lane 66g), lit like the Matchup's bug: each side's this-week
-	 * Proj and rest-of-season strength before and after the trade with the change, a bar of its gain
-	 * against the other side's (Lane 260), and its room; the verb between them. */
+	/** The trade builder's verdict (Lane 66g; box-score rows since Lane 268): one row per side, its
+	 * name in body weight, then this week's Proj and the rest-of-season gain a week, each before to
+	 * after with the change, a bar of its gain against the other side's (Lane 260), and its room; the
+	 * verb beside the rows. Each row has room for one more cell after Room (the value cell Lane 269's
+	 * answer brings): a head and a cell, the table's auto columns take it. */
 	interface Side {
 		name: string;
 		figures: BugFigures;
@@ -17,166 +19,190 @@
 	interface Props {
 		yours: Side;
 		theirs: Side;
-		/** The verb and its line, between the sides. */
+		/** The verb and its line, beside the rows. */
 		verb: Snippet;
 		/** The head over each side's gain, Gain a week (TRADES.gainHead). */
 		gainHead: string;
+		/** The head over the sides' names, for a screen reader: "Team". */
+		teamHead: string;
 	}
 
-	let { yours, theirs, verb, gainHead }: Props = $props();
+	let { yours, theirs, verb, gainHead, teamHead }: Props = $props();
 </script>
 
-{#snippet half(side: Side, mine: boolean)}
-	<div class="half" class:mine>
-		<span class="who"
-			><TeamAvatar name={side.name} size={26} me={mine} board /><span
-				><small>{mine ? TRADES.yourSide : TRADES.theirSide}</small><b>{side.name}</b></span
-			></span
+{#snippet row(side: Side, mine: boolean)}
+	<tr class:mine>
+		<th scope="row" class="who"
+			><span class="who-in"
+				><TeamAvatar name={side.name} size={20} me={mine} /><small
+					>{mine ? TRADES.yourSide : TRADES.theirSide}</small
+				><span class="name">{side.name}</span></span
+			></th
 		>
-		<span class="fig"
-			><small>{TRADES.weekHead}</small><span
+		<td class="fig"
+			><span class="figs"
 				><i>{side.figures.projBefore}</i><span class="to">{TRADES.to}</span><b
 					>{side.figures.projAfter}</b
 				><em class={side.figures.projTone}>{side.figures.projChange}</em></span
-			></span
+			></td
 		>
-		<span class="fig"
-			><small>{gainHead}</small><span
+		<td class="fig"
+			><span class="figs"
 				><i>{side.figures.seasonBefore}</i><span class="to">{TRADES.to}</span><b
 					>{side.figures.seasonAfter}</b
-				><em class={side.figures.seasonTone}>{side.figures.seasonChange}</em></span
-			></span
+				><em class={side.figures.seasonTone}>{side.figures.seasonChange}</em><span
+					class="bar {side.figures.seasonTone}"
+					aria-hidden="true"><span style:width="{String(Math.round(side.bar * 100))}%"></span></span
+				></span
+			></td
 		>
-		<span class="room"><small>{TRADES.room}</small><span>{side.room}</span></span>
-		<span class="bar {side.figures.seasonTone}" aria-hidden="true"
-			><span style:width="{String(Math.round(side.bar * 100))}%"></span></span
-		>
-	</div>
+		<td class="room">{side.room}</td>
+	</tr>
 {/snippet}
 
 <div class="bug">
-	{@render half(yours, true)}
+	<table>
+		<thead>
+			<tr>
+				<th scope="col"><span class="vh">{teamHead}</span></th>
+				<th scope="col">{TRADES.weekHead}</th>
+				<th scope="col">{gainHead}</th>
+				<th scope="col" class="room">{TRADES.room}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{@render row(yours, true)}
+			{@render row(theirs, false)}
+		</tbody>
+	</table>
 	<div class="mid">{@render verb()}</div>
-	{@render half(theirs, false)}
 </div>
 
 <style>
 	.bug {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-		border-radius: var(--r-md);
-		overflow: hidden;
-		background: var(--scoreboard);
-		color: var(--scoreboard-ink);
-	}
-
-	.half {
-		display: grid;
-		grid-template-columns: auto auto minmax(0, 1fr);
-		align-items: end;
-		gap: var(--s-2) var(--s-5);
-		padding: var(--s-3) var(--s-4);
+		display: flex;
+		align-items: center;
+		gap: var(--s-4);
 		min-width: 0;
 	}
 
-	.half:not(.mine) {
-		border-left: 1px solid var(--scoreboard-line);
+	table {
+		flex: 1;
+		min-width: 0;
+		border-collapse: collapse;
+		font-variant-numeric: tabular-nums;
+	}
+
+	th,
+	td {
+		padding: 0 var(--s-3) 0 0;
+		text-align: left;
+		white-space: nowrap;
+	}
+
+	thead th {
+		height: 14px;
+		line-height: 14px;
+		font-size: var(--t-xs);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--ink-3);
+	}
+
+	tbody tr {
+		height: 24px;
+	}
+
+	tbody tr + tr {
+		border-top: 1px solid var(--line);
 	}
 
 	.who {
-		grid-column: 1 / -1;
+		width: 1%;
+		max-width: 22rem;
+		font-weight: 500;
+	}
+
+	.who-in {
 		display: flex;
 		align-items: center;
 		gap: var(--s-2);
 		min-width: 0;
 	}
 
-	.who > span {
-		display: flex;
-		flex-direction: column;
-		min-width: 0;
-	}
-
-	.who b {
-		font-weight: 700;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
 	small {
+		flex: none;
+		width: 2.6em;
 		font-size: var(--t-xs);
-		font-weight: 600;
+		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: var(--track-label);
-		color: var(--scoreboard-ink-2);
-		white-space: nowrap;
+		color: var(--ink-3);
 	}
 
-	.fig,
-	.room {
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
+	.mine small {
+		color: var(--accent-text);
 	}
 
-	.fig > span {
-		display: flex;
+	.name {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-size: var(--t-sm);
+	}
+
+	.figs {
+		display: inline-flex;
 		align-items: baseline;
 		gap: 6px;
 		font-family: var(--font-num);
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
 	}
 
 	i {
 		font-style: normal;
-		font-size: var(--t-lg);
+		font-size: var(--t-md);
 		font-weight: 600;
-		color: var(--scoreboard-ink-2);
+		color: var(--ink-3);
 	}
 
 	.to {
 		font-family: var(--font-ui);
 		font-size: var(--t-xs);
-		color: var(--scoreboard-ink-2);
+		color: var(--ink-3);
 	}
 
 	b {
-		font-size: var(--t-xl);
-		font-weight: 800;
-	}
-
-	.mine .fig b {
-		color: var(--scoreboard-num);
+		font-size: var(--t-md);
+		font-weight: 700;
 	}
 
 	em {
 		font-style: normal;
-		font-size: var(--t-md);
+		font-size: var(--t-sm);
 		font-weight: 700;
 		padding: 0 5px;
 		border-radius: var(--r-sm);
-		color: var(--scoreboard-ink-2);
+		color: var(--ink-2);
 	}
 
-	/* The board's own gain and loss washes, the same in both themes. */
 	em.gain {
-		background: var(--scoreboard-gain-bg);
-		color: var(--scoreboard-gain-ink);
+		background: var(--gain-bg);
+		color: var(--gain-ink);
 	}
 
 	em.loss {
-		background: var(--scoreboard-loss-bg);
-		color: var(--scoreboard-loss-ink);
+		background: var(--loss-bg);
+		color: var(--loss-ink);
 	}
 
-	/* Each side's gain as a bar, the longer side full, in the board's gain and loss inks. */
+	/* Each side's gain as a short bar, the longer side full, in the gain and loss inks. */
 	.bar {
-		grid-column: 1 / -1;
+		align-self: center;
+		width: 56px;
 		height: 6px;
 		border-radius: 3px;
-		background: var(--scoreboard-line);
+		background: var(--line);
 		overflow: hidden;
 	}
 
@@ -184,16 +210,16 @@
 		display: block;
 		height: 100%;
 		border-radius: inherit;
-		background: var(--scoreboard-ink-2);
+		background: var(--ink-3);
 		transition: width 160ms ease-out;
 	}
 
 	.bar.gain > span {
-		background: var(--scoreboard-gain-ink);
+		background: var(--gain-ink);
 	}
 
 	.bar.loss > span {
-		background: var(--scoreboard-loss-ink);
+		background: var(--loss-ink);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -202,69 +228,99 @@
 		}
 	}
 
-	.room > span {
+	.room {
 		font-size: var(--t-sm);
 		font-weight: 600;
-		white-space: nowrap;
+		color: var(--ink-2);
+	}
+
+	thead .room {
+		font-size: var(--t-xs);
+		color: var(--ink-3);
 	}
 
 	.mid {
+		flex: none;
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		justify-content: center;
+		align-items: flex-end;
 		gap: 4px;
-		padding: var(--s-2) var(--s-3);
-		background: var(--scoreboard-2);
-		border-left: 1px solid var(--scoreboard-line);
-		max-width: 220px;
+		max-width: 21rem;
 		font-size: var(--t-xs);
-		color: var(--scoreboard-ink-2);
-		text-align: center;
+		color: var(--ink-2);
+		text-align: right;
 	}
 
-	.mid :global(a:not(.action)) {
-		color: var(--scoreboard-ink);
+	.vh {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 
+	/* The verb is pinned under the builder wherever the rosters stack (fix round 2), so one verb
+	   shows. */
 	@media (max-width: 1180px) {
-		.bug {
-			grid-template-columns: minmax(0, 1fr);
-		}
-
-		.half:not(.mine) {
-			border-left: 0;
-			border-top: 1px solid var(--scoreboard-line);
-		}
-
-		/* The verb is pinned under the builder wherever the scoreboard stacks (fix round 2), so one verb
-		   shows. */
 		.mid {
 			display: none;
 		}
 	}
 
 	@media (max-width: 760px) {
-		.half {
-			grid-template-columns: auto auto;
-			gap: var(--s-2) var(--s-3);
-			padding: var(--s-2) var(--s-3);
-		}
-
 		.room {
 			display: none;
 		}
 
-		b {
-			font-size: var(--t-lg);
+		.bar {
+			width: 28px;
 		}
 
-		i {
-			font-size: var(--t-md);
+		th,
+		td {
+			padding-right: var(--s-2);
+		}
+
+		/* The team's name whole, on a second line where it is long, never cut. */
+		.who {
+			width: 7.5rem;
+			white-space: normal;
+		}
+
+		.who-in {
+			align-items: flex-start;
+			flex-wrap: wrap;
+			column-gap: 4px;
+		}
+
+		.name {
+			flex-basis: 100%;
+			overflow: visible;
+			overflow-wrap: anywhere;
+			line-height: 1.2;
+		}
+
+		tbody tr {
+			height: auto;
+		}
+
+		tbody th,
+		tbody td {
+			padding-block: 3px;
+		}
+
+		.figs {
+			gap: 4px;
+		}
+
+		i,
+		b {
+			font-size: var(--t-sm);
 		}
 
 		em {
-			font-size: var(--t-sm);
+			font-size: var(--t-xs);
 		}
 	}
 </style>
