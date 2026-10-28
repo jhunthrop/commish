@@ -17,6 +17,11 @@ nesting are Yahoo's; the values are ours.
 - `yahoo-league-rosters.xml`: `league/{key}/teams;out=roster`
 - `yahoo-league-waivers.xml`: `league/{key}/players;status=W;out=ownership;start=0;count=25`
 - `yahoo-token.json`: the token endpoint's answer, with fixture tokens
+- `yahoo-pending-trades.xml`: `league/{key}/transactions;team_key={team};type=pending_trade`
+  (Lane 279, constructed): the guide's pending-trade sample (Transaction
+  resource, `257.l.193.pt.1`) inside the league transactions collection, four
+  rows: one proposed to team 1, one team 1 proposed, one accepted (waiting on
+  the league) and one whose player moves to a third team
 
 Replace each with a recorded answer once a member connects, and keep the tests'
 expectations: the parsers must read a recorded answer the same way.

@@ -179,6 +179,8 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(Testdata(s.t, "league-member.json"))
 	case "rosters":
 		_, _ = w.Write(Testdata(s.t, "rosters-member.json"))
+	case "pendingTrades":
+		_, _ = w.Write(Testdata(s.t, "pending-trades-member.json"))
 	case "liveScoring":
 		if s.applied {
 			_, _ = w.Write(Testdata(s.t, "live-member-after.json"))

@@ -19,6 +19,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/hosts"
+	"github.com/jhunthrop/commish/api/internal/mfl"
 	"github.com/jhunthrop/commish/api/internal/mfl/mfltest"
 )
 
@@ -440,6 +441,32 @@ func TestMemberLineup(t *testing.T) {
 	}
 	if _, err := m.Session(context.Background(), me); !errors.Is(err, ErrReconnect) {
 		t.Fatalf("a signed-out connection opened: %v", err)
+	}
+}
+
+// The member's pending trades read answers their franchise with the
+// offers, refuses a league they are not in, and signs a refused session
+// out (Lane 279).
+func TestMemberPendingTrades(t *testing.T) {
+	r := newRig(t)
+	m := r.svc.Leagues.(*Member)
+	if _, _, err := m.PendingTrades(context.Background(), me, mfltest.LeagueID, mfltest.Season); !errors.Is(err, hosts.ErrNotConnected) {
+		t.Fatalf("not connected: %v", err)
+	}
+	if code, _, _ := r.call(t, r.svc.connect, good()); code != http.StatusCreated {
+		t.Fatal(code)
+	}
+	franchise, list, err := m.PendingTrades(context.Background(), me, mfltest.LeagueID, mfltest.Season)
+	if err != nil || franchise != mfltest.Franchise || len(list) != 3 {
+		t.Fatalf("%v %d %+v", err, franchise, list)
+	}
+	if _, _, err := m.PendingTrades(context.Background(), me, "30030", mfltest.Season); !errors.Is(err, mfl.ErrNotYourTeam) {
+		t.Fatalf("another league: %v", err)
+	}
+	r.srv.Set(func(s *mfltest.Server) { s.SessionRefused = true })
+	if _, _, err := m.PendingTrades(context.Background(), me, mfltest.LeagueID, mfltest.Season); !errors.Is(err, ErrReconnect) ||
+		r.store.conn.Status != hosts.StatusSignedOut {
+		t.Fatalf("refused: %v", err)
 	}
 }
 

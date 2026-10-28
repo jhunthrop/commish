@@ -44,6 +44,7 @@ type Client interface {
 	Login(ctx context.Context, season int, username, password string) (mfl.Session, error)
 	MyLeagues(ctx context.Context, sess mfl.Session, season int) ([]mfl.MyLeague, error)
 	MemberLineup(ctx context.Context, sess mfl.Session, season int, leagueID string) (mfl.TeamLineup, error)
+	PendingTrades(ctx context.Context, sess mfl.Session, server string, season int, leagueID string) ([]mfl.PendingTrade, error)
 }
 
 // Connections is the part of hosts.Store a member read needs.
@@ -175,4 +176,29 @@ func (m *Member) Lineup(ctx context.Context, accountID uuid.UUID, leagueID strin
 		return mfl.TeamLineup{}, mfl.Session{}, err
 	}
 	return l, k.sess, nil
+}
+
+// PendingTrades is the offers to and from the member's franchise in the
+// league as their session reads them (Lane 279), and that franchise: the
+// league must be one MyFantasyLeague lists for them.
+func (m *Member) PendingTrades(ctx context.Context, accountID uuid.UUID, leagueID string, season int) (int, []mfl.PendingTrade, error) {
+	k, err := m.open(ctx, accountID)
+	if err != nil {
+		return 0, nil, err
+	}
+	mine, err := m.Client.MyLeagues(ctx, k.sess, season)
+	if err := m.refused(ctx, accountID, k, err); err != nil {
+		return 0, nil, err
+	}
+	for _, l := range mine {
+		if l.LeagueID != leagueID {
+			continue
+		}
+		list, err := m.Client.PendingTrades(ctx, k.sess, l.Server, season, leagueID)
+		if err := m.refused(ctx, accountID, k, err); err != nil {
+			return 0, nil, err
+		}
+		return l.Franchise, list, nil
+	}
+	return 0, nil, fmt.Errorf("%w: league %s", mfl.ErrNotYourTeam, leagueID)
 }

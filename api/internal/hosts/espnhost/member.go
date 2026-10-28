@@ -53,6 +53,7 @@ type Reader interface {
 	Read(ctx context.Context, id string, season int, cookies *espn.Cookies) (espn.FullLeague, error)
 	MyLeagues(ctx context.Context, cookies espn.Cookies, season int) ([]espn.MyLeague, error)
 	ReadWeek(ctx context.Context, id string, season, period int, cookies *espn.Cookies) (espn.WeekRead, error)
+	PendingTrades(ctx context.Context, cookies espn.Cookies, league string, season int) ([]espn.PendingTrade, error)
 }
 
 // Member reads ESPN with a connected member's cookies. Public tells a
@@ -198,6 +199,24 @@ func (m *Member) ReadWeek(ctx context.Context, accountID uuid.UUID, leagueID str
 		return espn.WeekRead{}, err
 	}
 	return w, nil
+}
+
+// PendingTrades is the league's open trade proposals as the member's
+// cookies are shown them (Lane 279). A refusal is handled as ReadWeek's
+// is: a league outside the member's own list is that league's refusal.
+func (m *Member) PendingTrades(ctx context.Context, accountID uuid.UUID, leagueID string, season int) ([]espn.PendingTrade, error) {
+	k, err := m.open(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	list, err := m.Client.PendingTrades(ctx, k.cookies, leagueID, season)
+	if errors.Is(err, espn.ErrSignedOut) && !m.inList(ctx, k.cookies, leagueID, season) {
+		return nil, fmt.Errorf("%w: not a league of this member", espn.ErrPrivate)
+	}
+	if err := m.after(ctx, accountID, k, err); err != nil {
+		return nil, err
+	}
+	return list, nil
 }
 
 // prove marks the session proven when the league just read with it is

@@ -4995,6 +4995,34 @@ export interface components {
 			projection_read_at: string | null;
 			/** @description as LineupAdvice's: the platform gives each player's points */
 			player_points: boolean;
+			/** @description the trades another team has offered the member on the platform and it still holds open (Lane 279), read with the member's own connection on ESPN, Yahoo and MyFantasyLeague as the league syncs, newest first; an offer past its expiry, or naming a player no longer on the roster it names, is left out. Empty when none is open or the platform's offers are not read (Sleeper, FFPC); absent from an older answer */
+			offers?: components['schemas']['TradeOffer'][];
+		};
+		TradeOffer: {
+			/** @description the preset's words, "Offered to you" */
+			label: string;
+			/** @description the team that made the offer (TradeTeam.roster_id) */
+			roster_id: number;
+			/** @description that team's name */
+			name: string;
+			/** @description host ids (LeaguePlayer.host_id) of the member's players the offer takes */
+			give: string[];
+			/** @description host ids of that team's players the offer sends the member */
+			get: string[];
+			/** @description host ids of the member's players the platform requires dropped with the offer, empty where it names none */
+			drop: string[];
+			/** @description the platform's own id for the offer */
+			host_offer_id: string;
+			/**
+			 * Format: date-time
+			 * @description when the platform lets the offer lapse, null where it states none (Yahoo)
+			 */
+			expires_at: string | null;
+			/**
+			 * Format: date-time
+			 * @description when the platform's pending offers were last read
+			 */
+			read_at: string;
 		};
 		TradeMoves: {
 			/**

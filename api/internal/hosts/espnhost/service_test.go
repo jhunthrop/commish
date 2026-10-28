@@ -76,6 +76,10 @@ func (f *fakeESPN) MyLeagues(_ context.Context, c espn.Cookies, season int) ([]e
 	return espn.ParseMyLeagues(f.fan, season)
 }
 
+func (f *fakeESPN) PendingTrades(context.Context, espn.Cookies, string, int) ([]espn.PendingTrade, error) {
+	return nil, nil
+}
+
 func (f *fakeESPN) listed(id string) bool {
 	list, _ := espn.ParseMyLeagues(f.fan, 2026)
 	for _, l := range list {

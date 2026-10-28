@@ -5730,6 +5730,9 @@ type TradeAdvice struct {
 	HostTradesUrl string     `json:"host_trades_url"`
 	Moves         TradeMoves `json:"moves"`
 
+	// Offers the trades another team has offered the member on the platform and it still holds open (Lane 279), read with the member's own connection on ESPN, Yahoo and MyFantasyLeague as the league syncs, newest first; an offer past its expiry, or naming a player no longer on the roster it names, is left out. Empty when none is open or the platform's offers are not read (Sleeper, FFPC); absent from an older answer
+	Offers *[]TradeOffer `json:"offers,omitempty"`
+
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
 
@@ -5842,6 +5845,36 @@ type TradeMoves struct {
 
 // TradeMovesPropose available when a trade can be proposed on the platform from our screen (none today: the verb would read Propose on the platform); unavailable when the verb copies the offer and opens the platform's trade page
 type TradeMovesPropose string
+
+// TradeOffer defines model for TradeOffer.
+type TradeOffer struct {
+	// Drop host ids of the member's players the platform requires dropped with the offer, empty where it names none
+	Drop []string `json:"drop"`
+
+	// ExpiresAt when the platform lets the offer lapse, null where it states none (Yahoo)
+	ExpiresAt *time.Time `json:"expires_at"`
+
+	// Get host ids of that team's players the offer sends the member
+	Get []string `json:"get"`
+
+	// Give host ids (LeaguePlayer.host_id) of the member's players the offer takes
+	Give []string `json:"give"`
+
+	// HostOfferId the platform's own id for the offer
+	HostOfferId string `json:"host_offer_id"`
+
+	// Label the preset's words, "Offered to you"
+	Label string `json:"label"`
+
+	// Name that team's name
+	Name string `json:"name"`
+
+	// ReadAt when the platform's pending offers were last read
+	ReadAt time.Time `json:"read_at"`
+
+	// RosterId the team that made the offer (TradeTeam.roster_id)
+	RosterId int `json:"roster_id"`
+}
 
 // TradeRecord defines model for TradeRecord.
 type TradeRecord struct {

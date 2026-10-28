@@ -116,6 +116,8 @@ func yahooAPIWith(t *testing.T, good string, failWaivers bool) (*Client, *[]stri
 			name = "yahoo-my-teams.xml"
 		case strings.Contains(r.URL.Path, "games;game_codes=nfl"):
 			name = "yahoo-games-2026.xml"
+		case strings.Contains(r.URL.Path, "/transactions;team_key=") && strings.HasSuffix(r.URL.Path, ";type=pending_trade"):
+			name = "yahoo-pending-trades.xml"
 		case strings.Contains(r.URL.Path, "/players;status=W") && failWaivers:
 			w.WriteHeader(http.StatusBadRequest)
 			return

@@ -22,6 +22,12 @@ MyFantasyLeague).
   import-ok.xml            DOCUMENTED  an import's success, <status>OK</status>
   import-locked.xml        GUESSED     an import refused for a started game ("Lineup is locked: ...")
   import-invalid.xml       TRIMMED     an import refused for its parameters (the export refusal's recorded words)
+  pending-trades-member.json  RECORDED ELSEWHERE  TYPE=pendingTrades (Lane 279): the two-row owner-view answer saved
+                           from a league clone in bborchardt/fuadmflsite tools/verify/screens/pendingTrades-offer.json,
+                           its franchises, player ids and team names set to this league's, plus a third row carrying a
+                           draft pick (DP_02_05) beside a player
+  pending-trades-one.json  RECORDED ELSEWHERE  the same source's one-row answer (pendingTrades.json), one offer as an
+                           object rather than a list, ids set the same way
 
 The proof move (the lane 67 report) captures the login answer and its cookie
 expiry, myleagues, liveScoring with the member's team, the import's success,

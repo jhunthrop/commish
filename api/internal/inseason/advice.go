@@ -7,6 +7,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
@@ -23,6 +25,8 @@ const MaxWaiverRows = 60
 // League is one followed league as the advice reads it.
 type League struct {
 	Snap leaguesync.Snapshot
+	// LinkID is the account's attachment of the league, its offers' key.
+	LinkID uuid.UUID
 	// Me is the drafter's roster.
 	Me int
 	// Saved is the saved league whose scoring and roster the advice
