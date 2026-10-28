@@ -7,6 +7,8 @@ public typealias RunPlayer = Components.Schemas.RunPlayer
 public typealias RunPlayerAnswer = Components.Schemas.RunPlayerAnswer
 public typealias RunPlayerFormat = Components.Schemas.RunPlayerFormat
 public typealias RunWeekRead = Components.Schemas.RunWeekRead
+/// The newest written week read the card's answer carries from the store (Lane 284).
+public typealias LiveWeekRead = Components.Schemas.PlayerWeekRead
 public typealias RunReadsDue = Components.Schemas.RunReadsDue
 public typealias RunCapsule = Components.Schemas.RunCapsule
 public typealias RunPullFigure = Components.Schemas.RunPullFigure

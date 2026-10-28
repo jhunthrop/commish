@@ -30,6 +30,16 @@ struct PlayerSheetParityTests {
         let shown: Shown
     }
 
+    /// A live read case (Lane 284): the run's read, whether the card's answer was read and its read, the
+    /// read shown.
+    struct LiveReadCase: Decodable {
+        let name: String
+        let run: RunWeekRead?
+        let answered: Bool
+        let live: LiveWeekRead?
+        let shown: RunWeekRead?
+    }
+
     struct NoRead: Decodable {
         let state: String?
         let due: RunReadsDue?
@@ -109,6 +119,7 @@ struct PlayerSheetParityTests {
     struct Parity: Decodable {
         let zone: String
         let weekRead: [ReadCase]
+        let liveRead: [LiveReadCase]
         let noRead: [NoRead]
         let statusHeld: [StatusCase]
         let nextPass: [Pass]
@@ -145,6 +156,23 @@ struct PlayerSheetParityTests {
             CardProjection(week: $0.week, ppr: $0.scoring == "ppr", points: $0.points, state: Self.state($0.state))
         }
         #expect(Self.shown(WeekReads.shown(test.read, card: card)) == test.shown, "\(test.name)")
+    }
+
+    @Test(arguments: parity.liveRead.indices)
+    func theNewerOfTheRunsAndTheLiveReadIsShownAsTheWebShowsIt(index: Int) {
+        let test = Self.parity.liveRead[index]
+        let shown = WeekReads.newest(run: test.run, live: test.answered ? test.live : nil)
+        #expect(shown?.body == test.shown?.body, "\(test.name)")
+        #expect(shown?.caption == test.shown?.caption, "\(test.name)")
+        #expect(shown?.writtenAt == test.shown?.writtenAt, "\(test.name)")
+        #expect(shown?.status == test.shown?.status, "\(test.name)")
+        #expect(shown?.call?.value1?.rawValue == test.shown?.call?.value1?.rawValue, "\(test.name)")
+        #expect(shown?.projection == test.shown?.projection, "\(test.name)")
+        // The Proj change tile measures from the shown read's figure: a live read quoting none quotes none.
+        if let shown, let live = test.live, shown.writtenAt == live.writtenAt {
+            let quoted: QuotedProjection = shown.projection.map { .points($0) } ?? QuotedProjection.none
+            #expect(QuotedProjection(shown) == quoted, "\(test.name)")
+        }
     }
 
     @Test func withNoReadThePlaceNamesHisNextGameOnlyWhileItIsToCome() {

@@ -77,6 +77,9 @@ type Service struct {
 	Offers Offers
 	// Weeks lists the account's leagues for GET /me/week, nil answers none.
 	Weeks Weeks
+	// WeekReads is the stored week reads the player card's answer carries
+	// live (Lane 284); nil answers none.
+	WeekReads WeekReads
 	// Records grades the account's league for GET /leagues/attached/{id}/record (Lane
 	// 93); nil answers its lineup with no weeks.
 	Records Records

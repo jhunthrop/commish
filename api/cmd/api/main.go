@@ -19,6 +19,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/account"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/billing"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/db"
 	"github.com/jhunthrop/commish/api/internal/deletion"
@@ -39,6 +40,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/season"
 	"github.com/jhunthrop/commish/api/internal/server"
 	"github.com/jhunthrop/commish/api/internal/sheets"
+	"github.com/jhunthrop/commish/api/internal/weekreads"
 )
 
 // version is set at build: -ldflags "-X main.version=<git sha>".
@@ -206,8 +208,13 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	if err != nil {
 		return nil, nil, err
 	}
+	weekReads, err := liveWeekReads(draftBoards.Schedule, now, log)
+	if err != nil {
+		return nil, nil, err
+	}
 	inSeason := &inseason.Service{
-		Leagues: inseason.SyncLeagues{Sync: leagueSync}, Weeks: inseason.SyncLeagues{Sync: leagueSync}, Facts: facts,
+		WeekReads: weekReads,
+		Leagues:   inseason.SyncLeagues{Sync: leagueSync}, Weeks: inseason.SyncLeagues{Sync: leagueSync}, Facts: facts,
 		Holds: sheetStore, Moves: moves, Boards: draftBoards, Lives: &inseason.LiveBoards{Log: log},
 		Season: draftBoards.Schedule.Season, Now: now, Log: log,
 		Landings: inseason.SyncLeagues{Sync: leagueSync}, Context: ctx,
@@ -318,4 +325,14 @@ func runReader(cfg config.API, now func() time.Time, log *slog.Logger) *runs.Rea
 
 func usage() error {
 	return fmt.Errorf("usage: api [%s]", jobNames())
+}
+
+// liveWeekReads is the stored week reads the player card's answer carries
+// (Lane 284), read from the board's pool and schema, kept a minute.
+func liveWeekReads(source *boards.PGSource, now func() time.Time, log *slog.Logger) (*weekreads.Live, error) {
+	reader, err := weekreads.NewPGReader(source.Pool, source.Schema)
+	if err != nil {
+		return nil, err
+	}
+	return &weekreads.Live{Reader: reader, Now: now, Log: log}, nil
 }

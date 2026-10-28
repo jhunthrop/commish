@@ -355,7 +355,10 @@ object PlayerPages {
     ): PlayerPageModel.Read {
         val state = input.week?.let { PlayerCards.readState(LineRead.game(it.line, input.now)) }
         if (underway) {
-            val read = player.weekRead ?: return PlayerPageModel.Read.WeekNone(WeekReads.noRead(state, player.weekReadsDue, input.now))
+            // The newer of the run's read and the answer's live one (Lane 284).
+            val read =
+                WeekReads.newest(player.weekRead, input.week?.weekRead)
+                    ?: return PlayerPageModel.Read.WeekNone(WeekReads.noRead(state, player.weekReadsDue, input.now))
             val shown = StatusHeld.read(read, input.capture, player.id, input.now)
             val card =
                 input.week?.let {

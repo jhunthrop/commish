@@ -1188,6 +1188,45 @@ func (e PlayerVerbKind) Valid() bool {
 	}
 }
 
+// Defines values for PlayerWeekReadCall.
+const (
+	PlayerWeekReadCallHold  PlayerWeekReadCall = "hold"
+	PlayerWeekReadCallNone  PlayerWeekReadCall = "none"
+	PlayerWeekReadCallSit   PlayerWeekReadCall = "sit"
+	PlayerWeekReadCallStart PlayerWeekReadCall = "start"
+)
+
+// Valid indicates whether the value is a known member of the PlayerWeekReadCall enum.
+func (e PlayerWeekReadCall) Valid() bool {
+	switch e {
+	case PlayerWeekReadCallHold:
+		return true
+	case PlayerWeekReadCallNone:
+		return true
+	case PlayerWeekReadCallSit:
+		return true
+	case PlayerWeekReadCallStart:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlayerWeekReadSource.
+const (
+	PlayerWeekReadSourceLlm PlayerWeekReadSource = "llm"
+)
+
+// Valid indicates whether the value is a known member of the PlayerWeekReadSource enum.
+func (e PlayerWeekReadSource) Valid() bool {
+	switch e {
+	case PlayerWeekReadSourceLlm:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Product.
 const (
 	ProductDraftPass  Product = "draft_pass"
@@ -4136,7 +4175,39 @@ type PlayerWeek struct {
 
 	// Week the week the line is for: the league's week, else the week of the next game still to be played
 	Week int `json:"week"`
+
+	// WeekRead the newest written week read for him and the board week (Lane 284), so a read the hourly pass rewrote or the retry writer rescued shows before the next nightly carries it; the clients show it in place of the run's when it was written after the run's. Absent when the store holds no written read for that week, once his game of that week has kicked off (the run's own rule), when the read failed (bounded to a second, the failure kept a minute so no request waits on it again) and from an answer older than the field
+	WeekRead *PlayerWeekRead `json:"weekRead,omitempty"`
 }
+
+// PlayerWeekRead the week read as the research store holds it (player_week_reads), the run's RunWeekRead with its source. Kept a minute. The caption is the write's own; the clients judge his status against the read as they judge the run's
+type PlayerWeekRead struct {
+	Body string              `json:"body"`
+	Call *PlayerWeekReadCall `json:"call"`
+
+	// Caption Written Wed Oct 28, 9:00 am CT, for week 8
+	Caption string `json:"caption"`
+
+	// FactsAt the newest stamp of the facts it was written from
+	FactsAt *time.Time `json:"factsAt"`
+
+	// Projection the published projection it was written with, in PPR, to the tenth; null with none
+	Projection *float64 `json:"projection"`
+
+	// Source the writer's; a facts block is never served, as the run serves none
+	Source PlayerWeekReadSource `json:"source"`
+
+	// Status the status it was written against
+	Status    *string   `json:"status"`
+	Week      int       `json:"week"`
+	WrittenAt time.Time `json:"writtenAt"`
+}
+
+// PlayerWeekReadCall defines model for PlayerWeekRead.Call.
+type PlayerWeekReadCall string
+
+// PlayerWeekReadSource the writer's; a facts block is never served, as the run serves none
+type PlayerWeekReadSource string
 
 // PlayoffWeeks the playoffs' first and last week
 type PlayoffWeeks struct {
