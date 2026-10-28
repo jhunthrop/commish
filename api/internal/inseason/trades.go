@@ -205,33 +205,35 @@ func (s tradeSide) countsAfter(out []int, in []*Candidate) map[draft.Position]in
 }
 
 // restOfSeason is the side's rest-of-season change from losing out and
-// drop (-1 for none) and taking in (Lane 269): the points over
-// replacement of the players it takes in less those it sends out and
-// drops, each counted at replacement or above, since a player under it is
-// one a manager replaces from waivers. Unlike the lineup gain it counts
-// the bench, so a trade that fills one slot by giving up two players the
-// side would keep shows what it costs.
+// drop (-1 for none) and taking in (Lane 269): what the players it takes
+// in score over the waiver level at their positions, less the same for
+// those it sends out and drops. The waiver level is the best free agent's
+// (Candidate.FreeLevel), so a bench back counts for what he scores over
+// the back the side could pick up free, and a player at or under that
+// level counts none: the side replaces him from waivers. Unlike the
+// lineup gain it counts the bench, so a trade that fills one slot by
+// giving up two players the side would keep shows what it costs.
 func (s tradeSide) restOfSeason(out []int, drop int, in []*Candidate) float64 {
 	total := 0.0
 	for _, c := range in {
-		total += overReplacement(c)
+		total += overWaivers(c)
 	}
 	for _, o := range out {
-		total -= overReplacement(s.players[o])
+		total -= overWaivers(s.players[o])
 	}
 	if drop >= 0 {
-		total -= overReplacement(s.players[drop])
+		total -= overWaivers(s.players[drop])
 	}
 	return total
 }
 
-// overReplacement is a player's rest-of-season points over replacement,
-// none under replacement or without a figure.
-func overReplacement(c *Candidate) float64 {
+// overWaivers is a player's rest-of-season points over the waiver level
+// at his position, none at or under it or without a figure.
+func overWaivers(c *Candidate) float64 {
 	if !c.HasValue {
 		return 0
 	}
-	return max(0, c.Value)
+	return max(0, c.Value-c.FreeLevel)
 }
 
 // Acceptable is whether a side takes a trade whose rest-of-season change
@@ -374,8 +376,9 @@ func (t *tradeSearch) theirs(give, get []int, always bool) Change {
 // Trades is §6.2's search between the member's squad and one other team's:
 // exact over every one-for-one and two-for-one pair both ways at the
 // skill positions, a trade kept when both lineups gain and both still
-// fill every slot, the other side giving up no more rest of season than
-// Acceptable allows (Lane 269), and proposable (Lane 103). focus, when set, keeps
+// fill every slot, neither side giving up more rest of season than
+// Acceptable allows (Lane 269: an idea both would take), and proposable
+// (Lane 103). focus, when set, keeps
 // only trades holding that player (either side's id). The best limit trades in orderTrades' order.
 // Gains are a week's over the weeks the order covers.
 func Trades(config []draft.SlotConfig, weeks int, mine, theirs Squad, focus string, limit int) []Trade {
@@ -395,7 +398,7 @@ func Trades(config []draft.SlotConfig, weeks int, mine, theirs Squad, focus stri
 			return
 		}
 		tr := t.tradeOf(give, get, my, their)
-		if !Acceptable(tr.TheirRest, t.f.weeks) {
+		if !Acceptable(tr.MyRest, t.f.weeks) || !Acceptable(tr.TheirRest, t.f.weeks) {
 			return
 		}
 		tr.Need = t.need(give, tr.Drop, get)

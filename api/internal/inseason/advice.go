@@ -68,6 +68,8 @@ type advisor struct {
 	// playing is the read's playing-first position ranks (playingRanks),
 	// computed once.
 	playing map[string]int
+	// free is the read's waiver levels (levels), computed once.
+	free *freeLevels
 	// data is the season's facts the Season indexes, kept for turnTo.
 	data Data
 	// platform is the league platform's points for its week (Lane 111),
@@ -312,7 +314,7 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	// His place among the players who play (PlayingRanks, Lane 128): the one
 	// position rank the line, the badge, the caption and the order's # say.
 	c := Candidate{ID: id, Position: position, Rank: a.playingRanks()[boardID], Tier: facts.Tier(),
-		Locked: facts.Locked, InjuredReserve: facts.InjuredReserve()}
+		Locked: facts.Locked, InjuredReserve: facts.InjuredReserve(), FreeLevel: a.levels().of(position)}
 	line := apitypes.PlayerLine{Player: lp, Held: boardID != "" && a.held[boardID], Facts: wireFacts(facts, thisWeek(a.Snap.Ref.Host, side, id, facts))}
 	// His game at the facts' clock as every screen says it (Lane 176).
 	line.GameState = lineGameState(line, a.now)
@@ -801,14 +803,10 @@ func (a *advisor) starts(p draft.Position) bool {
 	return startsAny(a.slots, p)
 }
 
-// pool is the board's players no roster in the league holds, at the
-// positions the league starts, filtered to one position when asked.
+// pool is the free agents (freeAgents) as the Waivers screen reads them.
 func (a *advisor) pool(position draft.Position) []person {
 	var out []person
-	for _, p := range a.Board.Raw.Players {
-		if _, held := a.HeldBy[p.ID]; held || !a.starts(p.Position) || (position != "" && p.Position != position) {
-			continue
-		}
+	for _, p := range a.freeAgents(position) {
 		id := p.ID
 		lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: boards.WireClub(p.Team)}
 		add := a.build(p.ID, lp, nil)
@@ -1081,7 +1079,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	out.Basis = TradesBasis(a.basis, a.weeks, a.horizon)
 	gainBasis := TradeGainBasis(a.basis, a.weeks, a.horizon)
 	out.GainBasis = &gainBasis
-	restBasis := RestOfSeasonBasis(a.basis, a.weeks, a.horizon, true)
+	restBasis := RestOfSeasonBasis(a.basis, a.weeks, a.horizon, true, a.levels().whole(a.slots))
 	out.RestOfSeasonBasis = &restBasis
 	out.PerGameBasis = perGameSaid(a.Board, shown...)
 	out.CheckBasis = TradeCheckBasis

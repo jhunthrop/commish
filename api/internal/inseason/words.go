@@ -525,25 +525,38 @@ func tradeWeeks(b OrderBasis, weeks int, h Horizon) string {
 	return weekSpan(weeks, h)
 }
 
-// Who the rest-of-season rule (Lane 269) speaks for: the finder lists
-// only trades the other side takes; the builder answers each side.
+// The rest-of-season rule (Lane 269) as each answer says it: the finder
+// lists only trades both sides take; the builder answers each side.
 const (
-	finderRest = "We list a trade only when theirs falls by %s or less."
+	finderRest = "We list a trade only when neither side falls by more than %s."
 	checkRest  = "A side takes a trade that costs it %s or less."
 )
 
+// The level the rest-of-season figures are over: the best free agent at
+// each position, or, with no read of the league's free agents, the last
+// starter league-wide.
+const (
+	overFreeAgent   = "the best free agent at their position"
+	overLastStarter = "the last starter at their position league-wide, as we have no read of the league's free agents"
+)
+
 // RestOfSeasonBasis is the line for a trade's rest-of-season figures
-// (Lane 269): what they count, the weeks, and the rule, the finder's
-// (finder) or the builder's: "Rest of season is the points over
-// replacement of the players a side gets less those it gives and drops,
-// weeks 9 to 17. We list a trade only when theirs falls by 9.0 or less."
-func RestOfSeasonBasis(b OrderBasis, weeks int, h Horizon, finder bool) string {
-	rule := checkRest
+// (Lane 269): what they count over which level (waivers, the free-agent
+// read is whole), the weeks, and the rule, the finder's (finder) or the
+// builder's: "Rest of season is what the players a side gets score over
+// the best free agent at their position, less the same for those it
+// gives and drops, weeks 9 to 17. We list a trade only when neither side
+// falls by more than 9.0."
+func RestOfSeasonBasis(b OrderBasis, weeks int, h Horizon, finder, waivers bool) string {
+	rule, level := checkRest, overLastStarter
 	if finder {
 		rule = finderRest
 	}
-	return "Rest of season is the points over replacement of the players a side gets less those it gives and drops, " +
-		tradeWeeks(b, weeks, h) + ". " + fmt.Sprintf(rule, points(GiveUp(weeks)))
+	if waivers {
+		level = overFreeAgent
+	}
+	return "Rest of season is what the players a side gets score over " + level +
+		", less the same for those it gives and drops, " + tradeWeeks(b, weeks, h) + ". " + fmt.Sprintf(rule, points(GiveUp(weeks)))
 }
 
 // TradeNeedWords is the need a trade fills (Lane 103, B43): the empty

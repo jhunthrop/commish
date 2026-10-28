@@ -85,7 +85,7 @@ func TestTradeCheckAgreesWithTheFinder(t *testing.T) {
 			// The rest-of-season figures agree too, and the finder lists
 			// only trades the other side takes (Lane 269).
 			if !sameFigure(got.Trade.MyRestOfSeason, row.MyRestOfSeason) || !sameFigure(got.Trade.TheirRestOfSeason, row.TheirRestOfSeason) ||
-				got.Acceptable == nil || !got.Acceptable.Theirs || got.RestOfSeasonBasis == nil {
+				got.Acceptable == nil || !got.Acceptable.Theirs || !got.Acceptable.Yours || got.RestOfSeasonBasis == nil {
 				t.Fatalf("%s: rest of season checked %v/%v, the finder %v/%v, acceptable %+v", team.Name,
 					got.Trade.MyRestOfSeason, got.Trade.TheirRestOfSeason, row.MyRestOfSeason, row.TheirRestOfSeason, got.Acceptable)
 			}

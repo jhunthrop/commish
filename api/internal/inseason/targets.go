@@ -135,6 +135,7 @@ func contentKey(a *advisor) string {
 			num(c.Value)
 			num(c.PerGame)
 			num(c.Proj)
+			num(c.FreeLevel)
 		}
 	}
 	held := make([]string, 0, len(a.held))

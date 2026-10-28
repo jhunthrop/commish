@@ -4771,7 +4771,7 @@ export interface components {
 			their_proj_change: number | null;
 			/**
 			 * Format: double
-			 * @description the drafter's rest-of-season change (Lane 269): the points over replacement on our order of the players he gets less those he gives and drops, each at replacement or above, over the weeks gain_basis names, one decimal; unlike my_gain it counts the bench; absent from an older answer
+			 * @description the drafter's rest-of-season change (Lane 269): what the players he gets score on our order over the waiver level at their position, less the same for those he gives and drops, over the weeks gain_basis names, one decimal. The waiver level is the best free agent at the position in the league's last read (the pool the Waivers screen reads), so a bench player counts for what he scores over the one his side could pick up free, and a player at or under it counts none; where the league's free agents are not read, the last starter league-wide (rest_of_season_basis says which). Unlike my_gain it counts the bench; absent from an older answer
 			 */
 			my_rest_of_season?: number;
 			/**
@@ -4921,7 +4921,7 @@ export interface components {
 			basis: string;
 			/** @description the line under the finder's Gain head: whose points and the weeks a Gain is a week over ("points over replacement in each lineup, weeks 7 to 17", Lane 103); absent from an older answer */
 			gain_basis?: string;
-			/** @description the line for the rows' rest-of-season figures and the rule that lists a trade (Lane 269): "Rest of season is the points over replacement of the players a side gets less those it gives and drops, weeks 9 to 17. We list a trade only when theirs falls by 9.0 or less."; absent from an older answer */
+			/** @description the line for the rows' rest-of-season figures, the level they are over, and the rule that lists a trade (Lane 269): a trade is listed only when neither side's figure falls by more than the tolerance, GiveUpPerWeek points for each week the figures cover, which the line states for its weeks; absent from an older answer */
 			rest_of_season_basis?: string;
 			/** @description every player on the drafter's active roster (injured reserve and taxi spots left out), by position then name: the picker's own players, a trade found or not */
 			roster: components['schemas']['PlayerLine'][];
@@ -4986,7 +4986,7 @@ export interface components {
 			theirs: components['schemas']['TradeSideTotals'];
 		};
 		TradeAcceptable: {
-			/** @description trade.my_rest_of_season, as one decimal prints it, falls by no more than 1.0 for each week it covers: the finder's rule for the other side, so a false on theirs is a trade the finder never lists */
+			/** @description trade.my_rest_of_season, as one decimal prints it, falls by no more than the tolerance (GiveUpPerWeek points for each week it covers): the finder's rule for both sides, so a false on either is a trade the finder never lists */
 			yours: boolean;
 			/** @description the same for theirs */
 			theirs: boolean;
@@ -5030,9 +5030,9 @@ export interface components {
 			trade: components['schemas']['TradeRow'];
 			fills: components['schemas']['TradeFills'];
 			totals: components['schemas']['TradeTotals'];
-			/** @description whether each side would take the trade on its rest of season (Lane 269); absent from an older answer */
+			/** @description whether each side would take the trade on its rest of season (Lane 269), the finder's rule for both sides; absent from an older answer */
 			acceptable?: components['schemas']['TradeAcceptable'];
-			/** @description the line for trade.my_rest_of_season and trade.their_rest_of_season and the rule acceptable reads (Lane 269): "Rest of season is the points over replacement of the players a side gets less those it gives and drops, weeks 9 to 17. A side takes a trade that costs it 9.0 or less."; absent from an older answer */
+			/** @description the line for trade.my_rest_of_season and trade.their_rest_of_season, the level they are over, and the rule acceptable reads, the tolerance stated for its weeks (Lane 269); absent from an older answer */
 			rest_of_season_basis?: string;
 			/** @description the host's trade page, the finder's, empty when we know none */
 			host_trades_url: string;

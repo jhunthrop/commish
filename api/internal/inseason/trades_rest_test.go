@@ -60,14 +60,15 @@ func TestIrvingForNacuaAndLoveIsDropped(t *testing.T) {
 		if words := tradeWords(tr, mine, theirs); words == "m-irving for t-nacua+t-love" || words == "m-irving for t-love+t-nacua" {
 			t.Fatalf("the finder lists %s", words)
 		}
-		if !Acceptable(tr.TheirRest, SeasonGames) {
-			t.Fatalf("the finder lists %s, costing them %v", tradeWords(tr, mine, theirs), tr.TheirRest)
+		if !Acceptable(tr.TheirRest, SeasonGames) || !Acceptable(tr.MyRest, SeasonGames) {
+			t.Fatalf("the finder lists %s, rest of season %v and %v", tradeWords(tr, mine, theirs), tr.MyRest, tr.TheirRest)
 		}
 	}
 }
 
-// A balanced two-for-one passes: two of the member's backs for a
-// receiver of theirs, more rest of season to them than they give.
+// A balanced two-for-one passes: m-rb3 (90) and m-wr2 (25) for t-wr2
+// (120) is 5 to the member and 6 from them (their drop, t-wr6, counted),
+// both inside the 17 the season allows.
 func TestABalancedTwoForOnePasses(t *testing.T) {
 	config := twelveTeamPPR(t)
 	mine, theirs := deepAtBack(), deepAtReceiver()
@@ -75,13 +76,112 @@ func TestABalancedTwoForOnePasses(t *testing.T) {
 	for _, tr := range Trades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
 		found[tradeWords(tr, mine, theirs)] = tr
 	}
-	tr, ok := found["m-rb3+m-rb4 for t-wr2"]
+	tr, ok := found["m-rb3+m-wr2 for t-wr2"]
 	if !ok {
-		t.Fatalf("the finder misses m-rb3+m-rb4 for t-wr2 among %d", len(found))
+		t.Fatalf("the finder misses m-rb3+m-wr2 for t-wr2 among %d", len(found))
 	}
-	// They take in 170 for 120, their drop counted against them.
-	if tr.TheirRest < 0 || tr.TheirRest > 50 {
-		t.Fatalf("their rest of season %v", tr.TheirRest)
+	if roundTenth(tr.MyRest) != 5 || roundTenth(tr.TheirRest) != -6 {
+		t.Fatalf("rest of season mine %v, theirs %v", tr.MyRest, tr.TheirRest)
+	}
+}
+
+// An idea both would take (coordinator's ruling, Lane 269 fix round 1):
+// m-rb3+m-rb4 for t-wr2 lifts both lineups and suits them, but costs the
+// member 50 against 17, so the finder leaves it out; the builder still
+// answers it, unacceptable to him.
+func TestTheFinderAsksBothSides(t *testing.T) {
+	config := twelveTeamPPR(t)
+	mine, theirs := deepAtBack(), deepAtReceiver()
+	me, them := Squad{Players: mine}, Squad{Players: theirs}
+	for _, tr := range Trades(config, SeasonGames, me, them, "", 1000) {
+		if tradeWords(tr, mine, theirs) == "m-rb3+m-rb4 for t-wr2" {
+			t.Fatalf("the finder lists m-rb3+m-rb4 for t-wr2: %+v", tr)
+		}
+	}
+	got := Check(config, SeasonGames, me, them, []int{3, 4}, []int{4})
+	if !positive(got.MyGain) || !positive(got.TheirGain) || roundTenth(got.MyRest) != -50 ||
+		Acceptable(got.MyRest, SeasonGames) || !Acceptable(got.TheirRest, SeasonGames) {
+		t.Fatalf("m-rb3+m-rb4 for t-wr2: %+v", got.Trade)
+	}
+}
+
+// The two figures part where a starter is under replacement (review
+// LOW-1): the lineup gain counts t-te's -5 as he starts, the rest of
+// season counts him none, since the side could pick up as good free.
+func TestTheTwoFiguresPartUnderReplacement(t *testing.T) {
+	config := twelveTeamPPR(t)
+	mine := deepAtBack()
+	theirs := set(deepAtReceiver(), "t-te", func(c Candidate) Candidate { c.Value = -5; return c })
+	got := Check(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{8}, []int{8})
+	// m-te (15) for t-te (-5): each starts at TE after the trade.
+	if roundTenth(got.TheirGain*SeasonGames) != 20 || roundTenth(got.TheirRest) != 15 {
+		t.Fatalf("theirs: lineup %v over the season, rest of season %v", got.TheirGain*SeasonGames, got.TheirRest)
+	}
+	if roundTenth(got.MyGain*SeasonGames) != -20 || roundTenth(got.MyRest) != -15 {
+		t.Fatalf("mine: lineup %v over the season, rest of season %v", got.MyGain*SeasonGames, got.MyRest)
+	}
+}
+
+// The waiver level (coordinator's ruling, Lane 269 fix round 1): a
+// player counts what he scores over the best free agent at his position.
+// Their backup back, under the last starter (-8), counts none on that
+// level and 22 over a free back at -30, which turns a trade they would
+// take into one they refuse. A back for a back cancels the level out.
+func TestTheWaiverLevelCountsTheBench(t *testing.T) {
+	config := twelveTeamPPR(t)
+	mine := set(deepAtBack(), "m-wr1", func(c Candidate) Candidate { c.Value = 80; return c })
+	theirs := set(deepAtReceiver(), "t-rb3", func(c Candidate) Candidate { c.Value = -8; return c })
+	// m-wr1 (80) for t-wr5 (85) and t-rb3.
+	give, get := []int{5}, []int{7, 11}
+	last := Check(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, give, get)
+	if roundTenth(last.TheirRest) != -5 || !Acceptable(last.TheirRest, SeasonGames) {
+		t.Fatalf("on the last starter's level: %v", last.TheirRest)
+	}
+	level := func(roster []Candidate) []Candidate {
+		out := append([]Candidate(nil), roster...)
+		for i := range out {
+			if out[i].Position == draft.RB {
+				out[i].FreeLevel = -30
+			}
+		}
+		return out
+	}
+	free := Check(config, SeasonGames, Squad{Players: level(mine)}, Squad{Players: level(theirs)}, give, get)
+	if roundTenth(free.TheirRest) != -27 || Acceptable(free.TheirRest, SeasonGames) {
+		t.Fatalf("on the waiver level: %v, want -27 and refused", free.TheirRest)
+	}
+	// m-rb4 (80) for t-wr5 and t-rb3: 110 in over the free back, 85 and 22 out.
+	backs := Check(config, SeasonGames, Squad{Players: level(mine)}, Squad{Players: level(theirs)}, []int{4}, get)
+	if roundTenth(backs.TheirRest) != 3 {
+		t.Fatalf("a back for a back: %v, want 3", backs.TheirRest)
+	}
+}
+
+// A superflex league (review LOW-5): quarterbacks are scarce, the best
+// free one far under the last starter, so a backup quarterback counts
+// against the side that gives him and the finder lists only trades both
+// sides take.
+func TestSuperflexCountsTheBackupQuarterback(t *testing.T) {
+	config := tenTeamHalfSuperflex(t)
+	qbs := func(roster []Candidate) []Candidate {
+		out := append([]Candidate(nil), roster...)
+		for i := range out {
+			if out[i].Position == draft.QB {
+				out[i].FreeLevel = -40
+			}
+		}
+		return out
+	}
+	mine, theirs := qbs(deepAtBack()), qbs(deepAtReceiver())
+	// m-rb4 (80) for t-wr4 (95) and t-qb2 (2, so 42 over the free one).
+	got := Check(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{4}, []int{6, 13})
+	if roundTenth(got.TheirRest) != -57 || Acceptable(got.TheirRest, SeasonGames) {
+		t.Fatalf("their rest of season %v, want -57 and refused", got.TheirRest)
+	}
+	for _, tr := range Trades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
+		if !Acceptable(tr.MyRest, SeasonGames) || !Acceptable(tr.TheirRest, SeasonGames) {
+			t.Fatalf("the finder lists %s at %v and %v", tradeWords(tr, mine, theirs), tr.MyRest, tr.TheirRest)
+		}
 	}
 }
 
@@ -162,18 +262,21 @@ func TestTheDropCountsAgainstItsSide(t *testing.T) {
 // finder's or the builder's voice, and never a trading word.
 func TestRestOfSeasonBasis(t *testing.T) {
 	h := Horizon{Last: LastWeek}
-	if got, want := RestOfSeasonBasis(RestOfSeason, 9, h, true),
-		"Rest of season is the points over replacement of the players a side gets less those it gives and drops, weeks 9 to 17. We list a trade only when theirs falls by 9.0 or less."; got != want {
+	if got, want := RestOfSeasonBasis(RestOfSeason, 9, h, true, true),
+		"Rest of season is what the players a side gets score over the best free agent at their position, less the same for those it gives and drops, weeks 9 to 17. We list a trade only when neither side falls by more than 9.0."; got != want {
 		t.Fatalf("finder %q", got)
 	}
-	if got := RestOfSeasonBasis(RestOfSeason, 9, h, false); !strings.HasSuffix(got, "A side takes a trade that costs it 9.0 or less.") {
+	if got := RestOfSeasonBasis(RestOfSeason, 9, h, true, false); !strings.Contains(got, "over the last starter at their position league-wide, as we have no read of the league's free agents,") {
+		t.Fatalf("with no free agents read %q", got)
+	}
+	if got := RestOfSeasonBasis(RestOfSeason, 9, h, false, true); !strings.HasSuffix(got, "A side takes a trade that costs it 9.0 or less.") {
 		t.Fatalf("builder %q", got)
 	}
-	pre := RestOfSeasonBasis(boards.OrderPreseason, SeasonGames, h, true)
-	if !strings.Contains(pre, "over the season's 17 weeks on our preseason number") || !strings.HasSuffix(pre, "17.0 or less.") {
+	pre := RestOfSeasonBasis(boards.OrderPreseason, SeasonGames, h, true, true)
+	if !strings.Contains(pre, "over the season's 17 weeks on our preseason number") || !strings.HasSuffix(pre, "more than 17.0.") {
 		t.Fatalf("preseason %q", pre)
 	}
-	for _, s := range []string{pre, RestOfSeasonBasis(RestOfSeason, 9, h, false)} {
+	for _, s := range []string{pre, RestOfSeasonBasis(RestOfSeason, 9, h, false, true), RestOfSeasonBasis(RestOfSeason, 9, h, false, false)} {
 		for _, w := range []string{"value", "price", "worth", "market"} {
 			if strings.Contains(strings.ToLower(s), w) {
 				t.Fatalf("%q says %q", s, w)
