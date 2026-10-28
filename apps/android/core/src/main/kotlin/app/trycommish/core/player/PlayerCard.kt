@@ -148,7 +148,7 @@ object PlayerCards {
     ): SheetRead? {
         if (input.page == null) return null
         val state = readState(game)
-        if (read == null) return SheetRead.None(WeekReads.noRead(state))
+        if (read == null) return SheetRead.None(WeekReads.noRead(state, input.page.weekReadsDue))
         val week = input.week
         val card = CardProjection(week.week, week.projectionScoring.format == ProjectionScoring.Format.ppr, week.line.weekProjection, state)
         return SheetRead.Shown(WeekReads.shown(read, card))

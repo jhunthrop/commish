@@ -122,9 +122,21 @@ public enum WeekReads {
         return ProjectionMove.of(now: card.points, quoted: quoted, earlier: nil).crosses
     }
 
-    /// noReadWords: his next game while it is to come, never "next" for one under way or final.
-    public static func noRead(_ state: GameRead?) -> String {
-        underway(state) ? Words.Card.readNotWritten : Words.Card.readNotYet
+    /// noReadWords: his next game while it is to come, never "next" for one under way or final; while the
+    /// coming week's reads are not yet written, the night they are (Lane 256, the run's `weekReadsDue`).
+    public static func noRead(_ state: GameRead?, due: RunReadsDue?) -> String {
+        if underway(state) {
+            return Words.Card.readNotWritten
+        }
+        guard let due, let night = due.night.value1?.rawValue ?? due.night.value2 else {
+            return Words.Card.readNotYet
+        }
+        return readsDue(week: due.week, night: night)
+    }
+
+    /// card.ts CARD.readsDue: "Our reads for week 8 are written Tuesday night."
+    static func readsDue(week: Int, night: String) -> String {
+        "Our reads for week \(week) are written \(night) night."
     }
 
     private static func withheldWords(_ read: RunWeekRead, card: CardProjection?) -> String {

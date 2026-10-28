@@ -3464,6 +3464,15 @@ export interface components {
 			/** @description the words the page shows once the live read prints another; absent on a run from before */
 			movedCaption?: string;
 		};
+		/** @description the coming week and the night its reads are written in one pass, when the week rolls over */
+		RunReadsDue: {
+			week: number;
+			/**
+			 * @description the Central night of the nightly that writes them
+			 * @enum {string}
+			 */
+			night: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+		};
 		/** @description a stat line in the research store's names; a field is null when the records do not carry it */
 		RunStatLine: {
 			pass_attempts: number | null;
@@ -3567,6 +3576,8 @@ export interface components {
 			capsule: components['schemas']['RunCapsule'] | null;
 			/** @description absent on a run from before the nightly wrote it, null when the writer did not write for the week ahead */
 			weekRead?: components['schemas']['RunWeekRead'] | null;
+			/** @description the night the coming week's reads are written, while they are not and no read is served; null otherwise, absent on a run from before */
+			weekReadsDue?: components['schemas']['RunReadsDue'] | null;
 			season: components['schemas']['RunSeason'];
 			/** @description his earlier seasons, newest first; absent on a run from before */
 			priorSeasons?: components['schemas']['RunPriorSeason'][];

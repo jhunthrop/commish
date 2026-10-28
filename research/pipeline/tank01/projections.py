@@ -249,15 +249,21 @@ def daily_capture_due(kickoffs: Sequence[TeamKickoff], now: datetime) -> DailyCa
     if not ahead:
         return None
     week = min(ahead)
-    first = bounds[week][0]
-    if first <= now:
+    if bounds[week][0] <= now:
         return None
-    opens_on = first.astimezone(_EASTERN).date() - timedelta(days=DAILY_SPAN_DAYS)
+    today = _daily_open(now.astimezone(_EASTERN).date())
+    return DailyCapture(week, today) if now >= max(daily_opens(bounds, week), today) else None
+
+
+def daily_opens(bounds: Mapping[int, tuple[datetime, datetime]], week: int) -> datetime:
+    """When the week ahead's daily read first opens: 06:00 Eastern on the day after the previous week's last
+    kickoff, or `DAILY_SPAN_DAYS` before its first kickoff's day, the later (the week reads' roll-over waits
+    for it, `capsules.week.rollover`)."""
+    opens_on = bounds[week][0].astimezone(_EASTERN).date() - timedelta(days=DAILY_SPAN_DAYS)
     earlier = [last for w, (_first, last) in bounds.items() if w < week]
     if earlier:
         opens_on = max(opens_on, max(earlier).astimezone(_EASTERN).date() + timedelta(days=1))
-    today = _daily_open(now.astimezone(_EASTERN).date())
-    return DailyCapture(week, today) if now >= max(_daily_open(opens_on), today) else None
+    return _daily_open(opens_on)
 
 
 @dataclass(frozen=True, slots=True)

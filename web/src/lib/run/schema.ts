@@ -275,6 +275,15 @@ export const weekReadSchema = z.object({
 
 export type WeekRead = z.infer<typeof weekReadSchema>;
 
+/** While the coming week's reads are not written (Lane 256, the roll-over writes every board player's
+ * in one pass), the week and the night they are written ("Tuesday"), on a page that serves no read. */
+export const readsDueSchema = z.object({
+	week: z.number().int().min(1),
+	night: z.enum(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+});
+
+export type ReadsDue = z.infer<typeof readsDueSchema>;
+
 export const playerSchema = z.object({
 	id: playerId,
 	slug,
@@ -288,6 +297,9 @@ export const playerSchema = z.object({
 	/** The week-ahead read (Lane 72): absent on a run from before the nightly wrote it, null for a
 	 * player the writer did not write for the week ahead. */
 	weekRead: weekReadSchema.nullable().optional(),
+	/** The night the coming week's reads are written (Lane 256): null once they are or while a read is
+	 * served; absent on a run from before. */
+	weekReadsDue: readsDueSchema.nullable().optional(),
 	/** His season so far: the season line and every week's game log, scored in one format. */
 	season: seasonSchema,
 	/** His earlier seasons, newest first, in the season block's format (Lane 66h); absent on a run

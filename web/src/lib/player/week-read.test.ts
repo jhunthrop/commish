@@ -102,8 +102,17 @@ void test('a read the run already withheld stays withheld', () => {
 });
 
 void test('with no read the place names his next game only while it is still to come', () => {
-	assert.equal(noReadWords('upcoming'), CARD.readNotYet);
-	assert.equal(noReadWords(null), CARD.readNotYet);
-	assert.equal(noReadWords('kicked_off'), CARD.readNotWritten);
-	assert.equal(noReadWords('final'), CARD.readNotWritten);
+	assert.equal(noReadWords('upcoming', null), CARD.readNotYet);
+	assert.equal(noReadWords(null, null), CARD.readNotYet);
+	assert.equal(noReadWords('kicked_off', null), CARD.readNotWritten);
+	assert.equal(noReadWords('final', null), CARD.readNotWritten);
+});
+
+void test('until the week rolls over the place says the night its reads are written', () => {
+	// Lane 256: the run names the week and the night, never "not written yet".
+	const due = { week: 8, night: 'Tuesday' } as const;
+	assert.equal(noReadWords('upcoming', due), 'Our reads for week 8 are written Tuesday night.');
+	assert.equal(noReadWords(null, due), CARD.readsDue(8, 'Tuesday'));
+	// A game under way says no read was written for it, whatever the run names.
+	assert.equal(noReadWords('kicked_off', due), CARD.readNotWritten);
 });

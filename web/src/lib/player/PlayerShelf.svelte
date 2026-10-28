@@ -180,7 +180,7 @@
 				{#if read && !read.withheld}
 					<Capsule body={read.body} byline={read.caption} week pulls={[]} />
 				{:else}
-					<p class="unwritten">{read?.words ?? noReadWords(readState)}</p>
+					<p class="unwritten">{read?.words ?? noReadWords(readState, built.weekReadsDue)}</p>
 				{/if}
 			</section>
 		{/if}

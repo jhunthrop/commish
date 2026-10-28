@@ -421,7 +421,7 @@ function shelfAt(
 		basis: live.basis,
 		read:
 			read === null
-				? { written: false, words: noReadWords(state) }
+				? { written: false, words: noReadWords(state, page.weekReadsDue ?? null) }
 				: {
 						written: true,
 						...shownWeekRead(read, { ...live.projection, state })
@@ -894,16 +894,26 @@ async function heldVerbCases(): Promise<unknown[]> {
 	);
 }
 
+/** The read's place with no read held (week-read.ts noReadWords): every game state, with no roll-over
+ * pending and while the coming week's reads are due on a night the run names (Lane 256). */
+function noReadCases(): unknown[] {
+	const dues = [null, { week: 8, night: 'Tuesday' }, { week: 9, night: 'Wednesday' }] as const;
+	return dues.flatMap((due) =>
+		(['upcoming', null, 'kicked_off', 'final'] as const).map((state) => ({
+			state,
+			due,
+			words: noReadWords(state, due)
+		}))
+	);
+}
+
 export async function renderPlayerSheet(about: string): Promise<string> {
 	const [standin, contract] = await Promise.all([runOf('standin'), runOf('contract')]);
 	const parity = {
 		about,
 		zone: ZONE,
 		weekRead: weekReadCases(),
-		noRead: (['upcoming', null, 'kicked_off', 'final'] as const).map((state) => ({
-			state,
-			words: noReadWords(state)
-		})),
+		noRead: noReadCases(),
 		statusHeld: await statusHeldCases(standin),
 		nextPass: nextPassCases(),
 		sheets: await sheetCases(standin, contract),

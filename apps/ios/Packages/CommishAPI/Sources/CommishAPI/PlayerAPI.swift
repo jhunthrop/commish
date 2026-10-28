@@ -7,6 +7,7 @@ public typealias RunPlayer = Components.Schemas.RunPlayer
 public typealias RunPlayerAnswer = Components.Schemas.RunPlayerAnswer
 public typealias RunPlayerFormat = Components.Schemas.RunPlayerFormat
 public typealias RunWeekRead = Components.Schemas.RunWeekRead
+public typealias RunReadsDue = Components.Schemas.RunReadsDue
 public typealias RunCapsule = Components.Schemas.RunCapsule
 public typealias RunPullFigure = Components.Schemas.RunPullFigure
 public typealias RunIndexEntry = Components.Schemas.RunIndexEntry

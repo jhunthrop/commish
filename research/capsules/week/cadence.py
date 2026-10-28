@@ -1,14 +1,19 @@
-"""WHEN A WEEK READ IS WRITTEN AGAIN: the nightly writes a read for every player on a board, and an hourly
-pass after the status capture rewrites the reads whose week moved.
+"""WHEN A WEEK READ IS WRITTEN AGAIN: the roll-over writes every board player's read for the coming week in one
+nightly pass (Lane 256, `rollover`), and after it an hourly pass after the status capture and the nightly
+rewrite only the reads whose week moved.
 
-- No read for his week yet (a new week, or his first): `FIRST`, nightly.
+- No read for his week yet (the roll-over, or a player new to the board since): `FIRST`, nightly.
 - The last one fell to its facts block (the writer could not serve him, or it was demoted for a shared
   sentence): `UNWRITTEN`, nightly, and at most once an hour and three times a Central day (`RETRY_GAP`,
-  `RETRIES_A_DAY`), so a read that keeps failing never spends a day's budget.
+  `RETRIES_A_DAY`), so a read that keeps failing never spends a day's budget. Within the roll-over pass a
+  fallen read is asked again at once (`nightly.week_reads.ROLLOVER_ROUNDS`).
 - His status changed since it was written (Lane 63's capture marks it): `STATUS_CHANGED`, nightly and hourly.
-- The published projection the card prints moved, by any tenth (Lane 66v: a read quotes the card's figure,
-  so one it no longer prints is stale): `PROJECTION_MOVED`, nightly only (the page is prerendered, so an
-  hourly rewrite would not be seen before the nightly's; the page withholds the moved read meanwhile).
+- The published projection the card prints moved past the Proj change tile's threshold (the page's serve rule,
+  `projection_moved_past_shown`; Lane 256: a move by a tenth rewrote 330 reads on the night of 2026-10-21 and 263
+  on 2026-10-23, the whole board mid-week, so a smaller move keeps the read the roll-over wrote, and the Wk tile's
+  "Proj at the read" says the figure it was written with): `PROJECTION_MOVED`, nightly only (the page is
+  prerendered, so an hourly rewrite would not be seen before the nightly's; the page withholds the moved read
+  meanwhile).
 
 Anything else (a new forecast, a new depth chart) waits for one of those, so a quiet week costs nothing.
 """
@@ -37,14 +42,6 @@ def central_day(instant: datetime) -> date:
     return instant.astimezone(CENTRAL).date()
 
 
-def projection_moved(now: float | None, then: float | None) -> bool:
-    """Whether the card's published projection (`now`) prints another figure than the one a read was
-    written with (`then`), each read as the card's tenth (a row kept before the tenth was stored too)."""
-    if now is None or then is None:
-        return (now is None) != (then is None)
-    return projection_tenth(now) != projection_tenth(then)
-
-
 # Tenths in a point: the card's figures are whole tenths, so the serve rule compares them as integers.
 _TENTHS: Final = 10
 
@@ -53,8 +50,7 @@ def projection_moved_past_shown(now: float | None, then: float | None) -> bool:
     """Whether the card's published projection (`now`) has moved from a read's (`then`) by the Proj change
     tile's threshold (`cells.SHOWN_CHANGE_FROM`, Lane 162, D04): the page's serve rule, so a move the tile
     calls "under 0.5" never withholds the read (the web's `card.ts projectionMoved`). A figure that appeared
-    or went is a move. The rewrite still follows any tenth (`projection_moved`), so the quote is refreshed
-    the next night."""
+    or went is a move. The rewrite follows the same threshold (Lane 256), so a smaller move keeps the read."""
     if now is None or then is None:
         return (now is None) != (then is None)
     moved = abs(round(projection_tenth(now) * _TENTHS) - round(projection_tenth(then) * _TENTHS))
@@ -62,7 +58,8 @@ def projection_moved_past_shown(now: float | None, then: float | None) -> bool:
 
 
 def _projection_moved(sheet: WeekSheet, stored: StoredWeekRead) -> bool:
-    return projection_moved(None if sheet.projection is None else sheet.projection.points, stored.projection_points)
+    now = None if sheet.projection is None else sheet.projection.points
+    return projection_moved_past_shown(now, stored.projection_points)
 
 
 def attempts_today(stored: StoredWeekRead | None, now: datetime) -> int:
