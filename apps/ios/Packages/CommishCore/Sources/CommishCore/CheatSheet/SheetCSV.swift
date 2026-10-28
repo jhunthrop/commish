@@ -1,3 +1,4 @@
+import CommishDesign
 import Foundation
 
 /// A CSV read on the phone before it is sent (a port of web/src/lib/sheet/csv.ts decodeCsv, held to
@@ -36,7 +37,7 @@ public enum SheetCSV {
     static let tagSeparators: Set<Character> = [",", "|", Character(Unicode.Scalar(0x3B))]
     static let byteOrderMark = "\u{FEFF}"
 
-    static let emptyFile = "The file is empty"
+    static let emptyFile = Words.SheetImport.emptyFile
     static let badHeader = "The first row must name rank, player_id, name and position"
 
     /// True when the text is the sheet's CSV, not a list of names: its first line names player_id (paste.ts
@@ -255,7 +256,7 @@ public enum SheetCSV {
             return "Keep it to \(SheetLimits.tags) tags"
         }
         if SheetTags.normalized(tags).count < tags.count {
-            return "Target and Avoid are both set, pick one"
+            return Words.SheetImport.bothTargetAndAvoid
         }
         return nil
     }
@@ -263,7 +264,7 @@ public enum SheetCSV {
     static func row(_ record: [String], _ index: [String: Int]) -> Result<Row, Refusal> {
         let rank = number(cell(record, index, "rank"))
         guard let rank, whole(rank), rank >= 1 else {
-            return .failure(Refusal(reason: "The rank is not a whole number from 1"))
+            return .failure(Refusal(reason: Words.SheetImport.badRank))
         }
         let id = cell(record, index, "player_id")
         let problem = lengthProblem("player_id", id, 1, SheetLimits.playerId)
@@ -274,7 +275,7 @@ public enum SheetCSV {
             return .failure(Refusal(reason: problem))
         }
         guard position(cell(record, index, "position")) != nil else {
-            return .failure(Refusal(reason: "The position is not QB, RB, WR, TE, K or DST"))
+            return .failure(Refusal(reason: Words.SheetImport.badPosition))
         }
         let rawTier = cell(record, index, "tier")
         if !rawTier.isEmpty {

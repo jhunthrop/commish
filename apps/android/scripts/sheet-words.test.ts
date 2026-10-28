@@ -1,15 +1,15 @@
-// The Android Sheet's words held to the web's (Lane 267, the iOS sheet-words.test.ts's twin, until B266
-// lifts the web's sheet words into a module gen-words carries): every string literal in SheetWords.kt, cut at
-// its templates, is found in the web's sheet sources, or is the web's with "line" said as the phone says it,
-// "row" (the copy rules keep "line" for the field), or is listed below as the phone's own with the reason. A
-// web wording change fails here until the phone follows. Run with `node --test apps/android/scripts/*.test.ts`.
+// The Android Sheet's words (Lane 267; Lane 283, B266): the words the web and the phones share are generated
+// from web/src/lib/sheet/words.ts and print-words.ts into the Words tables (shared/scripts/gen-words.ts),
+// and SheetWords reads them there; a copy of one in SheetWords fails here. What SheetWords still spells
+// is a word with a slot (B256), each piece of which is found in the web's sheet sources, or the phone's
+// own word, listed below with the reason. Run with `node --test apps/android/scripts/*.test.ts`.
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
 const REPOSITORY = join(import.meta.dirname, '..', '..', '..');
-const KOTLIN = join(
+const SOURCE = join(
 	REPOSITORY,
 	'apps/android/core/src/main/kotlin/app/trycommish/core/sheet/SheetWords.kt'
 );
@@ -114,7 +114,7 @@ function webSpelling(piece: string): string {
 
 test('every word the phone prints on the Sheet is the web’s, or listed as the phone’s own', () => {
 	const web = WEB.flatMap(sources).join('\n');
-	const missing = literals(readFileSync(KOTLIN, 'utf8')).filter(
+	const missing = literals(readFileSync(SOURCE, 'utf8')).filter(
 		(piece) =>
 			PHONE_OWN[piece] === undefined && !web.includes(piece) && !web.includes(webSpelling(piece))
 	);
@@ -122,7 +122,7 @@ test('every word the phone prints on the Sheet is the web’s, or listed as the 
 });
 
 test('the phone’s own list names only words SheetWords still prints', () => {
-	const printed = new Set(literals(readFileSync(KOTLIN, 'utf8')));
+	const printed = new Set(literals(readFileSync(SOURCE, 'utf8')));
 	assert.deepEqual(
 		Object.keys(PHONE_OWN).filter((piece) => !printed.has(piece)),
 		[]
@@ -140,4 +140,27 @@ test('the phone’s "row" is the web’s "line"', () => {
 	assert.equal(webSpelling('3 rows skipped'), '3 lines skipped');
 	assert.equal(webSpelling('Row 4: '), 'Line 4: ');
 	assert.equal(webSpelling('an earlier row'), 'an earlier line');
+});
+
+/** Every word the generated sheet tables carry (shared/words/sheet*.json, from web/src/lib/sheet). */
+function tableWords(): Set<string> {
+	const dir = join(REPOSITORY, 'shared/words');
+	return new Set(
+		readdirSync(dir)
+			.filter((name) => /^sheet(-[a-z]+)?\.json$/.test(name))
+			.flatMap((name) =>
+				Object.entries(JSON.parse(readFileSync(join(dir, name), 'utf8')) as Record<string, unknown>)
+					.filter(([key]) => key !== 'functions')
+					.map(([, word]) => String(word))
+			)
+	);
+}
+
+test('a word the generated sheet tables carry is read from Words, never copied', () => {
+	const words = tableWords();
+	assert.ok(words.has('Start from our board'));
+	assert.deepEqual(
+		literals(readFileSync(SOURCE, 'utf8')).filter((piece) => words.has(piece.replaceAll('\\n', '\n'))),
+		[]
+	);
 });
