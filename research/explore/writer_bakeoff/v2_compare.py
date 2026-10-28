@@ -19,7 +19,7 @@ from typing import Any, Final
 from research.capsules.narrative import ShapeMasks, club_spellings
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.week.voices import VOICES
-from research.explore.writer_bakeoff.audibility import audibility, corrected, first_sentence
+from research.explore.writer_bakeoff.audibility import BASES, Cut, audibility, corrected, first_sentence, voiced
 from research.explore.writer_bakeoff.voices_compare import WRITTEN_SLACK
 
 Json = dict[str, Any]
@@ -77,11 +77,11 @@ def _masks(arms: Mapping[str, Sequence[Json]]) -> ShapeMasks:
     )
 
 
-def _audible(on_runs: Sequence[Json], off_runs: Sequence[Json], masks: ShapeMasks) -> Json:
+def _audible(on_runs: Sequence[Json], off_runs: Sequence[Json], masks: ShapeMasks, cut: Cut = voiced) -> Json:
     """Each voice's audibility over the paired runs pooled: each run's reads against its own pair's off run."""
     on = [read | {"player_id": f"{i}:{read['player_id']}"} for i, r in enumerate(on_runs) for read in r["reads"]]
     off = [read | {"player_id": f"{i}:{read['player_id']}"} for i, r in enumerate(off_runs) for read in r["reads"]]
-    return {key: asdict(value) for key, value in audibility(on, off, masks).items()}
+    return {key: asdict(value) for key, value in audibility(on, off, masks, cut).items()}
 
 
 def bar(pooled: Mapping[str, Json], audible: Mapping[str, Json]) -> dict[str, bool]:
@@ -135,6 +135,9 @@ def compare(arms: Mapping[str, Sequence[Json]]) -> Json:
     per_pair = [{arm: _counts([arms[arm][i]]) for arm in ARMS} for i in range(pairs)]
     pooled = {arm: _counts(arms[arm]) for arm in ARMS}
     audible = {arm: _audible(arms[arm], arms["off"], masks) for arm in ("v1", "v2")}
+    wider = {
+        base: {arm: _audible(arms[arm], arms["off"], masks, cut) for arm in ("v1", "v2")} for base, cut in BASES.items()
+    }
     audible_per_pair = [
         {arm: _audible([arms[arm][i]], [arms["off"][i]], masks) for arm in ("v1", "v2")} for i in range(pairs)
     ]
@@ -144,7 +147,9 @@ def compare(arms: Mapping[str, Sequence[Json]]) -> Json:
         "pooled": pooled,
         "audibility": audible,
         "audibility_per_pair": audible_per_pair,
+        "audibility_by_basis": wider,
         "bar": bar(pooled, audible),
+        "bar_by_basis": {base: bar(pooled, value) for base, value in wider.items()},
         "samples": samples(arms["v2"][-1], arms["v1"][-1], arms["off"][-1]),
         "spent_usd": sum(r["run"]["spent_usd"] for runs in arms.values() for r in runs),
     }
@@ -210,6 +215,10 @@ def markdown(c: Mapping[str, Any]) -> str:
         *_audibility_rows(c["audibility"]),
         "",
     ]
+    for base, value in c["audibility_by_basis"].items():
+        tests = c["bar_by_basis"][base]
+        verdict = ", ".join(f"{v}: {'up' if tests[f'audibility up, {v}'] else 'not up'}" for v in QUIET_VOICES)
+        lines += [f"## Audibility per voice, pooled, on {base} ({verdict})", "", *_audibility_rows(value), ""]
     for i, pair in enumerate(c["audibility_per_pair"]):
         lines += [f"### Audibility, pair {chr(ord('a') + i)}", "", *_audibility_rows(pair), ""]
     for arm in ARMS:

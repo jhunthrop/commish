@@ -9,8 +9,10 @@ scores a voice on three measures, each from 0 (sounds like no voice) to 1, and t
 - the lean: how much more often the voice's reads carry what its brief leans on (`LEANS`) than the voices-off
   reads do, floored at 0.
 
-Only first-draft reads count (`voiced`): a correction or the retry writer's draft is asked without the brief,
-so a corrected read carries no voice; they are counted apart. The voices-off side is held to the same cut.
+Ruling 2's basis is the written first-draft reads (`voiced`): a correction or the retry writer's draft is asked
+without the brief, so a corrected read carries no voice; they are counted apart. Two wider bases sit beside it
+(`BASES`): every read's first draft, written or not (the voice as asked), and every written read (the voice as
+the page shows it). The voices-off side is held to the same cut.
 """
 
 import re
@@ -154,8 +156,28 @@ def corrected(read: Json) -> bool:
 
 
 def voiced(reads: Iterable[Json]) -> list[Json]:
-    """The written first-draft reads: the reads that carry the voice's brief."""
+    """The written first-draft reads: the reads that carry the voice's brief (ruling 2's basis)."""
     return [r for r in reads if is_written(r) and not corrected(r)]
+
+
+def first_drafts(reads: Iterable[Json]) -> list[Json]:
+    """Every read's first draft, written or not: every one was asked with the brief (the voice as asked)."""
+    return [{**r, "text": r["drafts"][0]["body"]} for r in reads if r["drafts"] and r["drafts"][0].get("body")]
+
+
+def written(reads: Iterable[Json]) -> list[Json]:
+    """Every written read, corrected or not: the voice as the page shows it."""
+    return [r for r in reads if is_written(r)]
+
+
+Cut = Callable[[Iterable[Json]], list[Json]]
+# The reads a tally is taken on: ruling 2's first-draft written reads, and two wider bases beside it (Lane 281:
+# about nine written reads in ten are corrected, which leaves ruling 2's basis a few reads a voice).
+BASES: Final[Mapping[str, Cut]] = {
+    "written first drafts": voiced,
+    "every first draft": first_drafts,
+    "every written read": written,
+}
 
 
 def ks_distance(a: Sequence[int], b: Sequence[int]) -> float:
@@ -187,11 +209,13 @@ def _rate(reads: Sequence[Json], test: Callable[[Json], bool]) -> float:
     return sum(test(r) for r in reads) / len(reads) if reads else 0.0
 
 
-def voice_audibility(voice: str, on: Sequence[Json], off: Sequence[Json], masks: ShapeMasks) -> VoiceAudibility:
+def voice_audibility(
+    voice: str, on: Sequence[Json], off: Sequence[Json], masks: ShapeMasks, cut: Cut = voiced
+) -> VoiceAudibility:
     """`voice`'s reads in a voiced arm (`on`, every read of its players) against the voices-off arm's reads of
-    the same players (`off`), both cut to their first drafts."""
+    the same players (`off`), both cut the same way (`cut`, the written first drafts by default)."""
     players = {r["player_id"] for r in on}
-    mine, theirs = voiced(on), voiced(r for r in off if r["player_id"] in players)
+    mine, theirs = cut(on), cut(r for r in off if r["player_id"] in players)
     open_on = Counter(opener_class(first_sentence(r["text"]), masks) for r in mine)
     open_off = Counter(opener_class(first_sentence(r["text"]), masks) for r in theirs)
     lean = LEANS[voice]
@@ -217,7 +241,9 @@ def voice_audibility(voice: str, on: Sequence[Json], off: Sequence[Json], masks:
     )
 
 
-def audibility(on: Sequence[Json], off: Sequence[Json], masks: ShapeMasks) -> dict[str, VoiceAudibility]:
+def audibility(
+    on: Sequence[Json], off: Sequence[Json], masks: ShapeMasks, cut: Cut = voiced
+) -> dict[str, VoiceAudibility]:
     """Every voice's audibility: `on` and `off` are two arms' reads, each carrying its player's `voice`."""
     keys = list(dict.fromkeys(r["voice"] for r in on))
-    return {key: voice_audibility(key, [r for r in on if r["voice"] == key], off, masks) for key in keys}
+    return {key: voice_audibility(key, [r for r in on if r["voice"] == key], off, masks, cut) for key in keys}

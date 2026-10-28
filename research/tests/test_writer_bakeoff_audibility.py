@@ -11,6 +11,7 @@ from research.capsules.narrative import ShapeMasks, club_spellings
 from research.capsules.week import prompt, rules, voices, write
 from research.explore.writer_bakeoff import voices_v1
 from research.explore.writer_bakeoff.audibility import (
+    BASES,
     CALL,
     CLUB,
     FIGURE,
@@ -134,3 +135,16 @@ def test_the_v1_arm_restores_lane_266s_prompt_and_drops_the_new_rules(monkeypatc
     assert [v.key for v in voices.VOICES] == [v.key for v in voices_v1.v1_voices()]
     assert {v.key: v.brief for v in voices.VOICES}["story"] == voices_v1.V1_BRIEFS["story"]
     assert rules._first_sentence_violation(["word " * 60]) == []
+
+
+def test_the_wider_bases_take_every_first_draft_and_every_written_read() -> None:
+    fixed = _read("b", "Puka Nacua carries no designation. He plays. Start him.", drafts=2)
+    fixed["drafts"] = [{"body": "Start him against Arizona. He plays. Go."}, {"body": fixed["text"]}]
+    fell = _read("d", "Facts.", source="facts")
+    fell["drafts"] = [{"body": "Start him now. He plays. Go."}]
+    assert [r["text"] for r in BASES["every first draft"]([fixed, fell])] == [
+        "Start him against Arizona. He plays. Go.",
+        "Start him now. He plays. Go.",
+    ]
+    assert BASES["every written read"]([fixed, fell]) == [fixed]
+    assert BASES["written first drafts"]([fixed, fell]) == []
