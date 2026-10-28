@@ -212,22 +212,32 @@ void test("the player sheet's parity: every held read, each sheet player at each
 		'a read that stands'
 	);
 	const notWritten = 'Our read for this game was not written.';
+	const notYet = 'Our read for his next game is not written yet.';
+	const underway = parity.noRead.filter((c) => c.state === 'kicked_off' || c.state === 'final');
+	assert.ok(underway.length > 0 && underway.every((c) => c.words === notWritten), 'under way');
+	// Lane 256 and 265: while a game is to come, the night of the nightly the run names, until the
+	// screen's clock passes it; a run from before names no instant. Each due on the clocks none,
+	// Tuesday 27 October and Friday 20 November.
 	assert.deepEqual(
-		parity.noRead.map((c) => c.words),
+		parity.noRead.filter((c) => c.state === 'upcoming').map((c) => c.words),
 		[
-			'Our read for his next game is not written yet.',
-			'Our read for his next game is not written yet.',
-			notWritten,
-			notWritten,
-			// Lane 256: until the week rolls over, the night the run names.
-			'Our reads for week 8 are written Tuesday night.',
-			'Our reads for week 8 are written Tuesday night.',
-			notWritten,
-			notWritten,
-			'Our reads for week 9 are written Wednesday night.',
-			'Our reads for week 9 are written Wednesday night.',
-			notWritten,
-			notWritten
+			...[notYet, notYet, notYet],
+			...[
+				'Our reads for week 8 are written Tuesday night.',
+				'Our reads for week 8 are written Tuesday night.',
+				notYet
+			],
+			...[
+				'Our reads for week 9 are written Wednesday night.',
+				'Our reads for week 9 are written Wednesday night.',
+				notYet
+			],
+			...[
+				'Our reads for week 9 are written Tuesday night.',
+				'Our reads for week 9 are written Tuesday night.',
+				notYet
+			],
+			...[notYet, notYet, notYet]
 		]
 	);
 	assert.ok(

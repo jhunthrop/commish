@@ -130,18 +130,18 @@ public enum WeekReads {
         if underway(state) {
             return Words.Card.readNotWritten
         }
-        guard let due, let at = due.at, now < at else {
+        guard let due, let nightly = due.at, now < nightly else {
             return Words.Card.readNotYet
         }
-        return readsDue(week: due.week, night: nightOf(at))
+        return readsDue(week: due.week, night: nightOf(nightly))
     }
 
     /// week-read.ts NIGHT_RUNS_PAST_MIDNIGHT_MS.
     static let nightRunsPastMidnight: TimeInterval = 6 * 60 * 60
 
     /// week-read.ts nightOf: the night a nightly belongs to, the Eastern day six hours before it.
-    static func nightOf(_ at: Date) -> String {
-        Formatting.weekdayName(at.addingTimeInterval(-nightRunsPastMidnight), zone: RecordWords.eastern)
+    static func nightOf(_ nightly: Date) -> String {
+        Formatting.weekdayName(nightly.addingTimeInterval(-nightRunsPastMidnight), zone: RecordWords.eastern)
     }
 
     /// card.ts CARD.readsDue: "Our reads for week 8 are written Tuesday night."
