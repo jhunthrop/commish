@@ -3903,6 +3903,9 @@ type OrderAdvice struct {
 	// Rows in our order, at most the limit
 	Rows []OrderRow `json:"rows"`
 
+	// StatusRead the injury capture the rows' statuses come from (Lane 280, B257), the hourly cache the order read, so a screen that draws the run's rows with the order's statuses dates its status column by the newer of the two; absent when no capture was read, and from an older answer
+	StatusRead *StatusRead `json:"status_read,omitempty"`
+
 	// Total every player the view holds before the limit
 	Total int `json:"total"`
 

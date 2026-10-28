@@ -10102,6 +10102,10 @@ components:
           format: date-time
           nullable: true
           description: when the week's published projection was read, null when none is stored
+        status_read:
+          allOf:
+            - $ref: "#/components/schemas/StatusRead"
+          description: the injury capture the rows' statuses come from (Lane 280, B257), the hourly cache the order read, so a screen that draws the run's rows with the order's statuses dates its status column by the newer of the two; absent when no capture was read, and from an older answer
         projection_scoring:
           $ref: "#/components/schemas/ProjectionScoring"
         rank_by:

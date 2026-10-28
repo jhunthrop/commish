@@ -320,6 +320,7 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 		out.Rows = append(out.Rows, a.orderRow(p, places.rank[i], places.overall[i], hosts, targets))
 	}
 	out.OnClub = &onClub
+	out.StatusRead = boards.StatusRead(a.season.designations)
 	for _, r := range out.Rows {
 		if r.Line.RestOfSeasonPerGame != nil {
 			out.Basis += " " + PerGameBasis()

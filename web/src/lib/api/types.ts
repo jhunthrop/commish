@@ -4612,6 +4612,8 @@ export interface components {
 			 * @description when the week's published projection was read, null when none is stored
 			 */
 			projection_read_at: string | null;
+			/** @description the injury capture the rows' statuses come from (Lane 280, B257), the hourly cache the order read, so a screen that draws the run's rows with the order's statuses dates its status column by the newer of the two; absent when no capture was read, and from an older answer */
+			status_read?: components['schemas']['StatusRead'];
 			projection_scoring: components['schemas']['ProjectionScoring'];
 			/**
 			 * @description the key the rows' rank sorts on, the figure a screen shows first: the rest-of-season total at a position, points over replacement across positions
