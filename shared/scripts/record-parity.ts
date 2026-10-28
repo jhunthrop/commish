@@ -104,6 +104,12 @@ export const RECORD_CASES: readonly {
 		file: 'shared/fixtures/record/set.json',
 		now: '2026-10-27T17:00:00.000Z'
 	},
+	// The same week with a missed week before it: the missed sentence stays, the waiting one is dropped (Lane 273).
+	{
+		name: 'set-missed',
+		file: 'shared/fixtures/record/set-missed.json',
+		now: '2026-10-27T17:00:00.000Z'
+	},
 	{
 		name: 'graded',
 		file: 'shared/fixtures/record/graded.json',

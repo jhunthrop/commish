@@ -75,7 +75,7 @@ struct MockRoomViewModelTests {
         }
         #expect(stale)
         #expect(!viewModel.canWrite)
-        #expect(viewModel.staleWords?.hasPrefix(Words.Mock.unreachablePhone) == true)
+        #expect(viewModel.staleWords?.hasPrefix(Words.Mock.unreachableStale) == true)
         await viewModel.draft()
         await viewModel.finish()
         #expect(await api.picks.isEmpty)

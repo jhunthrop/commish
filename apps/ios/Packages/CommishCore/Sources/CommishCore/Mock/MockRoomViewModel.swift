@@ -78,7 +78,7 @@ public final class MockRoomViewModel {
         guard case .room(_, true) = state else {
             return nil
         }
-        return [Words.Mock.unreachablePhone, stamp.map { AppWords.lastRead($0, zone: zone) }]
+        return [Words.Mock.unreachableStale, stamp.map { AppWords.lastRead($0, zone: zone) }]
             .compactMap(\.self).joined(separator: " ")
     }
 

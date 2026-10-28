@@ -11,6 +11,7 @@
 //   142): its figures are week 1's ADP lines relabelled, so the front card's two yardsticks can be
 //   shot. They are not a grade of anything either. The graded week 7 carries the run's ESPN sentence
 //   (Lane 147), its yardstick read after the set as the week's real one was.
+//   `set-missed` is `set` with week 6 before it, its first kickoff passed with no order set (Lane 273).
 //   `set` is week 7 set and played, waiting on its stats (Lane 250): its grading day is what
 //   research's `week_complete.grades_from` writes for its last kickoff (Mon Oct 26 night), Tuesday
 //   20:30 Eastern, held to that by research/tests/test_lane250_record_fixtures.py.
@@ -18,7 +19,7 @@ import { readFile } from 'node:fs/promises';
 import { RECORDS_WORDS } from '../../src/lib/run/records.ts';
 import type { RecordLine, RecordWeek, RunRecord } from '../../src/lib/run/schema.ts';
 
-export type TwoMode = 'upcoming' | 'set' | 'graded' | 'published';
+export type TwoMode = 'upcoming' | 'set' | 'set-missed' | 'graded' | 'published';
 
 const FROM_WEEK = 7;
 const SET_AT = '2026-10-22T18:00:00.000Z';
@@ -106,6 +107,22 @@ function setWaiting(seven: RecordWeek): RecordWeek {
 	};
 }
 
+/** The week before the set one, its first kickoff passed with no order set, as weekly_record.py writes
+ * a missed week (Lane 273): it never froze, so it carries no set time. */
+function missedBefore(week: number): RecordWeek {
+	return {
+		week,
+		status: 'missed',
+		frozenAt: null,
+		frozenBy: null,
+		order: null,
+		gradedAt: null,
+		population: 0,
+		lines: [],
+		note: 'Our order was not set before kickoff that week.'
+	};
+}
+
 /** The record with its two records, in the nightly's shape. */
 export async function withTwoRecords(record: RunRecord, mode: TwoMode): Promise<unknown> {
 	const draft = await json(new URL('draft-live.json', import.meta.url));
@@ -118,21 +135,22 @@ export async function withTwoRecords(record: RunRecord, mode: TwoMode): Promise<
 	const graded = mode === 'graded' || mode === 'published';
 	const first = graded
 		? gradedStandIn(two, mode === 'published' ? one.lines : null)
-		: mode === 'set'
+		: mode === 'set' || mode === 'set-missed'
 			? setWaiting(seven)
 			: seven;
 	const toDate = graded ? first.lines : [];
+	const missed = mode === 'set-missed' ? [missedBefore(FROM_WEEK - 1)] : [];
 	return {
 		...record,
 		draft,
 		weekly: {
-			fromWeek: FROM_WEEK,
+			fromWeek: FROM_WEEK - missed.length,
 			statistic: record.statistic,
 			scale: record.scale,
 			startersBasis: graded ? record.startersBasis : null,
 			method: await runMethod(graded ? ["ESPN's projection"] : []),
 			honest: null,
-			weeks: [first, ...later],
+			weeks: [...missed, first, ...later],
 			toDate
 		}
 	};

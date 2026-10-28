@@ -3122,6 +3122,288 @@
 				"basis": "Each position is graded on its own, All by players graded. Top named counts how many of the season's top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far the order also ranked that high."
 			}
 		},
+		"set-missed": {
+			"now": "2026-10-27T17:00:00.000Z",
+			"file": "shared/fixtures/record/set-missed.json",
+			"scoring": "PPR",
+			"states": {
+				"unplayed": [],
+				"underway": []
+			},
+			"lead": "Two records, each graded against what it competes with: our rest-of-season order, graded week by week against ESPN and the week's published projection, and our draft board against ADP.",
+			"weekly": {
+				"head": {
+					"title": "Weekly record",
+					"what": "Our rest-of-season order, graded week by week against ESPN and the week's published projection"
+				},
+				"bug": {
+					"kind": "pending",
+					"title": "Week 7 not graded yet",
+					"when": "Grades once every game's stats are in, usually Tue Oct 27.",
+					"gaps": "Week 6 was not set before kickoff, so it cannot be graded."
+				},
+				"positions": [],
+				"figures": [
+					"Order matched",
+					"Places off",
+					"Starters right"
+				],
+				"sourceHeads": [
+					"Ours",
+					"ESPN"
+				],
+				"before": {
+					"lead": "Weeks 1 to 5",
+					"text": "Our rest-of-season order is graded week by week from week 6. Each week's order is set before its first kickoff and graded as set, never as refreshed after, so a player put on IR later keeps the rank we set. Before that the site shipped the draft board, graded under Draft record."
+				},
+				"rows": [
+					{
+						"lead": "Week 6",
+						"text": "Our order was not set before kickoff, so it cannot be graded",
+						"order": null,
+						"caption": null,
+						"graded": false,
+						"players": null,
+						"cells": null,
+						"note": null
+					},
+					{
+						"lead": "Week 7",
+						"text": "Set Thu Oct 22, 1:00 pm Central, grades once every game's stats are in, usually Tue Oct 27",
+						"order": "Our rest-of-season order, set Oct 22",
+						"caption": null,
+						"graded": false,
+						"players": null,
+						"cells": null,
+						"note": null
+					},
+					{
+						"lead": "Week 8",
+						"text": "Set before kickoff Thu Oct 29",
+						"order": null,
+						"caption": null,
+						"graded": false,
+						"players": null,
+						"cells": null,
+						"note": null
+					},
+					{
+						"lead": "Weeks 9 to 18",
+						"text": "Set each week before kickoff",
+						"order": null,
+						"caption": null,
+						"graded": false,
+						"players": null,
+						"cells": null,
+						"note": null
+					}
+				],
+				"toDate": null,
+				"basis": "Order matched is how closely an order ranked the players to the week's finish: 1.00 is the same order, 0.00 no closer than chance, below 0.00 the order runs backwards. Places off is how many places a player finished from his rank, lower is better."
+			},
+			"draft": {
+				"head": {
+					"title": "Draft record",
+					"what": "Our draft board against ADP, on the season's points so far"
+				},
+				"waiting": null,
+				"bug": {
+					"span": "Season points through week 5",
+					"players": "208 players",
+					"tiles": [
+						{
+							"label": "order matched",
+							"key": null,
+							"pair": {
+								"ours": "0.55",
+								"theirs": "0.55",
+								"name": "ADP",
+								"leader": "level",
+								"lead": "level",
+								"accented": false
+							}
+						},
+						{
+							"label": "places off",
+							"key": "lower is better",
+							"pair": {
+								"ours": "12.9",
+								"theirs": "12.9",
+								"name": "ADP",
+								"leader": "level",
+								"lead": "level",
+								"accented": false
+							}
+						},
+						{
+							"label": "Top named",
+							"key": "of the top 12 QB, 24 RB, 36 WR, 12 TE",
+							"pair": {
+								"ours": "56 of 84",
+								"theirs": "60 of 84",
+								"name": "ADP",
+								"leader": "theirs",
+								"lead": "ADP by 4",
+								"accented": false
+							}
+						}
+					],
+					"honest": "ADP named more of the season's top players so far, 60 of 84 against our 56."
+				},
+				"figures": [
+					"Order matched",
+					"Places off",
+					"Top named"
+				],
+				"sourceHeads": [
+					"Ours",
+					"ADP"
+				],
+				"heads": {
+					"position": "Position",
+					"players": "Players graded",
+					"all": "All"
+				},
+				"rows": [
+					{
+						"position": "QB",
+						"players": 31,
+						"cells": {
+							"agreement": {
+								"accented": false,
+								"cells": [
+									"0.29",
+									"0.39"
+								]
+							},
+							"placesOff": {
+								"accented": false,
+								"cells": [
+									"8.8",
+									"8.2"
+								]
+							},
+							"starters": {
+								"accented": false,
+								"cells": [
+									"6 of 12",
+									"8 of 12"
+								]
+							}
+						}
+					},
+					{
+						"position": "RB",
+						"players": 63,
+						"cells": {
+							"agreement": {
+								"accented": false,
+								"cells": [
+									"0.66",
+									"0.69"
+								]
+							},
+							"placesOff": {
+								"accented": false,
+								"cells": [
+									"11.3",
+									"11.0"
+								]
+							},
+							"starters": {
+								"accented": false,
+								"cells": [
+									"18 of 24",
+									"20 of 24"
+								]
+							}
+						}
+					},
+					{
+						"position": "WR",
+						"players": 87,
+						"cells": {
+							"agreement": {
+								"accented": true,
+								"cells": [
+									"0.59",
+									"0.58"
+								]
+							},
+							"placesOff": {
+								"accented": true,
+								"cells": [
+									"17.5",
+									"18.0"
+								]
+							},
+							"starters": {
+								"accented": false,
+								"cells": [
+									"24 of 36",
+									"25 of 36"
+								]
+							}
+						}
+					},
+					{
+						"position": "TE",
+						"players": 27,
+						"cells": {
+							"agreement": {
+								"accented": true,
+								"cells": [
+									"0.47",
+									"0.36"
+								]
+							},
+							"placesOff": {
+								"accented": true,
+								"cells": [
+									"6.2",
+									"6.7"
+								]
+							},
+							"starters": {
+								"accented": true,
+								"cells": [
+									"8 of 12",
+									"7 of 12"
+								]
+							}
+						}
+					}
+				],
+				"all": {
+					"position": "All",
+					"players": 208,
+					"cells": {
+						"agreement": {
+							"accented": false,
+							"cells": [
+								"0.55",
+								"0.55"
+							]
+						},
+						"placesOff": {
+							"accented": false,
+							"cells": [
+								"12.9",
+								"12.9"
+							]
+						},
+						"starters": {
+							"accented": false,
+							"cells": [
+								"56 of 84",
+								"60 of 84"
+							]
+						}
+					}
+				},
+				"basis": "Each position is graded on its own, All by players graded. Top named counts how many of the season's top 12 QBs, 24 RBs, 36 WRs and 12 TEs so far the order also ranked that high."
+			}
+		},
 		"graded": {
 			"now": "2026-10-29T17:00:00.000Z",
 			"file": "shared/fixtures/record/graded.json",

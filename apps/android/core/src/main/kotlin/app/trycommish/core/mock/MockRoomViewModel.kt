@@ -133,7 +133,7 @@ class MockRoomViewModel(
     fun staleWords(state: MockRoomState = this.state.value): String? {
         if ((state as? MockRoomState.Room)?.stale != true) return null
         return listOfNotNull(
-            Words.Mock.unreachablePhone,
+            Words.Mock.unreachableStale,
             stamp?.let { "${AppWords.lastRead} ${Format.weekdayTime(it, zone)}" },
         ).joinToString(" ")
     }

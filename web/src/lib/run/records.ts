@@ -157,9 +157,12 @@ export function weeklySources(record: RunRecord): readonly RecordSource[] {
 	return ['ours', 'espn', ...(publishedDrawn(record) ? (['published'] as const) : [])];
 }
 
-/** The first week of the weekly record not graded yet, the one its bug names. */
+/** The first week of the weekly record not graded yet, the one its bug names. A missed week is never
+ * graded, so it is not the next to grade (Lane 273). */
 export function nextToGrade(record: RunRecord): number | null {
-	return record.weeks.find((week) => week.status !== 'graded')?.week ?? null;
+	return (
+		record.weeks.find((week) => week.status !== 'graded' && week.status !== 'missed')?.week ?? null
+	);
 }
 
 /** The weekly record as a record the record's functions read, or null on a run before Lane 114. The

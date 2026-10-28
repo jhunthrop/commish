@@ -42,6 +42,8 @@ export const MOCK = {
 	unreachable: 'The room could not be reached. Check the connection and reload.',
 	/** The same failure on the phones, which have no reload: the retry control is the verb (B258). */
 	unreachablePhone: 'The room could not be reached. Try again.',
+	/** The saved room shown with no Try again control, only a pull down (B258 review M2). */
+	unreachableStale: 'The room could not be reached. Pull down to try again.',
 	sharedNote:
 		'It starts from the first pick with the same settings and bots, so they draft the same way until a pick of yours changes the board.'
 } as const;

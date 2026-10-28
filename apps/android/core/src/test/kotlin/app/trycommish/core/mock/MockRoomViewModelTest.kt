@@ -112,7 +112,7 @@ class MockRoomViewModelTest {
         val shown = room(vm)
         assertTrue(shown.stale)
         assertFalse(shown.canWrite)
-        assertEquals("${Words.Mock.unreachablePhone} Last read Sun 4:00 pm", vm.staleWords())
+        assertEquals("${Words.Mock.unreachableStale} Last read Sun 4:00 pm", vm.staleWords())
         assertNull(vm.draft())
         assertNull(vm.finish())
         assertTrue(stub.picks.isEmpty())
