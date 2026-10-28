@@ -6,8 +6,9 @@ import (
 )
 
 // freeLevels is the waiver level at each position the league starts
-// (Lane 269): the points over replacement of the best free agent there,
-// from the free agents the Waivers screen reads (freeAgents). read is
+// (Lane 269): the points over replacement of the best free agent there a
+// side could start, from the free agents the Waivers screen reads
+// (freeAgents) that its table lists as pickups (pickupFacts). read is
 // false when the league's free agents are not read (no roster placement,
 // or a board with no players); a position missing from at, read or not,
 // takes the last starter's level, 0.
@@ -19,18 +20,17 @@ type freeLevels struct {
 // of is the waiver level at the position.
 func (l freeLevels) of(p draft.Position) float64 { return l.at[p] }
 
-// whole is whether every skill position the league starts has a free
-// agent's level: the rest-of-season line names the waiver level only then.
-func (l freeLevels) whole(slots []Slot) bool {
-	if !l.read {
-		return false
-	}
+// lacking is the skill positions the league starts that have no free
+// agent's level, in the order a lineup lists them: where the
+// rest-of-season line says the last starter's level stands in.
+func (l freeLevels) lacking(slots []Slot) []draft.Position {
+	var out []draft.Position
 	for _, p := range []draft.Position{draft.QB, draft.RB, draft.WR, draft.TE} {
 		if _, ok := l.at[p]; startsAny(slots, p) && !ok {
-			return false
+			out = append(out, p)
 		}
 	}
-	return true
+	return out
 }
 
 // freeAgents is the board's players no roster in the league holds, at the
@@ -55,6 +55,13 @@ func (a *advisor) levels() freeLevels {
 	l := freeLevels{at: map[draft.Position]float64{}, read: a.HeldBy != nil && a.Board.Raw != nil && len(a.Board.Raw.Players) > 0}
 	if l.read {
 		for _, p := range a.freeAgents("") {
+			// Only a free agent the Waivers table lists as a pickup sets the
+			// level (pickupFacts): a dropped star on injured reserve, ruled
+			// out, suspended or on a season-long list is no one a side
+			// could start in a lost player's place.
+			if !pickupFacts(a.season.For(Player{BoardID: p.ID, Team: p.Team, Position: p.Position, ReadAt: a.Snap.ReadAt})) {
+				continue
+			}
 			v, ok := a.Board.Values[p.ID]
 			if best, seen := l.at[p.Position]; ok && (!seen || v > best) {
 				l.at[p.Position] = v

@@ -262,21 +262,21 @@ func TestTheDropCountsAgainstItsSide(t *testing.T) {
 // finder's or the builder's voice, and never a trading word.
 func TestRestOfSeasonBasis(t *testing.T) {
 	h := Horizon{Last: LastWeek}
-	if got, want := RestOfSeasonBasis(RestOfSeason, 9, h, true, true),
+	if got, want := RestOfSeasonBasis(RestOfSeason, 9, h, true, true, nil),
 		"Rest of season is what the players a side gets score over the best free agent at their position, less the same for those it gives and drops, weeks 9 to 17. We list a trade only when neither side falls by more than 9.0."; got != want {
 		t.Fatalf("finder %q", got)
 	}
-	if got := RestOfSeasonBasis(RestOfSeason, 9, h, true, false); !strings.Contains(got, "over the last starter at their position league-wide, as we have no read of the league's free agents,") {
+	if got := RestOfSeasonBasis(RestOfSeason, 9, h, true, false, nil); !strings.Contains(got, "over the last starter at their position league-wide, as we have no read of the league's free agents,") {
 		t.Fatalf("with no free agents read %q", got)
 	}
-	if got := RestOfSeasonBasis(RestOfSeason, 9, h, false, true); !strings.HasSuffix(got, "A side takes a trade that costs it 9.0 or less.") {
+	if got := RestOfSeasonBasis(RestOfSeason, 9, h, false, true, nil); !strings.HasSuffix(got, "A side takes a trade that costs it 9.0 or less.") {
 		t.Fatalf("builder %q", got)
 	}
-	pre := RestOfSeasonBasis(boards.OrderPreseason, SeasonGames, h, true, true)
+	pre := RestOfSeasonBasis(boards.OrderPreseason, SeasonGames, h, true, true, nil)
 	if !strings.Contains(pre, "over the season's 17 weeks on our preseason number") || !strings.HasSuffix(pre, "more than 17.0.") {
 		t.Fatalf("preseason %q", pre)
 	}
-	for _, s := range []string{pre, RestOfSeasonBasis(RestOfSeason, 9, h, false, true), RestOfSeasonBasis(RestOfSeason, 9, h, false, false)} {
+	for _, s := range []string{pre, RestOfSeasonBasis(RestOfSeason, 9, h, false, true, nil), RestOfSeasonBasis(RestOfSeason, 9, h, false, false, nil)} {
 		for _, w := range []string{"value", "price", "worth", "market"} {
 			if strings.Contains(strings.ToLower(s), w) {
 				t.Fatalf("%q says %q", s, w)

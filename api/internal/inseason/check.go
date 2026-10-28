@@ -90,7 +90,7 @@ func (a *advisor) CheckTrade(in apitypes.TradeCheckInput) (apitypes.TradeCheck, 
 		Totals: apitypes.TradeTotals{Yours: sideTotals(week.mine, checked.MineBase, checked.MyGain),
 			Theirs: sideTotals(week.theirs, checked.TheirsBase, checked.TheirGain)},
 		Acceptable: &apitypes.TradeAcceptable{Yours: Acceptable(checked.MyRest, a.weeks), Theirs: Acceptable(checked.TheirRest, a.weeks)}}
-	restBasis := RestOfSeasonBasis(a.basis, a.weeks, a.horizon, false, a.levels().whole(a.slots))
+	restBasis := RestOfSeasonBasis(a.basis, a.weeks, a.horizon, false, a.levels().read, a.levels().lacking(a.slots))
 	out.RestOfSeasonBasis = &restBasis
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	return out, nil, true

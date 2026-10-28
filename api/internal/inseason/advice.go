@@ -1079,7 +1079,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	out.Basis = TradesBasis(a.basis, a.weeks, a.horizon)
 	gainBasis := TradeGainBasis(a.basis, a.weeks, a.horizon)
 	out.GainBasis = &gainBasis
-	restBasis := RestOfSeasonBasis(a.basis, a.weeks, a.horizon, true, a.levels().whole(a.slots))
+	restBasis := RestOfSeasonBasis(a.basis, a.weeks, a.horizon, true, a.levels().read, a.levels().lacking(a.slots))
 	out.RestOfSeasonBasis = &restBasis
 	out.PerGameBasis = perGameSaid(a.Board, shown...)
 	out.CheckBasis = TradeCheckBasis

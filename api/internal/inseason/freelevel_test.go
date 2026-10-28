@@ -18,13 +18,13 @@ func TestTheWaiverLevelIsTheBestFreeAgent(t *testing.T) {
 	f := newFixture(t)
 	a := newFixtureAdvisor(t, f, nil)
 	levels := a.levels()
-	if !levels.read || !levels.whole(a.slots) {
-		t.Fatalf("the fixture's free agents read %v, whole %v", levels.read, levels.whole(a.slots))
+	if !levels.read || len(levels.lacking(a.slots)) > 0 {
+		t.Fatalf("the fixture's free agents read %v, lacking %v", levels.read, levels.lacking(a.slots))
 	}
 	for _, position := range []draft.Position{draft.QB, draft.RB, draft.WR, draft.TE} {
 		best, seen := 0.0, false
 		for _, p := range a.pool(position) {
-			if p.cand.HasValue && (!seen || p.cand.Value > best) {
+			if p.cand.HasValue && listedAdd(p) && (!seen || p.cand.Value > best) {
 				best, seen = p.cand.Value, true
 			}
 		}
@@ -46,7 +46,7 @@ func TestNoFreeAgentReadFallsBackToTheLastStarter(t *testing.T) {
 	f := newFixture(t)
 	f.league.HeldBy = nil
 	a := newFixtureAdvisor(t, f, nil)
-	if l := a.levels(); l.read || l.whole(a.slots) || l.of(draft.RB) != 0 {
+	if l := a.levels(); l.read || len(l.lacking(a.slots)) == 0 || l.of(draft.RB) != 0 {
 		t.Fatalf("levels %+v", l)
 	}
 	out, ok := a.Trades("")
@@ -122,7 +122,7 @@ func TestTradeCheckAnswersATradeTheyRefuse(t *testing.T) {
 	}
 	if got.Trade.MyRestOfSeason == nil || got.Trade.TheirRestOfSeason == nil || *got.Trade.TheirRestOfSeason >= 0 ||
 		len(got.Trade.Give) != 1 || len(got.Trade.Get) != 2 || got.Totals.Theirs.SeasonBefore == 0 || got.RestOfSeasonBasis == nil ||
-		!strings.Contains(*got.RestOfSeasonBasis, "no read of the league's free agents") {
+		!strings.Contains(*got.RestOfSeasonBasis, "At QB, RB, WR and TE it is over the last starter league-wide, as the league has no free quarterback, running back, receiver or tight end.") {
 		t.Fatalf("the answer %+v", got)
 	}
 }
