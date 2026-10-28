@@ -3,31 +3,24 @@
 Pure functions over the outcomes the run recorded (`ReadOutcome`), so they are tested without a gateway.
 
 The shape-duplicate rate (the coordinator's ruling): each sentence of a written read is normalized, then
-every player name, club name or club code and every number is replaced with a placeholder. Among the
-sentences of `MIN_SHAPE_WORDS` words or more, the rate is the share whose shape appears on two or more
-players' reads.
+every player name, club name or club code and every number is replaced with a placeholder, by the one
+`research.capsules.narrative.ShapeMasks` the week validator holds reads to (Lane 265). Among the sentences of
+`MIN_SHAPE_WORDS` words or more (the validator's `shared_shape_min_words`), the rate is the share whose shape
+appears on two or more players' reads.
 """
 
 import math
-import re
 import statistics
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from research.capsules.facts.team_names import NFL_TEAM_NAMES
-from research.capsules.narrative import normalize_sentence, sentences_verbatim
+from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.narrative import ShapeMasks, sentences_verbatim
 from research.capsules.store import WRITTEN_SOURCE
 
-MIN_SHAPE_WORDS: Final = 6
+MIN_SHAPE_WORDS: Final = CAPSULE_CONFIG.shared_shape_min_words
 TOP_SHAPES: Final = 10
-PLAYER_MARK: Final = "zzplayer"
-CLUB_MARK: Final = "zzclub"
-NUMBER_MARK: Final = "zznum"
-# A number with its ordinal suffix, so "23rd" and "24th" are one shape.
-_NUMBER: Final = re.compile(r"\d+(?:[.,]\d+)*(?:st|nd|rd|th)?")
-_POSSESSIVE: Final = re.compile(r"['\u2019]s$")
-_SUFFIXES: Final = frozenset({"Jr.", "Jr", "Sr.", "Sr", "II", "III", "IV", "V"})
 _P95: Final = 0.95
 
 
@@ -132,52 +125,6 @@ def tally(model: str, outcomes: Sequence[ReadOutcome], budget_stopped: int = 0) 
         cost_usd=cost,
         cost_per_read=_rate(cost, reads),
     )
-
-
-def club_spellings() -> tuple[str, ...]:
-    """Every club spelling a read may use: the code, the city, the nickname and the two together."""
-    spellings: set[str] = set()
-    for code, (city, nickname) in NFL_TEAM_NAMES.items():
-        spellings.update((code, city, nickname, f"{city} {nickname}"))
-    return tuple(sorted(spellings))
-
-
-def player_spellings(names: Iterable[str]) -> tuple[str, ...]:
-    """Each player's full name and his last name (the name's last word that is not a suffix)."""
-    spellings: set[str] = set()
-    for name in names:
-        words = name.split()
-        if not words:
-            continue
-        spellings.add(name)
-        spellings.add(next((w for w in reversed(words) if w not in _SUFFIXES), words[-1]))
-    return tuple(sorted(spellings))
-
-
-@dataclass(frozen=True, slots=True)
-class ShapeMasks:
-    """The spellings a shape replaces, longest first so a full name goes before its last name."""
-
-    pattern: re.Pattern[str]
-    clubs: frozenset[str]
-
-    @classmethod
-    def of(cls, players: Iterable[str], clubs: Iterable[str]) -> "ShapeMasks":
-        club_set = frozenset(clubs)
-        words = sorted({*player_spellings(players), *club_set}, key=lambda w: (-len(w), w))
-        alternatives = "|".join(re.escape(w) for w in words) or r"(?!)"
-        return cls(re.compile(rf"(?<![\w'])(?:{alternatives})(?:['\u2019]s)?(?![\w'])"), club_set)
-
-    def shape(self, sentence: str) -> str:
-        """`sentence` with names, clubs and numbers masked, then normalized. Names match case-sensitively,
-        so a lower-case word that spells a surname is kept."""
-
-        def mark(match: re.Match[str]) -> str:
-            bare = _POSSESSIVE.sub("", match.group(0))
-            return f" {CLUB_MARK} " if bare in self.clubs else f" {PLAYER_MARK} "
-
-        masked = _NUMBER.sub(f" {NUMBER_MARK} ", self.pattern.sub(mark, sentence))
-        return normalize_sentence(masked)
 
 
 @dataclass(frozen=True, slots=True)

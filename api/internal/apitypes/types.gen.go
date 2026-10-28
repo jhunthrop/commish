@@ -5105,14 +5105,17 @@ type RunReachPartial struct {
 	Week int      `json:"week"`
 }
 
-// RunReadsDue the coming week and the night its reads are written in one pass, when the week rolls over
+// RunReadsDue the coming week and the nightly that writes its reads in one pass, when the week rolls over
 type RunReadsDue struct {
-	// Night the Central night of the nightly that writes them
-	Night RunReadsDueNight `json:"night"`
-	Week  int              `json:"week"`
+	// At the nightly that writes them (Lane 265): the clients name its night on the Eastern clock and stop promising it once their clock passes it; absent on a run from before
+	At *time.Time `json:"at,omitempty"`
+
+	// Night the night of the nightly that writes them, kept one deploy for the clients before Lane 265, which name it from at
+	Night *RunReadsDueNight `json:"night,omitempty"`
+	Week  int               `json:"week"`
 }
 
-// RunReadsDueNight the Central night of the nightly that writes them
+// RunReadsDueNight the night of the nightly that writes them, kept one deploy for the clients before Lane 265, which name it from at
 type RunReadsDueNight string
 
 // RunRecord the run's record.json, as written

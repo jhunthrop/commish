@@ -18,9 +18,10 @@ from sqlalchemy.exc import IntegrityError
 
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient
+from research.capsules.narrative import ShapeMasks
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.run_budget import RunBudget
-from research.capsules.week.cadence import FIRST, STATUS_CHANGED
+from research.capsules.week.cadence import FIRST, RULE_STALE, STATUS_CHANGED
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.store import (
     StoredWeekRead,
@@ -31,11 +32,12 @@ from research.capsules.week.store import (
     stored_week_reads,
     upsert_week_read,
 )
+from research.capsules.week.validate import week_masks
 from research.db.engine import make_engine
 from research.db.schema import CAPTURE_SNAPSHOTS, PLAYER_WEEK_READ_RUNS, PLAYER_WEEK_READS, PLAYERS
 from research.db.url import sqlalchemy_url
 from research.nightly.designations import designations_file, read_statuses, status_word
-from research.nightly.week_read_demotion import DEMOTED, demote_shared
+from research.nightly.week_read_demotion import DEMOTED, demote_shared, demote_shared_keeping, player_names
 from research.nightly.week_reads import WeekReadSpend, _write, record_spend
 from research.parity import databases
 from research.tests.test_week_read_rules import STARTER_READ
@@ -43,14 +45,14 @@ from research.tests.week_read_fixtures import WRITTEN_AT, questionable, starter
 
 _DATABASE = "parity_test_week_reads"
 # Lane 100 (B17, B44): the read quotes only the page's cells, at most three figures. The points the Bears allow
-# a game are on no cell, and the change is the card's Delta Proj, named as its change from the figure before.
+# a game are on no cell, and the published projection and its change are the card's alone (Lane 275).
 _QUESTIONABLE_READ = (
     "Bijan Robinson is Questionable on Friday's report, so whether he plays in week 6 of 2026 against Chicago is "
-    "not settled until Sunday. The published projection has him at 15.2 points, down 1.8 points from the "
-    "published figure before it. The Bears rank 9th of 32 against running backs, and the Falcons are expected "
+    "not settled until Sunday. He leads the Atlanta backfield when he plays. The Bears rank 9th of 32 against running backs, and the Falcons are expected "
     "to score 25 points. If he is active, Bijan Robinson stays in your lineup over a lesser back."
 )
 _SHARED = "The Rams lean on him every single week."
+_MASKS = ShapeMasks.of(("Puka Nacua", "Bijan Robinson"))
 _THIS_WEEK, _NEXT_WEEK = 6, 7
 _BOTH = 2
 
@@ -109,7 +111,15 @@ def test_the_nights_pool_lands_each_read_with_its_stamps_call_and_attempt(engine
 
     first, second = starter(), questionable()
     spend = WeekReadSpend()
-    _write(engine, _gateway(answer), {}, [(first, FIRST), (second, STATUS_CHANGED)], room=lambda: True, spend=spend)
+    _write(
+        engine,
+        _gateway(answer),
+        {},
+        [(first, FIRST), (second, STATUS_CHANGED)],
+        room=lambda: True,
+        spend=spend,
+        masks=_MASKS,
+    )
     with engine.connect() as conn:
         stored = stored_week_reads(conn, 2026, [6])
     assert spend.written == _BOTH and spend.facts_blocks == 0
@@ -122,14 +132,14 @@ def test_the_nights_pool_lands_each_read_with_its_stamps_call_and_attempt(engine
 
 
 def test_a_read_that_keeps_quoting_a_figure_off_the_page_falls_and_the_pass_says_why(engine: Engine) -> None:
-    """Lane 66v: every draft says 18.6 where the card prints 18.4, so the read falls to its facts block and
+    """Lane 66v: every draft says 25.6 where the card prints 25.9, so the read falls to its facts block and
     the pass's line names him and the figure guard."""
-    off_page = STARTER_READ.replace("18.4 points", "18.6 points")
+    off_page = STARTER_READ.replace("25.9 PPR points", "25.6 PPR points")
     spend = WeekReadSpend()
     gateway = _gateway(lambda _request: _completion(off_page, "start"))
-    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend)
+    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend, masks=_MASKS)
     assert spend.facts_blocks == 1 and spend.written == 0
-    assert f'Puka Nacua: failed validation: {FIGURE_OFF_PAGE}: "18.6"' in spend.line()
+    assert f'Puka Nacua: failed validation: {FIGURE_OFF_PAGE}: "25.6"' in spend.line()
 
 
 def test_a_read_the_budget_stopped_writes_nothing(engine: Engine) -> None:
@@ -138,7 +148,7 @@ def test_a_read_the_budget_stopped_writes_nothing(engine: Engine) -> None:
         upsert_week_read(conn, _row(pid, 6, "A written read that stands."))
     gateway = _gateway(lambda _request: _completion(STARTER_READ, "start")).with_budget(RunBudget.of(calls=0))
     spend = WeekReadSpend()
-    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend)
+    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend, masks=_MASKS)
     with engine.connect() as conn:
         stored = stored_week_reads(conn, 2026, [6])
     assert spend.budget_stopped == 1 and spend.written == 0
@@ -182,16 +192,41 @@ def test_a_sentence_shape_on_two_reads_demotes_the_later_carrier_over_the_board_
     first, second = starter(), questionable()
     with engine.begin() as conn:
         upsert_week_read(conn, _row(first.player_id, 6, f"Puka Nacua faces ARI at home. {_SHARED}"))
-        shaped = "The Falcons lean on Bijan Robinson every single week."
+        shaped = "The Falcons lean on him every single week."
         upsert_week_read(conn, _row(second.player_id, 6, f"Bijan Robinson faces CHI at home. {shaped}"))
     tonight = (first, replace(second, week=7))
-    assert demote_shared(engine, tonight, 6, datetime.now(UTC)) == 1
+    assert demote_shared(engine, tonight, 6, datetime.now(UTC), _MASKS) == {(second.player_id, 6)}
     with engine.connect() as conn:
         stored = stored_week_reads(conn, 2026, [6])
     assert stored[(first.player_id, 6)].source == "llm"
     kept = stored[(second.player_id, 6)]
     assert kept.source == FACTS_SOURCE and kept.reason == DEMOTED
     assert kept.body == "Week: 6 of 2026\nStatus: no designation\nPublished projection: 18.4 points (PPR)"
+
+
+def test_a_carrier_with_no_sheet_tonight_is_masked_by_name_from_the_store(engine: Engine) -> None:
+    """The Lane 265 review's M1: only the board's names equate "Amon-Ra St. Brown" (three words) with "Puka
+    Nacua" (two); his read's player has no sheet tonight, so his name comes from the players table."""
+    first = starter()
+    brown = replace(questionable(), player_id="00-0036963", name="Amon-Ra St. Brown")
+    with engine.begin() as conn:
+        conn.execute(insert(PLAYERS).values(id=brown.player_id, name=brown.name, position="WR"))
+        upsert_week_read(
+            conn, _row(first.player_id, 6, "Puka Nacua has drawn at least 9 targets in each of his last 3 games.")
+        )
+        upsert_week_read(
+            conn,
+            _row(brown.player_id, 6, "Amon-Ra St. Brown has drawn at least 7 targets in each of his last 4 games."),
+        )
+        names = player_names(conn, [first.player_id, brown.player_id])
+    try:
+        assert demote_shared(engine, (first,), 6, datetime.now(UTC), week_masks((first,))) == frozenset()
+        masks = week_masks((first,), names)
+        assert demote_shared(engine, (first,), 6, datetime.now(UTC), masks) == {(brown.player_id, 6)}
+    finally:
+        with engine.begin() as conn:
+            conn.execute(delete(PLAYER_WEEK_READS))
+            conn.execute(delete(PLAYERS).where(PLAYERS.c.id == brown.player_id))
 
 
 def test_the_hourly_passes_spend_is_read_back_for_the_days_cap(engine: Engine) -> None:
@@ -240,3 +275,100 @@ def test_a_refused_capture_leaves_the_page_and_the_web_on_the_same_status(engine
     web = designations_file(read, full)["players"]
     assert {pid: status_word(read, pid) for pid in full} == {pid: web[pid]["status"] for pid in full}
     assert status_word(read, "4426515") == "questionable"
+
+
+def test_a_status_rewrite_that_falls_keeps_the_written_read_and_counts_the_attempt(engine: Engine) -> None:
+    """Lane 275 fix round 1 (the founder: "we should always show a read"): a status change's rewrite that falls
+    to its facts block keeps the written row's body, call and status, so the page keeps it under the status
+    caption; the attempt is counted for the cadence's daily limit and the step line says held."""
+    pid = starter().player_id
+    written = replace(_row(pid, 6, "The read written before his status changed."), status="questionable", call="hold")
+    with engine.begin() as conn:
+        upsert_week_read(conn, written)
+    off_page = STARTER_READ.replace("25.9 PPR points", "25.6 PPR points")
+    spend = WeekReadSpend()
+    gateway = _gateway(lambda _request: _completion(off_page, "start"))
+    _write(
+        engine,
+        gateway,
+        {(pid, 6): written},
+        [(starter(), STATUS_CHANGED)],
+        room=lambda: True,
+        spend=spend,
+        masks=_MASKS,
+    )
+    with engine.connect() as conn:
+        kept = stored_week_reads(conn, 2026, [6])[(pid, 6)]
+    assert (kept.source, kept.body, kept.call, kept.status) == ("llm", written.body, "hold", "questionable")
+    assert (kept.written_at, kept.reason) == (written.written_at, written.reason)
+    assert (kept.attempt_day, kept.attempts) == (date(2026, 10, 16), written.attempts + 1)
+    assert (spend.held, spend.facts_blocks, spend.written) == (1, 1, 0)
+    assert "1 facts blocks (1 held over the written read)" in spend.line()
+
+
+def test_a_first_read_that_falls_still_stores_its_facts_block(engine: Engine) -> None:
+    """With nothing written to keep, a fallen first read stores its facts block, as before."""
+    off_page = STARTER_READ.replace("25.9 PPR points", "25.6 PPR points")
+    spend = WeekReadSpend()
+    gateway = _gateway(lambda _request: _completion(off_page, "start"))
+    _write(engine, gateway, {}, [(starter(), FIRST)], room=lambda: True, spend=spend, masks=_MASKS)
+    with engine.connect() as conn:
+        stored = stored_week_reads(conn, 2026, [6])[(starter().player_id, 6)]
+    assert stored.source == FACTS_SOURCE and spend.held == 0
+
+
+def test_a_rule_stale_rewrite_lands_with_its_reason(engine: Engine) -> None:
+    """Revision 0024: the table takes the cadence's `rule` reason."""
+    pid = starter().player_id
+    stale = _row(pid, 6, "The published projection has him at 18.4 points. Start him.")
+    with engine.begin() as conn:
+        upsert_week_read(conn, stale)
+    spend = WeekReadSpend()
+    gateway = _gateway(lambda _request: _completion(STARTER_READ, "start"))
+    _write(engine, gateway, {(pid, 6): stale}, [(starter(), RULE_STALE)], room=lambda: True, spend=spend, masks=_MASKS)
+    with engine.connect() as conn:
+        landed = stored_week_reads(conn, 2026, [6])[(pid, 6)]
+    assert (landed.body, landed.reason) == (STARTER_READ, RULE_STALE)
+
+
+def _same_shape_rewrites(engine: Engine) -> tuple[StoredWeekRead, StoredWeekRead]:
+    """Two reads rewritten in flight together, each landing a sentence of the same shape (review H1), over the
+    written reads the pass started from."""
+    first, second = starter(), questionable()
+    earlier = (
+        _row(first.player_id, 6, "Puka Nacua is the first read a manager trusts at receiver."),
+        _row(second.player_id, 6, "Bijan Robinson carries the Atlanta backfield on early downs and late."),
+    )
+    with engine.begin() as conn:
+        upsert_week_read(conn, _row(first.player_id, 6, f"Puka Nacua faces ARI at home. {_SHARED}"))
+        shaped = "The Falcons lean on him every single week."
+        upsert_week_read(conn, _row(second.player_id, 6, f"Bijan Robinson faces CHI at home. {shaped}"))
+    return earlier
+
+
+def test_a_carrier_rewritten_in_the_pass_gets_its_written_read_back(engine: Engine) -> None:
+    """Lane 275 fix round 2 (review H1): two concurrent rewrites land one shape; the later carrier in board
+    order gets back the written read the pass rewrote, its fall counted, never its facts block."""
+    first, second = starter(), questionable()
+    earlier = _same_shape_rewrites(engine)
+    kept = {(read.player_id, 6): read for read in earlier}
+    demotion = demote_shared_keeping(engine, (first, second), 6, WRITTEN_AT, _MASKS, kept=kept)
+    assert not demotion.demoted and demotion.restored == {(second.player_id, 6)}
+    with engine.connect() as conn:
+        stored = stored_week_reads(conn, 2026, [6])
+    back = stored[(second.player_id, 6)]
+    assert (back.source, back.body, back.reason) == ("llm", earlier[1].body, earlier[1].reason)
+    assert (back.attempt_day, back.attempts) == (date(2026, 10, 16), earlier[1].attempts + 1)
+    assert stored[(first.player_id, 6)].body.endswith(_SHARED)
+
+
+def test_a_carrier_whose_earlier_read_shares_a_shape_too_becomes_its_facts_block(engine: Engine) -> None:
+    first, second = starter(), questionable()
+    _same_shape_rewrites(engine)
+    sharing = _row(second.player_id, 6, f"Bijan Robinson faces CHI on the road. {_SHARED}")
+    demotion = demote_shared_keeping(
+        engine, (first, second), 6, WRITTEN_AT, _MASKS, kept={(second.player_id, 6): sharing}
+    )
+    assert demotion.demoted == {(second.player_id, 6)} and not demotion.restored
+    with engine.connect() as conn:
+        assert stored_week_reads(conn, 2026, [6])[(second.player_id, 6)].source == FACTS_SOURCE

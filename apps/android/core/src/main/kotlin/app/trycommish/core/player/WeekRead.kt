@@ -2,8 +2,13 @@ package app.trycommish.core.player
 
 import app.trycommish.api.models.RunReadsDue
 import app.trycommish.api.models.RunWeekRead
+import app.trycommish.core.Format
+import app.trycommish.core.board.RunWords
+import app.trycommish.core.instantOrNull
 import app.trycommish.core.start.GameRead
 import app.trycommish.design.Words
+import java.time.Duration
+import java.time.Instant
 import kotlin.math.abs
 import kotlin.math.floor
 
@@ -108,16 +113,26 @@ object WeekReads {
     }
 
     /** noReadWords: his next game while it is to come, never "next" for one under way or final; while the
-     * coming week's reads are not yet written, the night they are (Lane 256, the run's `weekReadsDue`). */
+     * coming week's reads are not yet written, the night of the nightly that writes them (Lane 256, the
+     * run's `weekReadsDue`), until the screen's clock passes it (Lane 265); a run from before names no
+     * instant and promises nothing. */
     fun noRead(
         state: GameRead?,
         due: RunReadsDue?,
-    ): String =
-        when {
-            underway(state) -> Words.Card.readNotWritten
-            due == null || due.night == RunReadsDue.Night.unknown_default_open_api -> Words.Card.readNotYet
-            else -> readsDue(due.week, due.night.value)
-        }
+        now: Instant,
+    ): String {
+        if (underway(state)) return Words.Card.readNotWritten
+        val week = due?.week ?: return Words.Card.readNotYet
+        val at = instantOrNull(due.at) ?: return Words.Card.readNotYet
+        if (!now.isBefore(at)) return Words.Card.readNotYet
+        return readsDue(week, nightOf(at))
+    }
+
+    /** week-read.ts nightOf: the night a nightly belongs to, the Eastern day six hours before it. */
+    fun nightOf(at: Instant): String = Format.weekdayName(at.minus(NIGHT_RUNS_PAST_MIDNIGHT), RunWords.eastern)
+
+    /** week-read.ts NIGHT_RUNS_PAST_MIDNIGHT_MS. */
+    private val NIGHT_RUNS_PAST_MIDNIGHT: Duration = Duration.ofHours(6)
 
     /** card.ts CARD.readsDue: "Our reads for week 8 are written Tuesday night." */
     internal fun readsDue(

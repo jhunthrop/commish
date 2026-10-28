@@ -35,6 +35,7 @@ from research.nightly.run_parts import (
     StepOutcome,
     held_out,
     manifest_of,
+    rollover_instant,
     ros_setup,
     run_steps,
 )
@@ -176,7 +177,8 @@ def run_nightly(deps: RunDeps, options: RunOptions) -> RunOutcome:
                 read_frozen_by(deps.store), PRODUCT_SEASON, frozen_weeks(conn, PRODUCT_SEASON), run_id
             )
             instant = deps.clock()
-            assembled = assemble(conn, instant, frozen_by, ros_setup(deps.engine, instant, deps.log))
+            ros = ros_setup(deps.engine, instant, deps.log)
+            assembled = assemble(conn, instant, frozen_by, ros, rollover_instant(steps))
     except Exception as error:
         return _failed(deps, run_id, steps, error)
     for line in assembled.dropped:

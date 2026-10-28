@@ -5,16 +5,17 @@ and, for a read his status has moved past, when the new one is due.
 it stands on is not named here: the run is built once a night, so a stamp baked into it was thirteen hours old at
 the Sunday 1 pm games (Lane 222, B186); the web names the status read its own build took, and the next one
 (`web/src/lib/player/read-byline.ts`), from `designations.json` and the run's schedule. A read written
-against another status than his current one is withheld behind "His status changed since this read was
-written. A new read is due by Sun Oct 18, 1:00 am CT." (the re-review's F5): the hourly pass after the
-status capture writes it (`HOURLY_PASS_HOURS_ET`, the capture's schedule in `infra/research-schedule.sh`).
+against another status than his current one stays on the page under "His status changed since this read was
+written. A new read is due by Sun Oct 18, 1:00 am CT." (the re-review's F5; Lane 275, the founder 2026-10-28:
+"we should always show a read"): the hourly pass after the status capture writes the new one (`HOURLY_PASS_HOURS_ET`, the capture's schedule in `infra/research-schedule.sh`).
 """
 
 from datetime import datetime, time, timedelta
 from typing import Final
 from zoneinfo import ZoneInfo
 
-from research.capsules.week.sheet import central_stamp
+from research.capsules.week.rollover import next_nightly
+from research.capsules.week.sheet import CENTRAL, central_stamp
 
 EASTERN: Final = ZoneInfo("America/New_York")
 # The hourly capture's hours, Eastern (`research-capture-harvest`, "0 0,2,6-23 * * *" America/New_York): the
@@ -40,12 +41,21 @@ def next_hourly_pass(after: datetime) -> datetime:
     raise AssertionError("unreachable: every day has a pass")
 
 
-def status_changed_caption(as_of: datetime) -> str:
-    """The caption over the season read when his status moved past the week read, with the next write."""
-    due = central_stamp(next_hourly_pass(as_of))
+def first_pass_of_next_day(as_of: datetime) -> datetime:
+    """The first pass, hourly or nightly, on the Central day after `as_of`'s: when a read whose status rewrites
+    are spent for the day (`cadence.status_rewrite_capped`) is asked again."""
+    midnight = datetime.combine(as_of.astimezone(CENTRAL).date() + timedelta(days=1), time(), CENTRAL)
+    return min(next_hourly_pass(midnight), next_nightly(midnight))
+
+
+def status_changed_caption(as_of: datetime, capped: bool = False) -> str:
+    """The caption over a week read his status has moved past, with the next write: the next hourly pass, or,
+    once the day's status rewrites are spent (`capped`, Lane 275 fix round 2), the next day's first pass."""
+    due = central_stamp(first_pass_of_next_day(as_of) if capped else next_hourly_pass(as_of))
     return f"His status changed since this read was written. A new read is due by {due}."
 
 
-# A read whose published projection the card no longer prints (Lane 66v): withheld at the run's build, and
-# on the page once the card's live read prints another figure, the season read showing beneath it.
+# The words a web build before Lane 274 shows over a read whose published projection moved (Lane 66v). The run
+# no longer withholds such a read (Lane 275): it carries these words only for that web, and they go once no web
+# reads `movedCaption`.
 PROJECTION_MOVED_CAPTION: Final = "The published projection moved since this read was written."

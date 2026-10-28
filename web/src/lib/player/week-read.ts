@@ -7,8 +7,13 @@
  * each rounded once there: this only compares them. */
 import type { components } from '#lib/api/types.ts';
 import type { GameHead } from '#lib/league/box/kickoff.ts';
+import { weekdayWord } from '#lib/format/date.ts';
 import type { ReadsDue, WeekRead } from '#lib/run/schema.ts';
 import { CARD } from './card.ts';
+
+/** A nightly in the small hours belongs to the night before: its night is the Eastern day this long
+ * before it (research capsules/week/rollover.py NIGHT_RUNS_PAST_MIDNIGHT, ported to both apps). */
+export const NIGHT_RUNS_PAST_MIDNIGHT_MS = 6 * 60 * 60 * 1000;
 
 /** His game's state at the screen's clock, by the screen's one rule (kickoff.ts lineState), null for
  * a bye or a week with no game held. */
@@ -53,10 +58,23 @@ export function shownWeekRead(read: WeekRead, card: CardProjection | null): Show
 	return { withheld: false, body: read.body, caption: read.caption };
 }
 
+/** The night a nightly at `at` belongs to, on the Eastern clock: "Tuesday" for Wednesday 05:30 UTC. */
+export function nightOf(at: string): string {
+	return weekdayWord(new Date(Date.parse(at) - NIGHT_RUNS_PAST_MIDNIGHT_MS).toISOString());
+}
+
 /** The read's place when the run holds no read for him: his next game while it is still to come,
  * never "next" for a game under way or final (Lane 158); while the coming week's reads are not yet
- * written, the night they are (Lane 256, the run's `weekReadsDue`). */
-export function noReadWords(state: ReadGameState, due: ReadsDue | null): string {
+ * written, the night of the nightly that writes them (Lane 256, the run's `weekReadsDue`), until the
+ * screen's clock (`now`, null before the screen has read one) passes it, when a run that was never
+ * published has left the promise standing (Lane 265). A run from before names no instant. */
+export function noReadWords(
+	state: ReadGameState,
+	due: ReadsDue | null,
+	now: number | null
+): string {
 	if (underway(state)) return CARD.readNotWritten;
-	return due === null ? CARD.readNotYet : CARD.readsDue(due.week, due.night);
+	if (due?.at === undefined) return CARD.readNotYet;
+	if (now !== null && now >= Date.parse(due.at)) return CARD.readNotYet;
+	return CARD.readsDue(due.week, nightOf(due.at));
 }

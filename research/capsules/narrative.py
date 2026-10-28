@@ -7,7 +7,7 @@ gone with the sportsbook register (the prep-site ruling): the page's modules no 
 """
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Final
 
@@ -21,6 +21,7 @@ from research.capsules.facts.model import (
     RookieEvidence,
     ShareEvidence,
 )
+from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.sentences import split_sentences
 from research.capsules.validate import grounding_of, validate_narrative_slot
 from research.capsules.voice_rules import in_fantasy_words
@@ -30,6 +31,26 @@ if TYPE_CHECKING:
 
 CALL_WORDS: Final = 30
 MODULE_WORDS: Final = 40
+# A sentence's shape (Lane 265, Lane 261's bake-off normalization): the marks its names, clubs and numbers
+# become, spelled so `normalize_sentence` keeps each one word, and the words the correction ask shows for each.
+PLAYER_MARK: Final = "zzplayer"
+CLUB_MARK: Final = "zzclub"
+NUMBER_MARK: Final = "zznum"
+_SHOWN_MARKS: Final = {PLAYER_MARK: "[name]", CLUB_MARK: "[club]", NUMBER_MARK: "[number]"}
+# A number with its ordinal suffix, so "23rd" and "24th" are one shape.
+_SHAPE_NUMBER: Final = re.compile(r"\d+(?:[.,]\d+)*(?:st|nd|rd|th)?")
+# A possessive, a name's ("Nacua's") or a plural's ("the Rams'").
+_POSSESSIVE: Final = re.compile(r"['\u2019]s?$")
+# Main's word mask (Lane 72's review, M4), kept beside the placeholders so the check is never weaker than it
+# was (the Lane 265 review's H1 and L1): every capitalised word, a pronoun or a first name among them, and
+# every number.
+_CAPITALISED: Final = re.compile(r"\b[A-Z][\w'\u2019.-]*")
+_WORD_NUMBER: Final = re.compile(r"\d+(?:[.,]\d+)*%?")
+# The two kinds of shape a sentence is held by, each its own namespace so one never equals the other.
+NAMES_KIND: Final = "names: "
+WORDS_KIND: Final = "words: "
+_WORD_MARK: Final = "x"
+_NAME_SUFFIXES: Final = frozenset({"Jr.", "Jr", "Sr.", "Sr", "II", "III", "IV", "V"})
 
 
 def why_group_slot_key(group_key: str) -> str:
@@ -59,6 +80,84 @@ def held_sentences(bodies: Sequence[str], min_words: int) -> set[str]:
     """A page's sentences held to uniqueness across pages: normalized, `min_words` long or longer."""
     normalized = {normalize_sentence(s) for body in bodies for s in sentences_verbatim(body)}
     return {s for s in normalized if len(s.split()) >= min_words}
+
+
+def player_spellings(names: Iterable[str]) -> tuple[str, ...]:
+    """Each player's full name, his last name (the name's last word that is not a suffix) and his first name
+    ("Puka", the Lane 265 review's L1: a read that calls him by it is the same shape as one that names him)."""
+    spellings: set[str] = set()
+    for name in names:
+        words = name.split()
+        if not words:
+            continue
+        spellings.update((name, words[0]))
+        spellings.add(next((w for w in reversed(words) if w not in _NAME_SUFFIXES), words[-1]))
+    return tuple(sorted(spellings))
+
+
+def club_spellings() -> tuple[str, ...]:
+    """Every club spelling a read may use: the code, the city, the nickname and the two together."""
+    spellings: set[str] = set()
+    for code, (city, nickname) in NFL_TEAM_NAMES.items():
+        spellings.update((code, city, nickname, f"{city} {nickname}"))
+    return tuple(sorted(spellings))
+
+
+@dataclass(frozen=True, slots=True)
+class ShapeMasks:
+    """The spellings a sentence's shape replaces, longest first so a full name goes before its last name."""
+
+    pattern: re.Pattern[str]
+    clubs: frozenset[str]
+
+    @classmethod
+    def of(cls, players: Iterable[str], clubs: Iterable[str] | None = None) -> "ShapeMasks":
+        """Masks for `players`' names (full and last) and `clubs` (every club spelling by default)."""
+        club_set = frozenset(club_spellings() if clubs is None else clubs)
+        words = sorted({*player_spellings(players), *club_set}, key=lambda w: (-len(w), w))
+        alternatives = "|".join(re.escape(w) for w in words) or r"(?!)"
+        # A trailing possessive, a name's or a plural's; nothing word-like after it.
+        possessive = r"(?:['\u2019]s|(?<=s)['\u2019])?"
+        return cls(re.compile(rf"(?<![\w'])(?:{alternatives}){possessive}(?![\w'\u2019])"), club_set)
+
+    def shape(self, sentence: str) -> str:
+        """`sentence` with names, clubs and numbers masked, then normalized. Names match case-sensitively,
+        so a lower-case word that spells a surname is kept. A name that is also a club spelling ("Washington")
+        is marked a club (the word shape, `word_shape`, holds such a pair)."""
+
+        def mark(match: re.Match[str]) -> str:
+            bare = _POSSESSIVE.sub("", match.group(0))
+            return f" {CLUB_MARK} " if bare in self.clubs else f" {PLAYER_MARK} "
+
+        masked = _SHAPE_NUMBER.sub(f" {NUMBER_MARK} ", self.pattern.sub(mark, sentence))
+        return normalize_sentence(masked)
+
+
+def word_shape(sentence: str) -> str:
+    """Main's shape: every capitalised word and every number masked, normalized (a number's mark drops out)."""
+    return normalize_sentence(_WORD_NUMBER.sub("#", _CAPITALISED.sub(_WORD_MARK.upper(), sentence)))
+
+
+def held_shapes(bodies: Sequence[str], masks: ShapeMasks, *, name_words: int, word_words: int) -> dict[str, str]:
+    """Each sentence shape of `bodies` held to one page, to its first sentence as written: the placeholder shape
+    (`masks`, `name_words` long or longer) and the word shape (`word_shape`, `word_words` or longer), each in its
+    own namespace, so two sentences either shape equates share a shape."""
+    out: dict[str, str] = {}
+    for body in bodies:
+        for sentence in sentences_verbatim(body):
+            named, worded = masks.shape(sentence), word_shape(sentence)
+            if len(named.split()) >= name_words:
+                out.setdefault(NAMES_KIND + named, sentence)
+            if len(worded.split()) >= word_words:
+                out.setdefault(WORDS_KIND + worded, sentence)
+    return out
+
+
+def shown_shape(shape: str) -> str:
+    """A shape as a correction ask shows it: "[name] is on injured reserve in week [number]"."""
+    if shape.startswith(WORDS_KIND):
+        return " ".join("[name]" if word == _WORD_MARK else word for word in shape.removeprefix(WORDS_KIND).split())
+    return " ".join(_SHOWN_MARKS.get(word, word) for word in shape.removeprefix(NAMES_KIND).split())
 
 
 @dataclass(frozen=True, slots=True)

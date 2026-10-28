@@ -7,7 +7,9 @@ points a game and the games behind it (Avg), each game's points (the game log), 
 states is one of those, as the cell prints it (`page_figures`: the tenth; the weather rounded to a whole
 degree and mph, the chance of rain or snow only from the share the cell names it at). A figure the page
 draws in no cell (a full-season preseason figure, a range, his touchdowns, points allowed a game) refuses
-the read, so a reader never meets a number he cannot find on the page.
+the read, so a reader never meets a number he cannot find on the page. The published projection and its
+change are cells the read never quotes (Lane 275, `quotable_figures`): the Wk cell carries them, and the read
+stands when they move.
 """
 
 import re
@@ -82,7 +84,13 @@ def _season_cells(sheet: WeekSheet) -> set[float]:
 
 def cell_figures(sheet: WeekSheet) -> frozenset[float]:
     """Every figure the page draws as a cell for `sheet`'s player and week, as the cell prints it."""
-    return frozenset(_projection_cells(sheet) | _game_cells(sheet) | _season_cells(sheet))
+    return frozenset(_projection_cells(sheet) | quotable_figures(sheet))
+
+
+def quotable_figures(sheet: WeekSheet) -> frozenset[float]:
+    """The cells' figures a read may quote: every cell but the published projection and its change, which the
+    card's Wk cell carries alone (Lane 275)."""
+    return frozenset(_game_cells(sheet) | _season_cells(sheet))
 
 
 # A figure's name, right after it or right before it (Lane 100 review M1, Lane 117 B80): every cell the card

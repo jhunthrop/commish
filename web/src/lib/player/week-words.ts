@@ -155,6 +155,8 @@ export interface LiveCard {
 	/** His position rank as the read places him, which the rest caption names (restTile): the
 	 * page's pill takes it, null where the run's stands (Lane 128 fix round 4). */
 	positionRank: number | null;
+	/** The clock the card was read at, which the read's place says its words on (Lane 265). */
+	at: number;
 }
 
 /** His rest-of-season points at the read's clock and the week they start from, as words. */
@@ -774,6 +776,7 @@ export function liveCard({
 		formats: formatsOf(week, restAtClock),
 		tier: tierOf(week, restAtClock, tier),
 		positionRank: rest === null ? null : week.line.position_rank,
+		at: now,
 		projection: {
 			week: week.week,
 			scoring: week.projection_scoring.format,

@@ -374,7 +374,7 @@
 				     drafted-for numbers are the draft's, shown before the first kickoff only. -->
 				{#if page.underway}
 					{#if !weekRead}<p class="unwritten">
-							{noReadWords(live?.projection.state ?? null, page.weekReadsDue)}
+							{noReadWords(live?.projection.state ?? null, page.weekReadsDue, live?.at ?? null)}
 						</p>{/if}
 				{:else if page.capsule}
 					<Capsule body={page.capsule.body} byline={page.card.readStamp} pulls={readPulls} />

@@ -1,7 +1,7 @@
 """Lane 266, the opener variety and the voices ship bar: masked openers, counted per 100 reads, compared on
 the players both arms wrote. No gateway and no store."""
 
-from research.explore.writer_bakeoff.tally import ShapeMasks, club_spellings
+from research.capsules.narrative import ShapeMasks, club_spellings
 from research.explore.writer_bakeoff.variety import common_reads, opener, variety
 from research.explore.writer_bakeoff.voices_compare import bar
 
@@ -12,7 +12,7 @@ def test_an_opener_masks_names_and_numbers() -> None:
     assert opener("Start Nacua against the Bears this week.", _MASKS, 3) == opener(
         "Start Chase against the Bears.", _MASKS, 3
     )
-    assert opener("18.4 points is his published projection.", _MASKS, 1) == "zznum"
+    assert opener("18.4 points a game is his average.", _MASKS, 1) == "zznum"
 
 
 def test_variety_counts_distinct_openers_per_100_reads() -> None:

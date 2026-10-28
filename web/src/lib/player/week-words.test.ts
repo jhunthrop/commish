@@ -1076,9 +1076,9 @@ void test('once his game is final the read stands', () => {
 });
 
 void test('with no read at all the place says it is not written, "next" only for a game to come', () => {
-	assert.equal(noReadWords(card(week(), null, NOW).projection.state, null), CARD.readNotYet);
+	assert.equal(noReadWords(card(week(), null, NOW).projection.state, null, NOW), CARD.readNotYet);
 	for (const now of [KICKED_OFF, FINAL]) {
-		const words = noReadWords(card(week(), null, now).projection.state, null);
+		const words = noReadWords(card(week(), null, now).projection.state, null, now);
 		assert.equal(words, CARD.readNotWritten);
 		assert.ok(!/\bnext\b/u.test(words), words);
 	}

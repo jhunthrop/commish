@@ -19,7 +19,7 @@ from typing import Any, Final
 from research.capsules.page_figures import projection_tenth
 from research.capsules.pull_figures import PageValues, page_numbers, pull_figures_of
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
-from research.capsules.week.cadence import projection_moved_past_shown
+from research.capsules.week.cadence import status_rewrite_capped
 from research.capsules.week.caption import PROJECTION_MOVED_CAPTION, status_changed_caption, written_caption
 from research.capsules.week.rollover import ReadsDue
 from research.capsules.week.store import StoredWeekRead
@@ -280,18 +280,8 @@ class ServedWeek:
     reads: Mapping[str, StoredWeekRead]
     statuses: Mapping[str, str | None]
     as_of: datetime
-    # Each player's published projection for the board week as the card prints it, by the board's id (None
-    # for a player the snapshot leaves out); None when the run read no snapshot for the week (Lane 66v).
-    projections: Mapping[str, float] | None = None
     # The board week and the night its reads are written, while its roll-over has not run (Lane 256).
     due: ReadsDue | None = None
-
-
-class _Unread:
-    """The run read no published projection for the board week, so a read is not judged by it."""
-
-
-UNREAD: Final = _Unread()
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,34 +293,29 @@ class ReadClock:
 
 
 def week_read_json(
-    stored: StoredWeekRead | None,
-    status: str | None,
-    kicked_off: bool,
-    clock: ReadClock,
-    projection: float | _Unread | None = UNREAD,
+    stored: StoredWeekRead | None, status: str | None, kicked_off: bool, clock: ReadClock
 ) -> Json | None:
     """The board week's read (Lane 72) with the page's caption, its stamps, the status it was written against
     and its call. None for a page the writer did not write for the board week, or whose board-week game has
-    kicked off. A read written against another status than his current one is withheld: its caption says his
-    status changed and when the hourly pass writes the new read, and the page shows the season read beneath
-    it (the review's H3, the re-review's F5). So is a read whose published projection the card prints has
-    moved from by the Proj change tile's threshold (`projection`, the run's for him; Lane 66v, Lane 162). `projection` and `movedCaption` are the figure the read
-    quotes, as the card prints it, and the words the page shows once the card's live read prints another."""
+    kicked off. A written read is always served (Lane 275, the founder 2026-10-28: "we should always show a
+    read"): one written against another status than his current one keeps its body and call under a caption
+    that says his status changed and when the hourly pass writes the new read (the re-review's F5), and a move
+    of the published projection leaves it standing under its written caption, the read never stating the
+    projection (`capsules.week.rules`, H4). `projection` is the figure the read was written with, as the card
+    prints it (the Wk tile's "Proj at the read"); `movedCaption` stays for a web build that still reads it."""
     if stored is None or stored.source != WRITTEN_SOURCE or kicked_off:
         return None
     quoted = None if stored.projection_points is None else projection_tenth(stored.projection_points)
-    moved = not isinstance(projection, _Unread) and projection_moved_past_shown(projection, stored.projection_points)
-    standing = stored.status == status and not moved
     if stored.status != status:
-        caption = status_changed_caption(clock.as_of)
+        caption = status_changed_caption(clock.as_of, status_rewrite_capped(stored, clock.as_of))
     else:
-        caption = PROJECTION_MOVED_CAPTION if moved else written_caption(stored.written_at, stored.week)
+        caption = written_caption(stored.written_at, stored.week)
     return {
         "week": stored.week,
-        "body": stored.body.strip() if standing else None,
+        "body": stored.body.strip(),
         "caption": caption,
         "status": stored.status,
-        "call": stored.call if standing else None,
+        "call": stored.call,
         "writtenAt": js_iso(stored.written_at),
         "factsAt": None if stored.facts_at is None else js_iso(stored.facts_at),
         "projection": quoted,
@@ -409,7 +394,7 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
         "formats": formats,
         "capsule": capsule_json(stored, page),
         "weekRead": week_read,
-        "weekReadsDue": reads_due_json(week_read, inputs.week.due),
+        "weekReadsDue": reads_due_json(week_read, _promised(who, season is not None, inputs)),
         "season": season,
         "priorSeasons": prior,
         # The club his newest game line was for, when it is not the page's (Lane 120), and whether that
@@ -420,15 +405,26 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
     }
 
 
+def _promised(who: Identity, has_season: bool, inputs: PageInputs) -> ReadsDue | None:
+    """The roll-over's promise for a page the pass will write (Lane 265, L4): a season block and a club
+    (`collect.week_sheet`'s own tests) whose game of the week has not kicked off; None for a free agent and
+    for any page the pass never writes, which says its read is not written yet."""
+    due = inputs.week.due
+    if due is None or not has_season:
+        return None
+    club = call_for(inputs.season.clubs, who.id).club
+    if club is None or _kicked_off(inputs.season.games.get(club, ()), due.week, inputs.week.as_of):
+        return None
+    return due
+
+
 def _week_read(who: Identity, universe_id: str | None, inputs: PageInputs) -> Json | None:
     stored = None if universe_id is None else inputs.week.reads.get(universe_id)
     if stored is None:
         return None
     kicked_off = _kicked_off(inputs.season.games.get(who.team, ()), stored.week, inputs.week.as_of)
-    projections = inputs.week.projections
-    projection = UNREAD if projections is None else projections.get(who.id)
     week = inputs.week
-    return week_read_json(stored, week.statuses.get(who.id), kicked_off, ReadClock(week.as_of), projection)
+    return week_read_json(stored, week.statuses.get(who.id), kicked_off, ReadClock(week.as_of))
 
 
 def _index_entry(p: Identity) -> Json:

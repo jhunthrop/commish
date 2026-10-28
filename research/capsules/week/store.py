@@ -2,8 +2,9 @@
 
 Keyed on the universe id, the season and the week the read is for. A rewrite in the same week replaces
 the row (the cadence says when, `cadence`); a new week is a new row, so last week's read stays on file.
-Each row keeps the write's instant, the facts' newest stamp and every fact's own (`sheet.stamps`), what
-the cadence compares against (the published projection and the status it was written with), the call
+Each row keeps the write's instant, the facts' newest stamp and every fact's own (`sheet.stamps`), the
+status the cadence compares against, the published projection it was written with (the card's "Proj at the
+read"), the call
 the writer classified it as, and its attempts on its Central day. The page serves the row of the board
 week only (`served_week_reads`). Each pass's spend is a row of `player_week_read_runs`, which the hourly
 passes' daily cap reads (`hourly_spend_since`).
