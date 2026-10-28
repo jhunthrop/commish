@@ -227,6 +227,9 @@ func (h *Handler) updateRow(w http.ResponseWriter, r *http.Request) {
 // replaces the sheet, so an empty read would empty it.
 const emptyReadSentence = "No player read, so your sheet is as it was."
 
+// badHeaderSentence refuses a CSV whose first line is not the header.
+const badHeaderSentence = "The first line must name rank, player_id, name and position"
+
 // readImport reads the body as the sheet's CSV, or as a names list against
 // the board the sheet is built on. It answers the request itself when it
 // cannot read.
@@ -244,7 +247,7 @@ func (h *Handler) readImport(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	if looksLikeCSV(string(body)) {
 		rows, skipped, err := DecodeCSV(bytes.NewReader(body))
 		if errors.Is(err, ErrBadHeader) {
-			httpx.WriteInvalid(w, r, map[string]string{"body": "The first line must name rank, player_id, name and position"})
+			httpx.WriteInvalid(w, r, map[string]string{"body": badHeaderSentence})
 			return nil, nil, false
 		}
 		if err != nil {
@@ -258,6 +261,10 @@ func (h *Handler) readImport(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return nil, nil, false
 	}
 	rows, skipped := ReadList(string(body), raw)
+	if len(rows) == 0 && headerLike(string(body)) {
+		httpx.WriteInvalid(w, r, map[string]string{"body": badHeaderSentence})
+		return nil, nil, false
+	}
 	return rows, skipped, true
 }
 
@@ -269,26 +276,13 @@ func (h *Handler) boardFor(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		h.fail(w, r, "sheets: import", err)
 		return nil, false
 	}
-	raw, err := h.Boards.Load(r.Context(), storedFormat(d.Format))
+	raw, err := h.Boards.Load(r.Context(), boards.FormatForBoard(d.Format))
 	if err != nil {
 		h.Log.Error("sheets: import board", "request_id", httpx.RequestIDFrom(r.Context()), "err", err)
 		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, "Our board did not load, so a list of names cannot be read yet", nil)
 		return nil, false
 	}
 	return raw, true
-}
-
-// storedFormat is the stored board a sheet format reads its players from;
-// a format with no board of its own reads the PPR board's players.
-func storedFormat(f apitypes.BoardFormat) boards.Format {
-	switch f {
-	case apitypes.BoardFormatHalfPpr:
-		return boards.Half
-	case apitypes.BoardFormatStandard:
-		return boards.Standard
-	default:
-		return boards.PPR
-	}
 }
 
 func (h *Handler) importCSV(w http.ResponseWriter, r *http.Request) {
@@ -301,6 +295,11 @@ func (h *Handler) importCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(rows) == 0 {
+		// A sheet that is not the account's is a 404 before it is a refusal.
+		if _, err := h.Store.Get(r.Context(), auth.AccountID(r), id); err != nil {
+			h.fail(w, r, "sheets: import", err)
+			return
+		}
 		httpx.WriteInvalid(w, r, map[string]string{"body": emptyReadSentence})
 		return
 	}

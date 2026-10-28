@@ -32,6 +32,19 @@ type sheetParity struct {
 		Position string  `json:"position"`
 		Team     *string `json:"team"`
 	} `json:"listBoard"`
+	LimitBoard []struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Position string `json:"position"`
+	} `json:"limitBoard"`
+	LimitList struct {
+		Text    string `json:"text"`
+		Read    int    `json:"read"`
+		Skipped []struct {
+			Line   int    `json:"line"`
+			Reason string `json:"reason"`
+		} `json:"skipped"`
+	} `json:"limitList"`
 	Lists []struct {
 		Text    string   `json:"text"`
 		CSV     bool     `json:"csv"`
@@ -54,6 +67,25 @@ func readParity(t *testing.T) sheetParity {
 		t.Fatal(err)
 	}
 	return parity
+}
+
+// A list longer than a sheet holds is cut at the limit as the web cuts it.
+func TestReadListStopsAtTheLimitAsTheWebDoes(t *testing.T) {
+	parity := readParity(t)
+	raw := &boards.Raw{}
+	for _, p := range parity.LimitBoard {
+		raw.Players = append(raw.Players, boards.Player{ID: p.ID, Name: p.Name, Position: draft.Position(p.Position)})
+	}
+	rows, skipped := ReadList(parity.LimitList.Text, raw)
+	want := parity.LimitList.Skipped
+	if len(rows) != parity.LimitList.Read || len(rows) != MaxRows || len(skipped) != len(want) || len(want) == 0 {
+		t.Fatalf("read %d skipped %v, web reads %d skips %v", len(rows), skipped, parity.LimitList.Read, want)
+	}
+	for k, s := range skipped {
+		if s.Line != want[k].Line || s.Reason != want[k].Reason {
+			t.Errorf("skipped %v, web skips %v", s, want[k])
+		}
+	}
 }
 
 // The API reads a pasted names list as the web does (Lane 270): the same

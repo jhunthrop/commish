@@ -156,8 +156,19 @@ export const LIST_BOARD: readonly SheetPlayer[] = [
 	listPlayer('DST-BUF', 'Buffalo Bills', 'DST', 'BUF'),
 	listPlayer('DST-KC', 'Kansas City Chiefs', 'DST', 'KC'),
 	listPlayer('DST-LAR', 'Los Angeles Rams', 'DST', 'LAR'),
-	listPlayer('DST-LAC', 'Los Angeles Chargers', 'DST', 'LAC')
+	listPlayer('DST-LAC', 'Los Angeles Chargers', 'DST', 'LAC'),
+	listPlayer('rb-walker', 'Kenneth Walker III', 'RB', 'KC'),
+	listPlayer('wr-fitz', 'Larry Fitzgerald Sr.', 'WR', 'ARI'),
+	listPlayer('wr-stbrown', 'Amon-Ra St. Brown', 'WR', 'DET'),
+	listPlayer('rb-swift', 'D’Andre Swift', 'RB', 'CHI')
 ];
+
+/** A board of one more player than a sheet holds, and the list naming each in turn: the last line is
+ * past the limit. Only the count read and the skipped lines are kept. */
+const LIMIT_BOARD: readonly SheetPlayer[] = Array.from(
+	{ length: SHEET_LIMITS.rows + 1 },
+	(_, k) => listPlayer(`lim-${String(k)}`, `Limit Player ${'x'.repeat(k % 5)}${String(k)}`, 'WR', null)
+);
 
 function listPlayer(
 	id: string,
@@ -178,6 +189,9 @@ const LISTS: readonly string[] = [
 	'audric estime\nAUDRIC ESTIMÉ, WR',
 	'Bills D/ST\nBUF DST\nChiefs\nKC\nBuffalo Defense\nLos Angeles D/ST\nRams D/ST\nLAC DEF\nLos Angeles',
 	'Gibbs\nJahmyr',
+	'Kenneth Walker III\nlarry fitzgerald sr\nKenneth Walker\nAmon Ra St Brown\namon-ra st. brown, WR',
+	'D’Andre Swift\nD\'Andre Swift\nDAndre Swift',
+	'1 Jahmyr Gibbs\n2) Brandon Aubrey\n3.  Amon-Ra St. Brown \n4) Bills D/ST\n5) Los Angeles D/ST\nMichael Thomas, TE\nBills DST\n \n﻿7. Jahmyr Gibbs',
 	'rank,player_id,name,position\n1,a,B,QB',
 	''
 ];
@@ -191,6 +205,16 @@ function listOf(text: string): {
 	if (looksLikeCsv(text)) return { text, csv: true, ids: [], skipped: [] };
 	const read = readList(text, nameIndex(LIST_BOARD));
 	return { text, csv: false, ids: read.rows.map((row) => row.id), skipped: read.skipped };
+}
+
+function limitRead(): {
+	text: string;
+	read: number;
+	skipped: readonly { line: number; reason: string }[];
+} {
+	const text = LIMIT_BOARD.map((p) => p.name).join('\n');
+	const read = readList(text, nameIndex(LIMIT_BOARD));
+	return { text, read: read.rows.length, skipped: read.skipped };
 }
 
 function readOf(text: string): {
@@ -250,7 +274,9 @@ export function renderSheet(about: string): string {
 		})),
 		reads: READS.map(readOf),
 		listBoard: LIST_BOARD,
-		lists: LISTS.map(listOf)
+		lists: LISTS.map(listOf),
+		limitBoard: LIMIT_BOARD.map((p) => ({ id: p.id, name: p.name, position: p.position })),
+		limitList: limitRead()
 	};
 	return `${JSON.stringify(sheet, null, '\t')}\n`;
 }

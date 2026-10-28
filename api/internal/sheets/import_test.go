@@ -23,14 +23,21 @@ import (
 type recorder struct {
 	Repository
 	format   apitypes.BoardFormat
+	missing  bool
 	replaced [][]apitypes.SheetRowInput
 }
 
 func (r *recorder) Get(context.Context, uuid.UUID, uuid.UUID) (apitypes.SheetDetail, error) {
+	if r.missing {
+		return apitypes.SheetDetail{}, ErrNotFound
+	}
 	return apitypes.SheetDetail{Format: r.format}, nil
 }
 
 func (r *recorder) ReplaceRows(_ context.Context, _, _ uuid.UUID, rows []apitypes.SheetRowInput, _ *string, _ *time.Time) (apitypes.SheetDetail, error) {
+	if r.missing {
+		return apitypes.SheetDetail{}, ErrNotFound
+	}
 	r.replaced = append(r.replaced, rows)
 	return apitypes.SheetDetail{Format: r.format}, nil
 }
@@ -115,6 +122,26 @@ func TestImportOfACSVNeedsNoBoard(t *testing.T) {
 	code, out := postImport(t, repo, loader, "text/csv", "rank,player_id,name,position\n1,a,Alpha,QB\n")
 	if code != http.StatusOK || out.Data.Imported != 1 || len(loader.loaded) != 0 || len(repo.replaced) != 1 {
 		t.Fatalf("%d %+v loaded %v", code, out, loader.loaded)
+	}
+}
+
+func TestImportOfAHeaderWithoutPlayerIDKeepsTheHeaderSentence(t *testing.T) {
+	for _, body := range []string{"rank,id,name,position\n1,a,B,QB", "Rank, Name, Position\n1,B,QB"} {
+		repo := &recorder{}
+		code, out := postImport(t, repo, &fixedBoards{}, "text/csv", body)
+		if code != http.StatusBadRequest || out.Error.Fields["body"] != badHeaderSentence || len(repo.replaced) != 0 {
+			t.Errorf("%q: %d %+v", body, code, out)
+		}
+	}
+}
+
+func TestImportOfAMissingSheetIs404OnBothPaths(t *testing.T) {
+	for _, body := range []string{"rank,player_id,name,position\n", "Nobody Real", "rank,player_id,name,position\n1,a,Alpha,QB"} {
+		repo := &recorder{missing: true}
+		code, _ := postImport(t, repo, &fixedBoards{}, "text/csv", body)
+		if code != http.StatusNotFound || len(repo.replaced) != 0 {
+			t.Errorf("%q: %d wrote %v", body, code, repo.replaced)
+		}
 	}
 }
 

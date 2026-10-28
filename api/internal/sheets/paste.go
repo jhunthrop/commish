@@ -3,7 +3,9 @@ package sheets
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/jhunthrop/commish/api/internal/accents"
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -39,13 +41,13 @@ const (
 )
 
 var (
-	leadingRank    = regexp.MustCompile(`^\s*\d+\s*[.)\-:]?\s+`)
-	nameSuffix     = regexp.MustCompile(`\s+(jr|sr|ii|iii|iv|v)$`)
+	leadingRank    = regexp.MustCompile(`^` + space + `*\d+` + space + `*[.)\-:]?` + space + `+`)
+	nameSuffix     = regexp.MustCompile(space + `+(jr|sr|ii|iii|iv|v)$`)
 	hintSplit      = regexp.MustCompile(`[,(/|\t]`)
 	hintParens     = regexp.MustCompile(`[()]`)
 	lineBreak      = regexp.MustCompile(`\r?\n`)
-	defenseWord    = regexp.MustCompile(`\s+(dst|def|defense|defence)$`)
-	slashedDefense = regexp.MustCompile(`(?i)\bd\s*/\s*st\b`)
+	defenseWord    = regexp.MustCompile(space + `+(dst|def|defense|defence)$`)
+	slashedDefense = regexp.MustCompile(`(?i)\bd` + space + `*/` + space + `*st\b`)
 	nameDropped    = strings.NewReplacer(".", "", "'", "", "’", "", "`", "")
 )
 
@@ -59,7 +61,7 @@ func listPositionAliases() map[string]string {
 func nameKey(name string) string {
 	s := accents.Strip(strings.ToLower(name))
 	s = strings.ReplaceAll(nameDropped.Replace(s), "-", " ")
-	s = strings.Join(strings.Fields(s), " ")
+	s = strings.Join(strings.FieldsFunc(s, isSpace), " ")
 	return nameSuffix.ReplaceAllString(s, "")
 }
 
@@ -122,6 +124,32 @@ func keysOf(p sheetPlayer) []string {
 	return keys
 }
 
+// space is what a pattern here reads as a space: JavaScript's \s, which
+// the web's reader uses and Go's \s (ASCII only) is not. A list copied
+// from a web page often holds a non-breaking space after its number.
+const space = `[\s\x{00a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}]`
+
+// isSpace is space as a rune test.
+func isSpace(r rune) bool { return unicode.IsSpace(r) || r == '\uFEFF' }
+
+// headerLike is whether a body that read to no player begins as a CSV
+// header would: a comma-separated first line naming one of the columns.
+// It is answered with the header's sentence, not "no player read".
+func headerLike(body string) bool {
+	first, _, _ := strings.Cut(strings.TrimLeftFunc(strings.TrimPrefix(body, byteOrderMark), isSpace), "\n")
+	cells := strings.Split(strings.ToLower(first), ",")
+	if len(cells) < 2 {
+		return false
+	}
+	for _, cell := range cells {
+		name := strings.TrimFunc(cell, isSpace)
+		if slices.Contains(requiredColumns(), name) || name == "player" || name == "id" {
+			return true
+		}
+	}
+	return false
+}
+
 // looksLikeCSV is whether the body's first line names player_id, the one
 // column a names list never carries. A CSV missing other columns is still
 // answered as a CSV, with the header's sentence.
@@ -137,7 +165,7 @@ type listLine struct {
 
 // parsePosition is a position as a list spells it, "" when it is none.
 func parsePosition(raw string) string {
-	upper := strings.ToUpper(strings.TrimSpace(raw))
+	upper := strings.ToUpper(strings.TrimFunc(raw, isSpace))
 	if alias, ok := listPositionAliases()[upper]; ok {
 		return alias
 	}
@@ -150,9 +178,9 @@ func parsePosition(raw string) string {
 func readListLine(line string) listLine {
 	withoutRank := slashedDefense.ReplaceAllString(leadingRank.ReplaceAllString(line, ""), defensePosition)
 	parts := hintSplit.Split(withoutRank, -1)
-	name := strings.TrimSpace(parts[0])
+	name := strings.TrimFunc(parts[0], isSpace)
 	for _, hint := range parts[1:] {
-		for _, word := range strings.Fields(hintParens.ReplaceAllString(hint, " ")) {
+		for _, word := range strings.FieldsFunc(hintParens.ReplaceAllString(hint, " "), isSpace) {
 			if position := parsePosition(word); position != "" {
 				return listLine{name: name, position: position}
 			}
@@ -202,7 +230,7 @@ func ReadList(body string, raw *boards.Raw) ([]apitypes.SheetRowInput, []apitype
 	seen := map[string]bool{}
 	for k, text := range lineBreak.Split(body, -1) {
 		line := k + 1
-		if strings.TrimSpace(text) == "" {
+		if strings.TrimFunc(text, isSpace) == "" {
 			continue
 		}
 		match, reason := matchLine(readListLine(text), index)
