@@ -27,6 +27,12 @@ public struct OrderAtClock: Equatable, Sendable {
         answer.readAt ?? landed
     }
 
+    /// The capture its rows' statuses come from (live-order.ts liveCapture), nil when the answer names
+    /// none or is older than the field (Lane 280, B257).
+    public var capture: CaptureStamp? {
+        answer.statusRead.map { CaptureStamp(asOf: $0.value1.asOf, checkedAt: $0.value1.checkedAt) }
+    }
+
     /// Several reads as one answer, the last one's with every read's rows (each player once): a pair
     /// read by its two names; nil for none.
     public static func merged(_ reads: [OrderAtClock]) -> OrderAtClock? {
