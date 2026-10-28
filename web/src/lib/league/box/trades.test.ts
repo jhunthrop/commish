@@ -5,6 +5,8 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { basisText, drawnText, KICKED_OFF_PART, phoneFinalsPart } from './basis.ts';
 import { stripLead, stripMark } from './strip.ts';
+import { BOX } from './box.ts';
+import { MINUS } from '#lib/format/number.ts';
 import type { PlayerLine, TradeAdvice, TradeCheck, TradeRow, TradeTeam } from '../inseason/api.ts';
 import {
 	bugFigures,
@@ -18,6 +20,8 @@ import {
 	offerText,
 	phoneWith,
 	proposeVerb,
+	refusalWords,
+	restFigure,
 	roomWords,
 	rosterOrder,
 	shortSide,
@@ -534,4 +538,35 @@ void test("an opened trade's and the builder's phone say what Avg and Last count
 		assert.ok(phone.includes(phoneFinalsPart('sleeper')), `${opened}: ${phone}`);
 		assert.ok(!phone.includes(KICKED_OFF_PART), `${opened}: ${phone}`);
 	}
+});
+
+void test('the verdict draws each side rest of season, tagged where that side would not take it (Lane 277)', () => {
+	const answered = {
+		...check(),
+		trade: { ...check().trade, my_rest_of_season: 21.6, their_rest_of_season: -21.6 },
+		acceptable: { yours: true, theirs: false }
+	};
+	assert.deepEqual(restFigure(answered, 'yours'), { text: '+21.6', tone: 'gain', refuses: false });
+	assert.deepEqual(restFigure(answered, 'theirs'), {
+		text: `${MINUS}21.6`,
+		tone: 'loss',
+		refuses: true
+	});
+	// Before an answer, the none mark every verdict cell draws.
+	assert.deepEqual(restFigure(null, 'yours'), { text: BOX.none, tone: 'even', refuses: false });
+	// An older answer with no figure draws the cell empty, never a figure we did not read.
+	assert.deepEqual(restFigure(check(), 'theirs'), { text: '', tone: 'even', refuses: false });
+	// A figure with no acceptable (an older answer) tags no side.
+	const untold = { ...answered, acceptable: undefined };
+	assert.equal(restFigure(untold, 'theirs').refuses, false);
+});
+
+void test('the answer line leads with the side that would not take it (Lane 277)', () => {
+	assert.equal(refusalWords({ yours: true, theirs: false }), TRADES.theyGiveUp);
+	assert.equal(refusalWords({ yours: false, theirs: true }), TRADES.youGiveUp);
+	assert.equal(refusalWords({ yours: false, theirs: false }), TRADES.bothGiveUp);
+	assert.equal(refusalWords({ yours: true, theirs: true }), null);
+	assert.equal(refusalWords(undefined), null);
+	assert.equal(TRADES.theyGiveUp, 'They give up more rest of season than they get.');
+	assert.equal(TRADES.noIdea, 'No idea they would take.');
 });

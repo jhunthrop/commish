@@ -64,7 +64,7 @@ export const weeksCovered = (week: number, h: Horizon): number => Math.max(1, h.
 const spanFrom = (weeks: number, h: Horizon): number => h.last - Math.max(1, weeks) + 1;
 
 /** The weeks by number, in the API's words (words.go weekSpan). */
-function weekSpan(weeks: number, h: Horizon): string {
+export function weekSpan(weeks: number, h: Horizon): string {
 	const from = spanFrom(weeks, h);
 	return from === h.last
 		? `week ${String(h.last)}`

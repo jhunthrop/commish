@@ -17,6 +17,8 @@
 		gainWord,
 		heldCheck,
 		proposeVerb,
+		refusalWords,
+		restFigure,
 		TRADES,
 		type CopiedTrade
 	} from '../box/trades.ts';
@@ -38,7 +40,9 @@
 		countWords,
 		fillsBoth,
 		gainBars,
+		ideaPlaces,
 		moreWords,
+		noIdeasFrom,
 		pickPrompt,
 		pickable,
 		proposable,
@@ -133,7 +137,9 @@
 	let drawn = $state<'give' | 'get'>('give');
 	/** Whether the ideas row shows every idea, or the best IDEAS_SHOWN and its "N more". */
 	let allIdeas = $state(false);
-	const shownIdeas = $derived(allIdeas ? presets : presets.slice(0, IDEAS_SHOWN));
+	/** Our ideas, then each team the finder lists none with, its line in its place (B271). */
+	const places = $derived(ideaPlaces(presets, noIdeasFrom(teams)));
+	const shownIdeas = $derived(allIdeas ? places : places.slice(0, IDEAS_SHOWN));
 	/** The ideas' list, so "N more" hands the focus to the first idea it shows. */
 	let ideaList = $state<HTMLUListElement | null>(null);
 	const IDEAS_ID = $derived(`${id}-ideas`);
@@ -143,9 +149,11 @@
 	async function showAllIdeas(): Promise<void> {
 		allIdeas = true;
 		await tick();
-		[...(ideaList?.querySelectorAll<HTMLButtonElement>('.idea') ?? [])].at(IDEAS_SHOWN)?.focus();
+		[...(ideaList?.querySelectorAll<HTMLElement>('.idea, .no-idea') ?? [])]
+			.at(IDEAS_SHOWN)
+			?.focus();
 	}
-	const hiddenIdeas = $derived(presets.length - shownIdeas.length);
+	const hiddenIdeas = $derived(places.length - shownIdeas.length);
 
 	// svelte-ignore state_referenced_locally
 	const asking = new Narrowing(check);
@@ -174,6 +182,8 @@
 	const page = $derived(answer?.host_trades_url ?? href);
 	const room = $derived(answer ? checkRoom(answer) : { yours: '', theirs: '' });
 	const bars = $derived(gainBars(answer?.trade.my_gain ?? null, answer?.trade.their_gain ?? null));
+	/** A side would not take the answered trade on its rest of season (Lane 269): the pin says why. */
+	const refusal = $derived(answer && fillsBoth(answer) ? refusalWords(answer.acceptable) : null);
 	const dropId = $derived(answer?.trade.drop?.player.host_id ?? null);
 	/** Propose and Share act on the answer only for the team and ticks it was read for, on a trade
 	 * both rosters can make. */
@@ -307,27 +317,39 @@
 {/snippet}
 
 <section {id} class="builder" tabindex="-1" aria-label={BUILDER_LINES.open} {@attach takeFocus}>
-	{#if presets.length > 0}
+	{#if places.length > 0}
 		<!-- Our ideas: the best trade with each team in this league, a card of two lines (the team and
 		     both gains, then the deal), the best three and the rest in place behind "N more". -->
 		<div class="ideas" role="group" aria-label={ANALYZER_LINES.ideas}>
 			<span class="ideas-head">{ANALYZER_LINES.ideas}</span>
 			<ul id={IDEAS_ID} class:all={allIdeas} bind:this={ideaList}>
-				{#each shownIdeas as preset (preset.key)}
-					<li>
-						<button
-							type="button"
-							class="idea"
-							aria-pressed={samePicks(picks, preset.picks)}
-							onclick={() => load(preset)}
-						>
-							<span class="top"
-								>{#if preset.mark}<b class="mark">{preset.mark}</b>{/if}<span class="with"
-									>{TRADES.with} {preset.team.name}</span
-								><span class="gains">{preset.gains}</span></span
-							><span class="deal">{preset.deal}</span>
-						</button>
-					</li>
+				{#each shownIdeas as place (place.kind === 'idea' ? place.preset.key : place.none.key)}
+					{#if place.kind === 'none'}
+						<!-- A team the finder lists no trade with: its line in its place, nothing to load. -->
+						<li>
+							<span class="no-idea" tabindex="-1"
+								><span class="top"
+									><span class="with">{TRADES.with} {place.none.team.name}</span></span
+								><span class="deal">{place.none.note}</span></span
+							>
+						</li>
+					{:else}
+						{@const preset = place.preset}
+						<li>
+							<button
+								type="button"
+								class="idea"
+								aria-pressed={samePicks(picks, preset.picks)}
+								onclick={() => load(preset)}
+							>
+								<span class="top"
+									>{#if preset.mark}<b class="mark">{preset.mark}</b>{/if}<span class="with"
+										>{TRADES.with} {preset.team.name}</span
+									><span class="gains">{preset.gains}</span></span
+								><span class="deal">{preset.deal}</span>
+							</button>
+						</li>
+					{/if}
 				{/each}
 				{#if hiddenIdeas > 0}
 					<li>
@@ -383,6 +405,7 @@
 		<div class:reading>
 			<TradeBug
 				gainHead={TRADES.gainHead}
+				restHead={TRADES.restHead}
 				teamHead={ANALYZER_LINES.team}
 				yours={{
 					name: me.name,
@@ -392,7 +415,8 @@
 						answer?.trade.my_proj_change ?? null
 					),
 					room: room.yours,
-					bar: bars.yours
+					bar: bars.yours,
+					rest: restFigure(answer, 'yours')
 				}}
 				theirs={{
 					name: team?.name ?? '',
@@ -402,7 +426,8 @@
 						answer?.trade.their_proj_change ?? null
 					),
 					room: room.theirs,
-					bar: bars.theirs
+					bar: bars.theirs,
+					rest: restFigure(answer, 'theirs')
 				}}
 			>
 				{#snippet verb()}
@@ -423,13 +448,17 @@
 	{#if moves.reason ?? hostNote}<p class="own">{moves.reason ?? hostNote}</p>{/if}
 	<p class="own" data-basis="builder">
 		{answer?.basis ?? basis}
+		{#if answer?.rest_of_season_basis}<span class="rest-said">{answer.rest_of_season_basis}</span
+			>{/if}
 		<a href={basisHref}>{BUILDER_LINES.figures}</a>
 	</p>
 	<!-- Where the rosters stack the gains, Share and the verb are pinned to the window's foot (above the
 	     tab bar on a phone), so each tap's answer stays in sight. -->
 	<div class="pin">
 		<span class="pin-gains" class:reading
-			>{#if answer && fillsBoth(answer)}<b>{gainWord(answer.trade.my_gain)}</b>
+			>{#if refusal}{refusal}{:else if answer && fillsBoth(answer)}<b
+					>{gainWord(answer.trade.my_gain)}</b
+				>
 				{TRADES.aWeekForYou}, {gainWord(answer.trade.their_gain)}
 				{TRADES.forTheirs}{:else}{sentence}{/if}</span
 		>
@@ -516,6 +545,27 @@
 		line-height: 16px;
 	}
 
+	/* A team with no idea (B271): the card's two lines, quiet and flat, nothing to press. */
+	.no-idea {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		width: 100%;
+		min-height: 38px;
+		padding: 3px var(--s-3);
+		border: 1px dashed var(--line);
+		border-radius: var(--r-md);
+		font-size: var(--t-sm);
+		line-height: 16px;
+		overflow: hidden;
+		color: var(--ink-2);
+		outline: none;
+	}
+
+	.no-idea .deal {
+		font-weight: 500;
+	}
+
 	.more {
 		width: auto;
 		white-space: nowrap;
@@ -571,6 +621,14 @@
 		font-size: var(--t-xs);
 		font-variant-numeric: tabular-nums;
 		color: var(--ink-2);
+	}
+
+	/* What the verdict's rest-of-season cells are and the rule a side takes a trade by (Lane 277),
+	   under the cells; at a desk only, as the phone draws no cell (TradeBug). */
+	@media (max-width: 760px) {
+		.rest-said {
+			display: none;
+		}
 	}
 
 	.choose {

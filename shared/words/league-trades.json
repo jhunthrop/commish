@@ -35,5 +35,11 @@
 	"sortBy": "Sort by",
 	"to": "to",
 	"projForYou": "Proj this week for your lineup",
+	"restHead": "Rest of season",
+	"wouldNotTake": "Would not take it",
+	"theyGiveUp": "They give up more rest of season than they get.",
+	"youGiveUp": "You give up more rest of season than you get.",
+	"bothGiveUp": "Both sides give up more rest of season than they get.",
+	"noIdea": "No idea they would take.",
 	"functions": []
 }

@@ -18,6 +18,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
 import { copyFault, watchData } from './copy-scan.ts';
 import { STRIP } from '../src/lib/league/box/strip.ts';
+import { TRADES } from '../src/lib/league/box/trades.ts';
 import { ANALYZER_LINES } from '../src/lib/league/inseason/builder.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { fixtureApiClock, installFixtureApiClock } from './inseason-fixture/clock.ts';
@@ -41,7 +42,12 @@ const ROW_WINDOWS = {
 	1280: { height: 800, rows: 10 },
 	390: { height: 844, rows: 7 }
 } as const;
-const VERDICT = /^(Your lineup|Both lineups|Neither lineup|Your roster|Their roster)/;
+const VERDICT =
+	/^(Your lineup|Both lineups|Neither lineup|Your roster|Their roster|They give up|You give up|Both sides give up)/;
+/** The idea the finder drops for Lane 269's rule (the old Best, Lane 268's shots): Rodgers for
+ * Skattebo and Strong with Max_Jensen10 costs them more rest of season than the rule lets a side give
+ * up, so the member builds it by tick and the verdict says why they would not take it (Lane 277). */
+const REFUSED = { give: ['Aaron Rodgers'], get: ['Cam Skattebo', 'Pierre Strong'] } as const;
 const KEEP_RULE = 'A player we rank first at his position goes only for';
 /** At this width and under, the rosters stack and the switch draws one at a time (TradeBuilder). */
 const STACKS_AT = 1180;
@@ -69,6 +75,11 @@ async function seen(page: Page) {
 				gains: text(b.querySelector('.gains')),
 				pressed: b.getAttribute('aria-pressed') === 'true'
 			})),
+			none: [...document.querySelectorAll('main .no-idea .deal')].map((b) => text(b)),
+			rest: [...document.querySelectorAll<HTMLElement>('main .bug td.rest')]
+				.filter((td) => td.offsetParent !== null)
+				.map((td) => text(td)),
+			pin: text(document.querySelector('main .builder .pin-gains')),
 			team: document.querySelector('main .builder select option:checked')?.textContent.trim() ?? '',
 			ticked: document.querySelectorAll('main .builder button.tick[aria-pressed="true"]').length,
 			line: text(document.querySelector('main .builder .words .line')),
@@ -90,6 +101,16 @@ async function tickAt(page: Page, mine: boolean, position: string, nth: number):
 	const name = (await row.locator('td.player').innerText()).split('\n')[0] ?? '';
 	await row.locator('button.tick').click();
 	return name;
+}
+
+/** Ticks a player by name in a box. */
+async function tickNamed(page: Page, mine: boolean, name: string): Promise<void> {
+	const box = page.locator(mine ? 'main table.box.mine' : 'main table.box:not(.mine)');
+	await box
+		.locator('tbody tr')
+		.filter({ has: page.locator('td.player', { hasText: name }) })
+		.locator('button.tick')
+		.click();
 }
 
 /** Waits for the verdict to read an answer (the answer line names a lineup's change). */
@@ -350,8 +371,13 @@ for (const theme of THEMES) {
 		);
 		const open = await seen(page);
 		check(
-			open.ideas.length === IDEAS_SHOWN + Number(more.split(' ')[0]),
-			`${where}: ${String(open.ideas.length)} ideas after ${more}`
+			open.ideas.length + open.none.length === IDEAS_SHOWN + Number(more.split(' ')[0]),
+			`${where}: ${String(open.ideas.length)} ideas and ${String(open.none.length)} lines after ${more}`
+		);
+		// A team the finder lists no trade with keeps its place, said (B271).
+		check(
+			open.none.length > 0 && open.none.every((line) => line === TRADES.noIdea),
+			`${where}: the teams with no idea say ${open.none.join(' | ') || 'nothing'}`
 		);
 		check(open.ideas[0]?.mark.toLowerCase() === STRIP.best.toLowerCase(), `${where}: no Best`);
 		check(
@@ -429,6 +455,57 @@ for (const theme of THEMES) {
 		const ticking = await verbs(page);
 		check(!ticking.propose && !ticking.share, `${where}: a verb live while a tick is read`);
 		await page.unroute(CHECK_ROUTE);
+
+		// An idea they would not take (Lane 277): the member builds the finder's dropped idea by tick.
+		// The verdict draws each side's rest of season, tags theirs at a desk, leads the line (and the
+		// phone's pin) with why they refuse, and leaves the verb live: the member may still propose.
+		await page.goto(`${web}/league/${FIXTURE_IDS.league}/trades`, { waitUntil: 'networkidle' });
+		await page.getByText(ANALYZER_LINES.ideas).first().waitFor({ timeout: READY_TIMEOUT_MS });
+		for (const name of REFUSED.give) await tickNamed(page, true, name);
+		if (stacked) await page.locator('main .switch button').nth(1).click();
+		for (const name of REFUSED.get) await tickNamed(page, false, name);
+		await verdict(page);
+		await waitLive(page);
+		const refused = await seen(page);
+		check(
+			refused.line.startsWith(TRADES.theyGiveUp),
+			`${where}: the refused idea reads "${refused.line}"`
+		);
+		if (!stacked) {
+			check(
+				refused.rest.length === 2 && /^\+\d+\.\d/.test(refused.rest[0] ?? ''),
+				`${where}: rest of season cells ${refused.rest.join(' | ')}`
+			);
+			check(
+				/^−\d+\.\d/.test(refused.rest[1] ?? ''),
+				`${where}: their rest of season ${refused.rest[1] ?? ''}`
+			);
+			check(
+				(refused.rest[1] ?? '').includes(TRADES.wouldNotTake),
+				`${where}: their cell is not tagged ${TRADES.wouldNotTake}`
+			);
+		} else {
+			// The phone draws no cell, as its basis has no room for its sentence; the pin says why.
+			check(refused.rest.length === 0, `${where}: a rest-of-season cell on the phone`);
+			check(refused.pin.startsWith(TRADES.theyGiveUp), `${where}: the pin reads "${refused.pin}"`);
+		}
+		const refusedCut = await cutText(page);
+		check(
+			refusedCut.length === 0,
+			`${where}: cut text in the refused verdict ${refusedCut.join(' | ')}`
+		);
+		if (!stacked)
+			check(
+				(await page.locator('main [data-basis="builder"]').innerText()).includes(
+					'A side takes a trade that costs it'
+				),
+				`${where}: the builder's line leaves out the rest-of-season rule`
+			);
+		taps.push(`${where}: refused, ${refused.line} | ${refused.rest.join(' | ')}`);
+		await page.screenshot({
+			path: new URL(`trades-${theme}-${String(width)}-refused-window.png`, out).pathname
+		});
+		await shoot(page, `trades-${theme}-${String(width)}-refused.png`, width);
 		await ctx.close();
 	}
 }
