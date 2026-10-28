@@ -82,7 +82,8 @@ func (c *CatchUp) Run(ctx context.Context) (Produced, bool, error) {
 	}
 	got, err := c.StarterStatus.Produce(ctx, w)
 	through := runThrough(mark, newest, got)
-	if got.Cut {
+	if got.Cut && !mark.Resuming() {
+		// Once per cut pass: a resume of the same window reads the same cut.
 		c.Log.Warn("notify: the capture pair read reached its bound; the mark stops at the newest capture read",
 			"bound", boards.MaxPairCaptures, "read", got.Captures, "left", got.CapturesLeft, "through", through)
 	}

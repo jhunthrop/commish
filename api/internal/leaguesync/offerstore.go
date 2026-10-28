@@ -16,17 +16,23 @@ import (
 // handful at most.
 const maxOffersKept = 50
 
-// OfferReadsKept is how long the offers archive keeps a read (Lane 285,
-// B278). The archive is the member's own record of what the host offered,
-// kept to answer "what was I offered and when" about the current season's
-// trades; an offer lapses on the host within days (ESPN and Yahoo expire
-// a proposal in two to seven, MyFantasyLeague's run to the trade
-// deadline), so thirty days covers an offer's whole life with margin and
-// no read older than that is about an offer still open. The daily sweep
-// job prunes past it (PruneOfferReads), so a link no longer read (detached
-// or disconnected) is pruned too, which a prune riding the capture would
-// never reach.
+// OfferReadsKept is how long the offers archive keeps a read that no
+// longer describes an open offer (Lane 285, B278). The archive is the
+// member's own record of what the host offered and when; ESPN and Yahoo
+// expire a proposal within days, so thirty days is past any of theirs.
+// MyFantasyLeague's can stay open to the trade deadline, months away, so
+// age alone never prunes: a link's newest read is kept while the link
+// still holds a current claim (app.host_offers), whatever its age, and
+// only reads superseded by a newer one, or a retired link's last read,
+// go once past thirty days (PruneOfferReads). The daily sweep job prunes,
+// so a link no longer read (detached or disconnected) is pruned too,
+// which a prune riding the capture would never reach.
 const OfferReadsKept = 30 * 24 * time.Hour
+
+// offerPruneBatch bounds one delete of the prune: each batch is its own
+// short statement on the read_at index, so a large archive is never
+// cleared under one long lock.
+const offerPruneBatch = 1000
 
 // ErrOffersNotKept is a read the store refused because its link was
 // detached or its host disconnected while the read was in flight: the
@@ -82,14 +88,28 @@ func RetireHostOffers(ctx context.Context, tx pgx.Tx, accountID uuid.UUID, host 
 	return nil
 }
 
-// PruneOfferReads deletes the archived offer reads older than before, the
-// sweep job's step (OfferReadsKept), and says how many went.
+// PruneOfferReads deletes the archived offer reads older than before,
+// except a link's newest read while the link holds a current claim (an
+// offer it describes may still be open), in batches of offerPruneBatch,
+// the sweep job's step (OfferReadsKept), and says how many went.
 func (s *Store) PruneOfferReads(ctx context.Context, before time.Time) (int64, error) {
-	tag, err := s.Pool.Exec(ctx, `delete from app.host_offer_reads where read_at < $1`, before)
-	if err != nil {
-		return 0, fmt.Errorf("leaguesync: prune offer reads: %w", err)
+	var total int64
+	for {
+		tag, err := s.Pool.Exec(ctx, `delete from app.host_offer_reads where id in (
+			select r.id from app.host_offer_reads r
+			where r.read_at < $1
+				and not (exists (select 1 from app.host_offers o where o.link_id = r.link_id)
+					and r.id = (select l.id from app.host_offer_reads l where l.link_id = r.link_id
+						order by l.read_at desc, l.id desc limit 1))
+			limit $2)`, before, offerPruneBatch)
+		if err != nil {
+			return total, fmt.Errorf("leaguesync: prune offer reads: %w", err)
+		}
+		total += tag.RowsAffected()
+		if tag.RowsAffected() < offerPruneBatch {
+			return total, nil
+		}
 	}
-	return tag.RowsAffected(), nil
 }
 
 // HeldOffer is an offer as the last good read of its link found it, and

@@ -206,3 +206,86 @@ func TestOfferHoldsAreBounded(t *testing.T) {
 		t.Fatalf("%d holds after every hold was over, want 1", len(c.until))
 	}
 }
+
+// The prune deletes in batches until none is left: 2,500 aged reads of a
+// retired link go in three batches, and the reads inside the window stay.
+func TestPruneOfferReadsInBatches(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	alice, err := (&auth.Store{Pool: pool}).UpsertAccount(ctx, auth.Identity{UserID: "user_alice", Email: "alice@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &Store{Pool: pool}
+	link, err := store.Save(ctx, Link{AccountID: alice.ID, Ref: Ref{Host: HostESPN, LeagueID: "48153503", Season: 2026, As: alice.ID}, RosterID: 7}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC)
+	cut := now.Add(-OfferReadsKept)
+	const aged, fresh = 2500, 3
+	if _, err := pool.Exec(ctx, `insert into app.host_offer_reads (link_id, account_id, read_at, offers)
+		select $1, $2, $3::timestamptz - make_interval(mins => i), '[]'::jsonb from generate_series(1, $4::int) i`,
+		link.ID, alice.ID, cut, aged); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `insert into app.host_offer_reads (link_id, account_id, read_at, offers)
+		select $1, $2, $3::timestamptz + make_interval(mins => i), '[]'::jsonb from generate_series(1, $4::int) i`,
+		link.ID, alice.ID, cut, fresh); err != nil {
+		t.Fatal(err)
+	}
+	n, err := store.PruneOfferReads(ctx, cut)
+	if err != nil || n != aged {
+		t.Fatalf("pruned %d (%v), want %d", n, err, aged)
+	}
+	if _, arch, _ := offerCounts(t, pool, link.ID); arch != fresh {
+		t.Fatalf("%d archived reads left, want %d", arch, fresh)
+	}
+}
+
+// A link's newest read is kept past the window while the link still holds
+// a current claim (a MyFantasyLeague offer can stay open to the trade
+// deadline); the older reads it superseded go, and once the claim is
+// retired its aged reads go too.
+func TestPruneKeepsTheReadOfAnOpenOffer(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	alice, err := (&auth.Store{Pool: pool}).UpsertAccount(ctx, auth.Identity{UserID: "user_alice", Email: "alice@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &Store{Pool: pool}
+	link, err := store.Save(ctx, Link{AccountID: alice.ID, Ref: Ref{Host: HostMFL, LeagueID: "10010", Season: 2026, As: alice.ID}, RosterID: 3}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connectHost(t, pool, alice.ID, HostMFL)
+	now := time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC)
+	old := now.Add(-OfferReadsKept - 60*24*time.Hour)
+	first := []Offer{{OfferID: "a", From: 2, Give: []string{"1"}}}
+	open := []Offer{{OfferID: "a", From: 2, Give: []string{"1"}}, {OfferID: "b", From: 4, Give: []string{"2"}}}
+	if err := store.PutOffers(ctx, link, first, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutOffers(ctx, link, open, old.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	n, err := store.PruneOfferReads(ctx, now.Add(-OfferReadsKept))
+	if err != nil || n != 1 {
+		t.Fatalf("pruned %d (%v), want only the superseded read", n, err)
+	}
+	var kept time.Time
+	if err := pool.QueryRow(ctx, `select read_at from app.host_offer_reads where link_id = $1`, link.ID).Scan(&kept); err != nil ||
+		!kept.Equal(old.Add(time.Hour)) {
+		t.Fatalf("kept the read of %v (%v), want the open claim's", kept, err)
+	}
+	if err := store.Detach(ctx, alice.ID, link.ID); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := store.PruneOfferReads(ctx, now.Add(-OfferReadsKept)); err != nil || n != 1 {
+		t.Fatalf("after the retire pruned %d (%v), want the aged read", n, err)
+	}
+	if _, arch, empty := offerCounts(t, pool, link.ID); arch != 1 || empty != 1 {
+		t.Fatalf("%d archived, %d retires left; want the retire alone", arch, empty)
+	}
+}
