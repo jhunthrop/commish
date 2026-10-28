@@ -6,9 +6,9 @@ off` (Lane 282) takes the voice reminder out of the corrections for the run, the
 Lane 282. `--retry-model` is the retry writer (Lane 276), production's setting by default and `none` for no
 retry writer.
 
-`--url` is the lane's copy (a `lane261_` database on the local 5433 server, refused otherwise). `--at` moves the instant
-later than the newest board (never earlier), within its board week. `--limit N`
-writes only the first N sheets in board order (the smoke run). `--budget` is the hard stop in dollars across
+`--url` is the lane's copy (a `lane261_`, `lane282_` or `lane286_` database on the local 5433 server, refused
+otherwise). `--at` moves the instant later than the newest board (never earlier), within its board week.
+`--limit N` writes only the first N sheets in board order (the smoke run). `--budget` is the hard stop in dollars across
 every call. The key is read from the environment or `--env-file`, never printed.
 """
 
@@ -48,7 +48,7 @@ from research.nightly.week_reads import worst_read_usd
 
 LOG = logging.getLogger("lane261")
 DEEPSEEK: Final = "deepseek/deepseek-v4.1-flash"
-SCRATCH_PREFIXES: Final = ("lane261_", "lane282_")
+SCRATCH_PREFIXES: Final = ("lane261_", "lane282_", "lane286_")
 NO_RETRY: Final = "none"
 DEFAULT_ENV_FILE: Final = Path("/Users/jh/code/fantasy/.env.local")
 JUDGE_PROMPT_TOKENS: Final = 1_000

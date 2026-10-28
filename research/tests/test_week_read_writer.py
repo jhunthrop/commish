@@ -11,7 +11,7 @@ from typing import Self
 
 import pytest
 
-from research.capsules.config import RETRY_WRITER_MODEL, writer_settings
+from research.capsules.config import CAPSULE_CONFIG, RETRY_WRITER_MODEL, writer_settings
 from research.capsules.gateway import Completion, GenerationError
 from research.capsules.gateway_ledger import ModelPrice, Usage
 from research.capsules.narrative import ShapeMasks
@@ -38,7 +38,8 @@ from research.capsules.week.prompt import (
     week_correction,
     week_prompt,
 )
-from research.capsules.week.sheet import Status
+from research.capsules.week.render import render_week_sheet
+from research.capsules.week.sheet import Status, WeekSheet
 from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
 from research.capsules.week.write import (
@@ -52,9 +53,9 @@ from research.capsules.week.write import (
 from research.db.schema.boards import WEEK_READ_REASONS
 from research.nightly.week_read_demotion import shared_week_sentences, stored_facts_block, week_demotions
 from research.nightly.week_reads import (
+    CHARS_PER_TOKEN,
     HOURLY_BUDGET_USD,
     HOURLY_DAY_USD,
-    MIN_CHARS_PER_TOKEN,
     NIGHTLY_BUDGET_USD,
     WORST_PROMPT_TOKENS,
     WeekReadSpend,
@@ -64,7 +65,7 @@ from research.nightly.week_reads import (
     worst_read_usd,
 )
 from research.tests.test_week_read_rules import BYE_READ, STARTER_READ
-from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, on_bye, questionable, starter
+from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, heaviest, on_bye, questionable, starter
 
 _USAGE = Usage(2400, 150, 2550, 0.0004)
 _A_DRAFT_AND_ONE_MORE = 2
@@ -312,17 +313,50 @@ def test_the_step_holds_a_dollar_budget_under_the_nightly_bound() -> None:
     assert worst_read_usd(_PRICE) == pytest.approx(2 * (9000 * 0.15 + 600 * 0.50) / 1_000_000)
 
 
-def test_the_worst_prompt_bound_holds_the_heaviest_correction() -> None:
-    """Review M4: the last correction a read can get (every rule broken so far, each with its sentence) on the
-    fullest fixture sheet, counted at the fewest characters a token took, fits WORST_PROMPT_TOKENS."""
+# The prompt bound's margin (Lane 286, B282): the heaviest correction, counted at the measured characters a
+# token, stays this share under WORST_PROMPT_TOKENS, or the test fails before the bound is ever met.
+BOUND_MARGIN = 0.10
+# Sentences other pages carry, as many as a correction quotes (`max_quoted_sentences`), each longer than the
+# longest of the 3,187 written sentences in Lane 282's six runs (231 characters).
+_AVOIDED = (
+    "Arizona has allowed the 26th-most PPR points a game to receivers through week 5 of 2026, and the Rams lean "
+    "on him whenever the game script asks for the ball to move quickly through the middle of the field on early "
+    "downs and late ones."
+)
+
+
+def heaviest_correction() -> tuple[str, str]:
+    """The heaviest ask a week read can carry (Lane 286, ruling 2): the heaviest sheet (`heaviest`), the last
+    correction a read can get, every rule broken so far with its sentence on an over-cap draft quoted and four
+    broken drafts, and every sentence a correction quotes to avoid at its longest. (system, user)."""
+    return worst_correction(heaviest())
+
+
+def worst_correction(sheet: WeekSheet) -> tuple[str, str]:
+    """The last correction a read of `sheet` can get, as `heaviest_correction` builds it."""
     long_read = _over_the_cap()
     broken = [long_read, _BROKEN, STARTER_READ.replace("18.4 points", "18.7 points"), "Buy him. Buy him now."]
-    ledger = notes_of([(text, validate_week_read(text, starter()).violations) for text in broken])
-    user = week_correction(starter(), long_read, ledger, ("Start him with confidence.",) * 12)
-    chars = len(WEEK_RULES) + len(user)
-    assert chars / MIN_CHARS_PER_TOKEN <= WORST_PROMPT_TOKENS, chars
+    ledger = notes_of([(text, validate_week_read(text, sheet).violations) for text in broken])
+    avoid = tuple(f"{_AVOIDED} ({n})" for n in range(CAPSULE_CONFIG.repetition.max_quoted_sentences))
+    return WEEK_RULES, week_correction(sheet, long_read, ledger, avoid)
+
+
+def test_the_worst_prompt_bound_holds_the_heaviest_correction_with_its_margin() -> None:
+    """Review M4, restated by Lane 286 (B282): the heaviest correction on the heaviest sheet, counted at the
+    characters a token the gateway measured for the writer and the retry writer (`CHARS_PER_TOKEN`), stays at
+    least BOUND_MARGIN under WORST_PROMPT_TOKENS."""
+    system, user = heaviest_correction()
+    tokens = (len(system) + len(user)) / CHARS_PER_TOKEN
+    assert tokens <= (1 - BOUND_MARGIN) * WORST_PROMPT_TOKENS, tokens
     assert step_budget(ModelPrice("m", None, None, "unread", None), HOURLY_BUDGET_USD).max_calls == int(0.05 / 0.00065)
     assert pytest.approx(4.00) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
+
+
+def test_the_heaviest_sheet_prints_every_section() -> None:
+    """Every line the sheet can print (`render_week_sheet`): the player, the day, the game, the injury report,
+    the published projection, the expected points, the forecast, the opponent's rank, the depth chart, his
+    games and our order."""
+    assert len(render_week_sheet(heaviest()).splitlines()) == 11  # noqa: PLR2004 - the sheet's eleven lines
 
 
 _NOW = WRITTEN_AT

@@ -114,6 +114,47 @@ def on_bye() -> WeekSheet:
     )
 
 
+def heaviest() -> WeekSheet:
+    """The heaviest sheet a week read is written from (Lane 286, the prompt bound): every section the sheet
+    prints, each at its longest, and nothing of the starter's, so the writer test's drafts (written for Puka
+    Nacua) break every rule they can on it, as on Terry McLaurin's sheet, the copy's heaviest correction. A
+    longer name than any on the copy, four teammates on the chart (the copy's most), three games in the log,
+    a week he missed, an Out status (a player who cannot play, so a draft that starts him breaks the most
+    rules), an outdoor forecast with every figure, a rank said by its rank, the projection and the one before it, the read
+    before this one, and every stamp. His voice is table talk, the voice with the longest reminder."""
+    return replace(
+        starter(),
+        player_id="00-0039003",
+        name="Jean-Baptiste Montgomery-Smith Jr.",
+        team="WAS",
+        game=WeekGame(6, "CHI", home=False, kickoff=KICKOFF, scheduled_at=BEFORE),
+        projection=PublishedProjection(11.3, CAPTURED, 13.6, BEFORE),
+        expected=ExpectedScore(23.5, 21.0, FIGURES),
+        status=Status("out", REPORT, FIGURES),
+        weather=Weather("outdoors", 83.0, 14.0, 55.0, "thunderstorms", FIGURES, BEFORE),
+        allowed=Allowed(22, 32, 20.2, "WR", 5, LINES),
+        depth=DepthPlace(
+            2.0,
+            (
+                ("Christian Montgomery-Watson", 1.0),
+                ("Demarcus Robinson-Whitfield", 3.0),
+                ("Jaxon Smith-Njigba-Ellington Jr.", 4.0),
+                ("Marquez Valdes-Scantling", 5.0),
+            ),
+            BEFORE,
+        ),
+        last_games=(GameLine(4, "NYG", False, 7.6), GameLine(3, "LV", True, 12.9), GameLine(1, "NYG", True, 19.4)),
+        points_per_game=13.3,
+        games_played=4,
+        touchdowns=1.0,
+        played=(1, 3, 4, 5),
+        missed=(2,),
+        board=BoardPlace(61, 27, 98.4, "rest_of_season", 6, BOARD),
+        last_read=LastRead(datetime(2026, 10, 16, 2, 0, tzinfo=UTC), 13.6, "questionable"),
+        lines_at=FIGURES,
+    )
+
+
 def on_injured_reserve() -> WeekSheet:
     """A starter whose status keeps him out: he cannot play this week."""
     return replace(starter(), status=Status("injured_reserve", REPORT))
