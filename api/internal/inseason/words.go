@@ -513,10 +513,86 @@ var keptWords = fmt.Sprintf("A player we rank first at his position goes only fo
 // B42): whose points, and the weeks they are a week over, "points over
 // replacement in each lineup, weeks 7 to 17".
 func TradeGainBasis(b OrderBasis, weeks int, h Horizon) string {
+	return "points over replacement in each lineup, " + tradeWeeks(b, weeks, h)
+}
+
+// tradeWeeks is the weeks a trade's figures cover, as the trade lines
+// say them: "weeks 7 to 17", or the season's on the preseason number.
+func tradeWeeks(b OrderBasis, weeks int, h Horizon) string {
 	if b != RestOfSeason {
-		return fmt.Sprintf("points over replacement in each lineup, over the season's %s on our preseason number", weekCount(weeks))
+		return fmt.Sprintf("over the season's %s on our preseason number", weekCount(weeks))
 	}
-	return "points over replacement in each lineup, " + weekSpan(weeks, h)
+	return weekSpan(weeks, h)
+}
+
+// The rest-of-season rule (Lane 269) as each answer says it: the finder
+// lists only trades both sides take; the builder answers each side.
+const (
+	finderRest = "We list a trade only when neither side falls by more than %s."
+	checkRest  = "A side takes a trade that costs it %s or less."
+)
+
+// The level the rest-of-season figures are over: the best free agent a
+// side could start at each position, or, with no read of the league's
+// free agents, the last starter league-wide.
+const (
+	overFreeAgent   = "the best free agent at their position"
+	overLastStarter = "the last starter at their position league-wide, as we have no read of the league's free agents"
+)
+
+// RestOfSeasonBasis is the line for a trade's rest-of-season figures
+// (Lane 269): what they count over which level, the weeks, and the rule,
+// the finder's (finder) or the builder's. read is whether the league's
+// free agents are read at all; lacking is each position with no free
+// agent a side could start, named in its own sentence where the last
+// starter's level stands in (fix round 2, LOW-A): "Rest of season is what
+// the players a side gets score over the best free agent at their
+// position, less the same for those it gives and drops, weeks 9 to 17. At
+// QB it is over the last starter league-wide, as the league has no free
+// quarterback. We list a trade only when neither side falls by more than
+// 9.0."
+func RestOfSeasonBasis(b OrderBasis, weeks int, h Horizon, finder, read bool, lacking []draft.Position) string {
+	rule, level := checkRest, overLastStarter
+	if finder {
+		rule = finderRest
+	}
+	if read {
+		level = overFreeAgent
+	}
+	out := "Rest of season is what the players a side gets score over " + level +
+		", less the same for those it gives and drops, " + tradeWeeks(b, weeks, h) + ". "
+	if read && len(lacking) > 0 {
+		out += lackingWords(lacking) + " "
+	}
+	return out + fmt.Sprintf(rule, points(GiveUp(weeks)))
+}
+
+// lackingWords is the sentence for the positions with no free agent a
+// side could start: "At QB and TE it is over the last starter
+// league-wide, as the league has no free quarterback or tight end."
+func lackingWords(lacking []draft.Position) string {
+	labels, nouns := make([]string, len(lacking)), make([]string, len(lacking))
+	for i, p := range lacking {
+		labels[i], nouns[i] = string(p), positionSingular(p)
+	}
+	none := strings.Join(nouns, " or ")
+	if len(nouns) > 2 {
+		none = strings.Join(nouns[:len(nouns)-1], ", ") + " or " + nouns[len(nouns)-1]
+	}
+	return fmt.Sprintf("At %s it is over the last starter league-wide, as the league has no free %s.", andList(labels), none)
+}
+
+// positionSingular names one of a skill position's players.
+func positionSingular(p draft.Position) string {
+	switch p {
+	case draft.QB:
+		return "quarterback"
+	case draft.RB:
+		return "running back"
+	case draft.WR:
+		return "receiver"
+	}
+	return "tight end"
 }
 
 // TradeNeedWords is the need a trade fills (Lane 103, B43): the empty

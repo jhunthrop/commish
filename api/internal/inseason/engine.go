@@ -43,6 +43,11 @@ type Candidate struct {
 	// InjuredReserve is a player listed on injured reserve: he counts in
 	// no lineup strength and is never traded.
 	InjuredReserve bool
+	// FreeLevel is the waiver level at his position (Lane 269): the points
+	// over replacement of the best free agent there, what a side that
+	// loses him could pick up. 0, the last starter's level, where the
+	// league's free agents are not read.
+	FreeLevel float64
 }
 
 // Slot is one starting spot: its type, the positions it takes and its
