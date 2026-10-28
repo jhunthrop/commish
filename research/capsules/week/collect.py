@@ -432,7 +432,7 @@ def _depth(subject: Subject) -> DepthPlace | None:
 
 def last_read_of(stored: StoredWeekRead | None) -> LastRead | None:
     """The read before this one, its projection as the card's tenth (a row kept before the tenth was stored
-    reads as the figure the run and the web compare, `cadence.projection_moved_past_shown`)."""
+    reads as the figure the card's "Proj at the read" prints)."""
     if stored is None:
         return None
     points = None if stored.projection_points is None else projection_tenth(stored.projection_points)

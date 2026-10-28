@@ -30,7 +30,7 @@ from research.capsules.week.collect import board_week
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.rollover import NIGHTS, ReadsDue, Rollover, next_nightly, night_of, reads_due, rollover
 from research.capsules.week.sheet import Status, WeekSheet
-from research.capsules.week.store import StoredWeekRead, stored_week_reads
+from research.capsules.week.store import StoredWeekRead, stored_week_reads, upsert_week_read
 from research.capsules.week.write import MAX_CALLS_PER_READ
 from research.db.engine import make_engine
 from research.db.schema import PLAYER_WEEK_READ_RUNS, PLAYER_WEEK_READS, PLAYERS
@@ -220,7 +220,7 @@ class _Writer:
         if "Puka Nacua" in who:
             if self.fail_first > 0:
                 self.fail_first -= 1
-                return _completion(STARTER_READ.replace("18.4 points", "18.6 points"), "start")
+                return _completion(STARTER_READ.replace("25.9 PPR points", "25.6 PPR points"), "start")
             return _completion(STARTER_READ, "start")
         return _completion(_QUESTIONABLE_READ, "hold")
 
@@ -302,7 +302,8 @@ def test_a_read_that_falls_to_its_facts_block_is_asked_again_and_the_pass_ends_c
     reads = _reads(engine)
     assert {read.source for read in reads.values()} == {WRITTEN_SOURCE}
     puka = reads[(starter().player_id, _BOARD_WEEK)]
-    assert puka.body == STARTER_READ and puka.attempts == 2  # noqa: PLR2004 - the fallen read and its retry
+    # A written read's attempts restart at its write (Lane 275 fix round 2): the fall before it is the facts row's.
+    assert puka.body == STARTER_READ and puka.attempts == 1
     assert "2 rounds" in record.summary and "every due read written" in record.summary
     assert "1 fell to their facts blocks: Puka Nacua" in record.summary
 
@@ -340,7 +341,9 @@ def test_an_hourly_pass_the_budget_cut_short_says_what_it_left_before_the_names(
     engine: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Lane 263's reads-left-unread note and Lane 265's names on one line (the Lane 265 review's M3): the note
-    sits in the tally, before the names, never on the last name's line. Lane 276 (the re-review's M1): the read the budget left is named too, with the one that fell."""
+    sits in the tally, before the names, never on the last name's line. Since Lane 275 fix round 2 a status
+    rewrite that falls keeps the written read (held) and one the budget stopped keeps it too: neither landed,
+    so both are named for the next pass."""
     _step(engine, monkeypatch, [starter(), questionable()], _Writer())
     monkeypatch.setattr(week_reads, "HOURLY_BUDGET_USD", week_reads.worst_read_usd(_PRICE) + 0.0001)
     moved = [
@@ -350,8 +353,10 @@ def test_an_hourly_pass_the_budget_cut_short_says_what_it_left_before_the_names(
     record = _step(engine, monkeypatch, moved, _Writer(), hourly=True)
     assert record.status == week_reads.PARTIAL and record.summary.startswith("2 still unwritten; hourly, ")
     tally, names = record.summary.split("; unwritten, asked again on the next pass:")
-    assert "1 reads left unread, the next kickoff among them" in tally
-    assert names.count("\n  ") == 2 and "reads left unread" not in names  # noqa: PLR2004 - the read that fell and the one the budget left
+    assert "1 reads left unread, the next kickoff among them" in tally and "(1 held over the written read)" in tally
+    assert names.count("\n  ") == 2 and "reads left unread" not in names  # noqa: PLR2004 - the held and the stopped
+    reads = _reads(engine)
+    assert {read.source for read in reads.values()} == {WRITTEN_SOURCE}
 
 
 def test_mid_week_a_status_change_rewrites_that_player_alone(engine: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -496,19 +501,24 @@ def test_retries_that_spent_their_share_leave_a_late_status_rewrite_funded(
     """The Lane 276 review's H1: the day's hourly passes have spent the retries' whole share, and a late pass has a
     status that moved and a read still unwritten. The status rewrite is asked and written on the status share;
     the retry is asked nothing and the line says why."""
-    writer = _Writer(fail_first=(MAX_CALLS_PER_READ + 1) * week_reads.ROLLOVER_ROUNDS)
-    _step(engine, monkeypatch, [starter(), questionable()], writer, retry=_RETRY)
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    bijan = _reads(engine)[(questionable().player_id, _BOARD_WEEK)]
     with engine.begin() as conn:
+        upsert_week_read(conn, replace(bijan, source=FACTS_SOURCE, body="Week: 6 of 2026", model=None, call=None))
         conn.execute(delete(PLAYER_WEEK_READ_RUNS))
     _hourly_spent(engine, week_reads.HOURLY_DAY_USD - week_reads.HOURLY_STATUS_RESERVE_USD)
-    moved = [starter(), replace(questionable(), status=Status("out", REPORT))]
+    moved = [replace(starter(), status=Status("questionable", REPORT)), questionable()]
     asked: list[str] = []
-    writer.asked = asked
-    late = _step(engine, monkeypatch, moved, writer, retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=1))
-    assert asked and all("Bijan Robinson" in who for who in asked)
+    late = _step(
+        engine, monkeypatch, moved, _Writer(asked=asked), retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=1)
+    )
+    assert asked and all("Puka Nacua" in who for who in asked)
     reads = _reads(engine)
-    assert reads[(questionable().player_id, _BOARD_WEEK)].status == "out"
-    assert reads[(starter().player_id, _BOARD_WEEK)].source == FACTS_SOURCE
+    assert (reads[(starter().player_id, _BOARD_WEEK)].source, reads[(starter().player_id, _BOARD_WEEK)].status) == (
+        WRITTEN_SOURCE,
+        "questionable",
+    )
+    assert reads[(questionable().player_id, _BOARD_WEEK)].source == FACTS_SOURCE
     assert "1 unwritten reads not asked, the retries' share" in late.summary
 
 
@@ -535,3 +545,23 @@ def test_a_retry_model_the_gateways_list_does_not_carry_turns_the_retry_writer_o
     warnings = [line for line in lines if "RETRY_WRITER_MODEL" in line]
     assert len(warnings) == 1 and f"names {_RETRY}" in warnings[0] and "off for this pass" in warnings[0]
     assert not warnings[0].startswith(week_reads.WARNING_MARKER)
+
+
+def test_a_retry_writer_rescue_replaces_a_held_read_and_a_retry_fall_keeps_it(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Lane 276 merge with Lane 275's hold: a status rewrite GLM cannot write and the retry writer can is
+    written over the held read, the retry model named; one both writers fail keeps the written read (held)."""
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    first = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    moved = [replace(starter(), status=Status("questionable", REPORT)), questionable()]
+    fell_all = _Writer(fail_first=MAX_CALLS_PER_READ + 1)
+    kept = _step(engine, monkeypatch, moved, fell_all, retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=1))
+    held = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert (held.source, held.body, held.status) == (WRITTEN_SOURCE, first.body, first.status)
+    assert "(1 held over the written read)" in kept.summary and "1 asked of the retry writer" in kept.summary
+    rescue = _Writer(fail_first=MAX_CALLS_PER_READ)
+    done = _step(engine, monkeypatch, moved, rescue, retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=2))
+    written = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert (written.source, written.model, written.status) == (WRITTEN_SOURCE, _RETRY, "questionable")
+    assert written.attempts == 1 and "1 rescued" in done.summary and "every due read written" in done.summary

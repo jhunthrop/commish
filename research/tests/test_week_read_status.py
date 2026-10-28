@@ -52,3 +52,10 @@ def test_the_next_hourly_pass_follows_the_capture_schedule(after: datetime, due:
 def test_the_caption_names_when_the_new_read_is_due() -> None:
     caption = status_changed_caption(datetime(2026, 10, 17, 2, 0, tzinfo=UTC))
     assert caption == "His status changed since this read was written. A new read is due by Fri Oct 16, 10:00 pm CT."
+
+
+def test_a_read_whose_status_rewrites_are_spent_names_the_next_days_first_pass() -> None:
+    """Lane 275 fix round 2 (review H2): once three rewrites fell since the written read, the caption keeps
+    honest and names the first pass of the next Central day, the nightly at 00:30 CDT."""
+    caption = status_changed_caption(datetime(2026, 10, 18, 18, 30, tzinfo=UTC), capped=True)
+    assert caption == "His status changed since this read was written. A new read is due by Mon Oct 19, 12:30 am CT."

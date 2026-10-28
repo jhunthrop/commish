@@ -20,11 +20,15 @@ from research.capsules.run_budget import BudgetSpentError
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.week.cadence import (
     FIRST,
-    PROJECTION_MOVED,
+    PRIORITY,
     RETRIES_A_DAY,
+    RULE_STALE,
     STATUS_CHANGED,
+    STATUS_REWRITES_A_DAY,
     UNWRITTEN,
     due_reason,
+    kept_read,
+    status_rewrite_capped,
 )
 from research.capsules.week.prompt import (
     WEEK_RULES,
@@ -42,8 +46,10 @@ from research.capsules.week.write import (
     MAX_ASKS_WITH_RETRY,
     MAX_CALLS_PER_READ,
     OVER_CAP_FALL,
+    WeekReadResult,
     write_week_read,
 )
+from research.db.schema.boards import WEEK_READ_REASONS
 from research.nightly.week_read_demotion import shared_week_sentences, stored_facts_block, week_demotions
 from research.nightly.week_reads import (
     HOURLY_BUDGET_USD,
@@ -54,6 +60,7 @@ from research.nightly.week_reads import (
     WeekReadSpend,
     dearest_price,
     step_budget,
+    stored_row,
     worst_read_usd,
 )
 from research.tests.test_week_read_rules import BYE_READ, STARTER_READ
@@ -113,7 +120,10 @@ def test_the_prompt_states_the_week_the_kickoff_and_that_the_number_is_published
     assert "45 to 70 words in all, about 60" in WEEK_RULES and "never more than 95" in WEEK_RULES
     # Lane 117 (B95): the four rules the first nightly broke most, in the writer's words.
     assert "One figure to a sentence." in WEEK_RULES
-    assert "The published projection is a cell you place inside a sentence about this player's week" in WEEK_RULES
+    # Lane 275: the read never states the published projection; the card's Wk cell prints it.
+    assert "Never state it, its figure, its change or a judgment of it" in WEEK_RULES
+    assert "Never the published projection, its figure or its change" in WEEK_RULES
+    assert "Name it once" not in WEEK_RULES and "with its figure" not in WEEK_RULES
     # Review H1 and M1: no stock projection sentence to copy, no trading word, no report name the facts never give.
     for primed in ("has him at", "the stock", "Tuesday-night"):
         assert primed not in WEEK_RULES, primed
@@ -211,7 +221,7 @@ def test_the_overrun_retry_is_one_and_only_for_the_cap() -> None:
 
 OUT_READ = (
     "Puka Nacua is Out on Friday's report, so he does not play against Arizona in week 6 of 2026. "
-    "The published projection has him at 18.4 points, but that figure does not count for a player who sits. "
+    "His 24.1 points in his last game do not count for a player who sits this week. "
     "Bench him this week and pick up a receiver who has a game."
 )
 # Plain words, no figure among them, that take a read over the 95-word cap.
@@ -339,22 +349,18 @@ def _stored(sheet_week: int = 6, **changes: object) -> StoredWeekRead:
     return replace(row, **changes)  # type: ignore[arg-type]
 
 
-def test_the_cadence_writes_a_first_read_a_status_change_and_a_projection_past_the_proj_change_threshold() -> None:
-    """Lane 256: after the roll-over a read is rewritten for a published projection that moved past the Proj
-    change tile's threshold (the page's serve rule), never for a smaller move, which rewrote the whole board
-    mid-week (330 reads on the night of 2026-10-21)."""
+def test_the_cadence_writes_a_first_read_and_a_status_change_and_a_read_stands_through_a_projection_move() -> None:
+    """Lane 275 (the founder, 2026-10-28): the read never states the published projection, so a move of it,
+    of any size, keeps the read the roll-over wrote; a first read, a status change and an unwritten read are
+    the reasons left."""
     sheet = questionable()  # the card prints 15.2
     assert due_reason(sheet, None, _NOW) == FIRST
     assert due_reason(sheet, _stored(sheet_week=5), _NOW) == FIRST
     assert due_reason(sheet, _stored(), _NOW) is None
     assert due_reason(replace(sheet, status=Status("out", REPORT)), _stored(), _NOW) == STATUS_CHANGED
-    assert due_reason(sheet, _stored(projection_points=15.7), _NOW) == PROJECTION_MOVED
-    assert due_reason(sheet, _stored(projection_points=14.7), _NOW) == PROJECTION_MOVED
-    assert due_reason(sheet, _stored(projection_points=15.6), _NOW) is None
-    assert due_reason(sheet, _stored(projection_points=15.1), _NOW) is None
-    assert due_reason(sheet, _stored(projection_points=None), _NOW) == PROJECTION_MOVED
-    # A row kept before the card's tenth was stored reads as the tenth it printed.
-    assert due_reason(sheet, _stored(projection_points=15.24), _NOW) is None
+    for then in (15.7, 14.7, 15.6, 15.1, 9.0, 22.0, None):
+        assert due_reason(sheet, _stored(projection_points=then), _NOW) is None, then
+    assert due_reason(replace(sheet, projection=None), _stored(), _NOW) is None
     assert due_reason(sheet, _stored(source="facts"), _NOW) == UNWRITTEN
 
 
@@ -373,15 +379,66 @@ def test_a_failed_read_is_retried_at_most_once_an_hour_and_every_hour_of_a_centr
 
 
 def test_the_hourly_pass_writes_a_status_that_moved_and_a_read_still_unwritten() -> None:
-    """The coordinator's ruling (Lane 66v review, finding 1): the page is prerendered, so a projection move is
-    the nightly's to rewrite, never the hourly pass's. Lane 276: a fallen read is the hourly pass's too."""
+    """The coordinator's ruling (Lane 66v review, finding 1): an hourly pass writes a status change, and since
+    Lane 276 a read still unwritten, asked every hour until one is written."""
     sheet = questionable()
     assert due_reason(sheet, None, _NOW, hourly=True) is None
     assert due_reason(sheet, _stored(source="facts"), _NOW, hourly=True) == UNWRITTEN
     assert due_reason(replace(sheet, status=Status("out", REPORT)), _stored(), _NOW, hourly=True) == STATUS_CHANGED
     assert due_reason(sheet, _stored(projection_points=13.0), _NOW, hourly=True) is None
     assert due_reason(sheet, _stored(projection_points=15.8), _NOW, hourly=True) is None
-    assert due_reason(sheet, _stored(projection_points=15.8), _NOW) == PROJECTION_MOVED
+
+
+_STALE_BODY = "The published projection has him at 15.2 points. Hold him until Sunday."
+
+
+def test_a_written_read_the_rules_now_refuse_is_due_once_a_day_at_the_nightly() -> None:
+    """Lane 275 fix round 1: a read written while the rules asked it to name the published projection is
+    rewritten at the nightly, never hourly, and at most once a Central day (its attempt today stops it)."""
+    sheet, tomorrow = questionable(), _NOW + timedelta(days=1)
+    assert due_reason(sheet, _stored(body=_STALE_BODY), tomorrow) == RULE_STALE
+    assert due_reason(sheet, _stored(body="Our projection likes him. Hold him."), tomorrow) == RULE_STALE
+    assert due_reason(sheet, _stored(body=_STALE_BODY), tomorrow, hourly=True) is None
+    assert due_reason(sheet, _stored(body=_STALE_BODY), _NOW) is None  # attempted today already
+    assert due_reason(sheet, _stored(), tomorrow) is None
+    # His rest-of-season order is ours, never the week's published projection.
+    assert due_reason(sheet, _stored(body="He is RB4 in our rest-of-season order. Hold him."), tomorrow) is None
+    # A changed status comes first, and a facts block is the unwritten retry's.
+    moved = replace(sheet, status=Status("out", REPORT))
+    assert due_reason(moved, _stored(body=_STALE_BODY), tomorrow) == STATUS_CHANGED
+    assert due_reason(sheet, _stored(body=_STALE_BODY, source="facts"), tomorrow) == UNWRITTEN
+
+
+def test_the_status_cap_counts_only_the_falls_since_the_written_read() -> None:
+    """Lane 275 fix round 2 (review H2): a change, two fallen rewrites, a success, then a second change the same
+    Central day gets its own three tries; three falls since the written read spend the day's."""
+    at = _NOW  # Fri Oct 16, 9:00 pm Central
+    out, active = replace(questionable(), status=Status("out", REPORT)), questionable()
+    written = _stored(attempt_day=date(2026, 10, 16), attempts=1)
+    assert due_reason(out, written, at, hourly=True) == STATUS_CHANGED
+    once = kept_read(written, at)
+    twice = kept_read(once, at)
+    assert (once.attempts, twice.attempts) == (2, 3)
+    assert due_reason(out, twice, at, hourly=True) == STATUS_CHANGED
+    rewritten = stored_row(out, _written_result(), STATUS_CHANGED, twice, at)
+    assert rewritten.attempts == 1 and rewritten.status == "out"
+    assert due_reason(active, rewritten, at, hourly=True) == STATUS_CHANGED
+    spent = kept_read(kept_read(kept_read(rewritten, at), at), at)
+    assert status_rewrite_capped(spent, at) and due_reason(active, spent, at, hourly=True) is None
+    # The next Central day starts its tries again; a read written on an earlier day counts its write as one.
+    assert due_reason(active, spent, at + timedelta(days=1)) == STATUS_CHANGED
+    yesterday = _stored(attempt_day=date(2026, 10, 15), attempts=3)
+    assert kept_read(yesterday, at).attempts == 2  # noqa: PLR2004 - its write and the fall
+
+
+def _written_result() -> WeekReadResult:
+    return WeekReadResult("A new read.", "llm", "hold", "m/x", None, 1, (), None)
+
+
+def test_the_nightly_writes_its_due_reads_in_the_cadences_priority() -> None:
+    """A budget stop leaves the rule-stale rewrites, last in `PRIORITY`, for the next night."""
+    assert PRIORITY.index(RULE_STALE) == len(PRIORITY) - 1
+    assert set(PRIORITY) <= set(WEEK_READ_REASONS)
 
 
 def test_a_sentence_shape_on_two_pages_keeps_its_first_carrier_in_board_order() -> None:
@@ -534,3 +591,17 @@ def test_a_throttled_or_refused_writer_never_asks_the_retry_writer() -> None:
         result = write_week_read(starter(), gateway, retry_model=_RETRY)  # type: ignore[arg-type]
         assert set(gateway.models) == {"m/x"} and result.retry_asks == 0
         assert result.fallback is not None and not result.fallback.startswith("failed validation")
+
+
+def test_the_hourly_retries_never_ask_one_read_twice_in_an_hour() -> None:
+    """The Lane 276 merge with Lane 275: a fallen read's facts row carries the pass's instant (`stored_row`), so
+    the gap holds its retries to one an hour; a written read held over a fallen rewrite keeps its written instant
+    and restarts its attempts at its write, so its status rewrites keep Lane 275's own cap, never the retries' 24."""
+    sheet, today = questionable(), date(2026, 10, 16)
+    fell = _stored(source="facts", attempt_day=today, attempts=2, written_at=_NOW - timedelta(minutes=59))
+    assert due_reason(sheet, fell, _NOW, hourly=True) is None
+    assert due_reason(sheet, fell, _NOW + timedelta(minutes=1), hourly=True) == UNWRITTEN
+    assert STATUS_REWRITES_A_DAY == 3 < RETRIES_A_DAY  # noqa: PLR2004 - Lane 275's cap
+    out = replace(sheet, status=Status("out", REPORT))
+    held = _stored(attempt_day=today, attempts=1 + STATUS_REWRITES_A_DAY)
+    assert due_reason(out, held, _NOW, hourly=True) is None
