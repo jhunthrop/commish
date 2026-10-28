@@ -14,8 +14,10 @@ Two modes on one pass (`run_week_read_step`), both on the board week alone (`col
   a read still unwritten, a player new to the board).
 - **Hourly**, after the in-season job's status capture (`research.inseason --task capture-harvest`): the
   reads whose status moved, then every read still unwritten (Lane 276, asked each hour until one is written),
-  under `HOURLY_BUDGET_USD` a pass and `HOURLY_DAY_USD` across a Central day's passes (`player_week_read_runs`);
-  a pass the day's dollars stop says so in its line.
+  under `HOURLY_BUDGET_USD` a pass and `HOURLY_DAY_USD` across a Central day's passes (`player_week_read_runs`).
+  The retries never draw on the status share of the day (`HOURLY_STATUS_RESERVE_USD`), so a late game day's
+  status rewrite always has dollars; a pass the dollars stop says so in its line, and the game-day alert counts
+  the status rewrites alone.
 
 A player whose board-week game has kicked off has his next week ahead, which is not the board week, so no read
 is written for a game under way, and none for the week after it before that week rolls over.
@@ -46,10 +48,10 @@ from typing import Final
 import httpx
 from sqlalchemy import Engine
 
-from research.capsules.config import CAPSULE_CONFIG, writer_settings
+from research.capsules.config import CAPSULE_CONFIG, WriterSettings, writer_settings
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient
-from research.capsules.gateway_ledger import ModelPrice
+from research.capsules.gateway_ledger import ModelPrice, fetch_price
 from research.capsules.narrative import ShapeMasks, sentences_verbatim
 from research.capsules.run_budget import RunBudget
 from research.capsules.store import WRITTEN_SOURCE
@@ -100,6 +102,15 @@ NIGHTLY_BUDGET_USD: Final = 2.50
 ROLLOVER_ROUNDS: Final = 3
 HOURLY_BUDGET_USD: Final = 0.05
 HOURLY_DAY_USD: Final = 1.50  # 0.60 before the game-day status passes (Lane 263): headroom over $0.93 of waves
+# THE STATUS SHARE (Lane 276 review, H1): the part of HOURLY_DAY_USD the hourly retries of fallen reads never
+# draw on, so a late game day's status rewrite always has dollars. A game day's status rewrites: Lane 263's three
+# inactives waves of about 100 board starters, GAME_DAY_STATUS_READS. Each is admitted at its worst case
+# (`worst_read_usd` at GLM's list price, 2 x (9,000 x $0.15 + 600 x $0.50) / 1M = $0.0033): 300 x $0.0033 =
+# $0.99, so the share is $1.00 and the retries take the rest, at most $0.50 a Central day (the day expected for
+# them, about $0.46, fits). The retries stop once the day's hourly spend, status rewrites' and retries' together,
+# reaches HOURLY_DAY_USD less this share; status rewrites draw on the whole day.
+GAME_DAY_STATUS_READS: Final = 300
+HOURLY_STATUS_RESERVE_USD: Final = 1.00
 # The heaviest prompt a week read's ask carries (a correction with its ledger and every line's stamp), for a
 # read's worst case against what is left of the budget. Measured on Lane 117's replay of 40 production
 # sheets of week 7 after the four-rule prompt: 8,506 prompt tokens at 17,643 characters, the fewest
@@ -386,19 +397,32 @@ def _write_rounds(  # noqa: PLR0913 - the pass's parts
     if batch and not room():
         spend.budget_stopped += len(batch)
         spend.budget_left |= {sheet.player_id for sheet, _ in batch}
-    while batch and spend.rounds < rounds and room():
-        spend.rounds += 1
+    done = 0
+    while batch and done < rounds and room():
+        done += 1
         _write(engine, gateway, stored, batch, room=room, spend=spend, masks=night.masks, judge=judge)
         spend.demoted_reads |= demote_shared(engine, night.sheets, night.board_week, now, night.masks)
         stored = _reread(engine, night.board_week)
         batch = [(sheet, UNWRITTEN) for sheet in _unwritten(night, due, stored)]
-    spend.unwritten = _left(night, due, stored, spend)
+    spend.rounds = max(spend.rounds, done)
+    spend.unwritten += _left(night, due, stored, spend)
 
 
 def _room(budget: RunBudget, worst: float) -> Callable[[], bool]:
     """Whether another read may start: its worst case fits what is left (the gateway's reservation is the
     hard stop for the reads in flight)."""
     return lambda: budget.max_usd is None or budget.spent_usd + worst <= budget.max_usd
+
+
+def combined(budgets: Sequence[RunBudget]) -> RunBudget | None:
+    """The pass's budgets as one tally (its limit the first's, the pass's own): calls made and dollars spent."""
+    if not budgets:
+        return None
+    first = budgets[0]
+    return RunBudget(
+        first.max_calls, first.max_usd, first.price,
+        sum(b.calls_made for b in budgets), sum(b.spent_usd for b in budgets),
+    )  # fmt: skip
 
 
 def record_spend(engine: Engine, now: datetime, mode: str, spend: WeekReadSpend, budget: RunBudget | None) -> None:
@@ -414,12 +438,21 @@ def _day_start(now: datetime) -> datetime:
     return datetime.combine(central_day(now), time(), CENTRAL)
 
 
+def _hourly_spent(engine: Engine, now: datetime) -> float:
+    with engine.connect() as conn:
+        return hourly_spend_since(conn, _day_start(now))
+
+
 def _budget_usd(engine: Engine, now: datetime, hourly: bool) -> float:
     if not hourly:
         return NIGHTLY_BUDGET_USD
-    with engine.connect() as conn:
-        spent = hourly_spend_since(conn, _day_start(now))
-    return max(0.0, min(HOURLY_BUDGET_USD, HOURLY_DAY_USD - spent))
+    return max(0.0, min(HOURLY_BUDGET_USD, HOURLY_DAY_USD - _hourly_spent(engine, now)))
+
+
+def retry_share_usd(spent_today: float) -> float:
+    """What the hourly retries may still spend today: the day's hourly dollars less the status share
+    (`HOURLY_STATUS_RESERVE_USD`) and what the day's hourly passes already spent."""
+    return max(0.0, HOURLY_DAY_USD - HOURLY_STATUS_RESERVE_USD - spent_today)
 
 
 def _due(night: _Night, now: datetime, hourly: bool) -> list[tuple[WeekSheet, str]]:
@@ -460,9 +493,70 @@ def _warn_spent_day(engine: Engine, now: datetime, log: Log, facts: FactsPassMem
     night = _read_night(engine, now, facts)
     if night is None or not night.rollover.ready:
         return
-    due = _due(night, now, True)
+    due = [item for item in _due(night, now, True) if item[1] != UNWRITTEN]
     if (left := left_unread(due, len(due))) is not None:
         log(f"{WARNING_MARKER} {left} at the game-day window's last pass, the day's hourly dollars spent")
+
+
+def _split(due: Sequence[tuple[WeekSheet, str]]) -> tuple[list[tuple[WeekSheet, str]], list[tuple[WeekSheet, str]]]:
+    """An hourly pass's due reads: the status rewrites, and the retries of reads still unwritten (Lane 276)."""
+    return [item for item in due if item[1] != UNWRITTEN], [item for item in due if item[1] == UNWRITTEN]
+
+
+def _left_line(
+    status_due: Sequence[tuple[WeekSheet, str]], status_stopped: int, retries_stopped: int, usd: float
+) -> str | None:
+    """What the budget left of an hourly pass: its status rewrites (the game-day alert's count), then the retries
+    the status share kept from asking (Lane 276 review, H1, M2)."""
+    parts = []
+    if (status := left_unread(status_due, status_stopped)) is not None:
+        low = f", with less than the pass's ${HOURLY_BUDGET_USD:.2f} left of the day's ${HOURLY_DAY_USD:.2f}"
+        parts.append(status + (low if usd < HOURLY_BUDGET_USD else ""))
+    if retries_stopped > 0:
+        parts.append(
+            f"{retries_stopped} unwritten reads not asked, the retries' share of the day's hourly "
+            f"${HOURLY_DAY_USD:.2f} spent (${HOURLY_STATUS_RESERVE_USD:.2f} kept for status rewrites)"
+        )
+    return "; ".join(parts) or None
+
+
+@dataclass(frozen=True, slots=True)
+class _CheckedRetry:
+    """The retry writer the pass may ask (None when off or unlisted) and its list price."""
+
+    model: str | None
+    prices: tuple[ModelPrice, ...]
+
+
+def _checked_retry(http: httpx.Client, key: str, settings: WriterSettings, log: Log) -> _CheckedRetry:
+    """The retry writer's model checked against the gateway's list (Lane 276 review, H2): one the list does not
+    carry turns the retry writer off for this pass, by a warning naming its setting, and never fails the pass."""
+    if settings.retry_model is None:
+        return _CheckedRetry(None, ())
+    price = fetch_price(http, key, settings.retry_model)
+    if price.listed is False:
+        variable = CAPSULE_CONFIG.gateway.retry_model_variable
+        log(
+            f"{STEP}: retry writer WARNING: {variable} names {settings.retry_model}, which the gateway's model list "
+            "does not carry; the retry writer is off for this pass"
+        )
+        return _CheckedRetry(None, ())
+    return _CheckedRetry(settings.retry_model, (price,))
+
+
+class _Pass:
+    """One pass's writing, in parts (an hourly pass's status rewrites, then its retries) on budgets of their own."""
+
+    def __init__(self, engine: Engine, night: _Night, now: datetime, spend: WeekReadSpend, judge: str) -> None:
+        self.engine, self.night, self.now, self.spend, self.judge = engine, night, now, spend, judge
+
+    def write(
+        self, gateway: GatewayClient, due: Sequence[tuple[WeekSheet, str]], room: Callable[[], bool], rounds: int
+    ) -> None:
+        _write_rounds(
+            self.engine, gateway, self.night, due, self.now, room=room, spend=self.spend, rounds=rounds,
+            judge=self.judge,
+        )  # fmt: skip
 
 
 def run_week_read_step(  # noqa: PLR0913 - the pass's parts
@@ -492,27 +586,38 @@ def run_week_read_step(  # noqa: PLR0913 - the pass's parts
     spend = WeekReadSpend(retry_model=settings.retry_model)
     for _, reason in due:
         spend.due[reason] = spend.due.get(reason, 0) + 1
-    budget: RunBudget | None = None
+    # An hourly pass writes the status rewrites first on the pass's dollars, then the retries on their share alone.
+    first, retries = _split(due) if hourly else (list(due), [])
+    budgets: list[RunBudget] = []
     try:
         with httpx.Client() as http:
             judge = judge_model(os.environ)
-            # The judge's model and the retry writer's are listed too, and the budget reserves at the dearest.
-            others = [judge, *([] if settings.retry_model is None else [settings.retry_model])]
-            prices = [checked_price(http, key, replace(settings, model=m)) for m in [settings.model, *others]]
-            price = dearest_price(prices)
-            budget = step_budget(price, usd)
-            room = _room(budget, worst_read_usd(price))
-            gateway = GatewayClient.for_run(key, http, settings).with_budget(budget)
+            checked = _checked_retry(http, key, settings, log)
+            spend.retry_model = checked.model
+            prices = [checked_price(http, key, replace(settings, model=m)) for m in (settings.model, judge)]
+            price = dearest_price([*prices, *checked.prices])
+            worst = worst_read_usd(price)
+            budgets.append(step_budget(price, usd))
+            gateway = GatewayClient.for_run(key, http, settings)
             rounds = 1 if hourly else ROLLOVER_ROUNDS
-            _write_rounds(engine, gateway, night, due, now, room=room, spend=spend, rounds=rounds, judge=judge)
+            pass_ = _Pass(engine, night, now, spend, judge)
+            pass_.write(gateway.with_budget(budgets[0]), first, _room(budgets[0], worst), rounds)
+            stopped_first = spend.budget_stopped
+            if retries:
+                spent = (
+                    _hourly_spent(engine, now) + budgets[0].spent_usd
+                )  # the day's, this pass's status rewrites with it
+                share = min(usd - budgets[0].spent_usd, retry_share_usd(spent))
+                budgets.append(step_budget(price, max(0.0, share)))
+                pass_.write(gateway.with_budget(budgets[1]), retries, _room(budgets[1], worst), rounds)
     finally:
         # Whatever the pass spent is on the day's ledger even when it raised (the re-review's F6).
-        record_spend(engine, now, mode, spend, budget)
-    left = left_unread(due, spend.budget_stopped) if hourly else None
-    if left is not None and last_pass:
-        log(f"{WARNING_MARKER} {left} at the game-day window's last pass")
-    if left is not None and usd < HOURLY_BUDGET_USD:
-        left += f", stopped at the day's hourly ${HOURLY_DAY_USD:.2f}"
+        record_spend(engine, now, mode, spend, combined(budgets))
+    left = _left_line(first, stopped_first, spend.budget_stopped - stopped_first, usd) if hourly else None
+    if hourly and last_pass and (warned := left_unread(first, stopped_first)) is not None:
+        log(f"{WARNING_MARKER} {warned} at the game-day window's last pass")
+    budget = combined(budgets)
+    assert budget is not None  # the pass's own budget is the first, made before any read
     line = (
         f"{spend.head()}{head}, {len(night.sheets)} board players with a week {night.board_week} ahead, "
         f"{budget.line()}; {spend.line(left)}"

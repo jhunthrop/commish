@@ -513,3 +513,24 @@ def test_the_pass_budget_reserves_at_the_dearest_models_price() -> None:
     assert (dearest.input_usd_per_million, dearest.output_usd_per_million) == (0.15, 0.50)
     unread = dearest_price([_PRICE, ModelPrice(_RETRY, None, None, "unread", None)])
     assert step_budget(unread, HOURLY_BUDGET_USD).max_usd is None
+
+
+def test_a_refusal_at_the_retry_ask_keeps_the_writers_fall_so_his_facts_block_lands() -> None:
+    """The Lane 276 review's M1: the budget refuses the retry writer's ask; the read is the writer's own fall,
+    named for its rule, so the pass writes his facts block and keeps him due, never a read with no row."""
+    gateway = _StubGateway([*[_answer(_BROKEN)] * MAX_CALLS_PER_READ, BudgetSpentError("the run's budget is spent")])
+    result = write_week_read(starter(), gateway, retry_model=_RETRY)  # type: ignore[arg-type]
+    assert (result.source, result.retry_asks, result.rescued) == ("facts", 1, False)
+    assert result.fallback is not None and result.fallback.startswith("failed validation")
+    assert result.calls == MAX_CALLS_PER_READ + 1
+
+
+def test_a_throttled_or_refused_writer_never_asks_the_retry_writer() -> None:
+    for error in (
+        GenerationError("Gateway returned HTTP 429, throttled.", False, transport=True),
+        GenerationError("Gateway refused the request.", False),
+    ):
+        gateway = _StubGateway([error] * 10)  # a throttle's re-asks within the one ask, then its fall
+        result = write_week_read(starter(), gateway, retry_model=_RETRY)  # type: ignore[arg-type]
+        assert set(gateway.models) == {"m/x"} and result.retry_asks == 0
+        assert result.fallback is not None and not result.fallback.startswith("failed validation")

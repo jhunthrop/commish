@@ -425,7 +425,8 @@ def test_an_hourly_pass_at_the_days_cap_stops_asking_and_says_so(
     engine: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A fallen read due on an hourly pass whose day has less left than a read's worst case: nothing is asked,
-    the read stands as it was, and the line says the day's hourly dollars stopped it. The cap is never raised."""
+    the read stands as it was, and the line says the retries' share of the day stopped it. The cap is never
+    raised."""
     sheets = [starter(), questionable()]
     writer = _Writer(fail_first=(MAX_CALLS_PER_READ + 1) * week_reads.ROLLOVER_ROUNDS)
     _step(engine, monkeypatch, sheets, writer, retry=_RETRY)
@@ -436,8 +437,8 @@ def test_an_hourly_pass_at_the_days_cap_stops_asking_and_says_so(
     writer.asked = asked
     hour = _step(engine, monkeypatch, sheets, writer, retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=1))
     assert asked == [] and "1 stopped by the budget" in hour.summary
-    assert "1 reads left unread, the next kickoff among them" in hour.summary
-    assert f"stopped at the day's hourly ${week_reads.HOURLY_DAY_USD:.2f}" in hour.summary
+    assert "1 unwritten reads not asked, the retries' share of the day's hourly $1.50 spent" in hour.summary
+    assert "reads left unread" not in hour.summary  # the game-day alert's count is the status rewrites' alone
     assert _reads(engine)[(starter().player_id, _BOARD_WEEK)].source == FACTS_SOURCE
     _hourly_spent(engine, 0.001, _PASS + timedelta(minutes=65))
     spent = _step(engine, monkeypatch, sheets, writer, retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=2))
@@ -487,3 +488,50 @@ def test_a_status_rewrite_the_budget_left_unasked_is_counted_unwritten_and_asked
     after = _step(engine, monkeypatch, moved, _Writer(asked=asked), hourly=True, at=_PASS + timedelta(hours=2))
     assert asked and "every due read written" in after.summary
     assert _reads(engine)[(starter().player_id, _BOARD_WEEK)].status == "questionable"
+
+
+def test_retries_that_spent_their_share_leave_a_late_status_rewrite_funded(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Lane 276 review's H1: the day's hourly passes have spent the retries' whole share, and a late pass has a
+    status that moved and a read still unwritten. The status rewrite is asked and written on the status share;
+    the retry is asked nothing and the line says why."""
+    writer = _Writer(fail_first=(MAX_CALLS_PER_READ + 1) * week_reads.ROLLOVER_ROUNDS)
+    _step(engine, monkeypatch, [starter(), questionable()], writer, retry=_RETRY)
+    with engine.begin() as conn:
+        conn.execute(delete(PLAYER_WEEK_READ_RUNS))
+    _hourly_spent(engine, week_reads.HOURLY_DAY_USD - week_reads.HOURLY_STATUS_RESERVE_USD)
+    moved = [starter(), replace(questionable(), status=Status("out", REPORT))]
+    asked: list[str] = []
+    writer.asked = asked
+    late = _step(engine, monkeypatch, moved, writer, retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=1))
+    assert asked and all("Bijan Robinson" in who for who in asked)
+    reads = _reads(engine)
+    assert reads[(questionable().player_id, _BOARD_WEEK)].status == "out"
+    assert reads[(starter().player_id, _BOARD_WEEK)].source == FACTS_SOURCE
+    assert "1 unwritten reads not asked, the retries' share" in late.summary
+
+
+def test_the_status_share_covers_a_game_days_status_rewrites_at_their_worst_case() -> None:
+    worst = week_reads.worst_read_usd(_PRICE)
+    assert week_reads.GAME_DAY_STATUS_READS * worst <= week_reads.HOURLY_STATUS_RESERVE_USD
+    assert week_reads.HOURLY_STATUS_RESERVE_USD < week_reads.HOURLY_DAY_USD
+    assert week_reads.retry_share_usd(0.0) == pytest.approx(0.50)
+    assert week_reads.retry_share_usd(0.49) == pytest.approx(0.01)
+    assert week_reads.retry_share_usd(1.20) == 0.0
+
+
+def test_a_retry_model_the_gateways_list_does_not_carry_turns_the_retry_writer_off_with_one_warning(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Lane 276 review's H2: the pass runs, its reads written by the writer alone, and one line names the
+    setting; it never fails the pass."""
+    unlisted = ModelPrice(_RETRY, None, None, "the list does not carry it", False)
+    monkeypatch.setattr(week_reads, "fetch_price", lambda *_args: unlisted)
+    models: list[str] = []
+    lines: list[str] = []
+    record = _step(engine, monkeypatch, [starter(), questionable()], _Writer(models=models), retry=_RETRY, lines=lines)
+    assert record.status == "ran" and "the retry writer off" in record.summary and _RETRY not in models
+    warnings = [line for line in lines if "RETRY_WRITER_MODEL" in line]
+    assert len(warnings) == 1 and f"names {_RETRY}" in warnings[0] and "off for this pass" in warnings[0]
+    assert not warnings[0].startswith(week_reads.WARNING_MARKER)

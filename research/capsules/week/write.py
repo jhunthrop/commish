@@ -262,7 +262,8 @@ def _retry_writer_read(  # noqa: PLR0913 - the read's parts
 ) -> WeekReadResult:
     """One draft of the read `fallen` could not write, asked of the retry writer (`retrier`, the same line,
     bucket and budget), validated as the writer's are and judged by the same judge for a player who may not
-    be started; written as the retry writer's, else the facts block named for this last draft."""
+    be started; written as the retry writer's, else the facts block named for this last draft, or for the
+    writer's own fall when the gateway refused the retry's ask."""
     judge_before = judge.calls
     attempts, usage = list(fallen.attempts), fallen.usage
 
@@ -275,8 +276,10 @@ def _retry_writer_read(  # noqa: PLR0913 - the read's parts
     try:
         completion = ask(retrier, messages_for(_retry_prompt(sheet, attempts, avoid)), MAX_TOKENS)
     except GenerationError as error:
+        # A refusal at the retry ask (the budget's above all, Lane 276 review M1) keeps the writer's own fall: his
+        # facts block lands and stays due, never a read the budget stopped with no row.
         usage = add_usage(usage, error.billed)
-        return done(block, FACTS_SOURCE, None, _gateway_why(error))
+        return done(block, FACTS_SOURCE, None, fallen.fallback)
     usage = add_usage(usage, completion.usage)
     answer = parse_week_answer(completion.content)
     text = answer.read or ""
@@ -287,7 +290,7 @@ def _retry_writer_read(  # noqa: PLR0913 - the read's parts
         except GenerationError as error:
             usage = add_usage(usage, error.billed)
             attempts.append(WeekAttempt(text, answer.call, ()))
-            return done(block, FACTS_SOURCE, None, _gateway_why(error))
+            return done(block, FACTS_SOURCE, None, fallen.fallback)
         usage = add_usage(usage, judged)
         violations = (judge_violation(sheet),) if says else ()
     attempts.append(WeekAttempt(text, answer.call, violations))

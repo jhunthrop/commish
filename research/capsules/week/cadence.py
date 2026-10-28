@@ -29,13 +29,15 @@ from research.capsules.week.store import StoredWeekRead
 
 RETRY_GAP: Final = timedelta(hours=1)
 # Lane 276 (the founder, 2026-10-28: "we should always show a read"): a fallen read is asked every hour of a
-# Central day, so the count is the day's hours and the gap and the dollars are what hold it. The worst day:
-# a read's worst case is its six asks (the writer's and the judge's) and the retry writer's draft with the
-# judge's ask on it: 6 x (9,000 x $0.15 + 600 x $0.50) / 1M = $0.0099 at most, plus (9,000 x $0.075 + 600 x $0.30) / 1M = $0.0009 and
-# a judge's ask of about $0.0004, so $0.011; with the whole board of 536 fallen, 536 x 20 passes (the
-# capture's hours) x $0.011 = $118 asked, which the hourly pass's $0.05 and the day's $1.50 hold to $1.50
-# (`nightly.week_reads.HOURLY_BUDGET_USD`, `HOURLY_DAY_USD`, unchanged). The day expected: about 2 reads in
-# 100 fall on the roll-over night, 11 of 536, at the dearest night's $0.0021 a read for 20 passes, $0.46.
+# Central day, so the count is the day's hours and the gap and the dollars are what hold it. The worst day: a
+# read may spend its six asks (the writer's and the judge's) and the retry writer's draft with the judge's ask on
+# it: 6 x (9,000 x $0.15 + 600 x $0.50) / 1M = $0.0099, plus (9,000 x $0.075 + 600 x $0.30) / 1M = $0.0009 and a
+# judge's ask of about $0.0004, so $0.011. A pass admits a read at two asks (`week_reads.worst_read_usd`); the
+# gateway's reservation, not that check, holds a read in flight to the rest. With the whole board of 536 fallen,
+# 536 x 20 passes (the capture's hours) x $0.011 = $118 asked, which the hourly pass's $0.05 and the retries'
+# share of the day hold to $0.50 (`week_reads.HOURLY_DAY_USD` $1.50, unchanged, less the status share
+# `HOURLY_STATUS_RESERVE_USD` $1.00 the retries never draw on). The day expected: about 2 reads in 100 fall on
+# the roll-over night, 11 of 536, at the dearest night's $0.0021 a read for 20 passes, $0.46.
 RETRIES_A_DAY: Final = 24
 FIRST: Final = "first"
 UNWRITTEN: Final = "unwritten"
