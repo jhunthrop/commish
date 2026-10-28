@@ -26,8 +26,15 @@ object StatusHeld {
     /** A day of hours and one more: every day holds a pass, so the search ends within it. */
     private const val HOURS_SEARCHED = 48L
 
+    /** How the run's status-changed caption opens, whatever due time it names (caption.py). */
+    private const val CHANGED_LEAD = "His status changed since this read was written."
+
     /** STATUS_HELD_WORDS.changed: the run's caption for a read his status moved past. */
-    private fun changed(due: String): String = "His status changed since this read was written. A new read is due by $due."
+    private fun changed(due: String): String = "$CHANGED_LEAD A new read is due by $due."
+
+    /** runSaysStatusChanged: the run sent its own status caption, whose due time knows a capped rewrite
+     * (Lane 275); it is said as sent. */
+    internal fun runSaysChanged(read: RunWeekRead): Boolean = read.caption.startsWith(CHANGED_LEAD)
 
     /** nextHourlyPass: the first hourly pass strictly after `after`, on the hour. */
     fun nextHourlyPass(after: Instant): Instant {
@@ -51,9 +58,9 @@ object StatusHeld {
         return instantOrNull(listed?.since)?.isAfter(written) ?: false
     }
 
-    /** readAtStatus: his read under the status caption and the next hourly pass when his designation
-     * changed since it was written, its body and call kept; as the run served it otherwise, and with no
-     * capture. */
+    /** readAtStatus: his read under the status caption when his designation changed since it was written
+     * (the run's own when it sent one, our next hourly pass only when it did not), its body and call kept;
+     * as the run served it otherwise, and with no capture. */
     fun read(
         read: RunWeekRead,
         capture: RunDesignations?,
@@ -61,6 +68,7 @@ object StatusHeld {
         now: Instant,
     ): RunWeekRead {
         if (capture == null || !changedSince(read, capture, capture.players[player])) return read
+        if (runSaysChanged(read)) return read
         val due = Format.stampAt(nextHourlyPass(now), captionZone)
         return read.copy(caption = changed(due))
     }

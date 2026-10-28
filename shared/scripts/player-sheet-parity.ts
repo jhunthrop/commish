@@ -295,6 +295,28 @@ async function statusHeldCases(standin: Run): Promise<unknown[]> {
 			now: CLOCKS.week
 		},
 		{
+			name: 'the run sent its own capped caption: said as sent',
+			read: {
+				...read,
+				caption:
+					'His status changed since this read was written. A new read is due by Sun Oct 18, 1:00 am CT.'
+			},
+			capture,
+			now: CLOCKS.week
+		},
+		{
+			name: 'an older run nulled it under its own caption: said as sent',
+			read: {
+				...read,
+				body: null,
+				call: null,
+				caption:
+					'His status changed since this read was written. A new read is due by Fri Oct 16, 10:00 pm CT.'
+			},
+			capture,
+			now: CLOCKS.week
+		},
+		{
 			name: 'the run caption at Friday 10 pm Eastern',
 			read,
 			capture,

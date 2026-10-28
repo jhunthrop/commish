@@ -27,10 +27,14 @@ const HOUR_MS = 3_600_000;
 /** A day of hours and one more: every day holds a pass, so the search ends within it. */
 const HOURS_SEARCHED = 48;
 
+/** How the run's status-changed caption opens, whatever due time it names (`caption.py
+ * status_changed_caption`, capped or not). */
+const CHANGED_LEAD = 'His status changed since this read was written.';
+
 export const STATUS_HELD_WORDS = {
+	changedLead: CHANGED_LEAD,
 	/** The run's caption for a read his status moved past (`caption.py status_changed_caption`). */
-	changed: (due: string): string =>
-		`His status changed since this read was written. A new read is due by ${due}.`
+	changed: (due: string): string => `${CHANGED_LEAD} A new read is due by ${due}.`
 } as const;
 
 const passHour = new Intl.DateTimeFormat('en-US', {
@@ -74,10 +78,17 @@ export function statusChangedSince(
 	return listed?.since != null && Date.parse(listed.since) > written;
 }
 
+/** Whether the run sent its own status-changed caption: then its due time is the run's, which knows when a
+ * rewrite is capped to the next day's first pass (Lane 275), and the clients say it as sent. */
+export function runSaysStatusChanged(read: Pick<WeekRead, 'caption'>): boolean {
+	return read.caption.startsWith(CHANGED_LEAD);
+}
+
 /** His read as the page and the shelf are built with it at `now` (ms): under the status caption and the
- * next hourly pass when his designation changed since it was written, its body and call kept (or still
+ * next hourly pass when his designation changed since it was written (the run's own caption when it sent
+ * one, our next hourly pass only when it did not), its body and call kept (or still
  * null where an older run nulled them); as the run served it otherwise, and with no capture to judge it
- * by. Returns the read itself when it stands, so a caller can tell. */
+ * by. Returns the read itself when we add nothing to it. */
 export function readAtStatus(
 	read: WeekRead,
 	capture: Designations | null,
@@ -86,6 +97,7 @@ export function readAtStatus(
 ): WeekRead {
 	if (capture === null || !statusChangedSince(read, capture, capture.players[playerId]))
 		return read;
+	if (runSaysStatusChanged(read)) return read;
 	const due = new Date(nextHourlyPass(now)).toISOString();
 	return { ...read, caption: STATUS_HELD_WORDS.changed(stampAt(due, CAPTION_ZONE)) };
 }

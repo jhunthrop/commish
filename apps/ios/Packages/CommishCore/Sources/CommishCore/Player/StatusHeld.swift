@@ -16,9 +16,18 @@ public enum StatusHeld {
     /// A day of hours and one more: every day holds a pass, so the search ends within it.
     static let hoursSearched = 48
 
+    /// How the run's status-changed caption opens, whatever due time it names (caption.py).
+    static let changedLead = "His status changed since this read was written."
+
     /// STATUS_HELD_WORDS.changed: the run's caption for a read his status moved past.
     static func changed(due: String) -> String {
-        "His status changed since this read was written. A new read is due by \(due)."
+        "\(changedLead) A new read is due by \(due)."
+    }
+
+    /// runSaysStatusChanged: the run sent its own status caption, whose due time knows a capped rewrite
+    /// (Lane 275); it is said as sent.
+    static func runSaysChanged(_ read: RunWeekRead) -> Bool {
+        read.caption.hasPrefix(changedLead)
     }
 
     /// nextHourlyPass: the first hourly pass strictly after `after`, on the hour.
@@ -50,13 +59,16 @@ public enum StatusHeld {
         return listed?.since.map { $0 > read.writtenAt } ?? false
     }
 
-    /// readAtStatus: his read under the status caption and the next hourly pass when his designation
-    /// changed since it was written, its body and call kept; as the run served it otherwise, and with no
-    /// capture.
+    /// readAtStatus: his read under the status caption when his designation changed since it was written
+    /// (the run's own when it sent one, our next hourly pass only when it did not), its body and call kept;
+    /// as the run served it otherwise, and with no capture.
     public static func read(_ read: RunWeekRead, capture: RunDesignations?, player: String, now: Date) -> RunWeekRead {
         guard let capture,
               changedSince(read, capture: capture, listed: capture.players.additionalProperties[player])
         else {
+            return read
+        }
+        if runSaysChanged(read) {
             return read
         }
         let due = Formatting.stampAt(nextHourlyPass(after: now), zone: captionZone)

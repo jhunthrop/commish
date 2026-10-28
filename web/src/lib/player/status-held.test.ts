@@ -6,7 +6,12 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { designationsSchema, weekReadSchema, type WeekRead } from '#lib/run/schema.ts';
 import { CARD } from './card.ts';
-import { nextHourlyPass, readAtStatus, statusChangedSince } from './status-held.ts';
+import {
+	nextHourlyPass,
+	readAtStatus,
+	runSaysStatusChanged,
+	statusChangedSince
+} from './status-held.ts';
 import { shownWeekRead, type CardProjection } from './week-read.ts';
 
 const fixture = (name: string): unknown =>
@@ -49,16 +54,36 @@ void test('a read written before he became due back keeps its body under the sta
 		assert.deepEqual(shownWeekRead(built, card(state)), shown);
 });
 
-void test('a read an older run already nulled for his status keeps its caption alone (old data)', () => {
-	const nulled = { ...readOf(ETIENNE), body: null, call: null };
+void test('a read an older run already nulled for his status keeps the run caption alone (old data)', () => {
+	const runCaption =
+		'His status changed since this read was written. A new read is due by Fri Oct 16, 10:00 pm CT.';
+	const nulled = { ...readOf(ETIENNE), body: null, call: null, caption: runCaption };
 	const built = readAtStatus(nulled, CAPTURE, ETIENNE, BUILD);
-	assert.deepEqual(built, { ...nulled, caption: DUE });
-	assert.deepEqual(shownWeekRead(built, card('upcoming')), { withheld: true, words: DUE });
+	assert.equal(built, nulled);
+	assert.deepEqual(shownWeekRead(built, card('upcoming')), { withheld: true, words: runCaption });
 	for (const state of ['kicked_off', 'final'] as const)
 		assert.deepEqual(shownWeekRead(built, card(state)), {
 			withheld: true,
 			words: CARD.readNotWritten
 		});
+});
+
+void test("the run's own status caption is said as sent, a capped due time with it (Lane 275 N1)", () => {
+	// Three falls since the write cap the rewrite: the run names the next day's first pass, which an
+	// hourly guess of ours would put hours early.
+	const capped =
+		'His status changed since this read was written. A new read is due by Sun Oct 18, 1:00 am CT.';
+	const sent = { ...readOf(ETIENNE), caption: capped };
+	assert.ok(runSaysStatusChanged(sent));
+	assert.ok(!runSaysStatusChanged(readOf(ETIENNE)));
+	assert.equal(readAtStatus(sent, CAPTURE, ETIENNE, BUILD), sent);
+	assert.deepEqual(shownWeekRead(sent, card('upcoming')), {
+		withheld: false,
+		body: sent.body,
+		caption: capped
+	});
+	// With no run caption the client says its own next hourly pass.
+	assert.equal(readAtStatus(readOf(ETIENNE), CAPTURE, ETIENNE, BUILD).caption, DUE);
 });
 
 void test('a read written after the capture was read is the one the writer read against: it stands', () => {
