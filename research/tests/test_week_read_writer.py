@@ -13,7 +13,6 @@ import pytest
 
 from research.capsules.gateway import Completion, GenerationError
 from research.capsules.gateway_ledger import ModelPrice, Usage
-from research.capsules.rule_notes import notes_of
 from research.capsules.run_budget import BudgetSpentError
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.week.cadence import (
@@ -24,17 +23,26 @@ from research.capsules.week.cadence import (
     due_reason,
 )
 from research.capsules.week.prompt import (
+    AVOID_LEAD,
     WEEK_RULES,
     answer_json,
     length_move,
     parse_week_answer,
     week_correction,
+    week_notes,
     week_prompt,
 )
 from research.capsules.week.sheet import Status
 from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
-from research.capsules.week.write import MAX_ASKS_PER_READ, MAX_CALLS_PER_READ, OVER_CAP_FALL, write_week_read
+from research.capsules.week.write import (
+    MAX_ASKS_PER_READ,
+    MAX_CALLS_PER_READ,
+    OVER_CAP_FALL,
+    WeekModels,
+    write_week_read,
+    write_week_read_with,
+)
 from research.nightly.week_read_demotion import shared_week_sentences, stored_facts_block, week_demotions
 from research.nightly.week_reads import (
     HOURLY_BUDGET_USD,
@@ -104,7 +112,7 @@ def test_the_prompt_states_the_week_the_kickoff_and_that_the_number_is_published
     for primed in ("has him at", "the stock", "Tuesday-night"):
         assert primed not in WEEK_RULES, primed
     assert "The season once, with the first week you name" in WEEK_RULES
-    assert "The injury list in the facts' own words for it" in WEEK_RULES
+    assert "The injury report exactly as the facts' injury report line names it" in WEEK_RULES
     assert "Pick the two or three facts that decide his week" in WEEK_RULES
     assert "quote at most 3 figures" in WEEK_RULES and "Never retell the cells" in WEEK_RULES
     assert '"in our preseason order" or "in our rest-of-season order"' in WEEK_RULES
@@ -114,7 +122,10 @@ def test_the_prompt_states_the_week_the_kickoff_and_that_the_number_is_published
 
 
 def test_the_prompt_quotes_the_sentences_other_pages_carry() -> None:
-    assert '"Start him with confidence."' in week_prompt(starter(), ("Start him with confidence.",))
+    user = week_prompt(starter(), ("Start him with confidence.", "Start Chase with confidence."))
+    # Lane 264 (B267): in the form the shape check compares, each shape once.
+    assert AVOID_LEAD in user and user.count('- "x him with confidence"') == 1
+    assert '- "x x with confidence"' in user and "Start him with confidence." not in user
 
 
 def test_the_answer_is_the_read_and_its_call() -> None:
@@ -293,7 +304,7 @@ def test_the_worst_prompt_bound_holds_the_heaviest_correction() -> None:
     fullest fixture sheet, counted at the fewest characters a token took, fits WORST_PROMPT_TOKENS."""
     long_read = _over_the_cap()
     broken = [long_read, _BROKEN, STARTER_READ.replace("18.4 points", "18.7 points"), "Buy him. Buy him now."]
-    ledger = notes_of([(text, validate_week_read(text, starter()).violations) for text in broken])
+    ledger = week_notes(starter(), [(text, validate_week_read(text, starter()).violations) for text in broken])
     user = week_correction(starter(), long_read, ledger, ("Start him with confidence.",) * 12)
     chars = len(WEEK_RULES) + len(user)
     assert chars / MIN_CHARS_PER_TOKEN <= WORST_PROMPT_TOKENS, chars
@@ -393,3 +404,11 @@ def test_a_status_that_keeps_him_out_means_he_cannot_play(status: str) -> None:
 
 def test_the_written_instant_is_utc_aware() -> None:
     assert starter().written_at.tzinfo is UTC
+
+
+def test_a_named_retry_model_writes_the_corrections_and_never_the_first_draft() -> None:
+    """Lane 264: the corrections asked of the retry model, the draft of the writer's own, every call counted."""
+    gateway = _StubGateway([_answer(_BROKEN), _answer(STARTER_READ)])
+    models = WeekModels(retry="r/y")
+    result = write_week_read_with(starter(), gateway, (), frozenset(), models)  # type: ignore[arg-type]
+    assert (result.source, result.model, result.calls, gateway.calls) == ("llm", "r/y", 2, 1)

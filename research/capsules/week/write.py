@@ -19,7 +19,6 @@ from research.capsules.gateway import GatewayClient, GenerationError
 from research.capsules.gateway_ledger import Usage, add_usage
 from research.capsules.generate import BUDGET_SPENT, THROTTLED, ask, gateway_failure
 from research.capsules.page_figures import fallback_violation
-from research.capsules.rule_notes import notes_of
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.validate import ValidationResult
 from research.capsules.week.judge import (
@@ -30,7 +29,7 @@ from research.capsules.week.judge import (
     judge_violation,
     says_start,
 )
-from research.capsules.week.prompt import WEEK_RULES, parse_week_answer, week_correction, week_prompt
+from research.capsules.week.prompt import WEEK_RULES, parse_week_answer, week_correction, week_notes, week_prompt
 from research.capsules.week.render import render_week_facts_block
 from research.capsules.week.sheet import WeekSheet
 from research.capsules.week.validate import WEEK_BAND, validate_week_read
@@ -140,6 +139,15 @@ def _judged_start(sheet: WeekSheet, text: str, judge: GatewayClient) -> tuple[bo
     return says_start(answer.content), answer.usage
 
 
+@dataclass(frozen=True, slots=True)
+class WeekModels:
+    """The models a read asks beside the writer's own: the judge's, and the corrections' when one is named
+    (`retry`, Lane 264), the first draft always the writer's."""
+
+    judge: str = JUDGE_MODEL
+    retry: str | None = None
+
+
 def write_week_read(
     sheet: WeekSheet,
     gateway: GatewayClient,
@@ -147,15 +155,28 @@ def write_week_read(
     taken: Set[str] = frozenset(),
     judge_model: str = JUDGE_MODEL,
 ) -> WeekReadResult:
+    """`sheet`'s read, its corrections asked of the writer too (`write_week_read_with`)."""
+    return write_week_read_with(sheet, gateway, avoid, taken, WeekModels(judge_model))
+
+
+def write_week_read_with(
+    sheet: WeekSheet,
+    gateway: GatewayClient,
+    avoid: Sequence[str],
+    taken: Set[str],
+    models: WeekModels,
+) -> WeekReadResult:
     """`sheet`'s read, told the sentences other pages carry (`avoid`, quoted) and held to their shapes
     (`taken`). For a player who may not be started, a read that passes goes to the judge (`judge`), whose
-    call is one of the read's four, made to `judge_model` on the same line and budget. `calls` counts every
+    call is one of the read's four, made to `models.judge` on the same line and budget. A correction is asked
+    of `models.retry` when one is named, the first draft always of `gateway`'s own. `calls` counts every
     HTTP call made for him, the judge's, retries and re-asks included."""
-    judge = gateway.with_model(judge_model)
+    judge = gateway.with_model(models.judge)
+    retrier = gateway if models.retry is None else gateway.with_model(models.retry)
     before = gateway.calls
 
     def made() -> int:
-        return gateway.calls - before + judge.calls
+        return gateway.calls - before + judge.calls + (0 if retrier is gateway else retrier.calls)
 
     usage: Usage | None = None
     attempts: list[WeekAttempt] = []
@@ -164,7 +185,8 @@ def write_week_read(
     while asks.left:
         asks.made += 1
         try:
-            completion = ask(gateway, messages_for(user), MAX_TOKENS)
+            writer = gateway if asks.made == 1 else retrier
+            completion = ask(writer, messages_for(user), MAX_TOKENS)
         except GenerationError as error:
             usage = add_usage(usage, error.billed)
             failure = gateway_failure(error)
@@ -199,8 +221,8 @@ def write_week_read(
         attempts.append(WeekAttempt(text, answer.call, violations))
         if not violations:
             calls = made()
-            return WeekReadResult(text, WRITTEN_SOURCE, answer.call, gateway.model, usage, calls, tuple(attempts), None)
-        ledger = notes_of([(attempt.body, attempt.violations) for attempt in attempts])
+            return WeekReadResult(text, WRITTEN_SOURCE, answer.call, writer.model, usage, calls, tuple(attempts), None)
+        ledger = week_notes(sheet, [(attempt.body, attempt.violations) for attempt in attempts])
         user = week_correction(sheet, text, ledger, avoid)
     first = (
         fallback_violation(attempts[-1].violations) if attempts and attempts[-1].violations else "no answer was written"
