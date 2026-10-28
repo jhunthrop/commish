@@ -183,7 +183,7 @@ struct SheetEditorView: View {
     let actions: SheetRowActions
     var live = true
 
-    @State private var note = ""
+    @State private var draft = NoteDraft(rowNote: nil)
     @State private var newTag = ""
     @State private var problem: String?
     @FocusState private var noteFocused: Bool
@@ -213,13 +213,16 @@ struct SheetEditorView: View {
         .padding(.vertical, Tokens.Space.s3)
         .background(theme.color(Tokens.Color.surface2))
         .overlay(alignment: .bottom) { Hairline() }
-        .onAppear { note = line.note ?? "" }
+        .onAppear { draft = NoteDraft(rowNote: line.note) }
+        .onChange(of: line.note) { _, rowNote in
+            draft.follow(rowNote: rowNote, focused: noteFocused)
+        }
         .onChange(of: noteFocused) { _, focused in
             if !focused {
-                actions.note(line.id, note)
+                writeNote()
             }
         }
-        .onDisappear { actions.note(line.id, note) }
+        .onDisappear(perform: writeNote)
     }
 
     private var chips: [BoardChip<String>] {
@@ -229,7 +232,7 @@ struct SheetEditorView: View {
     @ViewBuilder
     private func noteField(_ theme: Theme) -> some View {
         if live {
-            TextField(SheetWords.notePlaceholder, text: $note, axis: .vertical)
+            TextField(SheetWords.notePlaceholder, text: noteBinding, axis: .vertical)
                 .lineLimit(2 ... 4)
                 .focused($noteFocused)
                 .modifier(FieldFrame(theme: theme))
@@ -251,6 +254,16 @@ struct SheetEditorView: View {
                 .foregroundStyle(theme.color(Tokens.Color.ink3))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .modifier(FieldFrame(theme: theme))
+        }
+    }
+
+    private var noteBinding: Binding<String> {
+        Binding(get: { draft.text }, set: { draft.type($0) })
+    }
+
+    private func writeNote() {
+        if let typed = draft.takeWrite() {
+            actions.note(line.id, typed)
         }
     }
 
