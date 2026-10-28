@@ -40,10 +40,12 @@
 		gainBars,
 		pickPrompt,
 		pickable,
+		proposable,
 		samePicks,
 		shareText,
 		teamChoice,
 		toggle,
+		type Answered,
 		type Picks,
 		type Preset
 	} from './builder.ts';
@@ -117,7 +119,10 @@
 	// The surface is made again for each opening a verb elsewhere asks for ({#key} in the screen).
 	// svelte-ignore state_referenced_locally
 	let picks = $state<Picks>(start);
-	let answer = $state<TradeCheck | null>(null);
+	/** The last answer with the picks it was read for: drawn, quieter, while the next is read, but the
+	 * verbs act on it only while the picks are still the ones it answers (proposable). */
+	let answered = $state<Answered | null>(null);
+	const answer = $derived(answered?.check ?? null);
 	let reading = $state(false);
 	let problem = $state<string | null>(null);
 	let copied = $state<CopiedTrade | null>(null);
@@ -153,17 +158,20 @@
 	const room = $derived(answer ? checkRoom(answer) : { yours: '', theirs: '' });
 	const bars = $derived(gainBars(answer?.trade.my_gain ?? null, answer?.trade.their_gain ?? null));
 	const dropId = $derived(answer?.trade.drop?.player.host_id ?? null);
-	const canShare = $derived(team !== null && answer !== null && fillsBoth(answer));
+	/** Propose and Share act on the answer only for the team and ticks it was read for, on a trade
+	 * both rosters can make. */
+	const live = $derived(team !== null && proposable(answered, picks));
 
 	/** Reads the answer for the picks, keeping only the latest; the last answer stays, quieter, while
 	 * the next is read. */
 	async function ask(): Promise<void> {
-		const input = checkInput(picks);
+		const asked = picks;
+		const input = checkInput(asked);
 		problem = null;
 		copied = null;
 		shared = null;
 		if (input === null) {
-			answer = null;
+			answered = null;
 			reading = false;
 			void asking.choose(null);
 			return;
@@ -173,14 +181,17 @@
 		if (outcome.kind === 'overtaken') return;
 		reading = false;
 		// No change this week on a trade moving a player whose game has kicked off (Lane 85).
-		if (outcome.kind === 'answer') answer = heldCheck(outcome.answer, now);
+		if (outcome.kind === 'answer')
+			answered = { picks: asked, check: heldCheck(outcome.answer, now) };
 		if (outcome.kind === 'failed') {
-			answer = null;
+			answered = null;
 			problem = outcome.sentence;
 		}
 	}
 
+	/** Another team: the last answer was for the last team, so it goes (review H1). */
 	function choose(rosterId: number): void {
+		answered = null;
 		picks = { team: rosterId, give: picks.give, get: [] };
 		void ask();
 	}
@@ -192,6 +203,7 @@
 
 	/** One tap loads an idea into the ticks; the member changes it freely from there. */
 	function load(preset: Preset): void {
+		if (preset.picks.team !== picks.team) answered = null;
 		picks = preset.picks;
 		void ask();
 	}
@@ -221,13 +233,14 @@
 	}
 
 	async function press(): Promise<void> {
-		if (team === null || answer === null) return;
-		copied = await propose(team, answer.trade);
+		if (team === null || answered === null || !live) return;
+		copied = await propose(team, answered.check.trade);
 	}
 
 	async function shareTrade(): Promise<void> {
-		if (team === null || answer === null) return;
-		shared = (await share(shareText(team, answer))) ? ANALYZER_LINES.shared : TRADES.copyFailed;
+		if (team === null || answered === null || !live) return;
+		const text = shareText(team, answered.check);
+		shared = (await share(text)) ? ANALYZER_LINES.shared : TRADES.copyFailed;
 	}
 
 	/** Takes the focus as it opens when a verb elsewhere opened it. */
@@ -241,12 +254,12 @@
 </script>
 
 {#snippet action(fill: boolean)}
-	<!-- Made again with each answer: before one the verb is a button, after it a link that takes its
-	     new tab. -->
-	<span class="act" {@attach hostTab(answer === null ? '' : page)}>
+	<!-- Made again as the verb comes live: before, it is a disabled button, after, a link that takes
+	     its new tab. -->
+	<span class="act" {@attach hostTab(live ? page : '')}>
 		<Verb
 			href={page === '' ? undefined : page}
-			disabled={page === '' || answer === null}
+			disabled={page === '' || !live}
 			{fill}
 			onclick={() => void press()}>{verb}</Verb
 		>
@@ -268,7 +281,7 @@
 				/>
 				<span class="share">
 					{#if shared}<span class="said" role="status">{shared}</span>{/if}
-					<Quiet size="sm" disabled={!canShare} onclick={() => void shareTrade()}
+					<Quiet size="sm" disabled={!live} onclick={() => void shareTrade()}
 						>{ANALYZER_LINES.share}</Quiet
 					>
 				</span>
@@ -385,7 +398,7 @@
 			<!-- On a phone the gains and the verb are pinned above the tab bar, so each tap's answer stays in
 			     sight. -->
 			<div class="pin">
-				<span class="pin-gains"
+				<span class="pin-gains" class:reading
 					>{#if answer && fillsBoth(answer)}<b>{gainWord(answer.trade.my_gain)}</b>
 						{TRADES.aWeekForYou}, {gainWord(answer.trade.their_gain)}
 						{TRADES.forTheirs}{:else}{sentence}{/if}</span
@@ -620,12 +633,49 @@
 			display: none;
 		}
 
-		/* The scoreboard stacks here: the verdict sits under the rosters in its place. */
+		/* The scoreboard stacks here: the verdict sits under the rosters in its place, and the gains with
+		   the verb are pinned to the window's foot, so a tick on one roster reads its answer in sight
+		   (fix round 2: the switch shows one roster from here down). */
 		.verdict {
 			position: static;
 			margin: 0;
 			padding: 0;
 			border-top: 0;
+		}
+
+		.pin {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			justify-content: space-between;
+			gap: var(--s-1) var(--s-2);
+			position: sticky;
+			bottom: env(safe-area-inset-bottom, 0px);
+			z-index: 10;
+			margin: 0 calc(var(--s-4) * -1) calc(var(--s-4) * -1);
+			padding: var(--s-2) var(--s-3);
+			background: var(--scoreboard);
+			color: var(--scoreboard-ink);
+			font-size: var(--t-xs);
+		}
+
+		.pin-gains {
+			flex: 1;
+			min-width: 0;
+		}
+
+		.pin-gains b {
+			font-family: var(--font-num);
+			font-size: var(--t-lg);
+			color: var(--scoreboard-gain-ink);
+		}
+
+		.pin-said {
+			flex-basis: 100%;
+		}
+
+		.pin-said :global(a) {
+			color: var(--scoreboard-ink);
 		}
 	}
 
@@ -671,39 +721,9 @@
 			align-self: flex-start;
 		}
 
+		/* Above the tab bar on a phone. */
 		.pin {
-			display: flex;
-			flex-wrap: wrap;
-			align-items: center;
-			justify-content: space-between;
-			gap: var(--s-1) var(--s-2);
-			position: sticky;
 			bottom: calc(var(--tab-bar-h) + env(safe-area-inset-bottom, 0px));
-			z-index: 10;
-			margin: 0 calc(var(--s-4) * -1) calc(var(--s-4) * -1);
-			padding: var(--s-2) var(--s-3);
-			background: var(--scoreboard);
-			color: var(--scoreboard-ink);
-			font-size: var(--t-xs);
-		}
-
-		.pin-gains {
-			flex: 1;
-			min-width: 0;
-		}
-
-		.pin-gains b {
-			font-family: var(--font-num);
-			font-size: var(--t-lg);
-			color: var(--scoreboard-gain-ink);
-		}
-
-		.pin-said {
-			flex-basis: 100%;
-		}
-
-		.pin-said :global(a) {
-			color: var(--scoreboard-ink);
 		}
 	}
 </style>

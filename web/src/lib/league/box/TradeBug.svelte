@@ -237,11 +237,10 @@
 			border-top: 1px solid var(--scoreboard-line);
 		}
 
+		/* The verb is pinned under the builder wherever the scoreboard stacks (fix round 2), so one verb
+		   shows. */
 		.mid {
-			order: 3;
-			max-width: none;
-			border-left: 0;
-			border-top: 1px solid var(--scoreboard-line);
+			display: none;
 		}
 	}
 
@@ -266,11 +265,6 @@
 
 		em {
 			font-size: var(--t-sm);
-		}
-
-		/* The verb is pinned under the builder on a phone. */
-		.mid {
-			display: none;
 		}
 	}
 </style>

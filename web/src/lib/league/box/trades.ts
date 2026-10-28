@@ -488,7 +488,8 @@ export function tradeBasis(
 		...proj,
 		...waiting,
 		...players,
-		// The week's group is drawn only once its projection is read (weekProjected, TradeFinder).
+		// The week's group is drawn only once its projection is read (weekProjected): the apps' finder,
+		// held to shared/scripts/trades-parity.ts.
 		...said(weekProjected(advice) ? WEEK_ROOM : ROOM_PART, false),
 		{ text: LINES.orderRecord, phone: true, href: hrefs.record }
 	];

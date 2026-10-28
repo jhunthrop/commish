@@ -92,6 +92,46 @@ async function verdict(page: Page): Promise<void> {
 	);
 }
 
+/** The trade check's route, held back by holdChecks so a read is still out when the verbs are read. */
+const CHECK_ROUTE = '**/trades/check';
+const HOLD_MS = 1500;
+
+/** Holds every trade check for HOLD_MS before it goes on. */
+async function holdChecks(page: Page): Promise<void> {
+	await page.route(CHECK_ROUTE, async (route) => {
+		await new Promise((done) => setTimeout(done, HOLD_MS));
+		await route.continue();
+	});
+}
+
+/** Whether Propose (the drawn verb is a link) and Share (enabled) act now. */
+async function verbs(page: Page): Promise<{ propose: boolean; share: boolean }> {
+	return page.evaluate((shareWord) => {
+		const acts = [...document.querySelectorAll<HTMLElement>('main .builder .act')].filter(
+			(el) => el.offsetParent !== null
+		);
+		const share = [
+			...document.querySelectorAll<HTMLButtonElement>('main .builder .share button')
+		].find((b) => b.innerText.trim() === shareWord);
+		return {
+			propose: acts.some((el) => el.querySelector('a') !== null),
+			share: share !== undefined && !share.disabled
+		};
+	}, ANALYZER_LINES.share);
+}
+
+/** Waits for Propose and Share to come live on the answer for the ticks. */
+async function waitLive(page: Page): Promise<void> {
+	await page.waitForFunction(
+		() =>
+			[...document.querySelectorAll<HTMLElement>('main .builder .act')].some(
+				(el) => el.offsetParent !== null && el.querySelector('a') !== null
+			),
+		undefined,
+		{ timeout: READY_TIMEOUT_MS }
+	);
+}
+
 /** The whole page at its height, so the verdict sits in its place rather than over the rows. */
 async function shoot(page: Page, name: string, width: number): Promise<void> {
 	const height = await page.evaluate(() => document.documentElement.scrollHeight);
@@ -180,13 +220,29 @@ for (const theme of THEMES) {
 		const copied = await page.evaluate(() => navigator.clipboard.readText());
 		check(copied.startsWith('Trade with '), `${where}: shared "${copied}"`);
 
-		// One tap loads an idea: its team chosen, its players ticked, the preset pressed.
+		// One tap loads an idea: its team chosen, its players ticked, the preset pressed. Its check is
+		// held back, so the race (review H1) is seen: while it is read, the last answer (another team's
+		// trade) stays drawn and no verb acts on it.
+		await holdChecks(page);
 		await page.locator('main .idea').nth(LOADED_IDEA).click();
+		const racing = await verbs(page);
+		check(!racing.propose && !racing.share, `${where}: a verb live while an idea is read`);
 		await verdict(page);
+		await waitLive(page);
 		const loaded = await seen(page);
 		check(loaded.ideas[LOADED_IDEA]?.pressed === true, `${where}: the loaded idea not pressed`);
 		check(loaded.ticked >= 2, `${where}: ${String(loaded.ticked)} ticked after an idea`);
 		await shoot(page, `trades-${theme}-${String(width)}-idea.png`, width);
+		// Another tick on the same team while its check is read: the answer is for the idea's trade,
+		// the ticks hold one more, so no verb acts until the new answer lands.
+		if (stacked) await page.locator('main .switch button').first().click();
+		await page
+			.locator('main table.box.mine button.tick[aria-pressed="false"]:not([disabled])')
+			.first()
+			.click();
+		const ticking = await verbs(page);
+		check(!ticking.propose && !ticking.share, `${where}: a verb live while a tick is read`);
+		await page.unroute(CHECK_ROUTE);
 		await ctx.close();
 	}
 }

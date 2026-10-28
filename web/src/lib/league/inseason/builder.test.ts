@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
+import type { BoxRow } from '../box/box.ts';
 import type { PlayerLine, TradeCheck, TradeRow, TradeTeam } from './api.ts';
 import {
 	ANALYZER_LINES,
@@ -18,6 +19,8 @@ import {
 	pickPrompt,
 	pickable,
 	presetsFrom,
+	proposable,
+	rosterRow,
 	samePicks,
 	shareText,
 	teamChoice,
@@ -327,6 +330,58 @@ void test('the screen opens on the team our best idea names with nothing ticked,
 		ANALYZER_LINES.noTeam,
 		'Pick a team to trade with, then tick a player on each side.'
 	);
+});
+
+void test('with no trade worth proposing, no idea is Best and the screen opens on no team', () => {
+	// Every team's best trade is a close call for them: the decision proposes none (worthProposing).
+	const presets = presetsFrom([
+		team(4, 'Muttdogs', [row({ my_gain: 3, close_for_them: true })]),
+		team(9, 'Bower Rangers', [row({ my_gain: 1, close_for_them: true })])
+	]);
+	assert.equal(presets.length, 2);
+	assert.ok(presets.every((p) => p.mark === null && !p.lead));
+	assert.deepEqual(openingPicks(presets), { team: null, give: [], get: [] });
+	// A trade that loses the member's lineup is not proposed either.
+	const losing = presetsFrom([team(4, 'Muttdogs', [row({ my_gain: -1, close_for_them: false })])]);
+	assert.equal(openingPicks(losing).team, null);
+});
+
+/** An answer for picks, both rosters filled unless said. */
+const answeredFor = (
+	picks: { team: number; give: string[]; get: string[] },
+	fills: Partial<TradeCheck['fills']> = {}
+) => ({ picks, check: check({}, fills) });
+
+void test('Propose and Share act only on the answer read for the team and ticks on screen', () => {
+	const loveForWaddle = { team: 4, give: ['love'], get: ['waddle'] };
+	const read = answeredFor(loveForWaddle);
+	assert.ok(proposable(read, loveForWaddle));
+	assert.ok(proposable(read, { team: 4, give: ['love'], get: ['waddle'] }), 'the same ticks');
+	// The race: an idea with another team is tapped, its check still out; the last answer stays drawn
+	// but no verb copies Love for Waddle as a trade with Dad Runners.
+	assert.ok(!proposable(read, { team: 7, give: ['mahomes'], get: ['burden', 'stevenson'] }));
+	// A third tick while the next check is read: the answer is for two players, the ticks hold three.
+	assert.ok(!proposable(read, { team: 4, give: ['love', 'gainwell'], get: ['waddle'] }));
+	assert.ok(!proposable(null, loveForWaddle), 'no answer yet');
+});
+
+void test('a refused answer gates Propose as it gates Share: no verb on a trade a roster cannot make', () => {
+	const picks = { team: 4, give: ['love'], get: ['waddle'] };
+	assert.ok(!proposable(answeredFor(picks, { yours: false, yours_open: 'RB2' }), picks));
+	assert.ok(!proposable(answeredFor(picks, { theirs: false, theirs_open: 'TE' }), picks));
+	assert.ok(!proposable(answeredFor(picks, { yours_room: false }), picks));
+	assert.ok(!proposable(answeredFor(picks, { theirs_room: false }), picks));
+});
+
+void test("a roster row past its kickoff shows his points in the week's cell, as the Lineup's Pts does", () => {
+	const base = { proj: 14.1, pts: null as number | null };
+	const at = (state: BoxRow['state'], pts: number | null): BoxRow =>
+		({ ...base, pts, state }) as BoxRow;
+	assert.equal(rosterRow(at('upcoming', null)).proj, 14.1, 'still to play: the projection');
+	assert.equal(rosterRow(at(null, null)).proj, 14.1, 'no game state: as drawn');
+	assert.equal(rosterRow(at('final', 22.4)).proj, 22.4, 'final: his points');
+	assert.equal(rosterRow(at('kicked_off', 6)).proj, 6, 'under way: his points so far');
+	assert.equal(rosterRow(at('final', null)).proj, null, 'final with no points read: "--"');
 });
 
 void test("the roster switch counts each side's ticks after its name, nothing for none", () => {

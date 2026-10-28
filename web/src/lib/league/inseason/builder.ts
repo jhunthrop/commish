@@ -5,9 +5,16 @@
  * no grade: the two lineups' change is the whole answer. */
 import { fixed } from '#lib/format/number.ts';
 import { listWords } from '#lib/format/list.ts';
-import { onReserve } from '../box/box.ts';
+import { onReserve, type BoxRow } from '../box/box.ts';
 import { stripMark } from '../box/strip.ts';
-import { finderRows, gainWord, offerText, shortSide, TRADES } from '../box/trades.ts';
+import {
+	finderRows,
+	gainWord,
+	offerText,
+	shortSide,
+	TRADES,
+	worthProposing
+} from '../box/trades.ts';
 import type { PlayerLine, TradeCheck, TradeCheckInput, TradeRow, TradeTeam } from './api.ts';
 import { GAIN_DECIMALS, gainAmount, perGameWords, teamAside } from './words.ts';
 
@@ -160,7 +167,10 @@ export interface Preset {
 	team: TradeTeam;
 	row: TradeRow;
 	picks: Picks;
-	/** "Best" over the first of more than one, as a strip marks its lead; null on the rest. */
+	/** The trade the decision line proposes (worthProposing's first): the screen opens on its team. */
+	lead: boolean;
+	/** "Best" over the lead when there is more than one idea, as a strip marks its lead; null on the
+	 * rest, and on every idea when the decision proposes none. */
 	mark: string | null;
 	/** "Rodgers for Skattebo and Strong". */
 	deal: string;
@@ -169,8 +179,10 @@ export interface Preset {
 }
 
 /** Our ideas: the finder's best trade with each team, in the finder's order (the trades the other
- * team gains from first, each by your gain), each one whose players can all be ticked. */
+ * team gains from first, each by your gain), each one whose players can all be ticked. The lead is
+ * the trade the decision line proposes, so Best and the opening team agree with it (review L1). */
 export function presetsFrom(teams: readonly TradeTeam[]): Preset[] {
+	const proposed = worthProposing(teams)[0]?.key ?? null;
 	const loadable = finderRows(teams, false).flatMap((entry) => {
 		const picks = builtFrom(entry.team, entry.row);
 		return picks === null ? [] : [{ ...entry, picks }];
@@ -180,16 +192,40 @@ export function presetsFrom(teams: readonly TradeTeam[]): Preset[] {
 		team: entry.team,
 		row: entry.row,
 		picks: entry.picks,
-		mark: stripMark(i, loadable.length),
+		lead: entry.key === proposed,
+		mark: entry.key === proposed ? stripMark(i, loadable.length) : null,
 		deal: `${shortSide(entry.row.give)} for ${shortSide(entry.row.get)}`,
 		gains: `${gainWord(entry.row.my_gain)} ${TRADES.aWeekForYou}, ${gainWord(entry.row.their_gain)} ${TRADES.forTheirs}`
 	}));
 }
 
-/** The picks the screen opens with: the team our best idea names and nothing ticked, so the member's
- * own idea is a tick a player; no team when we have no idea. */
+/** The picks the screen opens with: the team of the trade the decision proposes and nothing ticked,
+ * so the member's own idea is a tick a player; no team when the decision proposes none, the member's
+ * roster alone. */
 export function openingPicks(presets: readonly Preset[]): Picks {
-	return { team: presets[0]?.team.roster_id ?? null, give: [], get: [] };
+	return { team: presets.find((p) => p.lead)?.team.roster_id ?? null, give: [], get: [] };
+}
+
+/** A check's answer with the picks it was read for. */
+export interface Answered {
+	picks: Picks;
+	check: TradeCheck;
+}
+
+/** Whether the verbs (Propose, Share) act on the answer: only while the team and ticks are the ones it
+ * was read for, and only on a trade both rosters can make (review H1, M1). While the next answer is
+ * read after an idea or another tick, the last one stays drawn, quieter, and no verb copies it. */
+export function proposable(answered: Answered | null, picks: Picks): boolean {
+	return answered !== null && samePicks(answered.picks, picks) && fillsBoth(answered.check);
+}
+
+/** A roster row as the builder draws it (fix round 2): once his game is past its kickoff (the row's
+ * lineState, as kickoff.ts pastKickoff and the trade's held week read it), his this-week cell is his
+ * points, as the Lineup row's Pts cell draws them (BoxLine's boxNumber(row.pts), "--" without), never
+ * the projection of a game under way or played. */
+export function rosterRow(row: BoxRow): BoxRow {
+	const past = row.state === 'kicked_off' || row.state === 'final';
+	return past ? { ...row, proj: row.pts } : row;
 }
 
 /** Whether two picks are the same trade, in any order of ticks: the preset the ticks hold is pressed. */

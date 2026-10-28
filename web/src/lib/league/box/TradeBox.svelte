@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { memberZone } from '#lib/format/clock.ts';
 	import type { PlayerLine } from '../inseason/api.ts';
+	import { rosterRow } from '../inseason/builder.ts';
 	import { BOX, boxRow, type BoxPick } from './box.ts';
 	import BoxLine from './BoxLine.svelte';
 	import TeamAvatar from './TeamAvatar.svelte';
@@ -67,7 +68,7 @@
 			<BoxLine
 				phoneFacts={false}
 				phoneOpp={false}
-				row={boxRow(line, '', zone, true, now)}
+				row={rosterRow(boxRow(line, '', zone, true, now))}
 				compact
 				evidence
 				season
