@@ -35,7 +35,9 @@ func (s *handleStore) SetHandle(_ context.Context, id uuid.UUID, handle string) 
 }
 
 // pushSettings refuses a quiet_start of "bad" and records each update.
-type pushSettings struct{ updates []apitypes.NotificationSettingsUpdate }
+type pushSettings struct {
+	updates []apitypes.NotificationSettingsUpdate
+}
 
 func (p *pushSettings) CheckNotifications(u apitypes.NotificationSettingsUpdate) map[string]string {
 	if u.QuietStart != nil && *u.QuietStart == "bad" {
