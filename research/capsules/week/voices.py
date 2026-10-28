@@ -33,7 +33,10 @@ class Voice:
 
 # Each brief stays inside the read's rules: the first sentence carries the call, a figure or his status;
 # one figure to a sentence; no greeting, no question, no scene set first. They differ in which of those
-# leads, in rhythm, and in what the middle of the read leans on.
+# leads and how, in rhythm, and in what the middle of the read leans on. Lane 281 (B270, voices v2): the
+# matchup, story and table-talk briefs each carry the opening rule's point in their own first sentence (the
+# call framed by the opponent, his status as the season's turn, the call said across a table), as the v1
+# briefs left the rule's status-first opener in charge and those three voices sounded like no voice.
 VOICES: Final = (
     Voice(
         "verdict",
@@ -44,10 +47,12 @@ VOICES: Final = (
     ),
     Voice(
         "matchup",
-        "Open on the opponent: the club by name and what it allows his position, with its rank. Sentences of "
-        '14 to 18 words, each one clause joined by "and" or "but". Lean on the game around him: the opponent, '
-        "the expected score, the weather, home or away. His own numbers come second, as the reason the "
-        "matchup matters for him.",
+        "Open on the call framed by the opponent: the first sentence names the club he faces and what that "
+        "game means for the move this week, never his status first. When he does not play this week, it names "
+        "the game he misses or the club he returns against. Sentences of 14 to 18 words, each one clause joined "
+        'by "and" or "but". Lean on the game around him: what the opponent allows his position, the expected '
+        "score, the weather, home or away. His own numbers come second, as the reason the matchup matters for "
+        "him.",
     ),
     Voice(
         "role",
@@ -63,21 +68,25 @@ VOICES: Final = (
     ),
     Voice(
         "story",
-        "Open on where his season stands, carried by a figure from it or by his status. Vary the rhythm: one "
-        "longer sentence of up to 20 words, then shorter ones. Lean on the week's story: how his season has "
-        "gone and what this game asks of him, told forward, never a recap of every game.",
+        "Open on his status as the turn his season takes this week: the first sentence sets where his season "
+        "has been against what this week brings, carried by his status or a figure from his season (back from "
+        "missed weeks, still on the list, healthy and rolling). Never a plain report of a clean status. Then "
+        "shorter sentences, told forward: how his season has gone and what this game asks of him, never a recap "
+        "of every game.",
     ),
     Voice(
         "table_talk",
-        "Open on the call or his status in the everyday words a league-mate uses across the table. "
-        "Contractions, plain verbs, sentences of 10 to 15 words. Lean on what a manager who has him worries "
-        "about this week and answer it straight.",
+        "Open on the call as a league-mate says it across the table: the move in everyday words, said to the "
+        'manager as "you", with the one reason that decides it in the same sentence. Contractions, plain verbs, '
+        "sentences of 10 to 15 words. Lean on what a manager who has him worries about this week and answer it "
+        "straight, the way a friend in the league would.",
     ),
 )
 
 _HEADER: Final = (
-    "This read's voice. It changes how the read sounds, never a rule: every rule you were given still holds, "
-    "and the facts, the call and the figures are the same in any voice."
+    "This read's voice. It sets how the first sentence carries its point and how the read sounds, never a "
+    "rule: every rule you were given still holds, and the facts, the call and the figures are the same in any "
+    "voice."
 )
 
 

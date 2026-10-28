@@ -21,7 +21,13 @@ from research.capsules.render_words import week_of
 from research.capsules.rule_notes import RuleNote
 from research.capsules.validate import word_count
 from research.capsules.week.render import render_week_sheet
-from research.capsules.week.rules import MAX_FIGURES, MAX_SENTENCES, MIN_SENTENCES, shown_week_words
+from research.capsules.week.rules import (
+    FIRST_SENTENCE_WORDS,
+    MAX_FIGURES,
+    MAX_SENTENCES,
+    MIN_SENTENCES,
+    shown_week_words,
+)
 from research.capsules.week.sheet import PROJECTION_BASIS, WeekSheet
 from research.capsules.week.validate import WEEK_BAND
 from research.capsules.week.voices import voice_section
@@ -64,6 +70,16 @@ def _quoted(words: Sequence[str]) -> str:
     return ", ".join(f'"{word}"' for word in words)
 
 
+# The opening rule (Lane 281, B270): the first sentence carries the point, and its shape is the voice's.
+OPENING_RULE: Final = (
+    f"- The first sentence carries the call, a figure or his status, in {FIRST_SENTENCE_WORDS} words at most. How "
+    'it carries it is yours to choose. Never open with a scene-setting clause before a colon (no "runs into the '
+    'kind of matchup:"), a greeting, a question, or his name followed by a verdict. Name him in the read.'
+)
+# Lane 281 (B270): "Los Angeles's other club" claimed a tie between two clubs the facts never give.
+OTHER_CLUB_RULE: Final = ', and never as a city\'s "other club" or "other team", a tie the facts never give'
+
+
 WEEK_RULES: Final = f"""You write the week-ahead read on one player's page for a fantasy football manager setting his lineup for the week in front of him. You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
 
 THE FOUR RULES READS BREAK MOST
@@ -75,7 +91,7 @@ THE FOUR RULES READS BREAK MOST
 THE READ
 - {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, {ASKED_WORDS[0]} to {ASKED_WORDS[1]} words in all, about {TARGET_WORDS}, and never more than {_HIGH}: four sentences of about {SENTENCE_WORDS} words each is the shape. Count the words before you answer. One paragraph, about the week the facts name and nothing else. Pick the two or three facts that decide his week (his game, his status, the matchup, the weather, his role, his rate) and build on those. Leave the rest unquoted.
 - The read sits under his player card, whose cells already print his numbers: the published projection and its change, the opponent's rank, his points a game, each game's points, his rest-of-season points, the expected score and the weather. The published projection and its change are the card's alone: never quote them. Say what those cells cannot: why his week looks the way it does (his status, his role, the matchup, the weather) and what a manager who has him does this week. Never retell the cells: quote at most {MAX_FIGURES} figures in all.
-- Open on the fact that matters most for him this week: the first sentence carries the call, a figure or his status. Never open with a scene-setting clause (no "runs into the kind of matchup" before a colon), a greeting, a question, or his name followed by a verdict. Name him in the read.
+{OPENING_RULE}
 - Every read on this site is written from facts like these, and no sentence may sit on two players' pages, even with the names and numbers swapped: build each sentence your own way for this player, never a sentence shape that would fit another player.
 - End on what a manager who has him does this week, in his own terms: start him, sit him, keep him on the bench, find a fill-in for the week.
 - A player who may not be started this week (on his bye, Out, Doubtful, on a season-long list) is never recommended to start, in any wording: his call is sit, hold or none. If he cannot play, say he does not play and what that means for a roster that has him: who fills the spot this week, whether he stays on the roster, his next game.
@@ -91,7 +107,7 @@ NUMBERS, TIME AND WORDS
 - A rank against his position reads as the facts give it, 1st allowed the fewest, said the way a person would, never a code. "The most" is only the last rank and "the fewest" only the first: say a rank in the words the facts give for it.
 - Name the season once, with the first week you name ("week 6 of 2026"), and every week after it without the year ("week 5", "week 7"). Never the year twice. "This week" is fine. Never a date or the name of a month. A week still to play is only looked ahead to.
 - The injury report is the one the facts name, by the day the facts give ("on Friday's report"), never "the latest" and never another day. Before a game's status report is out, say so as the facts do.
-- Name clubs by name as the facts give them beside the code ("the Cardinals", "Arizona"), never by their code ("ARI").
+- Name clubs by name as the facts give them beside the code ("the Cardinals", "Arizona"), never by their code ("ARI"){OTHER_CLUB_RULE}.
 - Fantasy football words, never a trading or a betting word. The game's expected points are an expected score and nothing more. Never a provider, a data source or a rival product by name. Never a tip and never "remember to".
 - Speak for the board as "we" when you need to, never "I", "me" or "my". The facts are yours alone: never mention a sheet.
 - Write like you talk. Contractions are welcome. Never an em-dash, never a semicolon.
