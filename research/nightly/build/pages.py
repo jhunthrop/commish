@@ -21,6 +21,7 @@ from research.capsules.pull_figures import PageValues, page_numbers, pull_figure
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
 from research.capsules.week.cadence import projection_moved_past_shown
 from research.capsules.week.caption import PROJECTION_MOVED_CAPTION, status_changed_caption, written_caption
+from research.capsules.week.rollover import ReadsDue
 from research.capsules.week.store import StoredWeekRead
 from research.free_agent import run_club
 from research.model.instants import js_iso
@@ -282,6 +283,8 @@ class ServedWeek:
     # Each player's published projection for the board week as the card prints it, by the board's id (None
     # for a player the snapshot leaves out); None when the run read no snapshot for the week (Lane 66v).
     projections: Mapping[str, float] | None = None
+    # The board week and the night its reads are written, while its roll-over has not run (Lane 256).
+    due: ReadsDue | None = None
 
 
 class _Unread:
@@ -333,6 +336,12 @@ def week_read_json(
         "projection": quoted,
         "movedCaption": PROJECTION_MOVED_CAPTION,
     }
+
+
+def reads_due_json(week_read: Json | None, due: ReadsDue | None) -> Json | None:
+    """While no read is served and the week's roll-over has not run, the week and the night its reads are
+    written (Lane 256), which the page says in place of "not written yet"; None otherwise."""
+    return None if week_read is not None or due is None else due.json()
 
 
 def _kicked_off(games: Sequence[Game], week: int, at: datetime) -> bool:
@@ -389,6 +398,7 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
             page_entry = entry
     page = None if page_entry is None else page_values(page_entry, inputs.adp_by_format[PAGE_FORMAT.id].get(who.id))
     stored = None if universe_id is None else inputs.capsules.get(universe_id)
+    week_read = _week_read(who, universe_id, inputs)
     return {
         "id": who.id,
         "slug": who.slug,
@@ -398,7 +408,8 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
         "headshot": who.headshot,
         "formats": formats,
         "capsule": capsule_json(stored, page),
-        "weekRead": _week_read(who, universe_id, inputs),
+        "weekRead": week_read,
+        "weekReadsDue": reads_due_json(week_read, inputs.week.due),
         "season": season,
         "priorSeasons": prior,
         # The club his newest game line was for, when it is not the page's (Lane 120), and whether that

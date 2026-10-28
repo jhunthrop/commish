@@ -78,6 +78,7 @@ from research.inseason.season_of import (
     unplaced_reason,
 )
 from research.inseason.season_week import STEPS, SeasonWeekContext, run_season_week, run_usage_backfill
+from research.inseason.status_windows import is_last_status_pass
 from research.inseason.step_result import StepResult
 from research.logging_setup import configure_logging
 from research.nightly.capsule_step import night_facts
@@ -301,7 +302,7 @@ def _capture_status(now: datetime) -> bool:
         return False
     failed = [feed.source for feed in result.feeds if feed.status == "failed"]
     _line(f"capture-status: {len(result.feeds)} feeds, {len(failed)} failed")
-    _week_reads(now)
+    _week_reads(now, last_pass=is_last_status_pass(now))
     return not failed and dated_ok
 
 
@@ -398,12 +399,12 @@ def _return_dates(engine: Engine, client: Tank01Client, now: datetime, season: i
     return outcome.status != "failed"
 
 
-def _week_reads(now: datetime) -> None:
+def _week_reads(now: datetime, *, last_pass: bool = False) -> None:
     """The hourly week-ahead reads pass after the status capture: its line, a failure named and never the
     job's verdict (the nightly's step is advisory the same way)."""
     engine = make_engine(database_url_from_env())
     try:
-        record = run_week_read_step(engine, now, _line, night_facts(engine), hourly=True)
+        record = run_week_read_step(engine, now, _line, night_facts(engine), hourly=True, last_pass=last_pass)
         _line(f"{record.name}: {record.status}, {record.summary}")
     except Exception as error:  # an aid to the page, never the capture's verdict; named, not swallowed
         _line(f"week-reads: FAILED, {type(error).__name__}: {error}")

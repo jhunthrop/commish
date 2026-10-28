@@ -31,5 +31,7 @@
 	"listedWeek": "Wk, Opp rank and Proj change are his once he is back.",
 	"findOnWaivers": "Find him on Waivers",
 	"none": "--",
-	"functions": []
+	"functions": [
+		"readsDue"
+	]
 }

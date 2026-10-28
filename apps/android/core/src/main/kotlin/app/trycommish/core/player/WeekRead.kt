@@ -1,5 +1,6 @@
 package app.trycommish.core.player
 
+import app.trycommish.api.models.RunReadsDue
 import app.trycommish.api.models.RunWeekRead
 import app.trycommish.core.start.GameRead
 import app.trycommish.design.Words
@@ -119,8 +120,23 @@ object WeekReads {
         return ProjectionMove.of(card.points, quoted, null).crosses
     }
 
-    /** noReadWords: his next game while it is to come, never "next" for one under way or final. */
-    fun noRead(state: GameRead?): String = if (underway(state)) Words.Card.readNotWritten else Words.Card.readNotYet
+    /** noReadWords: his next game while it is to come, never "next" for one under way or final; while the
+     * coming week's reads are not yet written, the night they are (Lane 256, the run's `weekReadsDue`). */
+    fun noRead(
+        state: GameRead?,
+        due: RunReadsDue?,
+    ): String =
+        when {
+            underway(state) -> Words.Card.readNotWritten
+            due == null || due.night == RunReadsDue.Night.unknown_default_open_api -> Words.Card.readNotYet
+            else -> readsDue(due.week, due.night.value)
+        }
+
+    /** card.ts CARD.readsDue: "Our reads for week 8 are written Tuesday night." */
+    internal fun readsDue(
+        week: Int,
+        night: String,
+    ): String = "Our reads for week $week are written $night night."
 
     private fun withheldWords(
         read: RunWeekRead,

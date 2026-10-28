@@ -7617,6 +7617,29 @@ components:
         movedCaption:
           type: string
           description: the words the page shows once the live read prints another; absent on a run from before
+    RunReadsDue:
+      type: object
+      description: the coming week and the night its reads are written in one pass, when the week rolls over
+      required:
+        - week
+        - night
+      properties:
+        week:
+          type: integer
+          minimum: 1
+        night:
+          description: the Central night of the nightly that writes them
+          anyOf:
+            - type: string
+              enum:
+                - Monday
+                - Tuesday
+                - Wednesday
+                - Thursday
+                - Friday
+                - Saturday
+                - Sunday
+            - type: string
     RunStatLine:
       type: object
       description: a stat line in the research store's names; a field is null when the records do not carry it
@@ -7940,6 +7963,11 @@ components:
           description: absent on a run from before the nightly wrote it, null when the writer did not write for the week ahead
           allOf:
             - $ref: "#/components/schemas/RunWeekRead"
+        weekReadsDue:
+          nullable: true
+          description: the night the coming week's reads are written, while they are not and no read is served; null otherwise, absent on a run from before
+          allOf:
+            - $ref: "#/components/schemas/RunReadsDue"
         season:
           $ref: "#/components/schemas/RunSeason"
         priorSeasons:

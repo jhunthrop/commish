@@ -1620,6 +1620,39 @@ func (e RunPosition) Valid() bool {
 	}
 }
 
+// Defines values for RunReadsDueNight.
+const (
+	RunReadsDueNightFriday    RunReadsDueNight = "Friday"
+	RunReadsDueNightMonday    RunReadsDueNight = "Monday"
+	RunReadsDueNightSaturday  RunReadsDueNight = "Saturday"
+	RunReadsDueNightSunday    RunReadsDueNight = "Sunday"
+	RunReadsDueNightThursday  RunReadsDueNight = "Thursday"
+	RunReadsDueNightTuesday   RunReadsDueNight = "Tuesday"
+	RunReadsDueNightWednesday RunReadsDueNight = "Wednesday"
+)
+
+// Valid indicates whether the value is a known member of the RunReadsDueNight enum.
+func (e RunReadsDueNight) Valid() bool {
+	switch e {
+	case RunReadsDueNightFriday:
+		return true
+	case RunReadsDueNightMonday:
+		return true
+	case RunReadsDueNightSaturday:
+		return true
+	case RunReadsDueNightSunday:
+		return true
+	case RunReadsDueNightThursday:
+		return true
+	case RunReadsDueNightTuesday:
+		return true
+	case RunReadsDueNightWednesday:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RunRecordPosition.
 const (
 	RunRecordPositionAll RunRecordPosition = "All"
@@ -4858,6 +4891,9 @@ type RunPlayer struct {
 
 	// WeekRead absent on a run from before the nightly wrote it, null when the writer did not write for the week ahead
 	WeekRead *RunWeekRead `json:"weekRead,omitempty"`
+
+	// WeekReadsDue the night the coming week's reads are written, while they are not and no read is served; null otherwise, absent on a run from before
+	WeekReadsDue *RunReadsDue `json:"weekReadsDue,omitempty"`
 }
 
 // RunPlayerAnswer defines model for RunPlayerAnswer.
@@ -4982,6 +5018,16 @@ type RunReachPartial struct {
 	Days []string `json:"days"`
 	Week int      `json:"week"`
 }
+
+// RunReadsDue the coming week and the night its reads are written in one pass, when the week rolls over
+type RunReadsDue struct {
+	// Night the Central night of the nightly that writes them
+	Night RunReadsDueNight `json:"night"`
+	Week  int              `json:"week"`
+}
+
+// RunReadsDueNight the Central night of the nightly that writes them
+type RunReadsDueNight string
 
 // RunRecord the run's record.json, as written
 type RunRecord struct {

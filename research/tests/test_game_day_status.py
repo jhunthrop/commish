@@ -10,7 +10,7 @@ import json
 import os
 import re
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -19,8 +19,11 @@ from zoneinfo import ZoneInfo
 import pytest
 from sqlalchemy import Engine
 
+from research.capsules.week.sheet import WeekSheet
 from research.db.engine import make_engine
 from research.db.url import sqlalchemy_url
+from research.inseason.status_windows import LAST_STATUS_PASS, is_last_status_pass
+from research.nightly import week_reads
 from research.parity import databases
 from research.pipeline.budget import PROVIDER_DAILY_REQUEST_QUOTA, PROVIDER_MONTHLY_REQUEST_CEILING
 from research.pipeline.http import HttpResponse
@@ -37,6 +40,7 @@ from research.pipeline.tank01.capture import (
     status_feeds,
 )
 from research.pipeline.tank01.client import Paths, Tank01Client
+from research.tests.week_read_fixtures import starter
 
 REPO_ROOT: Final = Path(__file__).resolve().parents[2]
 _EASTERN: Final = ZoneInfo("America/New_York")
@@ -218,3 +222,41 @@ def test_a_status_pass_requests_two_feeds_and_a_repeat_stores_nothing(engine: En
         ("tank01_inactives", "captured"),
     }
     assert {o.status for o in second.feeds} == {"unchanged"}
+
+
+def test_the_last_status_pass_of_each_weekday_is_the_schedules_last_fire() -> None:
+    for day in (19, 20, 21, 22, 23, 24, 25, 26):
+        fires = _status_fires(_eastern(day, 0))
+        at = _eastern(day, 12)
+        weekday = at.isoweekday()
+        if not fires:
+            assert weekday not in LAST_STATUS_PASS
+            continue
+        assert LAST_STATUS_PASS[weekday] == fires[-1].time()
+        assert is_last_status_pass(fires[-1]) and not is_last_status_pass(fires[-2])
+
+
+def _sheet_kicking_off(name: str, kickoff: datetime | None) -> WeekSheet:
+    base = starter()
+    game = None if kickoff is None or base.game is None else replace(base.game, kickoff=kickoff)
+    return replace(base, player_id=name, name=name, game=game)
+
+
+def test_due_reads_of_an_hourly_pass_run_soonest_kickoff_first_and_the_left_ones_name_the_next(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sheets = (
+        _sheet_kicking_off("late", _eastern(25, 16, 25)),
+        _sheet_kicking_off("bye", None),
+        _sheet_kicking_off("early-b", _eastern(25, 13)),
+        _sheet_kicking_off("early-a", _eastern(25, 13)),
+    )
+    monkeypatch.setattr(week_reads, "due_reason", lambda *_a, **_k: "status")
+    night = week_reads._Night(sheets, {}, 7, None)  # type: ignore[arg-type]
+    hourly = [s.name for s, _ in week_reads._due(night, _eastern(25, 11), hourly=True)]
+    nightly = [s.name for s, _ in week_reads._due(night, _eastern(25, 11), hourly=False)]
+    assert hourly == ["early-b", "early-a", "late", "bye"]  # board order within a kickoff, no game last
+    assert nightly == ["late", "bye", "early-b", "early-a"]
+    due = week_reads._due(night, _eastern(25, 11), hourly=True)
+    assert week_reads.left_unread(due, 0) is None
+    assert week_reads.left_unread(due, 2) == "2 reads left unread, the next kickoff among them Sun 15:25 Central"

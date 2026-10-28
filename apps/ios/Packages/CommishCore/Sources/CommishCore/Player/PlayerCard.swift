@@ -164,7 +164,7 @@ public enum PlayerCards {
         }
         let state = readState(game)
         guard let read else {
-            return .none(WeekReads.noRead(state))
+            return .none(WeekReads.noRead(state, due: input.page?.weekReadsDue?.value1))
         }
         let week = input.week
         let card = CardProjection(

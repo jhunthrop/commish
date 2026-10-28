@@ -278,7 +278,7 @@ public enum PlayerPages {
         let state = game.flatMap(PlayerCards.readState)
         if underway {
             guard let read = player?.weekRead?.value1 else {
-                return .weekNone(WeekReads.noRead(state))
+                return .weekNone(WeekReads.noRead(state, due: player?.weekReadsDue?.value1))
             }
             let shown = StatusHeld.read(read, capture: input.capture, player: player?.id ?? "", now: input.now)
             let card = input.week.map {

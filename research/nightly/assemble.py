@@ -15,6 +15,7 @@ from sqlalchemy import Connection, text
 
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsules_for
 from research.capsules.week.collect import published_projections
+from research.capsules.week.rollover import projection_held, published_from_week, reads_due, rollover
 from research.capsules.week.sheet import PublishedProjection
 from research.capsules.week.store import served_week_reads
 from research.errors import ResearchError
@@ -214,7 +215,7 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     universe_ids = sorted({e.row.universe_id for b in boards for e in b.entries})
     capsules = stored_capsules_for(conn, universe_ids)
     ids = sorted({(e.row.player_id, e.row.universe_id) for b in boards for e in b.entries})
-    served = _served_week(conn, as_of, states, rest, ids)
+    served = _served_week(conn, as_of, games, states, rest, ids)
     inputs = pages.page_inputs(boards, adp_by_format, capsules, context, served)
     players = [pages.player_json(who, inputs) for who in people]
     schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of, games, states)
@@ -261,16 +262,18 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     )
 
 
-def _served_week(
+def _served_week(  # noqa: PLR0913, PLR0917 - the reads' parts
     conn: Connection,
     as_of: datetime,
+    games: Mapping[str, Sequence[Game]],
     states: Mapping[ClubWeek, GameState],
     rest: RosResult | None,
     ids: Sequence[tuple[str, str]],
 ) -> pages.ServedWeek:
     """The week reads the pages serve (Lane 72): the board week's (the run's rest-of-season window's first
     week, else the first week with a game still to play by the run's game state, as the site's `board_week`), against each
-    player's status on the status read `designations.json` is written from (`designations.read_statuses`). `ids` is each page's (board id, universe id)."""
+    player's status on the status read `designations.json` is written from (`designations.read_statuses`). `ids` is each page's (board id, universe id).
+    While the week's roll-over has not run, the night its reads are written (Lane 256, `rollover.reads_due`)."""
     pending = schedule_read.weeks_left(states)
     week = rest.basis.from_week if rest is not None and rest.basis is not None else (pending[0] if pending else None)
     if week is None:
@@ -279,7 +282,9 @@ def _served_week(
     statuses = {board_id: status_word(read, board_id) for board_id, _ in ids}
     reads = served_week_reads(conn, PRODUCT_SEASON, week, sorted({uid for _, uid in ids}))
     projections = served_projections(published_projections(conn, PRODUCT_SEASON, [week], as_of), week)
-    return pages.ServedWeek(reads, statuses, as_of, projections)
+    held = projection_held(conn, PRODUCT_SEASON, week, as_of)
+    state = rollover(week, games, states, published_from_week(conn, PRODUCT_SEASON, as_of), held, as_of)
+    return pages.ServedWeek(reads, statuses, as_of, projections, reads_due(state, games, held, as_of))
 
 
 def served_projections(read: Mapping[tuple[str, int], PublishedProjection], week: int) -> Mapping[str, float] | None:

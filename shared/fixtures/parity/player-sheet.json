@@ -630,18 +630,86 @@
 	"noRead": [
 		{
 			"state": "upcoming",
+			"due": null,
 			"words": "Our read for his next game is not written yet."
 		},
 		{
 			"state": null,
+			"due": null,
 			"words": "Our read for his next game is not written yet."
 		},
 		{
 			"state": "kicked_off",
+			"due": null,
 			"words": "Our read for this game was not written."
 		},
 		{
 			"state": "final",
+			"due": null,
+			"words": "Our read for this game was not written."
+		},
+		{
+			"state": "upcoming",
+			"due": {
+				"week": 8,
+				"night": "Tuesday"
+			},
+			"words": "Our reads for week 8 are written Tuesday night."
+		},
+		{
+			"state": null,
+			"due": {
+				"week": 8,
+				"night": "Tuesday"
+			},
+			"words": "Our reads for week 8 are written Tuesday night."
+		},
+		{
+			"state": "kicked_off",
+			"due": {
+				"week": 8,
+				"night": "Tuesday"
+			},
+			"words": "Our read for this game was not written."
+		},
+		{
+			"state": "final",
+			"due": {
+				"week": 8,
+				"night": "Tuesday"
+			},
+			"words": "Our read for this game was not written."
+		},
+		{
+			"state": "upcoming",
+			"due": {
+				"week": 9,
+				"night": "Wednesday"
+			},
+			"words": "Our reads for week 9 are written Wednesday night."
+		},
+		{
+			"state": null,
+			"due": {
+				"week": 9,
+				"night": "Wednesday"
+			},
+			"words": "Our reads for week 9 are written Wednesday night."
+		},
+		{
+			"state": "kicked_off",
+			"due": {
+				"week": 9,
+				"night": "Wednesday"
+			},
+			"words": "Our read for this game was not written."
+		},
+		{
+			"state": "final",
+			"due": {
+				"week": 9,
+				"night": "Wednesday"
+			},
 			"words": "Our read for this game was not written."
 		}
 	],
