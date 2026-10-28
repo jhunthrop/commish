@@ -4,19 +4,24 @@ import app.trycommish.api.apis.AuthApi
 import app.trycommish.api.apis.BillingApi
 import app.trycommish.api.apis.CompanionsApi
 import app.trycommish.api.apis.DevicesApi
+import app.trycommish.api.apis.ExportsApi
 import app.trycommish.api.apis.LeagueSyncApi
 import app.trycommish.api.apis.LeaguesApi
 import app.trycommish.api.apis.MocksApi
 import app.trycommish.api.apis.RoomsApi
 import app.trycommish.api.apis.RunApi
+import app.trycommish.api.apis.SheetsApi
 import app.trycommish.api.infrastructure.HttpResponse
+import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.readBytes
 import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
 import java.util.UUID
@@ -64,6 +69,19 @@ class Transport(
     private val mocksApi by lazy { MocksApi(baseUrl, engine, config) }
     private val leaguesApi by lazy { LeaguesApi(baseUrl, engine, config) }
     private val roomsApi by lazy { RoomsApi(baseUrl, engine, config) }
+    private val sheetsApi by lazy { CsvSheetsApi(baseUrl, engine, config) }
+    private val exportsApi by lazy { ExportsApi(baseUrl, engine, config) }
+
+    /** A plain client on the same engine for a signed link: no bearer and no request id, since the link
+     * carries its own grant and goes to the file store, not the API. */
+    private val files by lazy {
+        HttpClient(engine) {
+            install(HttpTimeout) {
+                requestTimeoutMillis = TIMEOUT_MS
+                connectTimeoutMillis = TIMEOUT_MS
+            }
+        }
+    }
 
     fun leagueSync(): LeagueSyncApi = leagueSyncApi
 
@@ -91,7 +109,25 @@ class Transport(
     /** The lobby: the formats and how full each filling room is, a seat in one, the room, leaving it, the turn's
      * call and the report. Picks and the queue go over the room's socket, never through these. */
     fun rooms(): RoomsApi = roomsApi
+
+    /** The account's cheat sheets: the list, a sheet with its rows, a new one, its rows written in one
+     * guarded request, and an import that sends the CSV as text/csv, the body the API reads. */
+    fun sheets(): SheetsApi = sheetsApi
+
+    /** A sheet written as a file, with a signed link to it. */
+    fun exports(): ExportsApi = exportsApi
+
+    /** The file a signed link names, its bytes as the store holds them; a refusal is an [ApiFailure] with
+     * the store's status and no sentence. */
+    suspend fun download(url: String): ByteArray {
+        val response = files.get(url)
+        val status = response.status.value
+        if (status !in HTTP_OK until HTTP_MULTIPLE_CHOICES) throw ApiFailure(status, "download", "")
+        return response.readBytes()
+    }
 }
+
+private const val HTTP_MULTIPLE_CHOICES = 300
 
 /** An answer's body whole, or Unauthorized when the API no longer takes the device's token. */
 suspend fun HttpResponse<*>.bodyText(): String {

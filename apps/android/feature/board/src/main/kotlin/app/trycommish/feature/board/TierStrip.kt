@@ -29,8 +29,8 @@ import app.trycommish.core.board.TierBand
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
 import app.trycommish.design.NumWeight
+import app.trycommish.design.TierRamp
 import app.trycommish.design.Tokens
-import app.trycommish.design.resolve
 
 /** The tier's number column and the band's least height at 390 (TierStrip.svelte). */
 private val STRIP = 36.dp
@@ -43,15 +43,6 @@ private val RULE = 2.dp
 private const val WASH_LIGHT = 0.09f
 private const val WASH_DARK = 0.16f
 
-/** ui/tier.ts tierColor and tierInk: seven steps of the one ink ramp, a tier past the last sharing its
- * lightest. */
-private val SHADES =
-    with(Tokens.Color) { listOf(tier1, tier2, tier3, tier4, tier5, tier6, tier7) }
-private val INKS =
-    with(Tokens.Color) { listOf(tierInk1, tierInk2, tierInk3, tierInk4, tierInk5, tierInk6, tierInk7) }
-
-private fun step(tier: Int): Int = tier.coerceIn(1, SHADES.size) - 1
-
 /**
  * A tier's band over its rows, as the web's TierStrip draws it at 390 (the iOS TierStripView's twin): a
  * row's height, the tier's number once on its shade of the one ink ramp, its name and count, and the
@@ -61,7 +52,7 @@ private fun step(tier: Int): Int = tier.coerceIn(1, SHADES.size) - 1
 @Composable
 internal fun TierStrip(band: TierBand) {
     val c = CommishTheme.colors
-    val shade = SHADES[step(band.tier)].resolve(c.dark)
+    val shade = TierRamp.shade(band.tier, c.dark)
     val wash = lerp(c.bg, shade, if (c.dark) WASH_DARK else WASH_LIGHT)
     val top = RoundedCornerShape(topStart = Tokens.Radius.md.dp, topEnd = Tokens.Radius.md.dp)
     Box(Modifier.padding(top = Tokens.Space.s4.dp).fillMaxWidth().semantics(mergeDescendants = true) { heading() }) {
@@ -76,7 +67,7 @@ internal fun TierStrip(band: TierBand) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.width(STRIP).fillMaxHeight().background(shade), contentAlignment = Alignment.Center) {
-                Text(band.tier.toString(), style = number(NumWeight.Bold), color = INKS[step(band.tier)].resolve(c.dark))
+                Text(band.tier.toString(), style = number(NumWeight.Bold), color = TierRamp.ink(band.tier, c.dark))
             }
             Row(
                 Modifier.weight(1f),
