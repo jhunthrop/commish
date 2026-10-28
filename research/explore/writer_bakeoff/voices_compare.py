@@ -14,9 +14,10 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Final
 
+from research.capsules.narrative import ShapeMasks, club_spellings
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.week.voices import VOICES
-from research.explore.writer_bakeoff.tally import ShapeMasks, club_spellings, shape_duplicates
+from research.explore.writer_bakeoff.tally import shape_duplicates
 from research.explore.writer_bakeoff.variety import Variety, common_reads, variety
 
 Json = dict[str, Any]
