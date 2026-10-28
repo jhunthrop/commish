@@ -71,6 +71,27 @@ func TestParsePendingTradesEnvelope(t *testing.T) {
 	}
 }
 
+// A proposal with one TRADE item that does not read is dropped whole,
+// never shown as the smaller trade its other items make; a DROP item
+// beside the legs is passed over.
+func TestParsePendingTradesNeverHalfReads(t *testing.T) {
+	body := `{"id":48153503,"seasonId":2026,"pendingTransactions":[
+		{"id":"half","type":"TRADE_PROPOSAL","status":"PENDING","teamId":2,"items":[
+			{"type":"TRADE","playerId":1,"fromTeamId":2,"toTeamId":7},
+			{"type":"TRADE","playerId":2,"fromTeamId":7,"toTeamId":2},
+			{"type":"TRADE","playerId":3,"fromTeamId":7,"toTeamId":0}]},
+		{"id":"with-drop","type":"TRADE_PROPOSAL","status":"PENDING","teamId":2,"items":[
+			{"type":"TRADE","playerId":4,"fromTeamId":2,"toTeamId":7},
+			{"type":"DROP","playerId":5,"fromTeamId":2,"toTeamId":0}]}]}`
+	got, err := ParsePendingTrades([]byte(body), tradesLeague, 2026)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "with-drop" || len(got[0].Legs) != 1 || got[0].Legs[0].PlayerID != "4" {
+		t.Fatalf("got %+v, want only the proposal whose legs all read, with its one leg", got)
+	}
+}
+
 // Cookies ESPN refuses are ErrSignedOut, as every member read's are.
 func TestPendingTradesRefused(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusUnauthorized) }))

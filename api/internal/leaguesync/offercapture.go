@@ -82,14 +82,15 @@ func (c *OfferCapture) Landed(snap Snapshot) {
 		}
 		ctx, cancel := context.WithTimeout(base, OfferTimeout)
 		defer cancel()
-		c.Capture(ctx, snap.Ref)
+		c.Capture(ctx, snap)
 	}()
 }
 
 // Capture reads the offers of each live link the league's read serves
 // whose turn has come, keeping each good read and remembering each
-// failure.
-func (c *OfferCapture) Capture(ctx context.Context, ref Ref) {
+// failure. snap is the league's read that landed.
+func (c *OfferCapture) Capture(ctx context.Context, snap Snapshot) {
+	ref := snap.Ref
 	reader, ok := c.Readers[ref.Host]
 	if !ok {
 		return
@@ -106,13 +107,13 @@ func (c *OfferCapture) Capture(ctx context.Context, ref Ref) {
 		if !c.due(link.ID) {
 			continue
 		}
-		c.captureLink(ctx, reader, link)
+		c.captureLink(ctx, reader, link, snap)
 	}
 }
 
 // captureLink reads and keeps one link's offers.
-func (c *OfferCapture) captureLink(ctx context.Context, reader OfferReader, link Link) {
-	offers, err := reader.Offers(ctx, link.AccountID, link.Ref, link.RosterID)
+func (c *OfferCapture) captureLink(ctx context.Context, reader OfferReader, link Link, snap Snapshot) {
+	read, err := reader.Offers(ctx, link.AccountID, link.Ref, link.RosterID, snap)
 	if err != nil {
 		c.hold(link.ID, OfferFailFor)
 		level := slog.LevelWarn
@@ -125,10 +126,26 @@ func (c *OfferCapture) captureLink(ctx context.Context, reader OfferReader, link
 		return
 	}
 	c.hold(link.ID, OfferGap)
+	offers := c.keepable(link, read)
 	sort.Slice(offers, func(i, j int) bool { return offers[i].OfferID < offers[j].OfferID })
 	if err := c.Store.PutOffers(ctx, link, offers, c.Now()); err != nil {
 		c.Log.Warn("leaguesync: offers not kept", "league", link.Ref.Key(), "link", link.ID, "err", err)
 	}
+}
+
+// keepable is the read's offers the store can keep, each list non-nil;
+// an offer it cannot is skipped with a line naming the host and the
+// offer, so one bad offer never stops the read's retire.
+func (c *OfferCapture) keepable(link Link, read []Offer) []Offer {
+	out := make([]Offer, 0, len(read))
+	for _, o := range read {
+		if why := offerProblem(o); why != "" {
+			c.Log.Warn("leaguesync: an offer is skipped", "host", link.Ref.Host, "offer", o.OfferID, "link", link.ID, "why", why)
+			continue
+		}
+		out = append(out, o.normalized())
+	}
+	return out
 }
 
 // due reports whether the link's turn has come.

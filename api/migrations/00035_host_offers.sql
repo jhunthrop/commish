@@ -17,7 +17,9 @@ create table app.host_offers (
   link_id        uuid not null references app.league_links (id) on delete cascade,
   account_id     uuid not null references app.accounts (id) on delete cascade,
   offer_id       text not null check (char_length(offer_id) between 1 and 64),
-  from_roster    smallint not null check (from_roster between 1 and 32),
+  -- The host's id for the offering team: ESPN's team ids are not capped at
+  -- a league's size, so only what every parser guarantees is checked.
+  from_roster    integer not null check (from_roster > 0),
   give           text[] not null,
   get            text[] not null,
   drop_players   text[] not null,

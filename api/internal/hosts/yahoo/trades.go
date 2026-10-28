@@ -51,16 +51,22 @@ type TradeLeg struct {
 }
 
 type xmlPendingTrades struct {
-	XMLName      xml.Name `xml:"fantasy_content"`
-	Transactions []struct {
-		Key      string      `xml:"transaction_key"`
-		Type     string      `xml:"type"`
-		Status   string      `xml:"status"`
-		Trader   string      `xml:"trader_team_key"`
-		Tradee   string      `xml:"tradee_team_key"`
-		Proposed int64       `xml:"trade_proposed_time"`
-		Players  []xmlPlayer `xml:"players>player"`
-	} `xml:"league>transactions>transaction"`
+	XMLName xml.Name `xml:"fantasy_content"`
+	League  *struct {
+		// Collection is the transactions element, nil when the answer has
+		// none: not a pending read at all, never an empty one.
+		Collection *struct {
+			Transactions []struct {
+				Key      string      `xml:"transaction_key"`
+				Type     string      `xml:"type"`
+				Status   string      `xml:"status"`
+				Trader   string      `xml:"trader_team_key"`
+				Tradee   string      `xml:"tradee_team_key"`
+				Proposed int64       `xml:"trade_proposed_time"`
+				Players  []xmlPlayer `xml:"players>player"`
+			} `xml:"transaction"`
+		} `xml:"transactions"`
+	} `xml:"league"`
 }
 
 // PendingTrades is the league's trades pending for the team, read with the
@@ -80,18 +86,22 @@ func (c *Client) PendingTrades(ctx context.Context, access, leagueKey string, te
 // ParsePendingTrades reads the collection's open offers: a pending_trade
 // still proposed, with both teams and at least one player, each leg
 // between those two teams. Any other row (an accepted trade waiting on the
-// league, a waiver claim) is left out; a body that is not Yahoo's XML is
-// ErrMalformed.
+// league, a waiver claim) is left out; a body that is not Yahoo's XML, or
+// names no league transactions collection, is ErrMalformed.
 func ParsePendingTrades(body []byte) ([]PendingTrade, error) {
 	var root xmlPendingTrades
 	if err := xml.NewDecoder(bytes.NewReader(body)).Decode(&root); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrMalformed, err)
 	}
-	if len(root.Transactions) > maxPendingTrades {
-		return nil, fmt.Errorf("%w: %d pending trades", ErrMalformed, len(root.Transactions))
+	if root.League == nil || root.League.Collection == nil {
+		return nil, fmt.Errorf("%w: no league transactions", ErrMalformed)
+	}
+	rows := root.League.Collection.Transactions
+	if len(rows) > maxPendingTrades {
+		return nil, fmt.Errorf("%w: %d pending trades", ErrMalformed, len(rows))
 	}
 	out := []PendingTrade{}
-	for _, tx := range root.Transactions {
+	for _, tx := range rows {
 		if tx.Type != pendingTrade || tx.Status != statusProposed || tx.Key == "" || len(tx.Key) > 64 {
 			continue
 		}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -28,13 +29,35 @@ func hostFixture(t *testing.T, path string) []byte {
 	return b
 }
 
+const memberSWID = "{0000000A-0000-4000-8000-00000000000A}"
+
 type fakeESPNTrades struct {
-	list []espn.PendingTrade
-	err  error
+	list  []espn.PendingTrade
+	err   error
+	reads *int
+}
+
+func (f fakeESPNTrades) Cookies(context.Context, uuid.UUID) (espn.Cookies, error) {
+	if f.err != nil {
+		return espn.Cookies{}, f.err
+	}
+	return espn.Cookies{SWID: memberSWID}, nil
 }
 
 func (f fakeESPNTrades) PendingTrades(context.Context, uuid.UUID, string, int) ([]espn.PendingTrade, error) {
+	if f.reads != nil {
+		*f.reads++
+	}
 	return f.list, f.err
+}
+
+// offerESPNRead is a league read whose team 7 the member owns (their SWID in
+// another case) and team 2 someone else does.
+func offerESPNRead() Snapshot {
+	return Snapshot{Ref: Ref{Host: HostESPN, LeagueID: "48153503", Season: 2026}, Teams: []Team{
+		{RosterID: 2, OwnerIDs: []string{"{00000002-0000-4000-8000-000000000002}"}},
+		{RosterID: 7, OwnerIDs: []string{strings.ToLower(memberSWID)}},
+	}}
 }
 
 type fakeYahooTrades struct {
@@ -64,7 +87,8 @@ func TestESPNOffers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := ESPNOffers{Member: fakeESPNTrades{list: list}}.Offers(context.Background(), uuid.New(), Ref{Host: HostESPN, LeagueID: "48153503", Season: 2026}, 7)
+	snap := offerESPNRead()
+	got, err := ESPNOffers{Member: fakeESPNTrades{list: list}}.Offers(context.Background(), uuid.New(), snap.Ref, 7, snap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,9 +98,27 @@ func TestESPNOffers(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
-	_, err = ESPNOffers{Member: fakeESPNTrades{err: hosts.ErrNotConnected}}.Offers(context.Background(), uuid.New(), Ref{Host: HostESPN}, 7)
+	_, err = ESPNOffers{Member: fakeESPNTrades{err: hosts.ErrNotConnected}}.Offers(context.Background(), uuid.New(), snap.Ref, 7, snap)
 	if !errors.Is(err, ErrNotConnected) {
 		t.Fatalf("not connected: %v", err)
+	}
+}
+
+// An ESPN team is picked at attach, so a roster the cookies' member does
+// not own in the league's read (another's, or one the read does not name)
+// reads no offers, and the queue is never asked.
+func TestESPNOffersOnlyForTheMembersOwnRoster(t *testing.T) {
+	list, err := espn.ParsePendingTrades(hostFixture(t, "../espn/testdata/pending-trades-2026.json"), "48153503", 2026)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap := offerESPNRead()
+	for _, roster := range []int{2, 9} {
+		reads := 0
+		got, err := ESPNOffers{Member: fakeESPNTrades{list: list, reads: &reads}}.Offers(context.Background(), uuid.New(), snap.Ref, roster, snap)
+		if err != nil || got == nil || len(got) != 0 || reads != 0 {
+			t.Fatalf("roster %d: %+v %v after %d queue reads, want none and no read", roster, got, err, reads)
+		}
 	}
 }
 
@@ -87,7 +129,7 @@ func TestYahooOffers(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := &fakeYahooTrades{list: list}
-	got, err := YahooOffers{Member: f}.Offers(context.Background(), uuid.New(), Ref{Host: HostYahoo, LeagueID: "128934"}, 1)
+	got, err := YahooOffers{Member: f}.Offers(context.Background(), uuid.New(), Ref{Host: HostYahoo, LeagueID: "128934"}, 1, Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +149,7 @@ func TestMFLOffers(t *testing.T) {
 		t.Fatal(err)
 	}
 	ref := Ref{Host: HostMFL, LeagueID: "10010", Season: 2026}
-	got, err := MFLOffers{Member: fakeMFLTrades{franchise: 3, list: list}}.Offers(context.Background(), uuid.New(), ref, 3)
+	got, err := MFLOffers{Member: fakeMFLTrades{franchise: 3, list: list}}.Offers(context.Background(), uuid.New(), ref, 3, Snapshot{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,10 +158,10 @@ func TestMFLOffers(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
-	if _, err := (MFLOffers{Member: fakeMFLTrades{franchise: 4, list: list}}).Offers(context.Background(), uuid.New(), ref, 3); !errors.Is(err, ErrNotFound) {
+	if _, err := (MFLOffers{Member: fakeMFLTrades{franchise: 4, list: list}}).Offers(context.Background(), uuid.New(), ref, 3, Snapshot{}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("another franchise: %v", err)
 	}
-	if _, err := (MFLOffers{Member: fakeMFLTrades{err: mfl.ErrSignedOut}}).Offers(context.Background(), uuid.New(), ref, 3); !errors.Is(err, ErrSignInAgain) {
+	if _, err := (MFLOffers{Member: fakeMFLTrades{err: mfl.ErrSignedOut}}).Offers(context.Background(), uuid.New(), ref, 3, Snapshot{}); !errors.Is(err, ErrSignInAgain) {
 		t.Fatalf("signed out: %v", err)
 	}
 }
@@ -152,14 +194,14 @@ type flaky struct {
 	reads int
 }
 
-func (f *flaky) Offers(context.Context, uuid.UUID, Ref, int) ([]Offer, error) {
+func (f *flaky) Offers(context.Context, uuid.UUID, Ref, int, Snapshot) ([]Offer, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.reads++
 	if f.fail {
 		return nil, ErrUnavailable
 	}
-	return []Offer{{OfferID: "b", From: 2}, {OfferID: "a", From: 3}}, nil
+	return []Offer{{OfferID: "b", From: 2, Get: []string{"1"}}, {OfferID: "a", From: 3, Give: []string{"2"}}}, nil
 }
 
 // A failed read is remembered: the next landed reads inside OfferFailFor
@@ -172,29 +214,61 @@ func TestOfferCaptureHoldsAFailure(t *testing.T) {
 	reader := &flaky{fail: true}
 	c := &OfferCapture{Readers: map[string]OfferReader{HostESPN: reader}, Store: store, Now: func() time.Time { return now }, Log: quietLog()}
 	ctx := context.Background()
-	c.Capture(ctx, ref)
+	c.Capture(ctx, Snapshot{Ref: ref})
 	now = now.Add(OfferGap + time.Second)
-	c.Capture(ctx, ref)
+	c.Capture(ctx, Snapshot{Ref: ref})
 	if reader.reads != 1 || store.puts != 0 {
 		t.Fatalf("%d reads and %d kept inside the failure's hold, want 1 and 0", reader.reads, store.puts)
 	}
 	reader.fail = false
 	now = now.Add(OfferFailFor)
-	c.Capture(ctx, ref)
+	c.Capture(ctx, Snapshot{Ref: ref})
 	if reader.reads != 2 || store.puts != 1 {
 		t.Fatalf("%d reads and %d kept past the hold, want 2 and 1", reader.reads, store.puts)
 	}
 	if got := store.kept[store.links[0].ID]; len(got) != 2 || got[0].OfferID != "a" {
 		t.Fatalf("kept %+v, want both offers in id order", got)
 	}
-	c.Capture(ctx, ref)
+	c.Capture(ctx, Snapshot{Ref: ref})
 	if reader.reads != 2 {
 		t.Fatalf("a good read repeated inside OfferGap: %d reads", reader.reads)
 	}
 	// A host with no reader is never read.
-	c.Capture(ctx, Ref{Host: HostSleeper, LeagueID: "1"})
+	c.Capture(ctx, Snapshot{Ref: Ref{Host: HostSleeper, LeagueID: "1"}})
 	if reader.reads != 2 {
 		t.Fatalf("a host without a reader was read")
+	}
+}
+
+// readsThese answers the same offers every read.
+type readsThese []Offer
+
+func (r readsThese) Offers(context.Context, uuid.UUID, Ref, int, Snapshot) ([]Offer, error) {
+	return r, nil
+}
+
+// An offer the store cannot keep is skipped and the rest kept, so it never
+// stops the read's retire; a one-sided offer's empty side is kept as an
+// empty list, never nil.
+func TestOfferCaptureSkipsAnOfferItCannotKeep(t *testing.T) {
+	ref := Ref{Host: HostMFL, LeagueID: "10010", Season: 2026}
+	store := &memOffers{links: []Link{{ID: uuid.New(), AccountID: uuid.New(), Ref: ref, RosterID: 3}}}
+	reader := readsThese{
+		{OfferID: "1002", From: 1, Give: []string{"15757"}, Get: []string{"14802"}},
+		{OfferID: "one-sided", From: 1, Give: nil, Get: []string{"14802"}},
+		{OfferID: "", From: 1, Give: []string{"15757"}},
+		{OfferID: "no-team", From: 0, Give: []string{"15757"}},
+		{OfferID: strings.Repeat("x", 65), From: 1, Give: []string{"15757"}},
+		{OfferID: "nobody", From: 1},
+	}
+	c := &OfferCapture{Readers: map[string]OfferReader{HostMFL: reader}, Store: store, Now: time.Now, Log: quietLog()}
+	c.Capture(context.Background(), Snapshot{Ref: ref})
+	got := store.kept[store.links[0].ID]
+	if len(got) != 2 || got[0].OfferID != "1002" || got[1].OfferID != "one-sided" {
+		t.Fatalf("kept %+v, want the two offers that can be kept", got)
+	}
+	if got[1].Give == nil || len(got[1].Give) != 0 || got[1].Drop == nil {
+		t.Fatalf("the one-sided offer's lists: %#v %#v", got[1].Give, got[1].Drop)
 	}
 }
 
@@ -291,5 +365,19 @@ func TestPutOffersRetiresThePreviousClaim(t *testing.T) {
 	}
 	if got := ids(bob.ID); len(got) != 0 {
 		t.Fatalf("another account read %v", got)
+	}
+	// A one-sided offer straight to the store (nil lists) and an ESPN team
+	// id past a league's size are kept, the empty sides as [].
+	oneSided := Offer{OfferID: "one-sided", From: 41, Give: nil, Get: []string{"7"}}
+	if err := store.PutOffers(ctx, link, []Offer{oneSided}, at.Add(2*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	held, err = store.Offers(ctx, alice.ID, link.ID)
+	if err != nil || len(held) != 1 || held[0].From != 41 || held[0].Give == nil || len(held[0].Give) != 0 || held[0].Drop == nil {
+		t.Fatalf("the one-sided offer read back %+v %v", held, err)
+	}
+	var nulls int
+	if err := pool.QueryRow(ctx, `select count(*) from app.host_offer_reads where link_id = $1 and offers::text like '%null%'`, link.ID).Scan(&nulls); err != nil || nulls != 0 {
+		t.Fatalf("%d archived reads carry a null list (%v)", nulls, err)
 	}
 }

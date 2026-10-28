@@ -117,14 +117,20 @@ func ParsePendingTrades(body []byte, league string, season int) ([]PendingTrade,
 
 // trade is the row as an open proposal, false for any other row: a claim,
 // a cancel, an accepted trade, or a proposal with no players or too many.
+// A TRADE item that does not read (no player, or a team that is not one)
+// drops the whole proposal, never half-read into a trade nobody offered;
+// an item of another type (a DROP) is not a leg and is passed over.
 func (row wireTradeRow) trade() (PendingTrade, bool) {
 	if row.Type != tradeProposal || row.Status != statusPending || row.ExecutionType == cancelRow || row.ID == "" || len(row.ID) > 64 {
 		return PendingTrade{}, false
 	}
 	t := PendingTrade{ID: row.ID, Proposer: row.TeamID, ProposedAt: millis(row.ProposedDate), ExpiresAt: millis(row.Expiration)}
 	for _, it := range row.Items {
-		if it.Type != tradeItem || it.PlayerID <= 0 || it.FromTeamID <= 0 || it.ToTeamID <= 0 {
+		if it.Type != tradeItem {
 			continue
+		}
+		if it.PlayerID <= 0 || it.FromTeamID <= 0 || it.ToTeamID <= 0 {
+			return PendingTrade{}, false
 		}
 		t.Legs = append(t.Legs, TradeLeg{PlayerID: strconv.Itoa(it.PlayerID), From: it.FromTeamID, To: it.ToTeamID})
 	}

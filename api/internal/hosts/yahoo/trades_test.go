@@ -30,6 +30,11 @@ func TestParsePendingTrades(t *testing.T) {
 	if err != nil || empty == nil || len(empty) != 0 {
 		t.Fatalf("an empty collection read %v, %v", empty, err)
 	}
+	for _, body := range []string{`<fantasy_content/>`, `<fantasy_content><league><league_key>470.l.1</league_key></league></fantasy_content>`} {
+		if _, err := ParsePendingTrades([]byte(body)); !errors.Is(err, ErrMalformed) {
+			t.Errorf("%s: err %v, want ErrMalformed, never an empty read", body, err)
+		}
+	}
 }
 
 // The member's pending trades are asked for by their own team's key and

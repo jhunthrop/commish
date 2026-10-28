@@ -70,6 +70,9 @@ func TestTradesCarryTheOffers(t *testing.T) {
 		offer("lapsed", []string{mine.Players[0]}, []string{theirs.Players[1]}, &past, fresh),
 		offer("old read", []string{mine.Players[0]}, []string{theirs.Players[1]}, nil, now.Add(-OfferKeptFor-time.Minute)),
 		offer("moved", []string{theirs.Players[2]}, []string{theirs.Players[1]}, nil, fresh),
+		offer("theirs gone", []string{mine.Players[0]}, []string{mine.Players[2]}, nil, fresh),
+		{Offer: leaguesync.Offer{OfferID: "drop gone", From: other, Give: []string{mine.Players[0]}, Get: []string{theirs.Players[1]},
+			Drop: []string{theirs.Players[3]}}, ReadAt: fresh},
 		{Offer: leaguesync.Offer{OfferID: "mine", From: f.league.Me, Give: []string{}, Get: []string{mine.Players[1]}, Drop: []string{}}, ReadAt: fresh},
 	}}
 	s := fixtureService(t, f.league, f.data, &fakeHolds{})

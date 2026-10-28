@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -46,8 +47,8 @@ type Offer struct {
 // OfferReader reads a member's pending offers in one league on a host.
 type OfferReader interface {
 	// Offers is the offers made to the member's roster in the league,
-	// read as the account.
-	Offers(ctx context.Context, accountID uuid.UUID, ref Ref, roster int) ([]Offer, error)
+	// read as the account; snap is the league's read that just landed.
+	Offers(ctx context.Context, accountID uuid.UUID, ref Ref, roster int, snap Snapshot) ([]Offer, error)
 }
 
 // sides is an offer's two lists from the member's roster's view, false
@@ -73,19 +74,32 @@ type offerLeg struct {
 	from, to int
 }
 
-// ESPNTrades reads a league's queue with a member's cookies.
-// *espnhost.Member implements it.
+// ESPNTrades reads a league's queue with a member's cookies, and the
+// cookies themselves (their SWID names the member). *espnhost.Member
+// implements it.
 type ESPNTrades interface {
+	Cookies(ctx context.Context, accountID uuid.UUID) (espn.Cookies, error)
 	PendingTrades(ctx context.Context, accountID uuid.UUID, leagueID string, season int) ([]espn.PendingTrade, error)
 }
 
 // ESPNOffers is ESPN's offers: the queue's open proposals another team
-// made with the member's team on the other side. ESPN asks for any drop
-// when the offer is accepted, so an offer names none.
+// made with the member's team on the other side. An ESPN team is picked
+// from the league's list at attach, so the queue is read only for a
+// roster the cookies' member owns in the league's read (its owners name
+// the SWID): any other roster's offers are not the member's to see, and
+// it reads none. ESPN asks for any drop when the offer is accepted, so an
+// offer names none.
 type ESPNOffers struct{ Member ESPNTrades }
 
 // Offers reads the queue as the account.
-func (e ESPNOffers) Offers(ctx context.Context, accountID uuid.UUID, ref Ref, roster int) ([]Offer, error) {
+func (e ESPNOffers) Offers(ctx context.Context, accountID uuid.UUID, ref Ref, roster int, snap Snapshot) ([]Offer, error) {
+	cookies, err := e.Member.Cookies(ctx, accountID)
+	if err != nil {
+		return nil, espnErr(err)
+	}
+	if !ownsRoster(snap, roster, cookies.SWID) {
+		return []Offer{}, nil
+	}
 	list, err := e.Member.PendingTrades(ctx, accountID, ref.LeagueID, ref.Season)
 	if err != nil {
 		return nil, espnErr(err)
@@ -107,6 +121,21 @@ func (e ESPNOffers) Offers(ctx context.Context, accountID uuid.UUID, ref Ref, ro
 	return out, nil
 }
 
+// ownsRoster reports whether the read names the member (by their host
+// user id) among the roster's owners.
+func ownsRoster(snap Snapshot, roster int, member string) bool {
+	team, ok := snap.TeamByRoster(roster)
+	if !ok || strings.TrimSpace(member) == "" {
+		return false
+	}
+	for _, owner := range team.OwnerIDs {
+		if strings.EqualFold(owner, member) {
+			return true
+		}
+	}
+	return false
+}
+
 // YahooTrades reads a league's pending trades for a team as a member.
 // *yahoo.Member implements it.
 type YahooTrades interface {
@@ -118,7 +147,7 @@ type YahooTrades interface {
 type YahooOffers struct{ Member YahooTrades }
 
 // Offers reads the member's team's pending trades as the account.
-func (y YahooOffers) Offers(ctx context.Context, accountID uuid.UUID, ref Ref, roster int) ([]Offer, error) {
+func (y YahooOffers) Offers(ctx context.Context, accountID uuid.UUID, ref Ref, roster int, _ Snapshot) ([]Offer, error) {
 	list, err := y.Member.PendingTrades(ctx, accountID, ref.Season, ref.LeagueID, roster)
 	if err != nil {
 		return nil, yahooErr(err)
@@ -153,7 +182,7 @@ type MFLTrades interface {
 type MFLOffers struct{ Member MFLTrades }
 
 // Offers reads the pending trades as the account.
-func (m MFLOffers) Offers(ctx context.Context, accountID uuid.UUID, ref Ref, roster int) ([]Offer, error) {
+func (m MFLOffers) Offers(ctx context.Context, accountID uuid.UUID, ref Ref, roster int, _ Snapshot) ([]Offer, error) {
 	franchise, list, err := m.Member.PendingTrades(ctx, accountID, ref.LeagueID, ref.Season)
 	if err != nil {
 		return nil, mflMemberErr(err)
@@ -166,10 +195,43 @@ func (m MFLOffers) Offers(ctx context.Context, accountID uuid.UUID, ref Ref, ros
 		if t.OfferedTo != roster || t.Assets || len(t.GiveUp)+len(t.Receive) == 0 {
 			continue
 		}
-		out = append(out, Offer{OfferID: t.ID, From: t.Offering, Give: t.Receive, Get: t.GiveUp, Drop: []string{},
+		out = append(out, Offer{OfferID: t.ID, From: t.Offering, Give: listOf(t.Receive), Get: listOf(t.GiveUp), Drop: []string{},
 			ProposedAt: t.ProposedAt, ExpiresAt: t.ExpiresAt})
 	}
 	return out, nil
+}
+
+// listOf is ids as a list, empty rather than nil: a one-sided offer's
+// empty side is stored and answered as [], never null.
+func listOf(ids []string) []string {
+	if ids == nil {
+		return []string{}
+	}
+	return ids
+}
+
+// maxOfferID bounds a host's offer id, as the store keeps it.
+const maxOfferID = 64
+
+// offerProblem says why an offer cannot be kept, "" for one that can: an
+// id the store cannot hold, no offering team, or no player at all. The
+// capture skips such an offer, so it never stops a read's retire.
+func offerProblem(o Offer) string {
+	switch {
+	case o.OfferID == "" || len(o.OfferID) > maxOfferID:
+		return "its id is empty or too long"
+	case o.From < 1:
+		return "it names no offering team"
+	case len(o.Give)+len(o.Get) == 0:
+		return "it moves no player"
+	}
+	return ""
+}
+
+// normalized is the offer with every list non-nil.
+func (o Offer) normalized() Offer {
+	o.Give, o.Get, o.Drop = listOf(o.Give), listOf(o.Get), listOf(o.Drop)
+	return o
 }
 
 // mflMemberErr is a MyFantasyLeague member read's failure in this

@@ -31,6 +31,11 @@ func (s *Store) PutOffers(ctx context.Context, link Link, offers []Offer, at tim
 	if len(offers) > maxOffersKept {
 		offers = offers[:maxOffersKept]
 	}
+	kept := make([]Offer, len(offers))
+	for i, o := range offers {
+		kept[i] = o.normalized()
+	}
+	offers = kept
 	raw, err := json.Marshal(offers)
 	if err != nil {
 		return fmt.Errorf("leaguesync: encode offers: %w", err)
@@ -76,9 +81,7 @@ func (s *Store) Offers(ctx context.Context, accountID, linkID uuid.UUID) ([]Held
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (HeldOffer, error) {
 		var o HeldOffer
-		var from int16
-		err := r.Scan(&o.OfferID, &from, &o.Give, &o.Get, &o.Drop, &o.ProposedAt, &o.ExpiresAt, &o.ReadAt)
-		o.From = int(from)
+		err := r.Scan(&o.OfferID, &o.From, &o.Give, &o.Get, &o.Drop, &o.ProposedAt, &o.ExpiresAt, &o.ReadAt)
 		return o, err
 	})
 	if err != nil {
