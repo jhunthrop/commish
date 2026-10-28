@@ -211,6 +211,23 @@ func (e espnWiring) leagueHost(log *slog.Logger) *leaguesync.ESPN {
 	return &leaguesync.ESPN{Member: e.member, Public: e.client, Now: time.Now, Log: log}
 }
 
+// offerCapture reads the members' pending offers on each platform whose
+// member reads are open here: ESPN and MyFantasyLeague with the vault's
+// key, Yahoo when it is on (Lane 279).
+func offerCapture(ctx context.Context, pool *pgxpool.Pool, y yahooWiring, e espnWiring, m mflWiring, log *slog.Logger) *leaguesync.OfferCapture {
+	readers := map[string]leaguesync.OfferReader{}
+	if e.connect {
+		readers[leaguesync.HostESPN] = leaguesync.ESPNOffers{Member: e.member}
+	}
+	if y.on {
+		readers[leaguesync.HostYahoo] = leaguesync.YahooOffers{Member: y.member}
+	}
+	if m.ready {
+		readers[leaguesync.HostMFL] = leaguesync.MFLOffers{Member: m.member}
+	}
+	return &leaguesync.OfferCapture{Readers: readers, Store: &leaguesync.Store{Pool: pool}, Now: time.Now, Log: log, Context: ctx}
+}
+
 // hostList is GET /hosts: every host open here, in the account page's order.
 func hostList(ff ffpcWiring, y yahooWiring, e espnWiring, m mflWiring, writes hosts.Writes, log *slog.Logger) []httpx.Route {
 	var open []apitypes.ConnectedHost

@@ -72,6 +72,9 @@ type Service struct {
 	Facts    SeasonFacts
 	Holds    Holds
 	Moves    Moves
+	// Offers is the platform offers kept for each attachment, answered on
+	// the trade finder (Lane 279); nil answers none.
+	Offers Offers
 	// Weeks lists the account's leagues for GET /me/week, nil answers none.
 	Weeks Weeks
 	// Records grades the account's league for GET /leagues/attached/{id}/record (Lane
@@ -386,6 +389,9 @@ func (s *Service) trades(w http.ResponseWriter, r *http.Request) {
 	if s.searchStopped(w, r, a) {
 		return
 	}
+	if ok {
+		out.Offers = s.offersFor(r.Context(), auth.AccountID(r), a.League, s.Now())
+	}
 	s.answer(w, r, out, ok)
 }
 
@@ -438,7 +444,7 @@ func (l SyncLeagues) Follow(w http.ResponseWriter, r *http.Request) (League, boo
 
 // leagueOf is a followed league as the advice reads it.
 func leagueOf(f leaguesync.Followed) League {
-	out := League{Snap: f.Snap, Me: f.Link.RosterID, Saved: f.Saved, Board: f.Board, HeldBy: f.HeldBy, Player: f.Player}
+	out := League{Snap: f.Snap, LinkID: f.Link.ID, Me: f.Link.RosterID, Saved: f.Saved, Board: f.Board, HeldBy: f.HeldBy, Player: f.Player}
 	if f.Saved == nil {
 		out.SettingsNote = f.SettingsNote()
 	}

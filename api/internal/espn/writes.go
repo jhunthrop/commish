@@ -352,7 +352,7 @@ func classify(out WriteAnswer, answer []byte, cookies Cookies) WriteAnswer {
 	parsed := json.Unmarshal(answer, &w) == nil
 	if parsed && w.MemberID != nil && strings.TrimSpace(*w.MemberID) != "" {
 		out.Member = MemberMismatched
-		if sameSWID(*w.MemberID, cookies.SWID) {
+		if SameSWID(*w.MemberID, cookies.SWID) {
 			out.Member = MemberMatched
 		}
 	}
@@ -371,8 +371,8 @@ func classify(out WriteAnswer, answer []byte, cookies Cookies) WriteAnswer {
 	return out
 }
 
-// sameSWID compares two SWIDs, with or without braces, in any case.
-func sameSWID(a, b string) bool {
+// SameSWID compares two SWIDs, with or without braces, in any case.
+func SameSWID(a, b string) bool {
 	trim := func(s string) string { return strings.ToLower(strings.Trim(strings.TrimSpace(s), "{}")) }
 	return trim(a) != "" && trim(a) == trim(b)
 }

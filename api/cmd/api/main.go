@@ -217,8 +217,14 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	// listener opens, so neither /readyz nor the first request after a
 	// deploy waits on them (Lane 112). Bounded; a failure only logs.
 	inSeason.WarmAtStart(ctx, inseason.StartTimeout)
-	// The trade search warms as each league read lands (Lane 66u).
-	leagueSync.Poller.Landed = inSeason.OnLanded
+	// The trade search warms as each league read lands (Lane 66u), and the
+	// members' pending offers on the platform are read behind it (Lane 279).
+	offers := offerCapture(ctx, pool, yh, es, mf, log)
+	inSeason.Offers = &leaguesync.Store{Pool: pool}
+	leagueSync.Poller.Landed = func(snap leaguesync.Snapshot) {
+		inSeason.OnLanded(snap)
+		offers.Landed(snap)
+	}
 	// While a game is under way every screen waits for a read under the
 	// minute old (Lane 92): the schedule's one live window.
 	leagueSync.Poller.Live = facts.Live

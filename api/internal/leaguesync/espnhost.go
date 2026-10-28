@@ -160,6 +160,9 @@ func espnSnapshot(l espn.FullLeague, now time.Time) Snapshot {
 		if len(t.Owners) > 0 {
 			team.Owner = scoring.HostText(l.Members[t.Owners[0]])
 		}
+		// The members' ids (SWIDs) that own the team: an offers read is
+		// made only for a roster the cookies' member owns (Lane 279).
+		team.OwnerIDs = append([]string(nil), t.Owners...)
 		for _, p := range t.Roster {
 			snap.Players[p.ID] = espnPlayer(p)
 			team.Players = append(team.Players, p.ID)
