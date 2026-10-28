@@ -7,12 +7,13 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from typing import Any, Final
 
+from research.capsules.narrative import ShapeMasks, club_spellings
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.week.render import render_week_facts_block
 from research.capsules.week.sheet import WeekSheet
 from research.capsules.week.store import StoredWeekRead
 from research.explore.writer_bakeoff.run import Lane, Night, Rejudged, outcome_of
-from research.explore.writer_bakeoff.tally import ShapeMasks, agreement, club_spellings, shape_duplicates, tally
+from research.explore.writer_bakeoff.tally import agreement, shape_duplicates, tally
 
 SIDE_BY_SIDE: Final = 10
 # Where a fall's reason starts quoting the read: the sentence it names, or the words it found.

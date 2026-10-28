@@ -222,6 +222,10 @@ class CapsuleConfig:
     # A written sentence this long or longer may sit on one page only; shorter ones ("Draft him.",
     # "Let him go.") are the product's vocabulary, not stock prose (ruled in phase C's fix round 3).
     shared_sentence_min_words: int = 4
+    # A week read's sentence this long or longer, with every player name, club and number a placeholder
+    # (`narrative.ShapeMasks`), may carry its shape on one page only (Lane 265, as Lane 261's bake-off
+    # measured repetition); shorter shapes ("Sit [name] for week [number].") are the call's vocabulary.
+    shared_shape_min_words: int = 6
     narrative_voice_rewrites_per_slot: int = 1
     length_correction: LengthCorrection = LengthCorrection()
     narrative_target_share_of_cap: float = 0.75

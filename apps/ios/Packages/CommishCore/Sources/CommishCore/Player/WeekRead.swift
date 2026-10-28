@@ -123,15 +123,25 @@ public enum WeekReads {
     }
 
     /// noReadWords: his next game while it is to come, never "next" for one under way or final; while the
-    /// coming week's reads are not yet written, the night they are (Lane 256, the run's `weekReadsDue`).
-    public static func noRead(_ state: GameRead?, due: RunReadsDue?) -> String {
+    /// coming week's reads are not yet written, the night of the nightly that writes them (Lane 256, the
+    /// run's `weekReadsDue`), until the screen's clock passes it (Lane 265); a run from before names no
+    /// instant and promises nothing.
+    public static func noRead(_ state: GameRead?, due: RunReadsDue?, now: Date) -> String {
         if underway(state) {
             return Words.Card.readNotWritten
         }
-        guard let due, let night = due.night.value1?.rawValue ?? due.night.value2 else {
+        guard let due, let nightly = due.at, now < nightly else {
             return Words.Card.readNotYet
         }
-        return readsDue(week: due.week, night: night)
+        return readsDue(week: due.week, night: nightOf(nightly))
+    }
+
+    /// week-read.ts NIGHT_RUNS_PAST_MIDNIGHT_MS.
+    static let nightRunsPastMidnight: TimeInterval = 6 * 60 * 60
+
+    /// week-read.ts nightOf: the night a nightly belongs to, the Eastern day six hours before it.
+    static func nightOf(_ nightly: Date) -> String {
+        Formatting.weekdayName(nightly.addingTimeInterval(-nightRunsPastMidnight), zone: RecordWords.eastern)
     }
 
     /// card.ts CARD.readsDue: "Our reads for week 8 are written Tuesday night."

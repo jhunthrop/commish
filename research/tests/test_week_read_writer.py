@@ -13,6 +13,7 @@ import pytest
 
 from research.capsules.gateway import Completion, GenerationError
 from research.capsules.gateway_ledger import ModelPrice, Usage
+from research.capsules.narrative import ShapeMasks
 from research.capsules.rule_notes import notes_of
 from research.capsules.run_budget import BudgetSpentError
 from research.capsules.throttle_waits import AskWaits, RunWaits
@@ -372,8 +373,9 @@ def test_a_sentence_shape_on_two_pages_keeps_its_first_carrier_in_board_order() 
             player_id="d", body="A facts block. The Lions lean on Jahmyr Gibbs every single week.", source="facts"
         ),
     }
-    sentences = shared_week_sentences(reads)
-    assert [s.player_ids for s in sentences] == [("a", "b")]
+    sentences = shared_week_sentences(reads, ShapeMasks.of(("Puka Nacua", "Rome Odunze", "Jahmyr Gibbs")))
+    # Both shapes of the sentence (the placeholder and the word shape) name the same two pages.
+    assert {s.player_ids for s in sentences} == {("a", "b")}
     assert [pid for pid, _ in week_demotions(sentences, ["b", "a", "c"])] == ["a"]
 
 

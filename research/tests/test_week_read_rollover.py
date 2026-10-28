@@ -27,8 +27,8 @@ from research.capsules.gateway_ledger import ModelPrice
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.week.collect import board_week
 from research.capsules.week.prompt import answer_json
-from research.capsules.week.rollover import ReadsDue, Rollover, next_nightly, reads_due, rollover
-from research.capsules.week.sheet import Status, WeekGame, WeekSheet
+from research.capsules.week.rollover import NIGHTS, ReadsDue, Rollover, next_nightly, night_of, reads_due, rollover
+from research.capsules.week.sheet import Status, WeekSheet
 from research.capsules.week.store import StoredWeekRead, stored_week_reads
 from research.capsules.week.write import MAX_CALLS_PER_READ
 from research.db.engine import make_engine
@@ -109,20 +109,52 @@ def test_the_last_nightly_before_the_weeks_first_kickoff_rolls_over_whatever_is_
     assert not rollover(_WEEK, _games(), _states(_WEDNESDAY_RUN), 8, False, _WEDNESDAY_RUN).ready
 
 
-def test_until_the_roll_over_the_page_says_the_night_the_rule_keeps() -> None:
-    """Tuesday's run names Tuesday night (the Wednesday 05:30 UTC run); a projection still unread at Wednesday's
-    run names Wednesday night; in standard time the run at 05:30 UTC is still that Tuesday's night."""
+def test_until_the_roll_over_the_page_names_the_nightly_the_rule_keeps() -> None:
+    """Tuesday's run names the Wednesday 05:30 UTC nightly, Tuesday night (its own board covers week 8 once
+    published); a projection still unread at Wednesday's run names Thursday's, Wednesday night; in standard time
+    the run at 05:30 UTC is still that Tuesday's night."""
     waiting = rollover(_WEEK, _games(), _states(_TUESDAY_RUN), 7, False, _TUESDAY_RUN)
-    assert reads_due(waiting, _games(), False, _TUESDAY_RUN) == ReadsDue(_WEEK, "Tuesday")
+    assert reads_due(waiting, _games(), False, _WEEK, _TUESDAY_RUN) == ReadsDue(_WEEK, _WEDNESDAY_RUN)
+    assert ReadsDue(_WEEK, _WEDNESDAY_RUN).night == "Tuesday"
     assert next_nightly(_TUESDAY_RUN) == _WEDNESDAY_RUN
     late = rollover(_WEEK, _games(), _states(_WEDNESDAY_RUN), 8, False, _WEDNESDAY_RUN)
-    assert reads_due(late, _games(), False, _WEDNESDAY_RUN) == ReadsDue(_WEEK, "Wednesday")
-    assert reads_due(Rollover(_WEEK, True), _games(), True, _WEDNESDAY_RUN) is None
+    assert reads_due(late, _games(), False, _WEEK, _WEDNESDAY_RUN) == ReadsDue(_WEEK, _THURSDAY_RUN)
+    assert ReadsDue(_WEEK, _THURSDAY_RUN).night == "Wednesday"
+    assert reads_due(Rollover(_WEEK, True), _games(), True, _WEEK, _WEDNESDAY_RUN) is None
     november = {club: [replace(g, kickoff=g.kickoff + timedelta(days=14)) for g in s] for club, s in _games().items()}
     tuesday = _TUESDAY_RUN + timedelta(days=14)
     standard = rollover(_WEEK, november, {}, 7, False, tuesday)
-    assert reads_due(standard, november, False, tuesday) == ReadsDue(_WEEK, "Tuesday")
-    assert ReadsDue(_WEEK, "Tuesday").json() == {"week": _WEEK, "night": "Tuesday"}
+    due = reads_due(standard, november, False, _WEEK, tuesday)
+    assert due == ReadsDue(_WEEK, _WEDNESDAY_RUN + timedelta(days=14)) and due.night == "Tuesday"
+    assert ReadsDue(_WEEK, _WEDNESDAY_RUN).json() == {
+        "week": _WEEK,
+        "night": "Tuesday",
+        "at": "2026-10-28T05:30:00.000Z",
+    }
+
+
+def test_a_board_the_run_does_not_cover_or_a_final_never_held_names_the_last_pass() -> None:
+    """The review's M2: a preseason board (no rest-of-season week) or a week before still short of a final
+    keeps the trigger waiting to its last pass, Thursday 05:30 UTC on a Thursday night week, and the page
+    names that night, never the projection's."""
+    waiting = rollover(_WEEK, _games(), _states(_TUESDAY_RUN), None, False, _TUESDAY_RUN)
+    assert reads_due(waiting, _games(), False, None, _TUESDAY_RUN) == ReadsDue(_WEEK, _THURSDAY_RUN)
+    unfinal = rollover(_WEEK, _games(), _states(_TUESDAY_RUN, monday_final=False), 7, False, _TUESDAY_RUN)
+    assert reads_due(unfinal, _games(), False, _WEEK, _TUESDAY_RUN) == ReadsDue(_WEEK, _THURSDAY_RUN)
+
+
+@pytest.mark.parametrize(
+    ("at", "night"),
+    [
+        (datetime(2026, 10, 28, 5, 30, tzinfo=UTC), "Tuesday"),  # daylight time
+        (datetime(2026, 11, 11, 5, 30, tzinfo=UTC), "Tuesday"),  # standard time
+        (datetime(2026, 11, 2, 5, 30, tzinfo=UTC), "Sunday"),
+        (datetime(2026, 10, 29, 5, 30, tzinfo=UTC), "Wednesday"),
+    ],
+)
+def test_the_night_is_named_from_a_fixed_table_on_the_eastern_clock(at: datetime, night: str) -> None:
+    """The review's L3: never the locale's weekday name."""
+    assert night_of(at) == night and night in NIGHTS
 
 
 # THE PASS, against the scratch database.
@@ -140,7 +172,6 @@ def engine() -> Any:
             [
                 {"id": starter().player_id, "name": "Puka Nacua", "position": "WR"},
                 {"id": questionable().player_id, "name": "Bijan Robinson", "position": "RB"},
-                {"id": _NEXT_WEEK_ID, "name": "Marvin Harrison Jr.", "position": "WR"},
             ],
         )
     try:
@@ -158,18 +189,9 @@ def _empty(request: pytest.FixtureRequest) -> None:
             conn.execute(delete(PLAYER_WEEK_READ_RUNS))
 
 
-_NEXT_WEEK_ID = "00-0039849"
 _BOARD_WEEK = 6
 # The pass's instant: the fixtures' facts are read at it, so every sheet is written from it.
 _PASS = WRITTEN_AT
-
-
-def _kicked_off_club() -> WeekSheet:
-    """A player whose club's board-week game has kicked off: his sheet is for the week after (`club_week`)."""
-    return replace(
-        starter(), player_id=_NEXT_WEEK_ID, name="Marvin Harrison Jr.", team="ARI", week=_BOARD_WEEK + 1,
-        game=WeekGame(_BOARD_WEEK + 1, "SEA", home=True, kickoff=_PASS + timedelta(days=2)),
-    )  # fmt: skip
 
 
 def _completion(read: str, call: str) -> httpx.Response:
@@ -249,16 +271,17 @@ def test_before_the_roll_over_nothing_is_written_and_the_gateway_is_never_asked(
 def test_the_roll_over_writes_every_board_players_read_from_one_facts_instant(
     engine: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """No page cap and no trickle: both board players with a week 6 game are written, at the pass's one instant,
-    and the player whose club's week 6 game has kicked off gets no read (his week 7 rolls over later)."""
-    sheets = [starter(), questionable(), _kicked_off_club()]
+    """No page cap and no trickle: both board players with a week 6 game are written, at the pass's one instant
+    (the player whose club's week 6 game has kicked off has no sheet, `collect.read_week_facts`, held below on
+    the real tables)."""
+    sheets = [starter(), questionable()]
     record = _step(engine, monkeypatch, sheets, _Writer())
     reads = _reads(engine)
     assert set(reads) == {(starter().player_id, _BOARD_WEEK), (questionable().player_id, _BOARD_WEEK)}
     assert {read.source for read in reads.values()} == {WRITTEN_SOURCE}
     assert {read.written_at for read in reads.values()} == {_PASS}
     assert record.status == "ran" and "2 reads due (first 2), 2 written" in record.summary
-    assert "every due read written" in record.summary
+    assert "; every due read written; " in record.summary
 
 
 def test_a_read_that_falls_to_its_facts_block_is_asked_again_and_the_pass_ends_complete(
@@ -280,7 +303,44 @@ def test_a_read_still_unwritten_after_the_rounds_is_named_for_the_next_pass(
     record = _step(engine, monkeypatch, [starter(), questionable()], writer)
     assert _reads(engine)[(starter().player_id, _BOARD_WEEK)].source == FACTS_SOURCE
     assert f"{week_reads.ROLLOVER_ROUNDS} rounds" in record.summary
-    assert "1 still unwritten, asked again on the next pass: Puka Nacua" in record.summary
+    # The review's L1: a partial board says so in its status and at the head of its line, a name a line.
+    assert record.status == week_reads.PARTIAL
+    assert record.summary.startswith("1 still unwritten; nightly, board week 6")
+    assert record.summary.endswith("; unwritten, asked again on the next pass:\n  Puka Nacua")
+    # Lane 265 fix round 1 (L4): the count is said once, at the head.
+    assert record.summary.count("still unwritten") == 1
+
+
+def test_a_board_the_budget_cut_short_is_partial_and_names_who_waits(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The budget's stop (the review's L1): room for one read's worst case alone, so the second read never
+    starts, writes nothing, and is named for the next pass."""
+    monkeypatch.setattr(week_reads, "NIGHTLY_BUDGET_USD", week_reads.worst_read_usd(_PRICE) + 0.0001)
+    record = _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    reads = _reads(engine)
+    assert set(reads) == {(starter().player_id, _BOARD_WEEK)}
+    assert record.status == week_reads.PARTIAL and "1 stopped by the budget" in record.summary
+    assert record.summary.startswith("1 still unwritten; ")
+    assert record.summary.endswith("; unwritten, asked again on the next pass:\n  Bijan Robinson")
+
+
+def test_an_hourly_pass_the_budget_cut_short_says_what_it_left_before_the_names(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Lane 263's reads-left-unread note and Lane 265's names on one line (the Lane 265 review's M3): the note
+    sits in the tally, before the names, never on the last name's line."""
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    monkeypatch.setattr(week_reads, "HOURLY_BUDGET_USD", week_reads.worst_read_usd(_PRICE) + 0.0001)
+    moved = [
+        replace(starter(), status=Status("questionable", REPORT)),
+        replace(questionable(), status=Status("out", REPORT)),
+    ]
+    record = _step(engine, monkeypatch, moved, _Writer(), hourly=True)
+    assert record.status == week_reads.PARTIAL and record.summary.startswith("1 still unwritten; hourly, ")
+    tally, names = record.summary.split("; unwritten, asked again on the next pass:")
+    assert "1 reads left unread, the next kickoff among them" in tally
+    assert names.count("\n  ") == 1 and "reads left unread" not in names
 
 
 def test_mid_week_a_status_change_rewrites_that_player_alone(engine: Engine, monkeypatch: pytest.MonkeyPatch) -> None:

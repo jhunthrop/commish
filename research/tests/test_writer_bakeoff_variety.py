@@ -1,7 +1,7 @@
 """Lane 266, the opener variety and the voices ship bar: masked openers, counted per 100 reads, compared on
 the players both arms wrote. No gateway and no store."""
 
-from research.explore.writer_bakeoff.tally import ShapeMasks, club_spellings
+from research.capsules.narrative import ShapeMasks, club_spellings
 from research.explore.writer_bakeoff.variety import common_reads, opener, variety
 from research.explore.writer_bakeoff.voices_compare import bar
 

@@ -5,6 +5,7 @@ the site's words."""
 
 from collections import Counter
 from dataclasses import replace
+from typing import Final
 
 import pytest
 
@@ -13,9 +14,9 @@ from research.capsules.voice_rules import gate_hits
 from research.capsules.week import voices
 from research.capsules.week.prompt import WEEK_RULES, week_correction, week_prompt
 from research.capsules.week.rules import WEEK_NEVER_WORDS
-from research.capsules.week.validate import validate_week_read
+from research.capsules.week.validate import SHARED_SENTENCE, sentence_shapes, validate_week_read, week_masks
 from research.capsules.week.voices import VOICES, voice_for, voice_section
-from research.tests.week_read_fixtures import starter
+from research.tests.week_read_fixtures import questionable, starter
 
 _BOARD: tuple[str, ...] = tuple(f"p{n:05d}" for n in range(3000))
 # Each voice's share of a 3,000-player board within 2 points of even (an even share is about 16.7%).
@@ -83,3 +84,29 @@ def test_every_brief_keeps_the_sites_words(voice: voices.Voice) -> None:
     assert "—" not in text and ";" not in text and "?" not in text
     assert gate_hits(text, ()) == []
     assert [rule.name for rule in WEEK_NEVER_WORDS if rule.pattern.search(text)] == []
+
+
+# One sentence in each voice's manner, written for Bijan Robinson and for Puka Nacua: the same shape with his
+# name, his club and his numbers swapped in (the coordinator's ruling on Lane 266 in Lane 265's round 2).
+_VOICED: Final = {
+    "verdict": "Start {name} this week against the {club}, whose defense ranks {rank} of 32.",
+    "matchup": "The {club}' defense ranks {rank} of 32 against his position, and {name} draws them at home.",
+    "role": "{name} holds the top spot on the depth chart, and the work runs through him every week.",
+    "numbers": "{name} has averaged {points} points a game, and that floor holds against the {club} this week.",
+    "story": "{name} has carried his club's offense all season, and this game asks the same of him again.",
+    "table_talk": "Don't overthink {name} this week, he's the guy you drafted to start against the {club}.",
+}
+
+
+@pytest.mark.parametrize("voice", VOICES, ids=lambda v: v.key)
+def test_a_voiced_read_is_held_to_the_shapes_another_page_carries(voice: voices.Voice) -> None:
+    """Lane 266's voices change how a read sounds, never the shape rule: a sentence in any voice whose shape
+    another page's read carries this week is refused, through the same masks (`week_masks`) as any read."""
+    theirs, ours = questionable(), starter()
+    template = _VOICED[voice.key]
+    their_sentence = template.format(name="Bijan Robinson", club="Bears", rank="9th", points="16.1")
+    our_sentence = template.format(name="Puka Nacua", club="Cardinals", rank="26th", points="21.3")
+    taken = frozenset(sentence_shapes(their_sentence, week_masks((theirs, ours))))
+    assert taken & set(sentence_shapes(our_sentence, week_masks((ours,))))
+    result = validate_week_read(our_sentence, ours, taken, call="start")
+    assert any(v.startswith(SHARED_SENTENCE) for v in result.violations), voice.key

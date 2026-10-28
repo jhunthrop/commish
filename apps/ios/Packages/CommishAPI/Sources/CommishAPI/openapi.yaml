@@ -7710,16 +7710,15 @@ components:
           description: the words the page shows once the live read prints another; absent on a run from before
     RunReadsDue:
       type: object
-      description: the coming week and the night its reads are written in one pass, when the week rolls over
+      description: the coming week and the nightly that writes its reads in one pass, when the week rolls over
       required:
         - week
-        - night
       properties:
         week:
           type: integer
           minimum: 1
         night:
-          description: the Central night of the nightly that writes them
+          description: the night of the nightly that writes them, kept one deploy for the clients before Lane 265, which name it from at
           anyOf:
             - type: string
               enum:
@@ -7731,6 +7730,10 @@ components:
                 - Saturday
                 - Sunday
             - type: string
+        at:
+          type: string
+          format: date-time
+          description: "the nightly that writes them (Lane 265): the clients name its night on the Eastern clock and stop promising it once their clock passes it; absent on a run from before"
     RunStatLine:
       type: object
       description: a stat line in the research store's names; a field is null when the records do not carry it
