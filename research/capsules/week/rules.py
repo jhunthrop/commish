@@ -22,6 +22,10 @@ This week's rulings and the Lane 72 review's, each a rule the validator reads:
 - Every figure is one the page draws as a cell, as the cell prints it (`cells`), and a read states at most
   `MAX_FIGURES` of them: the cells carry his numbers, the read says what they cannot (Lane 100, B17, B44).
 - One paragraph, three to five sentences.
+- The first sentence runs at most `FIRST_SENTENCE_WORDS` words (Lane 281, B270): a numbers-voice read opened on a
+  60-word sentence with a colon.
+- No "other club", "other team" or "other side" for a club the facts do not name as a second club of his
+  (Lane 281, B270): "Los Angeles's other club" claims a tie the sheet never gives.
 
 Each violation names its sentence in the writer's form (`the sentence "..."`), so a correction hands it
 back word for word (`rule_notes`).
@@ -34,15 +38,19 @@ from typing import Final
 from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
+from research.capsules.validate import word_count
 from research.capsules.voice_rules import named_rule
 from research.capsules.week.cells import cell_figures, misnamed, misranked, quotable_figures
 from research.capsules.week.rank_words import fits, rank_words, superlatives_in
+from research.capsules.week.render import render_week_sheet
 from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import STATUS_WORDS, WeekSheet
 from research.capsules.week.start_advice import start_advice_in
 
 MIN_SENTENCES: Final = 3
 MAX_SENTENCES: Final = 5
+# The first sentence's words at most (Lane 281, B270): the opener carries the point, never a paragraph of it.
+FIRST_SENTENCE_WORDS: Final = 30
 # The figures a read states at most (Lane 100, B44): the cells above it carry his numbers.
 MAX_FIGURES: Final = 3
 # The writer's own call for its read, one word (H2): what it tells a manager who has him to do this week.
@@ -514,6 +522,49 @@ def _opener_violation(sentences: Sequence[str], season: int) -> list[str]:
     return []
 
 
+def _first_sentence_violation(sentences: Sequence[str]) -> list[str]:
+    """The first sentence runs at most `FIRST_SENTENCE_WORDS` words (Lane 281, B270)."""
+    if not sentences or word_count(sentences[0]) <= FIRST_SENTENCE_WORDS:
+        return []
+    return [
+        _sentence_violation(
+            f"opens on a sentence of {word_count(sentences[0])} words, over the {FIRST_SENTENCE_WORDS}-word cap",
+            sentences[0],
+            f"Open on a sentence of {FIRST_SENTENCE_WORDS} words or fewer that carries the call, a figure or his "
+            "status, and move the rest to a sentence of its own.",
+        )
+    ]
+
+
+# "Other club" phrasing (Lane 281, B270): "Los Angeles's other club", "the other New York team", "the other
+# side". The other side of the ball is football's own, and "every other team" compares with the league.
+_OTHER_CLUB: Final = re.compile(
+    r"(?<!\bevery )(?<!\bany )(?<!\bno )(?<!\beach )\bother(?:\s+[A-Z][\w.'\u2019]*){0,2}\s+"
+    r"(?:club|team|side|franchise)\b(?!\s+of\s+the\s+ball\b)",
+    re.IGNORECASE,
+)
+
+
+def _other_club_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
+    """A sentence that calls a club his "other" one, refused unless his facts name a second club of his (the
+    sheet's own words carry the phrase): the sheet names his club and his opponent, never a tie between them."""
+    if _OTHER_CLUB.search(render_week_sheet(sheet)):
+        return []
+    out = []
+    for s in sentences:
+        found = _OTHER_CLUB.search(s)
+        if found is not None:
+            out.append(
+                _sentence_violation(
+                    f'calls a club "{found.group(0)}" with no fact naming that tie',
+                    s,
+                    "Name the club by name, as the facts give it, and claim no tie between clubs the facts do not "
+                    "give.",
+                )
+            )
+    return out
+
+
 def _season_violation(text: str, season: int) -> list[str]:
     count = len(re.findall(rf"\b{season}\b", text))
     if count <= 1:
@@ -557,6 +608,8 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_code_violations(sentences),
         *_superlative_violations(sentences, sheet),
         *_opener_violation(sentences, sheet.season),
+        *_first_sentence_violation(sentences),
+        *_other_club_violations(sentences, sheet),
     ]
 
 
