@@ -19,12 +19,12 @@ struct TierStripView: View {
 
     var body: some View {
         let theme = Theme(colorScheme)
-        let shade = Self.shade(band.tier)
+        let shade = TierRamp.shade(band.tier)
         HStack(spacing: Tokens.Space.s2) {
             Text(String(band.tier))
                 .font(Faces.font(.num, size: Tokens.TypeScale.md, weight: .bold))
                 .monospacedDigit()
-                .foregroundStyle(theme.color(Self.ink(band.tier)))
+                .foregroundStyle(theme.color(TierRamp.ink(band.tier)))
                 .frame(width: Self.strip)
                 .frame(maxHeight: .infinity)
                 .background(theme.color(shade))
@@ -56,31 +56,6 @@ struct TierStripView: View {
         .padding(.top, Tokens.Space.s4)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
-    }
-
-    /// ui/tier.ts tierColor: seven steps of the one ink ramp (TIER_HUES), a tier past the last sharing
-    /// its lightest.
-    static let shades = [
-        Tokens.Color.tier1, Tokens.Color.tier2, Tokens.Color.tier3, Tokens.Color.tier4, Tokens.Color.tier5,
-        Tokens.Color.tier6, Tokens.Color.tier7,
-    ]
-    /// ui/tier.ts tierInk: the text on each step.
-    static let inks = [
-        Tokens.Color.tierInk1, Tokens.Color.tierInk2, Tokens.Color.tierInk3, Tokens.Color.tierInk4,
-        Tokens.Color.tierInk5, Tokens.Color.tierInk6, Tokens.Color.tierInk7,
-    ]
-
-    static func shade(_ tier: Int) -> ThemedColor {
-        shades[step(tier)]
-    }
-
-    static func ink(_ tier: Int) -> ThemedColor {
-        inks[step(tier)]
-    }
-
-    /// The tier's step on the ramp, zero-based, the last for every tier past it.
-    private static func step(_ tier: Int) -> Int {
-        min(max(tier, 1), shades.count) - 1
     }
 }
 
