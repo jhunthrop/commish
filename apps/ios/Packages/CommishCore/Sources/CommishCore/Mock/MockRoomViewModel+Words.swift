@@ -27,7 +27,7 @@ public extension MockRoomViewModel {
     internal static func sentence(for error: any Error) -> String {
         switch error {
         case let APIError.envelope(_, message) where !message.isEmpty: message
-        default: Words.Mock.unreachable
+        default: Words.Mock.unreachablePhone
         }
     }
 }

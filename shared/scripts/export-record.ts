@@ -37,6 +37,11 @@ export const RECORD_MODES = [
 			"the weekly record with week 7 set and played, waiting on its stats with the day it usually grades, and the draft record"
 	},
 	{
+		mode: 'set-missed',
+		about:
+			'the weekly record as `set` with week 6 before it, missed (no order was set before its kickoff)'
+	},
+	{
 		mode: 'graded',
 		about: 'the weekly record with a STAND-IN week 7 graded against ESPN, and the draft record'
 	},

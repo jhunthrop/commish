@@ -13,5 +13,6 @@ run's own record (`shared/fixtures/run`) is the record before Lane 114, with nei
 | `waiting.json` | the run's own record alone, week 6 set and waiting on its stats with the day it usually grades |
 | `upcoming.json` | the weekly record before its first week is set, and the draft record |
 | `set.json` | the weekly record with week 7 set and played, waiting on its stats with the day it usually grades, and the draft record |
+| `set-missed.json` | the weekly record as `set` with week 6 before it, missed (no order was set before its kickoff) |
 | `graded.json` | the weekly record with a STAND-IN week 7 graded against ESPN, and the draft record |
 | `published.json` | the STAND-IN week 7 with the week's published projection graded beside ESPN, and the draft record |

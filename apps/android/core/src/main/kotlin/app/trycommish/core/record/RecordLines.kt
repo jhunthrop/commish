@@ -30,10 +30,12 @@ internal object RecordLines {
         return if (played == 0) null else "Graded $gradedCount of ${Format.plural(played, "week", "weeks")} played"
     }
 
-    /** record.ts gapWords: why the played weeks not graded are not. */
+    /** record.ts gapWords: why the played weeks not graded are not. [whenWeek] is the week a drawn "when"
+     * line already says the rule for (B260), so its waiting sentence is dropped. */
     fun gaps(
         book: RecordBook,
         unplayed: List<Int>,
+        whenWeek: Int? = null,
     ): String {
         val missedLines =
             RecordWords.runs(book.weeks).filter { it.first().status == missed }.map { run ->
@@ -45,7 +47,7 @@ internal object RecordLines {
                 }
             }
         val waiting =
-            book.weeks.filter { it.status == frozen && it.week !in unplayed }.map { week ->
+            book.weeks.filter { it.status == frozen && it.week !in unplayed && it.week != whenWeek }.map { week ->
                 val lead = RecordWords.lead(listOf(week))
                 "$lead ${gradesWhen(week.gradesFrom?.let(::weekdayWordOf))}."
             }

@@ -104,6 +104,12 @@ export const RECORD_CASES: readonly {
 		file: 'shared/fixtures/record/set.json',
 		now: '2026-10-27T17:00:00.000Z'
 	},
+	// The same week with a missed week before it: the missed sentence stays, the waiting one is dropped (Lane 273).
+	{
+		name: 'set-missed',
+		file: 'shared/fixtures/record/set-missed.json',
+		now: '2026-10-27T17:00:00.000Z'
+	},
 	{
 		name: 'graded',
 		file: 'shared/fixtures/record/graded.json',
@@ -211,7 +217,7 @@ function weeklySection(
 	const toDateAll = allLine(record.toDate);
 	const pending = weekly ? weeklyPending(record, next) : null;
 	const headline = recordHeadline(record, unplayed);
-	const gaps = gapWords(record, unplayed);
+	const gaps = gapWords(record, unplayed, pending === null ? null : (next?.week ?? null));
 	const before = fromWeek === null ? null : beforeLine(fromWeek);
 	const rows = weekly
 		? weeklyLines(record.weeks, unplayed, underway)

@@ -172,7 +172,7 @@ struct MockRoomSnapshotTests {
 
     @Test func theOfflineRoomSaysWhenItWasRead() async {
         let viewModel = await Self.room(.offline)
-        #expect(viewModel.staleWords == "\(Words.Mock.unreachable) Last read Sun 4:00 pm")
+        #expect(viewModel.staleWords == "\(Words.Mock.unreachableStale) Last read Sun 4:00 pm")
         #expect(!viewModel.canWrite)
     }
 

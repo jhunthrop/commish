@@ -925,6 +925,8 @@ object Words {
         const val stillThere = "Still there"
         const val reshuffled = "the bots"
         const val unreachable = "The room could not be reached. Check the connection and reload."
+        const val unreachablePhone = "The room could not be reached. Try again."
+        const val unreachableStale = "The room could not be reached. Pull down to try again."
         const val sharedNote = "It starts from the first pick with the same settings and bots, so they draft the same way until a pick of yours changes the board."
     }
 

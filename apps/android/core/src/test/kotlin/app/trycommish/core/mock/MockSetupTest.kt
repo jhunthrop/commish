@@ -72,7 +72,7 @@ class MockSetupTest {
         val setup = MockSetupViewModel(stub)
         setup.start()
         idle()
-        assertEquals(app.trycommish.design.Words.Mock.unreachable, setup.form.value.problem)
+        assertEquals(app.trycommish.design.Words.Mock.unreachablePhone, setup.form.value.problem)
         assertNull(setup.form.value.started)
     }
 

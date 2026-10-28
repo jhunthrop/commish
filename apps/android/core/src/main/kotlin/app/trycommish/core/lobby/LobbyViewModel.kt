@@ -47,7 +47,7 @@ object LobbyRefusal {
 
     /** notice.ts noticeFor with subject lobby. */
     fun sentence(error: Throwable): String =
-        sentence(status(error)) ?: (error as? ApiFailure)?.message?.takeIf { it.isNotEmpty() } ?: Words.Mock.unreachable
+        sentence(status(error)) ?: (error as? ApiFailure)?.message?.takeIf { it.isNotEmpty() } ?: Words.Mock.unreachablePhone
 
     fun sentence(status: Int?): String? =
         when (status) {

@@ -27,6 +27,8 @@
 	"stillThere": "Still there",
 	"reshuffled": "the bots",
 	"unreachable": "The room could not be reached. Check the connection and reload.",
+	"unreachablePhone": "The room could not be reached. Try again.",
+	"unreachableStale": "The room could not be reached. Pull down to try again.",
 	"sharedNote": "It starts from the first pick with the same settings and bots, so they draft the same way until a pick of yours changes the board.",
 	"functions": []
 }

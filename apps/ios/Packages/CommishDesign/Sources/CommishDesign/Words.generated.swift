@@ -923,6 +923,8 @@ public enum Words {
         public static let stillThere = "Still there"
         public static let reshuffled = "the bots"
         public static let unreachable = "The room could not be reached. Check the connection and reload."
+        public static let unreachablePhone = "The room could not be reached. Try again."
+        public static let unreachableStale = "The room could not be reached. Pull down to try again."
         public static let sharedNote = "It starts from the first pick with the same settings and bots, so they draft the same way until a pick of yours changes the board."
     }
 

@@ -112,7 +112,7 @@ class MockRoomViewModelTest {
         val shown = room(vm)
         assertTrue(shown.stale)
         assertFalse(shown.canWrite)
-        assertEquals("${Words.Mock.unreachable} Last read Sun 4:00 pm", vm.staleWords())
+        assertEquals("${Words.Mock.unreachableStale} Last read Sun 4:00 pm", vm.staleWords())
         assertNull(vm.draft())
         assertNull(vm.finish())
         assertTrue(stub.picks.isEmpty())
@@ -121,7 +121,7 @@ class MockRoomViewModelTest {
     @Test
     fun `offline with nothing saved says the room cannot be reached`() {
         val stub = StubMock().apply { offline = true }
-        assertEquals(MockRoomState.Failed(Words.Mock.unreachable), viewModel(stub).state.value)
+        assertEquals(MockRoomState.Failed(Words.Mock.unreachablePhone), viewModel(stub).state.value)
     }
 
     @Test
@@ -233,7 +233,7 @@ class MockRoomViewModelTest {
         vm.runAgain {}
         idle()
         assertInstanceOf(MockRoomState.Report::class.java, vm.state.value)
-        assertEquals(Words.Mock.unreachable, vm.refusal.value)
+        assertEquals(Words.Mock.unreachablePhone, vm.refusal.value)
         stub.offline = false
         stub.hold("create")
         var opened = 0
@@ -252,7 +252,7 @@ class MockRoomViewModelTest {
         val vm = viewModel(stub)
         vm.finish()
         idle()
-        assertEquals(MockRoomState.Failed(Words.Mock.unreachable), vm.state.value)
+        assertEquals(MockRoomState.Failed(Words.Mock.unreachablePhone), vm.state.value)
         stub.reportFails = false
         stub.opened = MockFixtures.Answer.Finish
         vm.load()

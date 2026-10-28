@@ -75,7 +75,7 @@ struct MockRoomViewModelTests {
         }
         #expect(stale)
         #expect(!viewModel.canWrite)
-        #expect(viewModel.staleWords?.hasPrefix(Words.Mock.unreachable) == true)
+        #expect(viewModel.staleWords?.hasPrefix(Words.Mock.unreachableStale) == true)
         await viewModel.draft()
         await viewModel.finish()
         #expect(await api.picks.isEmpty)
@@ -86,7 +86,7 @@ struct MockRoomViewModelTests {
         await api.setOffline(true)
         let viewModel = Self.viewModel(api)
         await viewModel.load()
-        #expect(viewModel.state == .failed(Words.Mock.unreachable))
+        #expect(viewModel.state == .failed(Words.Mock.unreachablePhone))
     }
 
     @Test func aRefusedPickKeepsTheRoomAndSaysTheAPIsSentence() async throws {

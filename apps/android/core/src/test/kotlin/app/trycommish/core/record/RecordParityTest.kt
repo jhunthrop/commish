@@ -52,7 +52,7 @@ class RecordParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "graded", "published"])
+    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "set-missed", "graded", "published"])
     fun `the lead and the summary are the web's`(name: String) {
         val (web, model) = model(name)
         val weekly = web.getValue("weekly").jsonObject
@@ -64,7 +64,7 @@ class RecordParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "graded", "published"])
+    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "set-missed", "graded", "published"])
     fun `the weeks are the web's with their status words`(name: String) {
         val (web, model) = model(name)
         val weekly = web.getValue("weekly").jsonObject
@@ -80,7 +80,7 @@ class RecordParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "graded", "published"])
+    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "set-missed", "graded", "published"])
     fun `the draft record is the web's`(name: String) {
         val (web, model) = model(name)
         val theirs = web.getValue("draft").jsonObject
@@ -108,7 +108,7 @@ class RecordParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "graded", "published"])
+    @ValueSource(strings = ["own-sunday", "own", "waiting", "upcoming", "set", "set-missed", "graded", "published"])
     fun `the record never claims a weekly model`(name: String) {
         val (_, model) = model(name)
         val said = listOf(model.lead, model.weekly.basis, model.draft.basis) + model.weekly.rows.map { it.text }

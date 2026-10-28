@@ -125,7 +125,7 @@ struct NextGrade: Equatable, Sendable {
     let lastKickoff: Date?
 
     init?(_ book: RecordBook, schedule: RunSchedule) {
-        guard let week = book.weeks.first(where: { RecordBook.status($0) != .graded })?.week else {
+        guard let week = book.weeks.first(where: { ![.graded, .missed].contains(RecordBook.status($0)) })?.week else {
             return nil
         }
         self.week = week
