@@ -24,7 +24,7 @@ policy_body() { # display name, channel, absence enabled (true|false)
   python3 - "$1" "$2" "${3:-false}" <<'PY'
 import json, sys
 name, channel, enabled = sys.argv[1], sys.argv[2], sys.argv[3] == "true"
-jobs = 'resource.label.job_name = one_of("nightly", "nightly-publish", "inseason", "inseason-capture")'
+jobs = 'resource.label.job_name = one_of("nightly", "nightly-publish", "inseason", "inseason-capture", "inseason-status")'
 # The selector without its closing brace: each query adds its job_name and closes it.
 succeeded = 'run_googleapis_com:job_completed_execution_count{monitored_resource="cloud_run_job",result="succeeded"'
 # From September 8 (the first week's freeze passes run by then) through February (review R1: from
@@ -81,8 +81,19 @@ policies = {
             "labelExtractors": {"held": 'REGEXP_EXTRACT(textPayload, "nightly HELD: (.*)")'},
         },
     },
+    # Lane 263: a game-day status pass at its window's last pass that the hourly dollars stopped short prints one
+    # `week-reads WARNING:` line (research/nightly/week_reads.py); reads left unread wait for the hourly cadence.
+    "Research game-day reads left unread": {
+        "displayName": "A game-day status pass left reads unwritten at its window's last pass",
+        "conditionMatchedLog": {
+            "filter": 'resource.type = "cloud_run_job" AND resource.labels.job_name = "inseason-status" AND textPayload : "week-reads WARNING:"',
+        },
+    },
 }
 documentation = {
+    "Research game-day reads left unread": "The hourly week-read dollars (HOURLY_DAY_USD) ran out before a game-day window's last "
+    "status pass finished its reads. The line names how many are unread and the next kickoff among them. A warning, "
+    "not an outage: the hourly cadence reads them. Consider raising HOURLY_DAY_USD (research/nightly/week_reads.py).",
     "Research nightly held a page": "The nightly's schema gate refused a player page and published the run with it held "
     "(its earlier copy, or its board figures alone). The line names each page and what the web's reader said: a "
     "reader/writer drift to fix before the next night. research/nightly/held_pages.py.",
@@ -111,7 +122,7 @@ print(json.dumps(policy))
 PY
 }
 
-POLICIES=("Research job execution failed" "Research schedule firing failed" "Research nightly held a page" "Research nightly absent" "Research in-season absent" "Research weekly pass absent")
+POLICIES=("Research job execution failed" "Research schedule firing failed" "Research nightly held a page" "Research nightly absent" "Research in-season absent" "Research weekly pass absent" "Research game-day reads left unread")
 
 apply() { # absence enabled (true|false)
   local ch name line
