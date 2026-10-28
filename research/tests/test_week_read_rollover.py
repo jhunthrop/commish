@@ -340,7 +340,7 @@ def test_an_hourly_pass_the_budget_cut_short_says_what_it_left_before_the_names(
     engine: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Lane 263's reads-left-unread note and Lane 265's names on one line (the Lane 265 review's M3): the note
-    sits in the tally, before the names, never on the last name's line."""
+    sits in the tally, before the names, never on the last name's line. Lane 276 (the re-review's M1): the read the budget left is named too, with the one that fell."""
     _step(engine, monkeypatch, [starter(), questionable()], _Writer())
     monkeypatch.setattr(week_reads, "HOURLY_BUDGET_USD", week_reads.worst_read_usd(_PRICE) + 0.0001)
     moved = [
@@ -348,10 +348,10 @@ def test_an_hourly_pass_the_budget_cut_short_says_what_it_left_before_the_names(
         replace(questionable(), status=Status("out", REPORT)),
     ]
     record = _step(engine, monkeypatch, moved, _Writer(), hourly=True)
-    assert record.status == week_reads.PARTIAL and record.summary.startswith("1 still unwritten; hourly, ")
+    assert record.status == week_reads.PARTIAL and record.summary.startswith("2 still unwritten; hourly, ")
     tally, names = record.summary.split("; unwritten, asked again on the next pass:")
     assert "1 reads left unread, the next kickoff among them" in tally
-    assert names.count("\n  ") == 1 and "reads left unread" not in names
+    assert names.count("\n  ") == 2 and "reads left unread" not in names  # noqa: PLR2004 - the read that fell and the one the budget left
 
 
 def test_mid_week_a_status_change_rewrites_that_player_alone(engine: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -464,3 +464,26 @@ def test_an_hourly_pass_writes_a_status_that_moved_before_a_read_still_unwritten
         ("Bijan Robinson", "status"),
         ("Puka Nacua", "unwritten"),
     ]
+
+
+def test_a_status_rewrite_the_budget_left_unasked_is_counted_unwritten_and_asked_the_next_hour(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Lane 265 re-review's M1: a rewrite the day's dollars stopped keeps its old written row, so the rows
+    alone would call it written; the line names it as unwritten, and the next hour with dollars asks it."""
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    with engine.begin() as conn:
+        conn.execute(delete(PLAYER_WEEK_READ_RUNS))
+    _hourly_spent(engine, week_reads.HOURLY_DAY_USD - 0.001)
+    moved = [replace(starter(), status=Status("questionable", REPORT)), questionable()]
+    asked: list[str] = []
+    hour = _step(engine, monkeypatch, moved, _Writer(asked=asked), hourly=True, at=_PASS + timedelta(hours=1))
+    assert asked == [] and "1 reads due (status 1)" in hour.summary and "1 stopped by the budget" in hour.summary
+    assert hour.status == week_reads.PARTIAL and hour.summary.startswith("1 still unwritten; ")
+    assert hour.summary.endswith("; unwritten, asked again on the next pass:\n  Puka Nacua")
+    assert _reads(engine)[(starter().player_id, _BOARD_WEEK)].status != "questionable"
+    with engine.begin() as conn:
+        conn.execute(delete(PLAYER_WEEK_READ_RUNS))
+    after = _step(engine, monkeypatch, moved, _Writer(asked=asked), hourly=True, at=_PASS + timedelta(hours=2))
+    assert asked and "every due read written" in after.summary
+    assert _reads(engine)[(starter().player_id, _BOARD_WEEK)].status == "questionable"

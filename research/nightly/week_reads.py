@@ -138,6 +138,9 @@ class WeekReadSpend:
     retry_model: str | None = None
     retry_asks: int = 0
     rescued: int = 0
+    # The players whose due read the budget left unasked or cut (Lane 265 re-review M1): still unwritten, as a
+    # rewrite the budget stopped keeps the row it was due to replace, and still due on the next pass.
+    budget_left: set[str] = field(default_factory=set)
 
     def add(self, result: WeekReadResult) -> None:
         self.landed += 1
@@ -306,7 +309,7 @@ def _write(  # noqa: PLR0913 - the pass's parts
     """The due reads on the writer's pool, each landed in its own transaction, tallied on `spend` (whose
     `retry_model` is the retry writer the reads may ask)."""
     board = _Board(stored, masks)
-    landed = spend.landed
+    landed: set[str] = set()
     retry = spend.retry_model
 
     def start(item: tuple[WeekSheet, str]) -> Callable[[GatewayClient], WeekReadResult]:
@@ -316,10 +319,13 @@ def _write(  # noqa: PLR0913 - the pass's parts
 
     def land(item: tuple[WeekSheet, str], result: WeekReadResult) -> None:
         spend.add(result)
+        sheet, reason = item
+        landed.add(sheet.player_id)
         if result.fallback == "the run's budget is spent":
             spend.budget_stopped += 1
+            spend.budget_left.add(sheet.player_id)
             return
-        sheet, reason = item
+        spend.budget_left.discard(sheet.player_id)
         if result.source == FACTS_SOURCE and result.fallback is not None:
             spend.fell_to_facts(sheet.name, result.fallback)
         row = stored_row(sheet, result, reason, stored.get((sheet.player_id, sheet.week)), sheet.written_at)
@@ -328,7 +334,9 @@ def _write(  # noqa: PLR0913 - the pass's parts
         board.land(row)
 
     if gateway.rolling(due, start, land, stop=lambda: not room()):
-        spend.budget_stopped += len(due) - (spend.landed - landed)
+        unasked = {sheet.player_id for sheet, _ in due} - landed
+        spend.budget_stopped += len(unasked)
+        spend.budget_left |= unasked
 
 
 def _reread(engine: Engine, week: int) -> dict[tuple[str, int], StoredWeekRead]:
@@ -344,6 +352,18 @@ def _unwritten(
     return [sheet for sheet, row in rows if row is None or row.source != WRITTEN_SOURCE]
 
 
+def _left(
+    night: _Night,
+    due: Sequence[tuple[WeekSheet, str]],
+    stored: Mapping[tuple[str, int], StoredWeekRead],
+    spend: WeekReadSpend,
+) -> list[str]:
+    """The due reads the pass leaves unwritten, in due order: those its rows say are not written, and those the
+    budget left unasked or cut, a rewrite whose old read still stands among them."""
+    unwritten = {sheet.player_id for sheet in _unwritten(night, due, stored)} | spend.budget_left
+    return [sheet.name for sheet, _ in due if sheet.player_id in unwritten]
+
+
 def _write_rounds(  # noqa: PLR0913 - the pass's parts
     engine: Engine,
     gateway: GatewayClient,
@@ -357,20 +377,22 @@ def _write_rounds(  # noqa: PLR0913 - the pass's parts
     judge: str = JUDGE_MODEL,
 ) -> None:
     """The due reads, then the demotion over the board week, then again for every due read still unwritten, at
-    most `rounds` times while the budget has room; those still unwritten are named on `spend`. A pass whose budget
+    most `rounds` times while the budget has room; those still unwritten, the budget's among them, are named on
+    `spend`. A pass whose budget
     has no room for its first read asks nothing and counts every due read as stopped by it (Lane 276), so its line
     says why."""
     stored: Mapping[tuple[str, int], StoredWeekRead] = night.stored
     batch = list(due)
     if batch and not room():
         spend.budget_stopped += len(batch)
+        spend.budget_left |= {sheet.player_id for sheet, _ in batch}
     while batch and spend.rounds < rounds and room():
         spend.rounds += 1
         _write(engine, gateway, stored, batch, room=room, spend=spend, masks=night.masks, judge=judge)
         spend.demoted_reads |= demote_shared(engine, night.sheets, night.board_week, now, night.masks)
         stored = _reread(engine, night.board_week)
         batch = [(sheet, UNWRITTEN) for sheet in _unwritten(night, due, stored)]
-    spend.unwritten = [sheet.name for sheet in _unwritten(night, due, stored)]
+    spend.unwritten = _left(night, due, stored, spend)
 
 
 def _room(budget: RunBudget, worst: float) -> Callable[[], bool]:
