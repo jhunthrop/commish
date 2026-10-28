@@ -179,9 +179,24 @@ public enum SheetWords {
         "And \(count) more"
     }
 
-    /// The phone's own: an import that read no player is not let replace a sheet (the web's verb waits
-    /// for a player read; the API's import writes what it reads, so the phone puts the rows back).
+    /// The phone's own: a file that reads no player on the phone is not sent (the web's verb waits for a
+    /// player read).
     public static let keptAsItWas = "No player read, so your sheet is as it was."
+    /// The phone's own: the account's import read no player and replaced the rows anyway (B265), so the
+    /// sheet is read again and shown as the account now holds it.
+    public static let readNone = "No player read. Your sheet is shown as your account now holds it."
+
+    // MARK: a conflict the account's copy won (merge.ts mergeRow)
+
+    /// "Your note on Ja'Marr Chase was replaced by the one saved on another device".
+    public static func noteReplaced(_ name: String) -> String {
+        "Your note on \(name) was replaced by the one saved on another device"
+    }
+
+    /// "Your tags on Ja'Marr Chase were replaced by the ones saved on another device".
+    public static func tagsReplaced(_ name: String) -> String {
+        "Your tags on \(name) were replaced by the ones saved on another device"
+    }
 
     // MARK: the empty sheet (EmptySheet.svelte, SheetPage.svelte)
 

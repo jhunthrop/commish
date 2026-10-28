@@ -9,7 +9,9 @@ import Observation
 /// edit held on the phone and written with every row in one request guarded by the sheet's stamp. An
 /// edit never says saved before the account answers: while it is on its way its row says so, and when
 /// the request fails (no signal, the sheet changed on another device) its row says it is not saved and
-/// why, and a retry reads the sheet again where it changed and writes the edit over it.
+/// why, and a retry reads the sheet again and writes the edit over it field by field (merge.ts): a field
+/// another device changed and the phone did not keeps the account's value, and a field both changed keeps
+/// the account's with the row saying what the phone had.
 @MainActor
 @Observable
 public final class CheatSheetViewModel {
@@ -42,6 +44,8 @@ public final class CheatSheetViewModel {
     /// The edits not yet saved, by player id, and the ones the write on its way carries.
     var edits: [String: SheetEdit] = [:]
     private var sending: [String: SheetEdit] = [:]
+    /// By player id, what the phone had where the account's copy won a conflict.
+    var notices: [String: [String]] = [:]
 
     let api: any SheetsAPI
     let run: any RunAPI
@@ -84,11 +88,7 @@ public final class CheatSheetViewModel {
     var entries: [SheetEntry] {
         (detail?.value2.rows ?? []).compactMap { row in
             let entry = SheetEntry(row)
-            switch edits[entry.id] {
-            case .remove: return nil
-            case let .annotate(tags, note): return entry.with(tags: tags, note: note)
-            case nil: return entry
-            }
+            return edits[entry.id].map { $0.over(entry) } ?? entry
         }
     }
 
@@ -104,7 +104,8 @@ public final class CheatSheetViewModel {
         )
         let line = SheetWords.headLine(format: formatLabel, players: entries.count, status: status)
         return SheetModel(
-            name: detail.value1.name, line: line, entries: entries, saves: rowSaves, position: position
+            name: detail.value1.name, line: line, entries: entries, saves: rowSaves, position: position,
+            notices: notices
         )
     }
 
@@ -153,6 +154,7 @@ public final class CheatSheetViewModel {
             if let latest = try await api.sheets().first {
                 fresh = try await api.sheet(id: latest.id)
             }
+            merge(into: fresh)
             show(fresh, stamp: clock.now, stale: false)
             await keep()
         } catch where APIError.signsOut(error) {
@@ -237,14 +239,57 @@ public final class CheatSheetViewModel {
     /// His row taken off the sheet.
     public func remove(_ id: String) async {
         openRow = nil
-        edits[id] = .remove
+        guard let account = accountRow(id) else {
+            return
+        }
+        notices[id] = nil
+        edits[id] = SheetEdit(base: edits[id]?.base ?? account, local: nil)
         await write()
     }
 
+    /// His tags and note as set, held against the account's row the first unsaved edit was made over.
     private func annotate(_ entry: SheetEntry, tags: [String], note: String?) async {
-        let account = detail?.value2.rows.first { $0.playerId == entry.id }.map(SheetEntry.init)
-        edits[entry.id] = account?.tags == tags && account?.note == note ? nil : .annotate(tags: tags, note: note)
+        guard let account = accountRow(entry.id) else {
+            return
+        }
+        notices[entry.id] = nil
+        let local = entry.with(tags: tags, note: note)
+        let same = account.tags == tags && account.note == note
+        edits[entry.id] = same ? nil : SheetEdit(base: edits[entry.id]?.base ?? account, local: local)
         await write()
+    }
+
+    /// His row as the account holds it.
+    func accountRow(_ id: String) -> SheetEntry? {
+        detail?.value2.rows.first { $0.playerId == id }.map(SheetEntry.init)
+    }
+
+    /// The unsaved edits laid over a sheet read afresh (merge.ts mergeRow): a row taken off on the account
+    /// stays off; a row the phone took off stays off; each field the phone changed keeps the phone's value
+    /// unless the account's changed too, when the account's stands and the row says what the phone had.
+    /// Each edit is then held against the fresh row.
+    func merge(into fresh: SheetDetail?) {
+        let rows = Dictionary(
+            (fresh?.value2.rows ?? []).map { ($0.playerId, SheetEntry($0)) }, uniquingKeysWith: { first, _ in first }
+        )
+        var next: [String: SheetEdit] = [:]
+        for (id, edit) in edits {
+            guard let server = rows[id] else {
+                continue
+            }
+            guard let local = edit.local else {
+                next[id] = SheetEdit(base: server, local: nil)
+                continue
+            }
+            let merged = SheetMerge.row(base: edit.base, local: local, server: server)
+            if !merged.notices.isEmpty {
+                notices[id] = merged.notices
+            }
+            if merged.entry.tags != server.tags || merged.entry.note != server.note {
+                next[id] = SheetEdit(base: server, local: merged.entry)
+            }
+        }
+        edits = next
     }
 
     /// Every row written in one request guarded by the sheet's stamp; an edit made while it is on its way
@@ -259,7 +304,13 @@ public final class CheatSheetViewModel {
             let fresh = try await api.replaceRows(
                 id: detail.value1.id, rows: entries.map(\.input), ifUpdatedAt: detail.value1.updatedAt
             )
-            edits = edits.filter { sending[$0.key] != $0.value }
+            // An edit made while the write was on its way is held against the rows just written.
+            let written = Dictionary(
+                fresh.value2.rows.map { ($0.playerId, SheetEntry($0)) }, uniquingKeysWith: { first, _ in first }
+            )
+            edits = edits.filter { sending[$0.key] != $0.value }.reduce(into: [:]) { held, pair in
+                held[pair.key] = written[pair.key].map { SheetEdit(base: $0, local: pair.value.local) }
+            }
             sending = [:]
             show(fresh, stamp: clock.now, stale: false)
             save = .saved
@@ -273,22 +324,24 @@ public final class CheatSheetViewModel {
         }
     }
 
-    /// The unsaved edits written again: over the account's sheet read afresh where it changed on another
-    /// device or the sheet shown is a saved copy.
+    /// The unsaved edits written again over the account's sheet read afresh: it may have changed on
+    /// another device while the edit waited, signal or not, so the edits are merged into it field by field
+    /// before they are written.
     public func retry() async {
         guard case let .failed(_, changed) = save, let id = detail?.value1.id else {
             return
         }
-        if changed || stale {
-            do {
-                try await show(api.sheet(id: id), stamp: clock.now, stale: false)
-            } catch where APIError.signsOut(error) {
-                signedOut()
-                return
-            } catch {
-                save = .failed(reason: Self.reason(error), changed: changed)
-                return
-            }
+        do {
+            let fresh = try await api.sheet(id: id)
+            merge(into: fresh)
+            show(fresh, stamp: clock.now, stale: false)
+            await keep()
+        } catch where APIError.signsOut(error) {
+            signedOut()
+            return
+        } catch {
+            save = .failed(reason: Self.reason(error), changed: changed)
+            return
         }
         save = .idle
         await write()

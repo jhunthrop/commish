@@ -60,6 +60,9 @@ struct SheetRowView: View {
             if let words = line.save.words {
                 saveLine(words, theme: theme)
             }
+            ForEach(line.notices, id: \.self) { notice in
+                noticeLine(notice, theme: theme)
+            }
         }
         .background(theme.color(open ? Tokens.Color.surface2 : Tokens.Color.surface))
         .overlay(alignment: .bottom) { Hairline() }
@@ -134,6 +137,18 @@ struct SheetRowView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(SheetWords.edit(line.name))
+    }
+
+    /// What the phone had where the account's copy won (merge.ts's notice), under the row.
+    private func noticeLine(_ words: String, theme: Theme) -> some View {
+        Text(words)
+            .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
+            .fixedSize(horizontal: false, vertical: true)
+            .foregroundStyle(theme.color(Tokens.Color.ink3))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, Tokens.Space.s3 + Self.face + Tokens.Space.s2)
+            .padding(.trailing, Tokens.Space.s3)
+            .padding(.bottom, Tokens.Space.s1)
     }
 
     /// The row's save: on its way, or not saved with the reason and the retry.

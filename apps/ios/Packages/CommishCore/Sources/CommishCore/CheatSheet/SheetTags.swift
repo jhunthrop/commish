@@ -5,6 +5,10 @@ import Foundation
 public enum SheetLimits {
     public static let rows = 1000
     public static let sheetName = 60
+    public static let playerId = 64
+    public static let playerName = 80
+    public static let team = 8
+    public static let tier = 50
     public static let note = 500
     public static let tags = 4
     public static let tagLength = 20

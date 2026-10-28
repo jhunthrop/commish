@@ -61,7 +61,10 @@ struct SheetScreen: View {
     private func tools(_ theme: Theme) -> some View {
         if viewModel.model.map({ $0.players > 0 }) == true {
             HStack(spacing: Tokens.Space.s4) {
+                // Not while a row's write is on its way, whose answer would land over the imported rows.
                 QuietButton(SheetWords.importTool) { viewModel.openImport() }
+                    .disabled(viewModel.save == .saving)
+                    .opacity(viewModel.save == .saving ? 0.5 : 1)
                 QuietButton(SheetWords.exportTool) { Task { await viewModel.exportFile() } }
                     .disabled(viewModel.unsaved)
                     .opacity(viewModel.unsaved ? 0.5 : 1)

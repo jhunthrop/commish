@@ -40,7 +40,36 @@ public struct SheetParity: Decodable, Sendable {
         public let words: String?
     }
 
+    /// limits.ts SHEET_LIMITS.
+    public struct Limits: Decodable, Sendable {
+        public let rows: Int
+        public let sheetName: Int
+        public let playerId: Int
+        public let playerName: Int
+        public let team: Int
+        public let tier: Int
+        public let note: Int
+        public let tags: Int
+        public let tagLength: Int
+        public let headshot: Int
+    }
+
+    /// A file the web's import read (csv.ts decodeCsv): the header's sentence when it could not be used,
+    /// else the players kept in rank order and each skipped line's reason.
+    public struct FileRead: Decodable, Sendable {
+        public struct Skip: Decodable, Sendable {
+            public let line: Int
+            public let reason: String
+        }
+
+        public let text: String
+        public let header: String?
+        public let ids: [String]
+        public let skipped: [Skip]
+    }
+
     public let defaultName: String
+    public let limits: Limits
     public let rows: [Row]
     public let csv: String
     public let fixedTags: [Fixed]
@@ -49,6 +78,7 @@ public struct SheetParity: Decodable, Sendable {
     public let typed: [Typed]
     public let answeredAt: String
     public let statuses: [Status]
+    public let reads: [FileRead]
 
     public static func load() throws -> SheetParity {
         let file = RunFixture.fixtures.appendingPathComponent("parity/sheet.json")
@@ -141,6 +171,22 @@ public actor SheetStub: SheetsAPI {
 
     public func set(export name: String, _ data: Data) {
         exportFile = (name, data)
+    }
+
+    /// Another device's write: his tags and note as it left them, the sheet stamped later.
+    public func editElsewhere(_ playerID: String, tags: [String], note: String?) {
+        guard let current = detail else {
+            return
+        }
+        let rows = current.value2.rows.map(Self.input).map { row in
+            row.playerId == playerID
+                ? SheetRowInput(
+                    playerId: row.playerId, name: row.name, position: row.position, team: row.team,
+                    headshot: row.headshot, tier: row.tier, tags: tags, note: note
+                )
+                : row
+        }
+        detail = sheetDetail(rows, id: current.value1.id, stamp: current.value1.updatedAt.addingTimeInterval(60))
     }
 
     public func set(refusesToken: Bool) {

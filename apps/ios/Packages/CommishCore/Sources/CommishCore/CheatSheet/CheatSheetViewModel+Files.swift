@@ -19,22 +19,28 @@ public enum SheetImport: Equatable, Sendable {
     case done(SheetImportWords)
 }
 
-/// What an import says once it is in: the players read, the lines skipped and why, the first twelve
-/// named and the rest counted, and, when it read no player, that the sheet was kept as it was.
+/// What an import says once it is in or refused: the players read, the lines skipped and why, the first
+/// twelve named and the rest counted, and, when it read no player, what became of the sheet.
 public struct SheetImportWords: Equatable, Sendable {
     public let read: String
     public let skipped: String?
     public let lines: [String]
     public let kept: String?
 
-    init(_ result: SheetImportResult, kept: Bool) {
-        read = SheetWords.read(result.imported)
-        skipped = result.skipped.isEmpty ? nil : SheetWords.skipped(result.skipped.count)
-        let named = result.skipped.prefix(SheetWords.skipsShown)
-            .map { SheetWords.skip(line: $0.line, reason: $0.reason) }
-        let rest = result.skipped.count - named.count
+    init(read count: Int, skipped skips: [SheetCSV.Skip], kept: String?) {
+        read = SheetWords.read(count)
+        skipped = skips.isEmpty ? nil : SheetWords.skipped(skips.count)
+        let named = skips.prefix(SheetWords.skipsShown).map { SheetWords.skip(line: $0.line, reason: $0.reason) }
+        let rest = skips.count - named.count
         lines = named + (rest > 0 ? [SheetWords.more(rest)] : [])
-        self.kept = kept ? SheetWords.keptAsItWas : nil
+        self.kept = kept
+    }
+
+    init(_ result: SheetImportResult, kept: String?) {
+        self.init(
+            read: result.imported, skipped: result.skipped.map { SheetCSV.Skip(line: $0.line, reason: $0.reason) },
+            kept: kept
+        )
     }
 }
 
@@ -98,7 +104,12 @@ public extension CheatSheetViewModel {
         entries.isEmpty ? SheetWords.use : SheetWords.replace
     }
 
+    /// The import panel opened; not while a row's write is on its way, whose answer would land over the
+    /// imported rows.
     func openImport() {
+        guard save != .saving else {
+            return
+        }
         importing = .open(problem: nil)
     }
 
@@ -124,17 +135,37 @@ public extension CheatSheetViewModel {
         importing = .open(problem: nil)
     }
 
-    /// The CSV sent to the account's import, which replaces the rows: refused here past 1 MB, as the web
-    /// refuses a file; an empty account's sheet made for it first and taken off again if the import is
-    /// refused or reads no player; a sheet the import read no player into put back as it was.
+    /// The CSV read on the phone first, as the web's panel reads it: a header that cannot be used (a list
+    /// of names, an empty file) is refused with its sentence and a file that reads no player with what it
+    /// skipped, and nothing is sent or made. Otherwise it is sent to the account's import, which replaces
+    /// the rows; an empty account's sheet is made for it first. An import the account answers with no
+    /// player read is shown as refused and the sheet read again as the account now holds it; nothing is
+    /// written back.
     func importCSV(_ text: String) async {
         guard text.utf8.count <= SheetLimits.csvBytes else {
             importing = .open(problem: SheetWords.tooLarge)
             return
         }
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, importing != .sending else {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, importing != .sending,
+              save != .saving
+        else {
             return
         }
+        let read: SheetCSV.Read
+        do {
+            read = try SheetCSV.read(text)
+        } catch {
+            importing = .open(problem: (error as? SheetCSV.HeaderError)?.message ?? SheetWords.unreadable)
+            return
+        }
+        guard !read.ids.isEmpty else {
+            importing = .done(SheetImportWords(read: 0, skipped: read.skipped, kept: SheetWords.keptAsItWas))
+            return
+        }
+        await send(text)
+    }
+
+    private func send(_ text: String) async {
         importing = .sending
         var made: String?
         do {
@@ -145,47 +176,47 @@ public extension CheatSheetViewModel {
                 let sheet = try await api.createSheet(name: SheetWords.defaultName, format: format, rows: [])
                 made = sheet.value1.id
                 id = sheet.value1.id
-            }
-            let before = detail?.value2.rows.map(SheetEntry.init) ?? []
-            let result = try await api.importSheet(id: id, csv: text)
-            let sheet = try await settle(result, id: id, made: made != nil, before: before)
-            if result.imported > 0 {
-                edits = [:]
-            }
-            if let sheet {
                 show(sheet, stamp: clock.now, stale: false)
-                await keep()
             }
-            importing = .done(SheetImportWords(result, kept: result.imported == 0))
+            let result = try await api.importSheet(id: id, csv: text)
+            guard result.imported > 0 else {
+                importing = .done(SheetImportWords(result, kept: made == nil ? SheetWords.readNone : nil))
+                await reread(made: made)
+                return
+            }
+            edits = [:]
+            notices = [:]
+            save = .idle
+            show(result.sheet, stamp: clock.now, stale: false)
+            await keep()
+            importing = .done(SheetImportWords(result, kept: nil))
             pasted = ""
         } catch where APIError.signsOut(error) {
             signedOut()
         } catch {
-            if let made {
-                try? await api.deleteSheet(id: made)
-            }
             importing = .open(problem: Self.reason(error))
+            await reread(made: made)
         }
     }
 
-    /// The sheet after an import: its answer, or with no player read the rows put back (or the sheet made
-    /// for it taken off, nil).
-    private func settle(
-        _ result: SheetImportResult, id: String, made: Bool, before: [SheetEntry]
-    ) async throws -> SheetDetail? {
-        guard result.imported == 0 else {
-            return result.sheet
+    /// After an import that did not land: the sheet made for it taken off, else the account's sheet read
+    /// again, so the phone shows what the account holds (a failure leaves the made sheet shown, as it is).
+    private func reread(made: String?) async {
+        if let made {
+            do {
+                try await api.deleteSheet(id: made)
+            } catch where APIError.signsOut(error) {
+                signedOut()
+                return
+            } catch {
+                return
+            }
+            show(nil, stamp: clock.now, stale: false)
+            await keep()
+            return
         }
-        if made {
-            try await api.deleteSheet(id: id)
-            return nil
-        }
-        guard !before.isEmpty else {
-            return result.sheet
-        }
-        return try await api.replaceRows(
-            id: id, rows: before.map(\.input), ifUpdatedAt: result.sheet.value1.updatedAt
-        )
+        save = .idle
+        await load()
     }
 
     // MARK: export

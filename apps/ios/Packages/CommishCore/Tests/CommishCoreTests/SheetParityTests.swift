@@ -62,6 +62,42 @@ struct SheetParityTests {
             == "Saved to your account at 10:41 AM")
     }
 
+    @Test func theLimitsAreTheWebs() {
+        let limits = parity.limits
+        #expect(SheetLimits.rows == limits.rows)
+        #expect(SheetLimits.sheetName == limits.sheetName)
+        #expect(SheetLimits.playerId == limits.playerId)
+        #expect(SheetLimits.playerName == limits.playerName)
+        #expect(SheetLimits.team == limits.team)
+        #expect(SheetLimits.tier == limits.tier)
+        #expect(SheetLimits.note == limits.note)
+        #expect(SheetLimits.tags == limits.tags)
+        #expect(SheetLimits.tagLength == limits.tagLength)
+        #expect(SheetLimits.headshot == limits.headshot)
+    }
+
+    /// The web's reasons with "line" said as the phone says it, "row" (SheetCSV).
+    static func phone(_ web: String?) -> String? {
+        web?.replacingOccurrences(of: "line", with: "row")
+    }
+
+    @Test func aFileReadsOnThePhoneAsTheWebReadsIt() {
+        for file in parity.reads {
+            do {
+                let read = try SheetCSV.read(file.text)
+                #expect(file.header == nil, "\(file.text.prefix(30))")
+                #expect(read.ids == file.ids, "\(file.text.prefix(30))")
+                #expect(read.skipped.map(\.line) == file.skipped.map(\.line), "\(file.text.prefix(30))")
+                #expect(
+                    read.skipped.map(\.reason) == file.skipped.map { Self.phone($0.reason) },
+                    "\(file.text.prefix(30))"
+                )
+            } catch {
+                #expect((error as? SheetCSV.HeaderError)?.message == Self.phone(file.header), "\(file.text.prefix(30))")
+            }
+        }
+    }
+
     @Test func aRowWritesBackAsTheAccountHoldsIt() throws {
         let rows = try parityRows()
         let entries = sheetDetail(rows).value2.rows.map(SheetEntry.init)

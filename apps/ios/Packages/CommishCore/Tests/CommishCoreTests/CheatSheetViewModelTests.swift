@@ -6,8 +6,9 @@ import Testing
 
 /// The cheat sheet's view model over a stub account at a fixed clock (Lane 254): an edit's round trip
 /// guarded by the sheet's stamp, an edit made with no signal or over a sheet changed elsewhere never
-/// saying saved and saved by a retry, an import accepted and refused, the export's file as the web's,
-/// and the empty sheet started from our board.
+/// saying saved and saved by a retry that merges it field by field into the account's copy, an import
+/// read on the phone first and accepted or refused, the export's file shared as the API wrote it, and the
+/// empty sheet started from our board.
 @MainActor
 struct CheatSheetViewModelTests {
     static let zone = TimeZone(identifier: "America/Chicago")!
@@ -149,6 +150,66 @@ struct CheatSheetViewModelTests {
         #expect(writes.last?.rows[5].note == "Stash")
     }
 
+    @Test func aNoteChangedWithNoSignalAndATagAddedElsewhereBothSurviveTryAgain() async throws {
+        let (stub, viewModel) = try await Self.loaded()
+        await stub.set(offline: true)
+        await viewModel.setNote("4362628", "Round one, locked")
+        #expect(viewModel.model?.lines[0].save == .unsaved(SheetWords.offline))
+        await stub.set(offline: false)
+        await stub.editElsewhere("4362628", tags: ["target", "sleeper"], note: "Round one, no thinking.")
+        await viewModel.retry()
+        #expect(viewModel.save == .saved)
+        let written = try #require(await stub.writes.last?.rows.first)
+        #expect(written.note == "Round one, locked", "the phone's note")
+        #expect(written.tags == ["target", "sleeper"], "the laptop's tag")
+        #expect(await stub.writes.last?.guarded == SheetClock.stamp.addingTimeInterval(60))
+        #expect(viewModel.model?.lines[0].notices == [])
+    }
+
+    @Test func aNoteChangedOnBothSidesKeepsTheAccountsAndSaysSo() async throws {
+        let (stub, viewModel) = try await Self.loaded()
+        await stub.set(offline: true)
+        await viewModel.setNote("4362628", "Round one, locked")
+        await stub.set(offline: false)
+        await stub.editElsewhere("4362628", tags: ["target"], note: "Fade him")
+        await viewModel.retry()
+        #expect(await stub.writes.isEmpty, "nothing of the phone's is left to write")
+        #expect(!viewModel.unsaved)
+        let row = try #require(viewModel.model?.lines[0])
+        #expect(row.note == "Fade him")
+        #expect(row.save == .saved)
+        #expect(row.notices == ["Your note on Ja'Marr Chase was replaced by the one saved on another device"])
+        await viewModel.toggleTag("4362628", "sleeper")
+        #expect(viewModel.model?.lines[0].notices == [], "an edit to the row clears what it said")
+    }
+
+    @Test func aPullToRefreshMergesAnUnsavedEditToo() async throws {
+        let (stub, viewModel) = try await Self.loaded()
+        await stub.set(offline: true)
+        await viewModel.toggleTag("4689114", "sleeper")
+        await stub.set(offline: false)
+        await stub.editElsewhere("4689114", tags: [], note: "Backup only")
+        await viewModel.load()
+        let row = try #require(viewModel.model?.lines[5])
+        #expect(row.tags.map(\.label) == ["Sleeper"])
+        #expect(row.note == "Backup only")
+        await viewModel.retry()
+        let written = try #require(await stub.writes.last?.rows[5])
+        #expect(written.tags == ["sleeper"])
+        #expect(written.note == "Backup only")
+    }
+
+    @Test func aRowTakenOffElsewhereDropsThePhonesEditToIt() async throws {
+        let (stub, viewModel) = try await Self.loaded()
+        await stub.set(offline: true)
+        await viewModel.setNote("3054850", "Indoors")
+        await stub.set(offline: false)
+        _ = try await stub.replaceRows(id: SheetClock.sheetID, rows: Array(parityRows().prefix(7)), ifUpdatedAt: nil)
+        await viewModel.retry()
+        #expect(viewModel.model?.players == 7)
+        #expect(!viewModel.unsaved)
+    }
+
     @Test func aRowTakenOffIsWrittenWithoutHim() async throws {
         let (stub, viewModel) = try await Self.loaded()
         await viewModel.remove("dst-BUF")
@@ -166,83 +227,11 @@ struct CheatSheetViewModelTests {
         #expect(viewModel.phase == .failed(AppWords.Failure.signedOut))
     }
 
-    // MARK: import
-
-    @Test func anImportReplacesTheRowsAndSaysWhatItReadAndSkipped() async throws {
-        let (stub, viewModel) = try await Self.loaded()
-        let skips = (1 ... 14).map { Components.Schemas.ImportSkip(
-            line: $0 + 1,
-            reason: "The rank is not a whole number from 1"
-        ) }
-        let rows = try Array(parityRows().prefix(3))
-        await stub.set(importAnswer: SheetImportAnswer(imported: 3, skipped: skips, rows: rows))
-        #expect(viewModel.importVerb == SheetWords.replace)
-        let csv = try SheetParity.load().csv
-        await viewModel.importCSV(csv)
-        #expect(await stub.imports == [csv])
-        guard case let .done(words) = viewModel.importing else {
-            Issue.record("the import did not finish: \(viewModel.importing)")
-            return
-        }
-        #expect(words.read == "3 players read")
-        #expect(words.skipped == "14 rows skipped")
-        #expect(words.lines.count == 13)
-        #expect(words.lines.first == "Row 2: The rank is not a whole number from 1")
-        #expect(words.lines.last == "And 2 more")
-        #expect(words.kept == nil)
-        #expect(viewModel.model?.players == 3)
-    }
-
-    @Test func aRefusedImportSaysTheAPIsSentenceAndKeepsTheSheet() async throws {
-        let (stub, viewModel) = try await Self.loaded()
-        let sentence = "The first line must name rank, player_id, name and position"
-        await stub.set(importAnswer: nil, refusal: .envelope(code: "invalid", message: sentence))
-        await viewModel.importCSV("name,team\nJa'Marr Chase,CIN\n")
-        #expect(viewModel.importing == .open(problem: sentence))
-        #expect(viewModel.model?.players == 8)
-    }
-
-    @Test func aFileOverOneMegabyteIsRefusedBeforeItIsSent() async throws {
-        let (stub, viewModel) = try await Self.loaded()
-        await viewModel.importCSV(String(repeating: "x", count: SheetLimits.csvBytes + 1))
-        #expect(viewModel.importing == .open(problem: SheetWords.tooLarge))
-        #expect(await stub.imports.isEmpty)
-    }
-
-    @Test func anImportThatReadsNoPlayerPutsTheSheetBack() async throws {
-        let (stub, viewModel) = try await Self.loaded()
-        let skip = Components.Schemas.ImportSkip(line: 2, reason: "The position is not QB, RB, WR, TE, K or DST")
-        await stub.set(importAnswer: SheetImportAnswer(imported: 0, skipped: [skip], rows: []))
-        await viewModel.importCSV("rank,player_id,name,position\n1,x,Somebody,LB\n")
-        guard case let .done(words) = viewModel.importing else {
-            Issue.record("the import did not finish")
-            return
-        }
-        #expect(words.read == "0 players read")
-        #expect(words.kept == SheetWords.keptAsItWas)
-        #expect(await stub.writes.last?.rows.count == 8)
-        #expect(viewModel.model?.players == 8)
-    }
-
-    @Test func anImportIntoAnEmptyAccountMakesTheSheetAndTakesItOffWhenRefused() async throws {
-        let stub = SheetStub(nil)
-        let viewModel = Self.viewModel(stub)
-        await viewModel.load()
-        #expect(viewModel.model == nil)
-        #expect(viewModel.importVerb == SheetWords.use)
-        await stub.set(importAnswer: nil, refusal: .envelope(code: "invalid", message: "Refused"))
-        await viewModel.importCSV("rank\n")
-        #expect(await stub.created.count == 1)
-        #expect(await stub.deleted == [SheetClock.sheetID])
-        #expect(viewModel.model == nil)
-        try await stub.set(importAnswer: SheetImportAnswer(imported: 8, skipped: [], rows: parityRows()))
-        try await viewModel.importCSV(SheetParity.load().csv)
-        #expect(viewModel.model?.players == 8)
-    }
-
     // MARK: export
 
-    @Test func theExportIsTheWebsFileUnderTheAPIsName() async throws {
+    /// The phone shares the API's file byte for byte under its name; that the API's file is the web's for
+    /// the same rows is held by api/internal/sheets/csv_parity_test.go over the same sheet.json.
+    @Test func theExportSharesTheAPIsFileByteForByte() async throws {
         let (stub, viewModel) = try await Self.loaded()
         let csv = try SheetParity.load().csv
         await stub.set(export: "My sheet.csv", Data(csv.utf8))

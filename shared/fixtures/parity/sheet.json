@@ -349,5 +349,105 @@
 			"players": 0,
 			"words": null
 		}
+	],
+	"reads": [
+		{
+			"text": "1. Puka Nacua\n2. Ja'Marr Chase, WR",
+			"header": "The first line must name rank, player_id, name and position",
+			"ids": [],
+			"skipped": []
+		},
+		{
+			"text": "",
+			"header": "The file is empty",
+			"ids": [],
+			"skipped": []
+		},
+		{
+			"text": "name,team\nJa'Marr Chase,CIN\n",
+			"header": "The first line must name rank, player_id, name and position",
+			"ids": [],
+			"skipped": []
+		},
+		{
+			"text": "rank,player_id,name,position,team,tier,tags,note\n1,4362628,Ja'Marr Chase,WR,CIN,1,target,\"Round one, no thinking.\"\n2,4430807,Bijan Robinson,RB,ATL,1,\"sleeper, PPR bump\",\"Says \"\"workhorse\"\", I agree\"\n3,4431299,Rome Odunze,WR,CHI,2,,\"Two lines.\nSecond line.\"\n4,3139477,Patrick Mahomes,QB,KC,,\"avoid, injury\",'=SUM(A1)\n5,4239996,Travis Etienne Jr.,RB,JAX,3,handcuff,'-3 last week\n6,4689114,Jaxson Dart,QB,NYG,,,\n7,dst-BUF,Buffalo Bills,DST,BUF,,breakout,'+ upside at home\n8,3054850,Brandon Aubrey,K,,,,'@ the dome\n",
+			"header": null,
+			"ids": [
+				"4362628",
+				"4430807",
+				"4431299",
+				"3139477",
+				"4239996",
+				"4689114",
+				"dst-BUF",
+				"3054850"
+			],
+			"skipped": []
+		},
+		{
+			"text": "rank,player_id,name,position\n0,a,Zero,QB\n1,b,Linebacker,LB\n2,,No id,RB\n",
+			"header": null,
+			"ids": [],
+			"skipped": [
+				{
+					"line": 2,
+					"reason": "The rank is not a whole number from 1"
+				},
+				{
+					"line": 3,
+					"reason": "The position is not QB, RB, WR, TE, K or DST"
+				},
+				{
+					"line": 4,
+					"reason": "The player_id runs 1 to 64 characters"
+				}
+			]
+		},
+		{
+			"text": "﻿RANK,Player_ID,Name,Position,Tier,Tag,Note,Team\r\n3,c,Third,wr,2,sleeper|Rookie,'=1+1,CIN\r\n1,a,First,QB,,target;avoid,,\r\n2,b,Second,D/ST,51,,,\r\n4,d,Fourth,PK,,a|b|c|d|e,,\r\n5,e,Fifth,TE,1.5,,,\r\n6,c,Again,RB,,,,\r\n1.0,f,Sixth,RB,,-bad,,\r\nx,g,Seventh,RB,,,,\r\n7,h,Eighth,RB,,,,TOOLONGTEAM\r\n8,i,Ninth,K,,,,\r\n9,j,Tenth,RB,,,\"open",
+			"header": null,
+			"ids": [
+				"c",
+				"i"
+			],
+			"skipped": [
+				{
+					"line": 3,
+					"reason": "Target and Avoid are both set, pick one"
+				},
+				{
+					"line": 4,
+					"reason": "The tier is not a whole number from 1 to 50"
+				},
+				{
+					"line": 5,
+					"reason": "Keep it to 4 tags"
+				},
+				{
+					"line": 6,
+					"reason": "The tier is not a whole number from 1 to 50"
+				},
+				{
+					"line": 7,
+					"reason": "This player is already on an earlier line"
+				},
+				{
+					"line": 8,
+					"reason": "A tag is 1 to 20 letters or numbers"
+				},
+				{
+					"line": 9,
+					"reason": "The rank is not a whole number from 1"
+				},
+				{
+					"line": 10,
+					"reason": "The team runs 0 to 8 characters"
+				},
+				{
+					"line": 12,
+					"reason": "This line is not valid CSV"
+				}
+			]
+		}
 	]
 }

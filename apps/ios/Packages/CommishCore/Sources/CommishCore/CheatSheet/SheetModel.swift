@@ -49,11 +49,18 @@ public struct SheetEntry: Equatable, Sendable, Identifiable {
     }
 }
 
-/// An edit made on the phone and not yet saved to the account: his tags and note as set, or his row
-/// taken off.
-public enum SheetEdit: Equatable, Sendable {
-    case annotate(tags: [String], note: String?)
-    case remove
+/// An edit made on the phone and not yet saved to the account: the account's row it was made over (the
+/// ancestor merge.ts keeps), and the row as the phone set it, or nil when his row is taken off. The rows
+/// drawn and written lay the edit over the account's row field by field (SheetMerge), so a field another
+/// device changed and the phone did not is never written back as it was.
+public struct SheetEdit: Equatable, Sendable {
+    let base: SheetEntry
+    let local: SheetEntry?
+
+    /// The account's row with this edit laid over it; nil when the edit takes him off.
+    func over(_ server: SheetEntry) -> SheetEntry? {
+        local.map { SheetMerge.row(base: base, local: $0, server: server).entry }
+    }
 }
 
 /// A row's save as the row says it: nothing to say, on its way, or not saved with the reason.
@@ -89,6 +96,9 @@ public struct SheetLine: Equatable, Sendable, Identifiable {
     public let tagged: [String]
     public let note: String?
     public let save: RowSave
+    /// What the phone had where the account's copy won a conflict ("Your note on X was replaced by the one
+    /// saved on another device").
+    public let notices: [String]
     public let player: SheetPlayer
     /// A defense: its face is its club's chip (B245).
     public let clubMark: Bool
@@ -111,7 +121,8 @@ public struct SheetModel: Equatable, Sendable {
     static let order = ["QB", "RB", "WR", "TE", "K", "DST"]
 
     init(
-        name: String, line: String, entries: [SheetEntry], saves: [String: RowSave], position: String?
+        name: String, line: String, entries: [SheetEntry], saves: [String: RowSave], position: String?,
+        notices: [String: [String]] = [:]
     ) {
         self.name = name
         self.line = line
@@ -120,7 +131,9 @@ public struct SheetModel: Equatable, Sendable {
         positions = [BoardChip(label: SheetWords.all, value: nil, pressed: position == nil)]
             + present.map { BoardChip(label: $0, value: $0, pressed: $0 == position) }
         let drawn = entries.enumerated().filter { position == nil || $0.element.position == position }
-        lines = drawn.map { index, entry in Self.line(entry, place: index + 1, save: saves[entry.id] ?? .saved) }
+        lines = drawn.map { index, entry in
+            Self.line(entry, place: index + 1, save: saves[entry.id] ?? .saved, notices: notices[entry.id] ?? [])
+        }
         shown = drawn.count == entries.count ? nil : SheetWords.shown(drawn.count)
         ownTags = SheetTags.own(entries.map(\.tags))
     }
@@ -133,13 +146,13 @@ public struct SheetModel: Equatable, Sendable {
         }
     }
 
-    static func line(_ entry: SheetEntry, place: Int, save: RowSave) -> SheetLine {
+    static func line(_ entry: SheetEntry, place: Int, save: RowSave, notices: [String] = []) -> SheetLine {
         let defense = entry.position == "DST"
         return SheetLine(
             id: entry.id, place: place, name: entry.name, initials: Initials.of(entry.name),
             headshot: defense ? nil : entry.headshot.flatMap(URL.init(string:)), position: entry.position,
             team: entry.team, tier: entry.tier, tags: SheetTags.marks(entry.tags), tagged: entry.tags, note: entry.note,
-            save: save,
+            save: save, notices: notices,
             player: SheetPlayer(
                 id: entry.id, slug: PlayerSlug.of(entry.name), name: entry.name, position: entry.position, rank: nil,
                 club: entry.team, boardID: entry.id

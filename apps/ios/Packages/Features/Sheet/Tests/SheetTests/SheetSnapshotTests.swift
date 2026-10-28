@@ -14,8 +14,9 @@ import Testing
 /// its rows and the mock verb pinned; a row open in its editor (his note, his tags pressed, his own tag's
 /// field); a note edited with no signal, its row not saved with the reason and the retry, the head saying
 /// the same; the empty sheet over the stand-in's PPR board; the import with a CSV pasted; and the import
-/// refused with the API's sentence. A face draws its initials here (a snapshot loads no image). With
-/// SNAPSHOT_SHOTS set each is also written at its phone's own scale for the persona panel.
+/// refused on the phone, before any request, with the header's sentence. A face draws its initials here
+/// (a snapshot loads no image). With SNAPSHOT_SHOTS set each is also written at its phone's own scale for
+/// the persona panel.
 @MainActor
 struct SheetSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -71,13 +72,6 @@ struct SheetSnapshotTests {
         case .refused:
             viewModel.openImport()
             viewModel.pasted = "name,team\nJa'Marr Chase,CIN"
-            await stub.set(
-                importAnswer: nil,
-                refusal: .envelope(
-                    code: "invalid",
-                    message: "The first line must name rank, player_id, name and position"
-                )
-            )
             await viewModel.importCSV(viewModel.pasted)
         }
         return viewModel
@@ -101,7 +95,7 @@ struct SheetSnapshotTests {
         let unsaved = try await Self.viewModel(.unsaved)
         #expect(unsaved.model?.lines[2].save == .unsaved(SheetWords.offline))
         let refused = try await Self.viewModel(.refused)
-        #expect(refused.importing == .open(problem: "The first line must name rank, player_id, name and position"))
+        #expect(refused.importing == .open(problem: "The first row must name rank, player_id, name and position"))
         let empty = try await Self.viewModel(.empty)
         #expect(empty.preview.count == 5)
         #expect(empty.model == nil)
