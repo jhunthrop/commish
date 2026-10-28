@@ -504,7 +504,7 @@ object Words {
         const val underShownRead = "Moved under 0.5 since our read was written"
         const val notInRead = "Not in our read"
         const val changePart = "Proj change is its move since the earlier read, shown from 0.5."
-        const val changePartRead = "Proj change is its move since our read was written, shown from 0.5. The read is withheld from the same move."
+        const val changePartRead = "Proj change is its move since our read was written, shown from 0.5."
     }
 
     object PlayerPage {

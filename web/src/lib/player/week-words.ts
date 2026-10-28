@@ -62,11 +62,11 @@ import {
 	type RestParts
 } from './card.ts';
 import { vsAvgCaption } from './basis-words.ts';
-import { movedPastRead, type CardProjection } from './week-read.ts';
+import type { CardProjection } from './week-read.ts';
 import type { WeekRead } from '#lib/run/schema.ts';
 
 /** What of the week's read the change tile needs: its week and the projection it quotes. */
-export type ReadQuote = Pick<WeekRead, 'week' | 'projection' | 'body' | 'movedCaption'>;
+export type ReadQuote = Pick<WeekRead, 'week' | 'projection' | 'body'>;
 
 /** Tenths in a point, the precision the API prints. */
 const TENTHS = 10;
@@ -81,13 +81,13 @@ export const WEEK_TILE = {
 		`Proj at the read ${points}${scoring === null ? '' : ` in ${scoring}`}`,
 	sinceEarlier: 'since the earlier read',
 	underShown: `Moved under ${String(SHOWN_CHANGE_FROM)} since the earlier read`,
-	/** With a read written for the week the change is measured from the figure it quotes, the move that
-	 * decides whether the read stands (Lane 162, D04). */
+	/** With a read written for the week the change is measured from the figure it quotes (Lane 162, D04);
+	 * the read stands through it (Lane 274). */
 	sinceRead: 'since our read was written',
 	underShownRead: `Moved under ${String(SHOWN_CHANGE_FROM)} since our read was written`,
 	notInRead: 'Not in our read',
 	changePart: `${CARD.delta} is its move since the earlier read, shown from ${String(SHOWN_CHANGE_FROM)}.`,
-	changePartRead: `${CARD.delta} is its move since our read was written, shown from ${String(SHOWN_CHANGE_FROM)}. The read is withheld from the same move.`
+	changePartRead: `${CARD.delta} is its move since our read was written, shown from ${String(SHOWN_CHANGE_FROM)}.`
 } as const;
 
 type Schemas = components['schemas'];
@@ -350,32 +350,24 @@ function publishedWords(readAt: string | null, zone: string): string {
 		: `${WEEK_TILE.published}, read ${stampAt(readAt, zone)}`;
 }
 
-/** The figure the shown read quotes when the tile prints another (Lane 165, D10): a read that stands
- * (his game kicked off, or the move under the shown threshold) while the published projection has moved
- * a tenth or more from it. Null when the tile shows the quoted figure, the read quotes none, or the
- * read is withheld, which says its own words instead. */
-function readFigureWords(week: PlayerWeek, now: number, read: ReadQuote | null): string | null {
+/** The figure the shown read quotes when the tile prints another (Lane 165, D10): a read stands through
+ * any move of the published projection (Lane 274), so whenever it has moved a tenth or more from it.
+ * Null when the tile shows the quoted figure, the read quotes none, or the run withheld the read, which
+ * says its own words instead. */
+function readFigureWords(week: PlayerWeek, read: ReadQuote | null): string | null {
 	const value = week.line.week_projection;
 	const quoted = read?.week === week.week ? read.projection : null;
 	if (value === null || quoted === null || quoted === undefined) return null;
 	if (printTenth(quoted) === printTenth(value)) return null;
+	// A read the run withheld quotes nothing to explain (fix round 1, M2).
+	if (read?.body === null || read === null) return null;
 	const scoring = week.projection_scoring.format;
-	// A read the page withholds (the run's, or for the move) quotes nothing to explain (fix round 1, M2),
-	// by the one test shownWeekRead uses.
-	const card = {
-		week: week.week,
-		scoring,
-		points: value,
-		state: lineState(week.line, now)
-	};
-	if (read === null) return null;
-	if (read.body === null || movedPastRead(read, card)) return null;
 	return WEEK_TILE.atRead(printTenth(quoted), scoring === 'ppr' ? null : SCORING_WORDS.ppr);
 }
 
 function projTile(week: PlayerWeek, zone: string, now: number, read: ReadQuote | null): CardTile {
 	const value = week.line.week_projection;
-	const atRead = readFigureWords(week, now, read);
+	const atRead = readFigureWords(week, read);
 	const published =
 		value === null ? noProjWords(week) : publishedWords(week.projection_read_at, zone);
 	return {

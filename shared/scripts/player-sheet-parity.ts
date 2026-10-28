@@ -222,11 +222,11 @@ function weekReadCases(): ReadCase[] {
 	});
 	return [
 		readCase('the read stands at the figure it quotes', READ, ppr(26.4)),
-		...[26.9, 25.9, 27.0, null].map((points) =>
-			readCase(`withheld before kickoff, the card at ${String(points)}`, READ, ppr(points))
-		),
 		...[26.8, 26.0, 26.5].map((points) =>
 			readCase(`a move under 0.5 shows the read, the card at ${String(points)}`, READ, ppr(points))
+		),
+		...[26.9, 25.9, 28.4, 24.4, 32.4, 20.4, null].map((points) =>
+			readCase(`a move the tile prints shows the read, the card at ${String(points)}`, READ, ppr(points))
 		),
 		readCase('a bye is judged as before kickoff', READ, ppr(20, null)),
 		...(['kicked_off', 'final'] as const).flatMap((state) => [
@@ -243,9 +243,9 @@ function weekReadCases(): ReadCase[] {
 			state: 'upcoming'
 		}),
 		readCase('as built for another week', READ, ppr(20, 'upcoming', 8)),
-		readCase('a read from before its figure is not judged', older, ppr(20)),
+		readCase('a read from before its figure stands', older, ppr(20)),
 		readCase(
-			'a read written with no projection beside a card that prints one is moved',
+			'a read written with no projection stands beside a card that prints one',
 			weekReadSchema.parse({ ...READ, projection: null }),
 			ppr(20)
 		),

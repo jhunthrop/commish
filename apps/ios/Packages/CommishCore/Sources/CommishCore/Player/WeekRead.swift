@@ -45,7 +45,7 @@ public enum QuotedProjection: Equatable, Sendable {
     }
 }
 
-/// The projection's move, one fact for the Proj change tile, the moved caption and the run's serve rule
+/// The projection's move, one fact for the Proj change tile and the run's rewrite rule
 /// (card.ts ProjectionMove): its signed change (nil with no figures to subtract), whether it reaches the
 /// shown threshold, and what it is measured from.
 struct ProjectionMove: Equatable {
@@ -98,28 +98,13 @@ public enum WeekReads {
     }
 
     /// shownWeekRead: a read the run withheld keeps its caption while his game is to come and says it
-    /// was not written once his game is under way; a read the card's projection has moved past by the
-    /// shown threshold is withheld behind the run's moved caption; otherwise it stands.
+    /// was not written once his game is under way; a written read stands through any move of the
+    /// published projection (Lane 274).
     public static func shown(_ read: RunWeekRead, card: CardProjection?) -> ShownRead {
         guard let body = read.body else {
             return .withheld(withheldWords(read, card: card))
         }
-        if movedPastRead(read, card: card), let moved = read.movedCaption {
-            return .withheld(moved)
-        }
         return .written(body: body, caption: read.caption)
-    }
-
-    /// movedPastRead: the one test the read's withhold and the Wk tile's quote share.
-    static func movedPastRead(_ read: RunWeekRead, card: CardProjection?) -> Bool {
-        guard read.body != nil, let card, card.ppr, card.week == read.week, !underway(card.state) else {
-            return false
-        }
-        let quoted = QuotedProjection(read)
-        guard quoted != .notNamed, read.movedCaption != nil else {
-            return false
-        }
-        return ProjectionMove.of(now: card.points, quoted: quoted, earlier: nil).crosses
     }
 
     /// noReadWords: his next game while it is to come, never "next" for one under way or final; while the

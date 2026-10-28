@@ -9,10 +9,10 @@
 // reopens it and the close button then clears the address. A player with a written read, opened from
 // the address on Players, shows the read in the UI face at the rows' body size (Lane 126). The Lineup's
 // IR case (Lane 128) opens a player on injured reserve: no rank on his row, "QB IR" on the shelf. It prints each screen's script on load,
-// gzipped, before any tap (the shelf's script waits for the first). Lane 158: a player whose read
-// quotes a projection the card does not print shows the moved caption alone before his kickoff, never
-// under "not written yet"; with SHELF_IN_PLAY=1 the case runs alone on the fixture's Sunday clock
-// (FIXTURE_SUNDAY_CLOCK, his noon game under way), where the read written for the week is shown.
+// gzipped, before any tap (the shelf's script waits for the first). Lane 274: a player whose read
+// quotes a projection the card does not print shows the read before his kickoff, never the moved caption
+// or "not written yet"; with SHELF_IN_PLAY=1 the case runs alone on the fixture's Sunday clock
+// (FIXTURE_SUNDAY_CLOCK, his noon game under way), where the read written for the week is shown too.
 // Lane 160 (B140): CeeDee Lamb's read the run withheld for his status says its due time alone before his
 // Sunday night kickoff; with SHELF_AFTER_GAMES=1 the case runs alone on the fixture's Monday clock
 // (FIXTURE_MONDAY_CLOCK, his game final), where it says the read for this game was not written.
@@ -504,7 +504,7 @@ const READ_CASES: readonly ReadCase[] = AFTER_GAMES
 		? [{ slug: 'rome-odunze', shot: 'read-in-play', shown: true }]
 		: [
 				{ slug: 'puka-nacua', shot: 'read', shown: true },
-				{ slug: 'rome-odunze', shot: 'read-moved', shown: false, says: MOVED },
+				{ slug: 'rome-odunze', shot: 'read-moved', shown: true },
 				{ slug: 'ceedee-lamb', shot: 'read-withheld', shown: false, says: DUE }
 			];
 

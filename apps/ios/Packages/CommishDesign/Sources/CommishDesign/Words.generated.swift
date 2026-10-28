@@ -502,7 +502,7 @@ public enum Words {
         public static let underShownRead = "Moved under 0.5 since our read was written"
         public static let notInRead = "Not in our read"
         public static let changePart = "Proj change is its move since the earlier read, shown from 0.5."
-        public static let changePartRead = "Proj change is its move since our read was written, shown from 0.5. The read is withheld from the same move."
+        public static let changePartRead = "Proj change is its move since our read was written, shown from 0.5."
     }
 
     public enum PlayerPage {

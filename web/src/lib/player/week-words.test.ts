@@ -985,15 +985,9 @@ void test('before kickoff the read stands while the published projection is the 
 	assert.deepEqual(shownAt(week(), NOW), SHOWN);
 });
 
-void test('before kickoff a moved projection withholds the read: its caption alone, never "not written"', () => {
-	const shown = shownAt(week({}, { week_projection: 23.4 }), NOW);
-	assert.deepEqual(shown, { withheld: true, words: WEEK_READ.movedCaption });
-	assert.ok(!JSON.stringify(shown).includes('not written'));
-});
-
-// Lane 162 (D04): one threshold for "the published projection moved". The read quotes 21.8; the Proj
-// change tile and the read's withhold read the same card figure against the same 0.5.
-void test('a move under the tile\'s 0.5 shows the read beside "Moved under 0.5"; 0.6 withholds it beside the move', () => {
+// Lane 162 (D04), Lane 274: the Proj change tile reads the card figure against the read's from 0.5, and
+// the read stands through any move. The read quotes 21.8.
+void test('a move under the tile\'s 0.5 shows the read beside "Moved under 0.5"; 0.6, 2.0 and 6.0 print the move beside the read', () => {
 	const under = week({}, { week_projection: 22.2, projection_delta: 0.4 });
 	assert.equal(tile(card(under, null, NOW).tiles, 'delta').caption, WEEK_TILE.underShown);
 	assert.deepEqual(shownAt(under, NOW), SHOWN);
@@ -1003,12 +997,16 @@ void test('a move under the tile\'s 0.5 shows the read beside "Moved under 0.5";
 	);
 	const past = week({}, { week_projection: 22.4, projection_delta: 0.6 });
 	assert.equal(tile(card(past, null, NOW).tiles, 'delta').value, '+0.6');
-	assert.deepEqual(shownAt(past, NOW), { withheld: true, words: WEEK_READ.movedCaption });
+	assert.deepEqual(shownAt(past, NOW), SHOWN);
+	for (const points of [22.3, 23.8, 19.8, 27.8, 15.8]) {
+		const shown = shownAt(week({}, { week_projection: points }), NOW);
+		assert.deepEqual(shown, SHOWN, String(points));
+		assert.ok(!JSON.stringify(shown).includes('not written'), String(points));
+	}
 });
 
 // Lane 162 fix round 1 (D04): with a read written for the week the Proj change tile is measured from the
-// figure the read quotes, so the tile and the withhold are one fact; with no read, from the earlier
-// snapshot. The read quotes 21.8; the earlier snapshot says something else.
+// figure the read quotes; with no read, from the earlier snapshot. The read quotes 21.8; the earlier snapshot says something else.
 const withRead = (w: PlayerWeek, read: WeekRead | null) =>
 	liveCard({ ...liveInputOf(w), read, now: NOW });
 const liveInputOf = (w: PlayerWeek) => ({
@@ -1023,23 +1021,31 @@ const liveInputOf = (w: PlayerWeek) => ({
 	zone: ZONE
 });
 
-void test('the change tile and the withhold read the move since the read was written, at 0.4 and 0.6', () => {
+void test('the change tile reads the move since the read was written, at 0.4, 0.6, 2.0 and 6.0, and the read stands', () => {
 	// The snapshot says 0.8 but the read's own quote is 0.4 away: the tile says under 0.5, the read shows.
 	const under = week({}, { week_projection: 22.2, projection_delta: 0.8 });
 	const shownCard = withRead(under, WEEK_READ);
 	assert.equal(tile(shownCard.tiles, 'delta').value, NONE);
 	assert.equal(tile(shownCard.tiles, 'delta').caption, WEEK_TILE.underShownRead);
 	assert.deepEqual(shownWeekRead(WEEK_READ, shownCard.projection), SHOWN);
-	// The snapshot says 0.3 but the quote is 0.6 away: the tile says +0.6 and the read is withheld.
+	// The snapshot says 0.3 but the quote is 0.6 away: the tile prints +0.6 and the read still shows.
 	const past = week({}, { week_projection: 22.4, projection_delta: 0.3 });
-	const heldCard = withRead(past, WEEK_READ);
-	assert.equal(tile(heldCard.tiles, 'delta').value, '+0.6');
-	assert.equal(tile(heldCard.tiles, 'delta').caption, WEEK_TILE.sinceRead);
-	assert.deepEqual(shownWeekRead(WEEK_READ, heldCard.projection), {
-		withheld: true,
-		words: WEEK_READ.movedCaption
-	});
-	assert.ok(heldCard.basis.join(' ').includes(WEEK_TILE.changePartRead));
+	for (const [points, printed] of [
+		[22.4, '+0.6'],
+		[23.8, '+2.0'],
+		[27.8, '+6.0']
+	] as const) {
+		const moved = withRead(week({}, { week_projection: points, projection_delta: 0.3 }), WEEK_READ);
+		assert.equal(tile(moved.tiles, 'delta').value, printed);
+		assert.equal(tile(moved.tiles, 'delta').caption, WEEK_TILE.sinceRead);
+		assert.deepEqual(shownWeekRead(WEEK_READ, moved.projection), SHOWN, printed);
+	}
+	const pastCard = withRead(past, WEEK_READ);
+	assert.equal(
+		WEEK_TILE.changePartRead,
+		'Proj change is its move since our read was written, shown from 0.5.'
+	);
+	assert.ok(pastCard.basis.join(' ').includes(WEEK_TILE.changePartRead));
 	// With no read the tile keeps the earlier snapshot, and says so.
 	const none = withRead(week({}, { week_projection: 22.4, projection_delta: 0.4 }), null);
 	assert.equal(tile(none.tiles, 'delta').caption, WEEK_TILE.underShown);
@@ -1188,9 +1194,21 @@ void test('a standing read quoting another figure than the Wk tile shows is name
 	// The tile showing the quoted figure says nothing more.
 	const same = liveCard({ ...liveInputOf(week()), read: WEEK_READ, now: KICKED_OFF });
 	assert.ok(!tile(same.tiles, 'proj').caption.includes('at the read'));
-	// Before kickoff a move past the shown threshold withholds the read, so the tile does not name it.
-	const ahead = liveCard({ ...liveInputOf(moved), read: WEEK_READ, now: NOW });
-	assert.ok(!tile(ahead.tiles, 'proj').caption.includes('at the read'));
+	// Before kickoff the read stands through any move (Lane 274), so the tile names the read's own figure
+	// beside the change it prints.
+	for (const [points, printed] of [
+		[23.4, '+1.6'],
+		[23.8, '+2.0'],
+		[27.8, '+6.0']
+	] as const) {
+		const ahead = liveCard({
+			...liveInputOf(week({}, { week_projection: points })),
+			read: WEEK_READ,
+			now: NOW
+		});
+		assert.ok(tile(ahead.tiles, 'proj').caption.endsWith('Proj at the read 21.8'), printed);
+		assert.equal(tile(ahead.tiles, 'delta').value, printed);
+	}
 	// Under the threshold the read shows beside a tile that prints another tenth: the tile names the quote.
 	const under = week({}, { week_projection: 22.2 });
 	const near = liveCard({ ...liveInputOf(under), read: WEEK_READ, now: NOW });
@@ -1204,16 +1222,20 @@ void test('a standing read quoting another figure than the Wk tile shows is name
 	assert.ok(!tile(quiet.tiles, 'proj').caption.includes('at the read'));
 });
 
-void test('"Proj at the read" is never shown for a read the page withholds (fix round 1, M2)', () => {
-	const moved = week({}, { week_projection: 23.4, facts: facts({ points_this_week: 4.6 }) });
+void test('"Proj at the read" is never shown for a read the run withheld (fix round 1, M2)', () => {
+	const moved = week({}, { week_projection: 23.8, facts: facts({ points_this_week: 4.6 }) });
 	const caption = (read: WeekRead, now: number) =>
 		tile(liveCard({ ...liveInputOf(moved), read, now }).tiles, 'proj').caption;
 	// The run withheld the read (a status change): the page shows its caption, the tile adds nothing.
-	assert.ok(!caption({ ...WEEK_READ, body: null }, KICKED_OFF).includes('at the read'));
-	// Before kickoff, moved past 0.5: withheld for the move.
-	assert.ok(!caption(WEEK_READ, NOW).includes('at the read'));
-	// A read from before the moved caption is never withheld for the move: the page shows it, so the tile names its figure.
+	for (const now of [NOW, KICKED_OFF])
+		assert.ok(!caption({ ...WEEK_READ, body: null }, now).includes('at the read'));
+	// A standing read moved from, before kickoff, a read from before the moved caption alike.
+	assert.ok(caption(WEEK_READ, NOW).endsWith('Proj at the read 21.8'));
 	assert.ok(
 		caption({ ...WEEK_READ, movedCaption: undefined }, NOW).endsWith('Proj at the read 21.8')
 	);
+	assert.deepEqual(shownWeekRead({ ...WEEK_READ, body: null }, card(moved, null, NOW).projection), {
+		withheld: true,
+		words: WEEK_READ.caption
+	});
 });
