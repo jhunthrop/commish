@@ -89,6 +89,9 @@ struct CheatSheetImportTests {
             #expect(SheetCSV.looksLikeCSV(list.text) == list.csv, "\(list.text)")
         }
         #expect(SheetCSV.looksLikeCSV("\u{FEFF}\n  Rank,Player_ID,Name,Position\n1,a,B,QB"))
+        // As the API reads it: a no-break space is not set aside, and "\r" alone does not end the line.
+        #expect(!SheetCSV.looksLikeCSV("\u{00A0}\nrank,player_id,name,position"))
+        #expect(SheetCSV.looksLikeCSV("Gibbs\rrank,player_id,name,position"))
     }
 
     @Test func aListOfNamesIntoAnEmptyAccountMakesTheSheetAndTakesItOffWhenNoPlayerIsRead() async {
@@ -106,6 +109,51 @@ struct CheatSheetImportTests {
         #expect(await stub.created.count == 1)
         #expect(await stub.deleted == [SheetClock.sheetID])
         #expect(viewModel.model == nil)
+    }
+
+    /// A list the account reads no player from says why (its sentence), what a list that reads looks like,
+    /// and Done goes back to the box with the text kept to fix it; an import that read players closes.
+    @Test func aListThatReadsNothingSaysWhatToPasteAndDoneKeepsTheText() async throws {
+        let (stub, viewModel) = try await CheatSheetViewModelTests.loaded()
+        viewModel.openImport()
+        viewModel.pasted = "Puka Nacua - WR - LAR"
+        await viewModel.importText(viewModel.pasted)
+        guard case let .done(words) = viewModel.importing else {
+            Issue.record("the refusal was not shown as the import's result: \(viewModel.importing)")
+            return
+        }
+        #expect(words.kept == SheetStub.emptyRead)
+        #expect(words.shape == SheetWords.listShape)
+        #expect(words.again)
+        viewModel.finishImport()
+        #expect(viewModel.importing == .open(problem: nil))
+        #expect(viewModel.pasted == "Puka Nacua - WR - LAR", "the text is kept to fix")
+        try await stub.set(importAnswer: SheetImportAnswer(
+            imported: 1,
+            skipped: [],
+            rows: Array(parityRows().prefix(1))
+        ))
+        await viewModel.importText("1. Ja'Marr Chase")
+        guard case let .done(read) = viewModel.importing else {
+            Issue.record("the import did not finish: \(viewModel.importing)")
+            return
+        }
+        #expect(read.shape == nil)
+        #expect(!read.again)
+        viewModel.finishImport()
+        #expect(viewModel.importing == .closed)
+        #expect(viewModel.pasted.isEmpty)
+    }
+
+    @Test func aCSVThatReadsNoPlayerNamesItsRowsAndNoShape() async throws {
+        let (_, viewModel) = try await CheatSheetViewModelTests.loaded()
+        await viewModel.importText("rank,player_id,name,position\n1,x,Somebody,LB\n")
+        guard case let .done(words) = viewModel.importing else {
+            Issue.record("the read was not shown: \(viewModel.importing)")
+            return
+        }
+        #expect(words.shape == nil, "the skipped row says why")
+        #expect(words.again)
     }
 
     @Test func aRefusalForAnotherReasonSaysTheAPIsSentenceAndKeepsTheSheet() async throws {

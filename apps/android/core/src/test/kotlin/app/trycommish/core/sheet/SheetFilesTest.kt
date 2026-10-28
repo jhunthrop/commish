@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -138,7 +139,48 @@ class SheetFilesTest {
     fun `a list is told from a CSV by its first line`() {
         SheetParity.load().lists.forEach { assertEquals(it.csv, SheetCsv.looksLikeCsv(it.text), it.text) }
         assertTrue(SheetCsv.looksLikeCsv("﻿\n  Rank,Player_ID,Name,Position\n1,a,B,QB"))
+        // As the API reads it: a no-break space is not set aside, and "\r" alone does not end the line.
+        assertFalse(SheetCsv.looksLikeCsv(" \nrank,player_id,name,position"))
+        assertTrue(SheetCsv.looksLikeCsv("Gibbs\rrank,player_id,name,position"))
     }
+
+    /** A list the account reads no player from says why (its sentence), what a list that reads looks like, and
+     * Done goes back to the box with the text kept to fix it; an import that read players closes. */
+    @Test
+    fun `a list that reads nothing says what to paste and Done keeps the text`() =
+        runTest(main) {
+            val (stub, vm) = loaded()
+            vm.openImport()
+            vm.paste("Puka Nacua - WR - LAR")
+            vm.importText(vm.ui.value.importText)
+            settle()
+            val words = vm.done()
+            assertEquals(SheetStub.EMPTY_READ, words.kept)
+            assertEquals(SheetWords.listShape, words.shape)
+            assertTrue(words.again)
+            vm.finishImport()
+            assertEquals(SheetImport.Open(), vm.ui.value.importing)
+            assertEquals("Puka Nacua - WR - LAR", vm.ui.value.pasted, "the text is kept to fix")
+            stub.importAnswer = SheetImportAnswer(1, emptyList(), parityRows().take(1))
+            vm.importText("1. Ja'Marr Chase")
+            settle()
+            val read = vm.done()
+            assertNull(read.shape)
+            assertFalse(read.again)
+            vm.finishImport()
+            assertEquals(SheetImport.Closed, vm.ui.value.importing)
+            assertEquals("", vm.ui.value.pasted)
+        }
+
+    @Test
+    fun `a CSV that reads no player names its rows and no shape`() =
+        runTest(main) {
+            val (_, vm) = loaded()
+            vm.importText("rank,player_id,name,position\n1,x,Somebody,LB\n")
+            val words = vm.done()
+            assertNull(words.shape, "the skipped row says why")
+            assertTrue(words.again)
+        }
 
     @Test
     fun `a list of names into an empty account makes the sheet and takes it off when no player is read`() =

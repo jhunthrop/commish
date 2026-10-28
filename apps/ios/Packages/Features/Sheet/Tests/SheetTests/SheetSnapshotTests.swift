@@ -102,6 +102,7 @@ struct SheetSnapshotTests {
         }
         #expect(words.read == "0 players read")
         #expect(words.kept == SheetStub.emptyRead)
+        #expect(words.shape == SheetWords.listShape)
         #expect(refused.model?.players == 8, "the sheet is as it was")
         let empty = try await Self.viewModel(.empty)
         #expect(empty.preview.count == 5)

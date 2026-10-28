@@ -38,6 +38,8 @@ class SheetPanelActions(
     val start: () -> Unit = {},
     val openImport: () -> Unit = {},
     val closeImport: () -> Unit = {},
+    /** Done on the result: back to the box with the text kept when nothing was read, else closed. */
+    val finishImport: () -> Unit = {},
     val chooseFile: () -> Unit = {},
     val paste: (String) -> Unit = {},
     val importText: (String) -> Unit = {},
@@ -131,7 +133,7 @@ internal fun SheetImportPanel(
         when (val importing = ui.importing) {
             is SheetImport.Done -> {
                 ImportResult(importing.words)
-                Verb(SheetWords.done, onClick = actions.closeImport)
+                Verb(SheetWords.done, onClick = actions.finishImport)
             }
             else -> {
                 Label(SheetWords.fileLabel)
@@ -193,6 +195,7 @@ private fun ImportResult(words: SheetImportWords) {
     Column(Modifier.semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(Tokens.Space.s1.dp)) {
         Text(words.read, style = Faces.body.copy(fontWeight = FontWeight.Bold), color = c.ink)
         words.kept?.let { Problem(it) }
+        words.shape?.let { Text(it, style = Faces.small, color = c.ink2) }
         words.skipped?.let { skipped ->
             Label(skipped)
             words.rows.forEach { Text(it, style = Faces.small, color = c.ink2) }

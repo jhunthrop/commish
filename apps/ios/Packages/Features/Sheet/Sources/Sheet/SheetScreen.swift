@@ -201,7 +201,7 @@ struct SheetImportView: View {
                 .accessibilityAddTraits(.isHeader)
             if case let .done(words) = viewModel.importing {
                 result(words, theme: theme)
-                Verb(SheetWords.done) { viewModel.closeImport() }
+                Verb(SheetWords.done) { viewModel.finishImport() }
             } else {
                 sources(theme)
                 if case let .open(problem?) = viewModel.importing {
@@ -269,6 +269,12 @@ struct SheetImportView: View {
                 Text(kept)
                     .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .medium))
                     .foregroundStyle(theme.color(Tokens.Color.lossInk))
+            }
+            if let shape = words.shape {
+                Text(shape)
+                    .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .regular))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(theme.color(Tokens.Color.ink2))
             }
             if let skipped = words.skipped {
                 label(skipped, theme: theme)

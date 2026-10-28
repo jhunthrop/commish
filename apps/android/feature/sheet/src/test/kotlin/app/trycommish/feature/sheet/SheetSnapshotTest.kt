@@ -139,6 +139,7 @@ class SheetScenesTest {
         val words = (refused.ui.importing as SheetImport.Done).words
         assertEquals("0 players read", words.read)
         assertEquals(SheetStub.EMPTY_READ, words.kept)
+        assertEquals(SheetWords.listShape, words.shape)
         assertEquals("the sheet is as it was", 8, refused.model?.players)
         val empty = SheetScenes.view(SheetSnapshotTest.Scene.Empty)
         assertEquals(5, empty.ui.preview.size)

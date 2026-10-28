@@ -134,6 +134,11 @@ object SheetWords {
 
     /** ImportPanel.svelte PASTE_EXAMPLE. */
     const val pastePlaceholder = "1. Puka Nacua\n2. Ja'Marr Chase, WR"
+
+    /** The phone's own: what a list that reads looks like, said under an import that read nothing and named no
+     * skipped row (the account's refusal carries no row's reason). The web says "one per line" in its label; the
+     * copy rules keep that word for the field. */
+    const val listShape = "Paste one player to a row, like 1. Puka Nacua"
     const val replace = "Replace my sheet"
     const val use = "Use this sheet"
     const val cancel = "Cancel"

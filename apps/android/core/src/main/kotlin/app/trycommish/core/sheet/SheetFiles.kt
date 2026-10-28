@@ -71,6 +71,13 @@ fun SheetViewModel.closeImport() {
     if (ui.value.importing != SheetImport.Sending) update { it.copy(importing = SheetImport.Closed, pasted = "", chosen = null) }
 }
 
+/** Done on the result: an import that read nothing goes back to the box with the text kept, to fix it; any other
+ * closes the panel. */
+fun SheetViewModel.finishImport() {
+    val done = ui.value.importing as? SheetImport.Done
+    if (done?.words?.again == true) update { it.copy(importing = SheetImport.Open()) } else closeImport()
+}
+
 /** The paste box as typed: the last way in is the one the verb sends, so a chosen file is let go. */
 fun SheetViewModel.paste(text: String) = update { it.copy(pasted = text, chosen = null) }
 

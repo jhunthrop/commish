@@ -47,12 +47,13 @@ object SheetCsv {
     private val decimal = Regex("^[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?$")
 
     /** True when the text is the sheet's CSV, not a list of names: its first line names player_id (paste.ts
-     * looksLikeCsv, the API's looksLikeCSV, held to sheet.json `lists`). */
+     * looksLikeCsv, held to sheet.json `lists`). Read as the API reads it (paste.go looksLikeCSV), which decides:
+     * a byte order mark, then spaces, tabs and line breaks set aside, the first line up to "\n". */
     fun looksLikeCsv(text: String): Boolean =
         text
-            .trimStart { it.isWhitespace() || it == byteOrderMark }
-            .lineSequence()
-            .first()
+            .removePrefix(byteOrderMark.toString())
+            .trimStart(' ', '\t', '\r', '\n')
+            .substringBefore('\n')
             .lowercase()
             .contains("player_id")
 

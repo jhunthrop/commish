@@ -20,12 +20,18 @@ public enum SheetImport: Equatable, Sendable {
 }
 
 /// What an import says once it is in or refused: the players read, the lines skipped and why, the first
-/// twelve named and the rest counted, and, when it read no player, what became of the sheet.
+/// twelve named and the rest counted, and, when it read no player, what became of the sheet, what a list
+/// that reads looks like when no skipped row says why, and that Done goes back to the box with the text
+/// kept so it can be fixed.
 public struct SheetImportWords: Equatable, Sendable {
     public let read: String
     public let skipped: String?
     public let lines: [String]
     public let kept: String?
+    /// The shape a list is read in, when nothing was read and no skipped row says why.
+    public let shape: String?
+    /// True when nothing was read: Done goes back to the box, the text kept, to fix it.
+    public let again: Bool
 
     init(read count: Int, skipped skips: [SheetCSV.Skip], kept: String?) {
         read = SheetWords.read(count)
@@ -34,6 +40,8 @@ public struct SheetImportWords: Equatable, Sendable {
         let rest = skips.count - named.count
         lines = named + (rest > 0 ? [SheetWords.more(rest)] : [])
         self.kept = kept
+        again = count == 0
+        shape = count == 0 && skips.isEmpty ? SheetWords.listShape : nil
     }
 
     /// The account's answer, its reasons said with the phone's word for a line (SheetWords.rowWords).
@@ -125,6 +133,16 @@ public extension CheatSheetViewModel {
             importing = .closed
             pasted = ""
         }
+    }
+
+    /// Done on the result: an import that read nothing goes back to the box with the text kept, to fix it;
+    /// any other closes the panel.
+    func finishImport() {
+        if case let .done(words) = importing, words.again {
+            importing = .open(problem: nil)
+            return
+        }
+        closeImport()
     }
 
     /// A chosen file read into the paste box, so the verb replaces the sheet with what the box shows:

@@ -40,10 +40,13 @@ public enum SheetCSV {
     static let badHeader = "The first row must name rank, player_id, name and position"
 
     /// True when the text is the sheet's CSV, not a list of names: its first line names player_id (paste.ts
-    /// looksLikeCsv, the API's looksLikeCSV, held to sheet.json `lists`).
+    /// looksLikeCsv, held to sheet.json `lists`). Read as the API reads it (paste.go looksLikeCSV), which
+    /// decides: a byte order mark, then spaces, tabs and line breaks set aside, the first line up to "\n".
     public static func looksLikeCSV(_ text: String) -> Bool {
-        let first = text.drop(while: { $0.isWhitespace || String($0) == byteOrderMark })
-            .prefix(while: { !$0.isNewline })
+        let unmarked = text.hasPrefix(byteOrderMark) ? String(text.dropFirst()) : text
+        let lead: Set<Unicode.Scalar> = [" ", "\t", "\r", "\n"]
+        let body = unmarked.unicodeScalars.drop(while: { lead.contains($0) })
+        let first = String(String.UnicodeScalarView(body.prefix(while: { $0 != "\n" })))
         return first.lowercased().contains("player_id")
     }
 

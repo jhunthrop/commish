@@ -149,6 +149,10 @@ public enum SheetWords {
     public static let pasteLabel = "Or paste a CSV or a list of names"
     /// ImportPanel.svelte PASTE_EXAMPLE.
     public static let pastePlaceholder = "1. Puka Nacua\n2. Ja'Marr Chase, WR"
+    /// The phone's own: what a list that reads looks like, said under an import that read nothing and named
+    /// no skipped row (the account's refusal carries no row's reason). The web says "one per line" in its
+    /// label; the copy rules keep that word for the field.
+    public static let listShape = "Paste one player to a row, like 1. Puka Nacua"
     public static let replace = "Replace my sheet"
     public static let use = "Use this sheet"
     public static let cancel = "Cancel"
