@@ -11,6 +11,7 @@
 // (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z), as `npm run shots -- every-lineup-shots` runs it.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { LINEUP } from '../src/lib/league/box/lineup.ts';
 import { EVERY } from '../src/lib/league/inseason/every-lineup.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
@@ -29,6 +30,8 @@ const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const FOUR = 'espnDone,espnRefused,league,espnSet';
 /** What the moves came to: ESPN set the first league and refused the second. */
 const REPORTED = 'Set in 1 league. 1 did not change. Its league says why below.';
+/** The API's words for a lineup ESPN set. */
+const SET_ON_ESPN = 'Set on ESPN. Your lineup there now reads as ours.';
 const LANDED = 'Changes in 3 of your 4 leagues. 1 more to set on Sleeper yourself.';
 
 await requireFixtureClock(API_ORIGIN, FIXTURE_WEEK_CLOCK);
@@ -116,11 +119,15 @@ async function walk(width: number, theme: (typeof THEMES)[number]): Promise<void
 		await page.getByRole('button', { name: 'Set them on ESPN' }).click();
 		await says(page, REPORTED, at);
 		const main = await page.locator('main').innerText();
-		for (const sentence of [
-			'Set on ESPN. Your lineup there now reads as ours.',
-			'ESPN did not make the move, so nothing changed there.'
-		])
+		for (const sentence of [SET_ON_ESPN, 'ESPN did not make the move, so nothing changed there.'])
 			if (!main.includes(sentence)) fault(at, `no league says "${sentence}"`);
+		// The league ESPN set reads back as set: its block keeps its result in place, and on a phone
+		// pins nothing beside it (review N2).
+		const setBlock = page.locator('main section.block').filter({ hasText: SET_ON_ESPN });
+		if (!((await setBlock.textContent()) ?? '').includes(LINEUP.set))
+			fault(at, 'the league just set does not read back as set');
+		if (width < 500 && (await setBlock.locator('.pin').filter({ visible: true }).count()) !== 0)
+			fault(at, 'the league just set pins a line beside its result');
 		await holds(page, `${at} reported`);
 		await shoot(page, `every-reported-${theme}-${String(width)}`);
 		process.stdout.write(`${at}: landed, confirmed, reported\n`);

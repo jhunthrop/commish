@@ -201,6 +201,10 @@ const SHOT_NAMES: Readonly<Record<string, string>> = {
 	[ESPN_SET]: 'Family League (ESPN stand-in)'
 };
 
+/** The leagues whose lineup a move set on the every-league shots' account, read back as set until the
+ * page opens again (Lane 257 review N2). */
+const madeSet = new Set<string>();
+
 /** The ESPN league whose lineup is already ours: the recorded lineup with every slot kept. */
 const setLineup = (advice: LineupAdvice): LineupAdvice => ({
 	...advice,
@@ -1017,6 +1021,8 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		// (Lane 257 review L4); every other list, the apps' shared fixtures among them, keeps the one
 		// stand-in name.
 		const named = ATTACHED_ASKED.test(req.headers.cookie ?? '');
+		// Each every-league page opens on the lineups as recorded (Lane 257).
+		if (named) madeSet.clear();
 		send(
 			req,
 			res,
@@ -1073,7 +1079,15 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			send(req, res, HTTP.badRequest, CLAIM_FORM_WORDS, 'invalid');
 			return;
 		}
-		send(req, res, HTTP.ok, moveAnswer(moved[1] ?? '', moved[2] !== undefined, body));
+		const answer = moveAnswer(moved[1] ?? '', moved[2] !== undefined, body);
+		// On the every-league shots' account, a lineup ESPN set reads back as set (Lane 257 N2).
+		if (
+			ATTACHED_ASKED.test(req.headers.cookie ?? '') &&
+			'outcome' in answer &&
+			answer.outcome === 'done'
+		)
+			madeSet.add(moved[1] ?? '');
+		send(req, res, HTTP.ok, answer);
 		return;
 	}
 	if (CHECK.test(url.pathname) && req.method === 'POST') {
@@ -1178,7 +1192,12 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			return;
 		}
 		const bodies = {
-			lineup: id === ESPN_SET ? setLineup(espnLineup()) : isEspn(id ?? '') ? espnLineup() : lineup,
+			lineup:
+				id === ESPN_SET || madeSet.has(id ?? '')
+					? setLineup(espnLineup())
+					: isEspn(id ?? '')
+						? espnLineup()
+						: lineup,
 			matchup: isEspn(id ?? '') ? espnMatchup(matchupBox) : matchupBox,
 			// The ESPN leagues show the week on its Sunday afternoon, a stand-in (league.ts): the
 			// points are made up so the board's played states can be drawn.

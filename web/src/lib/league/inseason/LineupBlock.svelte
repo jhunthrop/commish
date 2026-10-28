@@ -143,7 +143,7 @@
 				scope={id}
 				{mover}
 				{held}
-				pin={block.kind !== 'here'}
+				pin={block.kind !== 'here' && mover.step.kind === 'closed'}
 			/>
 		</div>
 	{:else}
