@@ -81,6 +81,7 @@ enum class RecordFixture(
     Waiting("record/waiting.json"),
     Upcoming("record/upcoming.json"),
     Set("record/set.json"),
+    SetMissed("record/set-missed.json"),
     Graded("record/graded.json"),
     Published("record/published.json"),
     ;

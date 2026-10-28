@@ -122,8 +122,10 @@ internal data class NextGrade(
             book: RecordBook,
             schedule: RunSchedule,
         ): NextGrade? {
-            val week = book.weeks.firstOrNull { it.status != RunRecordWeekStatus.graded && it.status != RunRecordWeekStatus.missed }?.week
-                    ?: return null
+            val week =
+                book.weeks
+                    .firstOrNull { it.status != RunRecordWeekStatus.graded && it.status != RunRecordWeekStatus.missed }
+                    ?.week ?: return null
             val last =
                 schedule.slates
                     .flatMap { it.games }
