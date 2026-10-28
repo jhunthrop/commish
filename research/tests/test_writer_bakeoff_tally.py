@@ -119,8 +119,7 @@ def test_p95_is_nearest_rank() -> None:
 
 def test_player_spellings_take_the_last_name_past_a_suffix() -> None:
     # The first name too (Lane 265 fix round 1): a read that calls him "Puka" is the same shape. A suffixed
-    # name also without its suffix, and its bare full and last names with every suffix form (B276, Lane 286).
-    with_suffix = {f"{stem} {suffix}" for stem in ("Marvin Harrison", "Harrison") for suffix in NAME_SUFFIXES}
+    # name is spelled without its suffix; the masks take any suffix after a spelling (B276, Lane 286).
     assert set(player_spellings(["Marvin Harrison Jr.", "Puka Nacua"])) == {
         "Marvin Harrison",
         "Marvin",
@@ -128,9 +127,15 @@ def test_player_spellings_take_the_last_name_past_a_suffix() -> None:
         "Puka Nacua",
         "Puka",
         "Nacua",
-        *with_suffix,
     }
-    assert {"Harrison Jr", "Harrison Jr.", "Marvin Harrison Jr"} <= with_suffix
+
+
+@pytest.mark.parametrize("suffix", NAME_SUFFIXES)
+def test_a_suffix_the_boards_name_does_not_carry_still_masks_to_the_player(suffix: str) -> None:
+    """The Lane 286 review's L1: the board says "Kenneth Walker", the read "Kenneth Walker III"."""
+    masks = ShapeMasks.of(["Kenneth Walker"], club_spellings())
+    said = masks.shape(f"Kenneth Walker {suffix} drew 4 targets against the Rams, the most on the team.")
+    assert said == masks.shape("Walker drew 4 targets against the Rams, the most on the team.")
 
 
 _SUFFIXED: Final = ("Marvin Harrison Jr.", "Odell Beckham Jr.", "Kenneth Walker III")

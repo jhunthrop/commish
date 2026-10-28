@@ -117,7 +117,7 @@ def on_bye() -> WeekSheet:
 def heaviest() -> WeekSheet:
     """The heaviest sheet a week read is written from (Lane 286, the prompt bound): every section the sheet
     prints, each at its longest, and nothing of the starter's, so the writer test's drafts (written for Puka
-    Nacua) break every rule they can on it, as on Terry McLaurin's sheet, the copy's heaviest correction. A
+    Nacua) break every rule they can on it, as on the copy's heaviest real sheets. A
     longer name than any on the copy, four teammates on the chart (the copy's most), three games in the log,
     a week he missed, an Out status (a player who cannot play, so a draft that starts him breaks the most
     rules), an outdoor forecast with every figure, a rank said by its rank, the projection and the one before it, the read

@@ -53,6 +53,7 @@ _WORD_MARK: Final = "x"
 # A name's suffix in every form a read may write it (B276, Lane 286): with and without the period.
 NAME_SUFFIXES: Final = ("Jr.", "Jr", "Sr.", "Sr", "II", "III", "IV", "V")
 _NAME_SUFFIX_SET: Final = frozenset(NAME_SUFFIXES)
+_SUFFIXES_LONGEST_FIRST: Final = tuple(sorted(NAME_SUFFIXES, key=len, reverse=True))
 
 
 def why_group_slot_key(group_key: str) -> str:
@@ -85,21 +86,15 @@ def held_sentences(bodies: Sequence[str], min_words: int) -> set[str]:
 
 
 def player_spellings(names: Iterable[str]) -> tuple[str, ...]:
-    """Each player's name as a read may write it: his full name, the name without its suffix, his last name
+    """Each player's name as a read may write it, his suffix aside: his full name without it, his last name
     (the name's last word that is not a suffix) and his first name ("Puka", the Lane 265 review's L1: a read
-    that calls him by it is the same shape as one that names him), and the bare full and last names with every
-    suffix form when his name carries one (B276, Lane 286: "Harrison Jr." and "Marvin Harrison" are both Marvin
-    Harrison Jr.)."""
+    that calls him by it is the same shape as one that names him). The masks take any suffix after a spelling
+    (`ShapeMasks`, B276), so "Harrison Jr.", "Marvin Harrison" and "Marvin" are all Marvin Harrison Jr."""
     spellings: set[str] = set()
     for name in names:
-        words = name.split()
-        bare = _without_suffix(words)
-        if not bare:
-            continue
-        full, last = " ".join(bare), bare[-1]
-        spellings.update((name, full, bare[0], last))
-        if len(bare) < len(words):
-            spellings.update(f"{stem} {suffix}" for stem in (full, last) for suffix in NAME_SUFFIXES)
+        bare = _without_suffix(name.split())
+        if bare:
+            spellings.update((" ".join(bare), bare[0], bare[-1]))
     return tuple(sorted(spellings))
 
 
@@ -128,13 +123,16 @@ class ShapeMasks:
 
     @classmethod
     def of(cls, players: Iterable[str], clubs: Iterable[str] | None = None) -> "ShapeMasks":
-        """Masks for `players`' names (full and last) and `clubs` (every club spelling by default)."""
+        """Masks for `players`' names (full, first and last, any suffix after) and `clubs` (every club spelling
+        by default)."""
         club_set = frozenset(club_spellings() if clubs is None else clubs)
         words = sorted({*player_spellings(players), *club_set}, key=lambda w: (-len(w), w))
         alternatives = "|".join(re.escape(w) for w in words) or r"(?!)"
-        # A trailing possessive, a name's or a plural's; nothing word-like after it.
+        # A name's suffix in any form, whether or not the board's name carries one (B276, the Lane 286 review's
+        # L1), then a trailing possessive, a name's or a plural's; nothing word-like after it.
+        suffix = rf"(?:,?\s+(?:{'|'.join(re.escape(x) for x in _SUFFIXES_LONGEST_FIRST)})(?!\w))?"
         possessive = r"(?:['\u2019]s|(?<=s)['\u2019])?"
-        return cls(re.compile(rf"(?<![\w'])(?:{alternatives}){possessive}(?![\w'\u2019])"), club_set)
+        return cls(re.compile(rf"(?<![\w'])(?:{alternatives}){suffix}{possessive}(?![\w'\u2019])"), club_set)
 
     def shape(self, sentence: str) -> str:
         """`sentence` with names, clubs and numbers masked, then normalized. Names match case-sensitively,

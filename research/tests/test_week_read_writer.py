@@ -327,15 +327,27 @@ _AVOIDED = (
 
 def heaviest_correction() -> tuple[str, str]:
     """The heaviest ask a week read can carry (Lane 286, ruling 2): the heaviest sheet (`heaviest`), the last
-    correction a read can get, every rule broken so far with its sentence on an over-cap draft quoted and four
+    correction a read can get, every rule broken so far with its sentence on an over-cap draft quoted and five
     broken drafts, and every sentence a correction quotes to avoid at its longest. (system, user)."""
     return worst_correction(heaviest())
+
+
+# A fifth draft (the writer's asks and its one overrun retry, the Lane 286 review's M2) that breaks the four rules
+# B282 added, each with its own note: a colon set-up, a spelled count his cell prints, the member's roster, a
+# rank stated twice.
+_FORM = (
+    "Bye week for him: he has played four games this season. Keep him on your roster for now. Detroit has "
+    "allowed the 9th-fewest PPR points a game to receivers, 9th of 32."
+)
+# The heaviest real correction this ledger builds on the lane286_bakeoff copy's 519 sheets (Tyquan Thornton's),
+# the floor the synthetic one never falls under.
+_HEAVIEST_REAL_CHARS = 21_761
 
 
 def worst_correction(sheet: WeekSheet) -> tuple[str, str]:
     """The last correction a read of `sheet` can get, as `heaviest_correction` builds it."""
     long_read = _over_the_cap()
-    broken = [long_read, _BROKEN, STARTER_READ.replace("18.4 points", "18.7 points"), "Buy him. Buy him now."]
+    broken = [long_read, _BROKEN, STARTER_READ.replace("18.4 points", "18.7 points"), "Buy him. Buy him now.", _FORM]
     ledger = notes_of([(text, validate_week_read(text, sheet).violations) for text in broken])
     avoid = tuple(f"{_AVOIDED} ({n})" for n in range(CAPSULE_CONFIG.repetition.max_quoted_sentences))
     return WEEK_RULES, week_correction(sheet, long_read, ledger, avoid)
@@ -346,6 +358,10 @@ def test_the_worst_prompt_bound_holds_the_heaviest_correction_with_its_margin() 
     characters a token the gateway measured for the writer and the retry writer (`CHARS_PER_TOKEN`), stays at
     least BOUND_MARGIN under WORST_PROMPT_TOKENS."""
     system, user = heaviest_correction()
+    # The floor (the review's M2): a refactor that drops a note shrinks the ask and must fail here, not pass.
+    assert len(system) + len(user) >= _HEAVIEST_REAL_CHARS
+    for reason in ("set-up clause", "spells out a figure", "addresses the member", "states the rank"):
+        assert reason in user, reason
     tokens = (len(system) + len(user)) / CHARS_PER_TOKEN
     assert tokens <= (1 - BOUND_MARGIN) * WORST_PROMPT_TOKENS, tokens
     assert step_budget(ModelPrice("m", None, None, "unread", None), HOURLY_BUDGET_USD).max_calls == int(0.05 / 0.00065)

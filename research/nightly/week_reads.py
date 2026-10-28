@@ -132,10 +132,10 @@ WORST_PROMPT_TOKENS: Final = 9_000
 # hard stop for those in flight.
 BUDGETED_CALLS_PER_READ: Final = 2
 # The characters a prompt token takes, for counting a built prompt (the tests), measured by Lane 286 (B282)
-# against the gateway's own count: the heaviest correction (`test_week_read_writer.heaviest_correction`, 19,407
-# characters) sent once to each writer with one token out took 5,130 prompt tokens on GLM-5.3 Flash (3.78
-# characters a token) and 5,153 on the retry writer, deepseek 1017 (3.77); the copy's heaviest real one
-# (Terry McLaurin's, 19,376 characters) took 5,113 and 5,143. Rounded down from the fewer. Lane 117's 1.8 put
+# against the gateway's own count: the heaviest correction (`test_week_read_writer.heaviest_correction`, 21,861
+# characters) sent once to each writer with one token out took 5,768 prompt tokens on GLM-5.3 Flash (3.79
+# characters a token) and 5,797 on the retry writer, deepseek 1017 (3.77); the copy's heaviest real one
+# (Tyquan Thornton's, 21,761 characters) took 5,732 and 5,769. Rounded down from the fewer. Lane 117's 1.8 put
 # main's heaviest real correction over the bound when the gateway counted it at about half of it (Lane 282).
 CHARS_PER_TOKEN: Final = 3.7
 # The recordings' dearest call, for a budget in calls when the price list cannot be read.
