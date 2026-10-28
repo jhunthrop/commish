@@ -126,7 +126,11 @@ object PlayerCards {
         val game = LineRead.game(line, input.now)
         val status = RowStatuses.row(line.facts.designation, line.player.injuredReserve, game.toPlay, input.zone)
         val listed = status?.rank
-        val read = input.page?.weekRead?.let { StatusHeld.read(it, input.capture, input.page.id, input.now) }
+        // The newer of the run's read and the answer's live one (Lane 284), judged by the status rule.
+        val read =
+            WeekReads.newest(input.page?.weekRead, input.week.weekRead)?.let {
+                StatusHeld.read(it, input.capture, input.page?.id.orEmpty(), input.now)
+            }
         val tiles = CardTiles.live(input, read, game)
         return PlayerCard(
             head = head(input, game),

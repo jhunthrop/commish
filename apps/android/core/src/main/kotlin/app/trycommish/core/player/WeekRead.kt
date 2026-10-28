@@ -1,5 +1,6 @@
 package app.trycommish.core.player
 
+import app.trycommish.api.models.PlayerWeekRead
 import app.trycommish.api.models.RunReadsDue
 import app.trycommish.api.models.RunWeekRead
 import app.trycommish.core.Format
@@ -101,6 +102,35 @@ data class ProjectionMove(
 
 /** week-read.ts: the read beside the card's live projection, and the place's words when none stands. */
 object WeekReads {
+    /** The marker a live read carries in place of the run's movedCaption, never shown: a live read is from
+     * after the projection field, so its absent figure was written without one (QuotedProjection.of reads a
+     * present movedCaption so), as the web reads a null projection. */
+    internal const val LIVE_MOVED_CAPTION = ""
+
+    /** newestWeekRead (Lane 284, B277): the card's live read when its answer carries one written after the
+     * run's, so an hourly rewrite or a rescue shows within the hour; else the run's. The status rule
+     * (StatusHeld) is judged on the read this returns, as on the run's. */
+    fun newest(
+        run: RunWeekRead?,
+        live: PlayerWeekRead?,
+    ): RunWeekRead? {
+        if (live == null) return run
+        val liveAt = instantOrNull(live.writtenAt) ?: return run
+        val runAt = run?.let { instantOrNull(it.writtenAt) }
+        if (run != null && (runAt == null || !liveAt.isAfter(runAt))) return run
+        return RunWeekRead(
+            week = live.week,
+            body = live.body,
+            caption = live.caption,
+            status = live.status,
+            call = live.call?.let { call -> RunWeekRead.Call.entries.firstOrNull { it.value == call.value } },
+            writtenAt = live.writtenAt,
+            factsAt = live.factsAt,
+            projection = live.projection?.toBigDecimal(),
+            movedCaption = LIVE_MOVED_CAPTION,
+        )
+    }
+
     /** shownWeekRead: a read the run withheld keeps its caption while his game is to come and says it was
      * not written once his game is under way; a written read stands through any move of the published
      * projection (Lane 274). */
