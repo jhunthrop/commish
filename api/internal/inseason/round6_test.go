@@ -38,6 +38,15 @@ func TestALeagueShapeChangeIsNewContent(t *testing.T) {
 	if contentKey(a) != before {
 		t.Fatal("the content key is not stable")
 	}
+	// A game moved to another week moves a bye (Lane 287 fix round, LOW-3).
+	moved := *a
+	moved.plays = map[string]uint32{}
+	for _, p := range a.Board.Raw.Players {
+		moved.plays[p.Team] = a.plays[p.Team] ^ PlaysIn([]int{9})
+	}
+	if contentKey(&moved) == before {
+		t.Fatal("a moved game leaves the content unchanged")
+	}
 }
 
 // tradesOf is the trades a /trades answer lists across teams.

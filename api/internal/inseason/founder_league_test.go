@@ -58,8 +58,10 @@ func loadFounderLeague(t *testing.T) (founderLeagueFile, TradeLeague, Squad) {
 // The founder's case: his lineup's weak spots are at receiver (his
 // quarterback slot sits at the league's median over the weeks left: C.J.
 // Stroud is the league's seventh, on bye the week the page addresses),
-// the finder's ideas fill them, and fewer teams answer no idea than the
-// seven his screen showed.
+// the finder's ideas fill them, and none leaves him a hole he did not
+// have (fix round HIGH-1: no idea sends out Stroud with no quarterback
+// back). On this read that leaves ideas with three teams: eight answer no
+// idea, where his screen showed seven and the old finder six.
 func TestTheFoundersLeague(t *testing.T) {
 	f, l, mine := loadFounderLeague(t)
 	if l.Weeks() != 11 || f.Span != (Span{First: 8, Last: 18}) {
@@ -93,15 +95,39 @@ func TestTheFoundersLeague(t *testing.T) {
 			if len(tr.Give) == 1 && f.Names[mine.Players[tr.Give[0]].ID] == "Bucky Irving" && strings.Contains(founderWords(f, mine, tm.Squad, tr), "Puka Nacua") {
 				t.Fatalf("the refused trade is back: %s", founderWords(f, mine, tm.Squad, tr))
 			}
+			if slot, ok := openedSlot(l, mine, tm.Squad, tr); ok {
+				t.Fatalf("%s leaves %s below the median team", founderWords(f, mine, tm.Squad, tr), SlotLabel(l.slots, slot))
+			}
 			t.Log(founderWords(f, mine, tm.Squad, tr))
 		}
 	}
 	if receivers == 0 {
 		t.Fatal("no idea fills a receiver spot")
 	}
-	if none > 5 {
-		t.Fatalf("%d teams with no idea, the founder's screen showed 7 and this read 6 before", none)
+	if none != 8 {
+		t.Fatalf("%d teams with no idea, the recorded read gives 8", none)
 	}
+}
+
+// openedSlot is a starting slot the trade leaves short of the median team
+// by CloseCall a week or more where it was not before, or shorter by that
+// much again, reckoned here from the rosters themselves (not the finder's
+// own opens).
+func openedSlot(l TradeLeague, mine, theirs Squad, tr Trade) (int, bool) {
+	out := tr.Give
+	if tr.Drop >= 0 {
+		out = append(append([]int(nil), tr.Give...), tr.Drop)
+	}
+	before := l.Profile(mine.Players).Slots
+	after := l.Profile(Swapped(mine.Players, out, candidatesOf(theirs.Players, tr.Get))).Slots
+	least := CloseCall * float64(l.Weeks())
+	for i := range l.slots {
+		shortBefore, shortAfter := max(0, l.Median[i]-before[i]), l.Median[i]-after[i]
+		if skillSlot(l.slots[i]) && shortAfter >= least && shortAfter-shortBefore >= least {
+			return i, true
+		}
+	}
+	return -1, false
 }
 
 // founderWords is a trade with each side's figures, as the report's table

@@ -98,7 +98,9 @@ func TestTheFoundersTradeOnRealFigures(t *testing.T) {
 	if got.Drop < 0 || mine.Players[got.Drop].ID != "4426386" {
 		t.Fatalf("the drop %d, want Roschon Johnson", got.Drop)
 	}
-	found := pairTrades(founderConfig, founderWeeks, mine, theirs, "", 1000)
+	// The finder in his whole league, as the recorded read profiles it (Lane 287).
+	_, league, _ := loadFounderLeague(t)
+	found := Trades(league, mine, theirs, "", 1000)
 	if len(found) == 0 {
 		t.Fatal("the finder lists nothing with them, so the test proves less")
 	}

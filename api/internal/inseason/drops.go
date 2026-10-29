@@ -112,11 +112,24 @@ type dropOption struct {
 // order values least. False when no drop keeps the lineup full.
 func (r dropRule) recommend(cands []dropOption, out []int, in []Candidate) (dropOption, bool) {
 	m := newMove(r, out, in)
-	sorted := append([]dropOption(nil), cands...)
-	sort.SliceStable(sorted, func(i, j int) bool { return roundTenth(sorted[i].gain) > roundTenth(sorted[j].gain) })
+	// Each gain is rounded once: the trade search ranks drops thousands of
+	// times a read (Lane 287 fix round).
+	type ranked struct {
+		option  dropOption
+		printed float64
+	}
+	keyed := make([]ranked, len(cands))
+	for i, c := range cands {
+		keyed[i] = ranked{c, roundTenth(c.gain)}
+	}
+	sort.SliceStable(keyed, func(i, j int) bool { return keyed[i].printed > keyed[j].printed })
+	sorted := make([]dropOption, len(keyed))
+	for i, k := range keyed {
+		sorted[i] = k.option
+	}
 	for lo := 0; lo < len(sorted); {
 		hi := lo
-		for hi < len(sorted) && roundTenth(sorted[hi].gain) == roundTenth(sorted[lo].gain) {
+		for hi < len(sorted) && keyed[hi].printed == keyed[lo].printed {
 			hi++
 		}
 		if best, ok := m.bestOfTier(sorted[lo:hi]); ok {
