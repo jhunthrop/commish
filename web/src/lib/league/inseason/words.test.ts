@@ -1,7 +1,8 @@
 // The in-season screens' words, and the copy guard over every line they compose: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { memberZone, weekdayTime, zoneLine } from '#lib/format/clock.ts';
+import { memberZone, weekdayTime } from '#lib/format/clock.ts';
+import { zoneLine } from '#lib/league/phase-words.ts';
 import { readFileSync } from 'node:fs';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { isScreen } from './screens.ts';

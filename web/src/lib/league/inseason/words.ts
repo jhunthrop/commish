@@ -5,7 +5,7 @@ import { fixed, plural, signed } from '#lib/format/number.ts';
 import { listWords } from '#lib/format/list.ts';
 import { monthDayLabel } from '#lib/format/date.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
-import { designationMark, sitsHim } from '#lib/format/designation.ts';
+import { DESIGNATION_WORDS, sitsHim } from '#lib/format/designation.ts';
 import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { LeagueHost } from '../api.ts';
 import { recordWords } from '../model.ts';
@@ -200,12 +200,13 @@ export function gameWords(facts: WeekFacts, zone: string = memberZone()): string
 	return facts.kickoff === null ? game : `${game} ${weekdayTime(facts.kickoff, zone)}`;
 }
 
-/** "Questionable as of Thu 4:10 pm": the designation with when the report said so. */
+/** "Questionable as of Thu 4:10 pm": the designation with when the report said so. Here, not in
+ * format/designation.ts, which every page loads: only the league screens say it (Lane 284). */
 export function designationWords(
 	designation: InjuryDesignation,
 	zone: string = memberZone()
 ): string {
-	return designationMark(designation.status, designation.as_of, zone);
+	return `${DESIGNATION_WORDS[designation.status]} as of ${weekdayTime(designation.as_of, zone)}`;
 }
 
 /** Whether a designation keeps him out (out, injured reserve, suspended, PUP, NFI): drawn as a loss. */

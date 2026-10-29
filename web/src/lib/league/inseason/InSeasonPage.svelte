@@ -18,7 +18,7 @@
 		readNowWords,
 		standingWords
 	} from '../model.ts';
-	import { zoneLine } from '#lib/format/clock.ts';
+	import { zoneLine } from '#lib/league/phase-words.ts';
 	import { LEAGUE_HOME } from '#lib/ui/nav.ts';
 	import { screenSection } from '#lib/ui/rail-league.ts';
 	import { tabHref } from './tabs.ts';
