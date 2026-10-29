@@ -71,7 +71,8 @@ const SHEET_MODULE = "web/src/lib/sheet/words.ts";
  * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word; then the
  * Waivers' (Lane 186): its table, strip and drop panel, the heads' basis, the Stash group, the season
  * figures' heads and the strip's mark; then the Trades' (Lane 189): the trade table's words, the
- * picker's first choice and the close call's chip, and the builder's lines; then the player sheet's
+ * picker's first choice and the close call's chip, the builder's lines and the builder-first screen's
+ * own (Lane 289: its ideas row, its roster switch, its team choice); then the player sheet's
  * and page's (Lane 192): a held page's words, the week tile's, the page's facts, the read's figures'
  * labels and the words in place of a read not ready; then the Rankings' and Our record's (Lane 194):
  * the order's table, its week's kickers and defenses, the page's purpose and name, the pool's counts,
@@ -358,6 +359,12 @@ export const TABLES: readonly TableSource[] = [
     module: "web/src/lib/league/inseason/builder.ts",
     picks: ["BUILDER_LINES"],
     json: "shared/words/league-builder.json",
+  },
+  {
+    name: "Analyzer",
+    module: "web/src/lib/league/inseason/builder.ts",
+    picks: ["ANALYZER_LINES"],
+    json: "shared/words/league-analyzer.json",
   },
   {
     name: "HeldPage",

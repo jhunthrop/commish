@@ -45,14 +45,13 @@ private val TARGET = 44.dp
 private val EDGE = 3.dp
 private val CHECK = listOf("M5 12.5l4.5 4.5L19 7.5")
 
-/** One roster row of the trade builder (web BoxLine with its pick, compact, at 390): the tick that picks
- * him for the trade, his face and name with his game and his Avg and Last under it, Proj and his
- * rest-of-season points a game. A picked row is lit in the accent, the member's drop in the loss's ink; a
+/** One roster row of the trade builder (web BoxLine with its pick, the tight row at 390, the Lineup's
+ * height and type): the tick that picks him for the trade, his face and name with his club and his game
+ * under it (Avg and Last stay at a desk, Lane 268), Proj and his rest-of-season points a game. A picked row is lit in the accent, the member's drop in the loss's ink; a
  * player no trade takes has an empty tick. */
 @Composable
 fun PickRow(
     cells: RowCells,
-    line: String,
     tick: PickTick,
     actions: RowActions,
     toggle: () -> Unit,
@@ -79,7 +78,7 @@ fun PickRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(BoxColumn.slot), contentAlignment = Alignment.CenterStart) { TickCell(cells, tick, toggle) }
-        PlayerCell(cells, actions.open, Modifier.weight(1f), evidence = line, facts = false)
+        PlayerCell(cells, actions.open, Modifier.weight(1f), evidence = null, facts = false)
         Figure(cells.proj, BoxColumn.proj)
         Figure(cells.season, BoxColumn.season)
     }

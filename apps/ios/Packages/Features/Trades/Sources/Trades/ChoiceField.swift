@@ -27,9 +27,11 @@ struct ChoiceField: View {
         let theme = Theme(colorScheme)
         Button { open = true } label: {
             HStack(spacing: Tokens.Space.s2) {
+                // The choice whole, on a second line where it is long.
                 Text(value)
                     .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
-                    .lineLimit(1)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: Tokens.Space.s2)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 11, weight: .semibold))

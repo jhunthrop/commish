@@ -2,21 +2,20 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// One roster row of the trade builder (web BoxLine with its pick, compact, at 390): the tick that
-/// picks him for the trade, his face and name with his game and his Avg and Last under it, Proj and his
-/// rest-of-season points a game. A picked row is lit in the accent, the member's drop in the loss's ink;
-/// a player no trade takes has an empty tick.
+/// One roster row of the trade builder (web BoxLine with its pick, the tight row at 390, the Lineup's
+/// height and type): the tick that picks him for the trade, his face and name with his club and his game
+/// under it (Avg and Last stay at a desk, Lane 268), Proj and his rest-of-season points a game. A picked
+/// row is lit in the accent, the member's drop in the loss's ink; a player no trade takes has an empty
+/// tick.
 public struct PickRowView: View {
     @Environment(\.colorScheme) private var colorScheme
     private let cells: RowCells
-    private let line: String
     private let tick: PickTick
     private let actions: RowActions
     private let toggle: () -> Void
 
-    public init(cells: RowCells, line: String, tick: PickTick, actions: RowActions, toggle: @escaping () -> Void) {
+    public init(cells: RowCells, tick: PickTick, actions: RowActions, toggle: @escaping () -> Void) {
         self.cells = cells
-        self.line = line
         self.tick = tick
         self.actions = actions
         self.toggle = toggle
@@ -28,7 +27,7 @@ public struct PickRowView: View {
             tickCell(theme)
                 .frame(width: Column.slot, alignment: .leading)
             PlayerCell(
-                cells: cells, sheetPlayer: cells.sheetPlayer, evidence: line, facts: false, open: actions.open
+                cells: cells, sheetPlayer: cells.sheetPlayer, evidence: nil, facts: false, open: actions.open
             )
             .frame(maxWidth: .infinity, alignment: .leading)
             Figure(text: cells.proj, width: Column.proj, muted: cells.proj == Words.Box.none)

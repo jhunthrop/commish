@@ -178,14 +178,14 @@ private fun waivers(scheduler: TestCoroutineScheduler): @Composable () -> Unit {
     return { WaiverScreen(ui, stamp, pin, refreshing = false, actions = WaiverActions()) }
 }
 
-/** Saturday noon, the finder with its best trade opened into its players. */
+/** Saturday noon, the builder with our best idea loaded into its ticks. */
 private fun trades(scheduler: TestCoroutineScheduler): @Composable () -> Unit {
     val clock = FixedClock(StartFixtures.instant(TradeFixtures.WEEK))
     val reads = FixtureTrades(tradesEnvelope(TradeFixtures.trades()), TradeFixtures.check(TradeFixtures.WEEK, 1))
     val vm = TradesViewModel(reads, MemoryCache(), clock, Fixtures.zone, storeLeague.host, ME, { true }, {}, {})
     vm.load(TradeFixtures.LEAGUE)
     scheduler.advanceUntilIdle()
-    vm.toggle(TradeFixtures.BEST)
+    vm.loadIdea(TradeFixtures.BEST, TradeFixtures.LEAGUE)
     scheduler.advanceUntilIdle()
     val ui = vm.ui.value
     val stamp = vm.stampWords(ui)
@@ -278,7 +278,7 @@ private class FixtureWaivers(
     ): HostMoveResult = throw IOException("a store shot makes no claim")
 }
 
-/** The trade finder and its check as the fixture answers them. */
+/** The trades and their check as the fixture answers them. */
 private class FixtureTrades(
     private val body: String,
     private val check: TradeCheck,

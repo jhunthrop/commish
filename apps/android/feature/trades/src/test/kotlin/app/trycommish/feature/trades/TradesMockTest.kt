@@ -1,7 +1,7 @@
 package app.trycommish.feature.trades
 
+import app.trycommish.core.trades.BuilderPinWords
 import app.trycommish.core.trades.TradeFixtures
-import app.trycommish.core.trades.TradesState
 import app.trycommish.design.Words
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -10,7 +10,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -28,20 +27,25 @@ class TradesMockTest {
 
     @Test
     fun theMockShowsTheStatesItNames() {
-        val finder = viewModelAt(TradesSnapshotTest.Scene.Finder).ui.value
-        assertEquals(9, (finder.state as TradesState.Loaded).model.rows.size)
-        val copied = viewModelAt(TradesSnapshotTest.Scene.Copied).ui.value
-        assertEquals("Copied. Propose it on FFPC's trade page.", copied.copied[TradeFixtures.BEST]?.words)
-        val holding = viewModelAt(TradesSnapshotTest.Scene.Holding).ui.value
-        assertEquals("Aaron Rodgers", holding.model?.picker?.label)
-        val builder = viewModelAt(TradesSnapshotTest.Scene.Builder).ui.value.builder
-        assertNotNull(builder?.theirs)
-        assertTrue(builder?.verbEnabled == true)
-        assertEquals(
-            Words.Builder.pickBoth,
-            viewModelAt(TradesSnapshotTest.Scene.New)
+        val open = viewModelAt(TradesSnapshotTest.Scene.Open).ui.value.builder
+        assertEquals(Words.Builder.pickBoth, open?.sentence)
+        assertEquals("8 more", open?.more)
+        val idea = viewModelAt(TradesSnapshotTest.Scene.Idea).ui.value.builder
+        assertEquals(TradeFixtures.BEST, idea?.pressed)
+        assertTrue(idea?.verbEnabled == true)
+        assertNull(
+            viewModelAt(TradesSnapshotTest.Scene.Ideas)
                 .ui.value.builder
-                ?.sentence,
+                ?.more,
+        )
+        val refused = viewModelAt(TradesSnapshotTest.Scene.Refused).ui.value.builder
+        assertEquals(BuilderPinWords.Said(Words.Trades.theyGiveUp), refused?.pin)
+        assertTrue(
+            refused
+                ?.bug
+                ?.theirs
+                ?.rest
+                ?.refuses == true,
         )
         val stale = viewModelAt(TradesSnapshotTest.Scene.Stale)
         assertEquals("Last read Sat 12:00 pm", stale.stampWords())
@@ -50,16 +54,10 @@ class TradesMockTest {
             stale.ui.value.builder
                 ?.sentence,
         )
-        val sunday = viewModelAt(TradesSnapshotTest.Scene.Sunday).ui.value
-        assertNull(
-            sunday.model
-                ?.row(TradeFixtures.BEST)
-                ?.opened
-                ?.week,
-        )
+        val sunday = viewModelAt(TradesSnapshotTest.Scene.Sunday).ui.value.builder
         assertEquals(
             Words.Box.none,
-            sunday.builder
+            sunday
                 ?.bug
                 ?.yours
                 ?.figures

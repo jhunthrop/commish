@@ -506,6 +506,19 @@ object Words {
         const val full = "Two picked, tap one to put him back"
     }
 
+    object Analyzer {
+        const val ideas = "Our ideas, by team"
+        const val yours = "yours"
+        const val theirs = "theirs"
+        const val team = "Team"
+        const val share = "Share"
+        const val shared = "Copied the trade as text."
+        const val pickTeam = "Pick a team"
+        const val noTeam = "Pick a team to trade with, then tick a player on each side."
+        const val rosters = "Rosters"
+        const val you = "You"
+    }
+
     object HeldPage {
         const val log = "His game log is not written yet."
         const val basis = "His figures are the board's. His game log and our read of him are not written yet."

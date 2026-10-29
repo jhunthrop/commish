@@ -15,10 +15,10 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * The Trades' basis as a phone says it once under the rows (trades.ts tradeBasis, drawnText for the
- * phone): which trades are listed and who decides, what a game is while a trade is opened, what Proj is
- * or the day it arrives, when Final and the stats land, what Opp is while a trade is opened, and the
- * rules our stats lack; the record's link follows it. A port of the iOS one, held to the web's paragraph
+ * The Trades' basis as a phone says it once under the builder (trades.ts tradeBasis with the builder
+ * open, drawnText for the phone): which trades are listed and who decides, what the rest-of-season cells
+ * are, what a game is, what Proj is or the day it arrives, when Final and the stats land, and the rules
+ * our stats lack; the record's link follows it. A port of the iOS one, held to the web's paragraph
  * at every clock by the parity file.
  */
 internal object TradesBasis {
@@ -28,28 +28,24 @@ internal object TradesBasis {
     class Facts(
         val advice: TradeAdvice,
         val host: LeagueHost,
-        /** Every line the finder and its opened trades can show (TradeScreen's lines). */
+        /** Every line the builder can show (TradeScreen's lines). */
         val lines: List<PlayerLine>,
-        /** What is open: a trade's players' columns, or the builder's rosters, are on the screen. */
-        val opened: TradesOpened,
         val zone: ZoneId,
         val now: Instant,
     )
 
     fun phone(facts: Facts): String {
         val advice = facts.advice
-        val open = facts.opened != TradesOpened.None
+        // The builder's phone rows draw no Opp rank (TradeBox), so no Opp sentence.
         val parts =
             listOf(
                 advice.basis,
-                // What the verdict's rest-of-season cells are, with the builder open (Lane 277).
-                if (facts.opened == TradesOpened.Builder) Words.Trades.restBasis else null,
-                if (open) advice.perGameBasis else null,
+                // What the verdict's rest-of-season cells are (Lane 277).
+                Words.Trades.restBasis,
+                advice.perGameBasis,
                 arrives(facts) ?: proj(facts),
                 finals(facts),
-                // The builder's phone rows draw no Opp rank (TradeBox), so its sentence is the desk's there.
-                if (facts.opened == TradesOpened.Trade) Words.Basis.oppPhone else null,
-                if (open) BasisParts.uncounted(advice.basisNote, advice.basisNoteList, facts.lines) else null,
+                BasisParts.uncounted(advice.basisNote, advice.basisNoteList, facts.lines),
             )
         return parts.filterNotNull().filter { it.isNotEmpty() }.joinToString(" ")
     }
@@ -72,19 +68,19 @@ internal object TradesBasis {
         val read = instantOrNull(advice.projectionReadAt)?.let { "read ${Format.weekdayTime(it, facts.zone)}" } ?: "not in yet"
         // The builder's boxes draw a defense; a trade never holds one (Lane 66g).
         val defense =
-            if (facts.opened == TradesOpened.Builder && facts.lines.any { it.player.position == "DEF" }) DEFENSES_CLAUSE else ""
+            if (facts.lines.any { it.player.position == "DEF" }) DEFENSES_CLAUSE else ""
         val said = "${Words.Box.proj} is $week published projection${BasisParts.scoringWords(scoring, null)}$defense, $read."
         return BasisParts.teBonusSentence(scoring.teBonus, null)?.let { "$said $it" } ?: said
     }
 
-    /** basis.ts finalsParts on a phone over the trades' rows: the one sentence where nothing waits on
-     * Final, else the phone's short sentence of what Avg and Last count; with a trade opened, when Final
-     * lands is left to the desk. */
+    /** basis.ts finalsParts on a phone over the builder's rows: the one sentence where nothing waits on
+     * Final, else the phone's short sentence of what Avg and Last count; when Final lands is left to the
+     * desk. */
     private fun finals(facts: Facts): String? {
         val timing = LineupBasis.kickedOffPart(facts.lines, facts.now)
         val full = finalsAt(facts) ?: return null
         if (timing == null || full == timing) {
-            return if (facts.opened != TradesOpened.None && full == Words.Basis.kickedOffPart) null else full
+            return if (full == Words.Basis.kickedOffPart) null else full
         }
         return "${Words.Box.avg} and ${Words.Box.last} count ${ValueWords.platform(facts.host)}'s finals, " +
             "our stats ${Words.Basis.statsByWednesday}"

@@ -301,7 +301,8 @@ export function shareText(team: Pick<TradeTeam, 'name'>, check: Pick<TradeCheck,
 	return `${offerText(team, trade)} ${changeWords(trade)}${drop}`;
 }
 
-/** The screen's own words the apps do not draw yet (Lane 260; the apps follow from this screen). */
+/** The screen's own words (Lane 260), which the apps draw too, from the generated Analyzer table
+ * (Lane 289). */
 export const ANALYZER_LINES = {
 	/** Over the presets: the finder's best trade with each team in this league, one tap each to load
 	 * (Lane 268: "by team", so the row reads as the league's teams, not leagues). */

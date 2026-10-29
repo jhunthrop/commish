@@ -4,41 +4,34 @@ import Foundation
 import Observation
 
 /// The Trades screen's view model (the League home's pattern): the API, the cache, the clock and the
-/// clipboard injected; the saved finder at once, then the API's; each team's best or every trade, by
-/// either gain; the trades holding one player, read from the API as the picker narrows; a trade opened
-/// into its players; the builder, from a trade or new, posting the check of the trade built as each
-/// pick lands and keeping only the latest answer; the verb copies a trade's offer for the member to
-/// propose on the platform. A read that fails keeps what is shown, the finder dated by its stamp.
+/// clipboard injected; the saved trades at once, then the API's; the builder is the screen (Lane 260):
+/// it opens on our best trade's team with nothing ticked, an idea loads its ticks, a tick or another
+/// team posts the check of the trade built, keeping only the latest answer; the verb copies the built
+/// trade's offer for the member to propose on the platform and Share copies it as text. A read that
+/// fails keeps what is shown, dated by its stamp.
 @MainActor
 @Observable
 public final class TradesViewModel {
     public enum State: Equatable, Sendable {
         case loading
-        /// The finder, when its answer was read, and whether that read is older than the latest try.
+        /// The trades, when their answer was read, and whether that read is older than the latest try.
         case loaded(TradesModel, stamp: Date, stale: Bool)
         case failed(String)
     }
 
     public private(set) var state: State = .loading
-    /// Every trade, or each team's best.
-    public private(set) var every = false
-    public private(set) var sort: TradeSort = .mine
-    /// The trades opened, by key.
-    public private(set) var opened: Set<String> = []
-    /// The line under each pressed verb, by trade.
-    public private(set) var copied: [String: CopiedLine] = [:]
-    /// The player the trades are narrowed to (state.ts pickKey), nil for every trade.
-    public private(set) var holding: String?
-    /// The trades holding him are being read: the last ones stay, quieter.
-    public private(set) var narrowing = false
-    /// Why the trades holding him could not be read, over the finder.
-    public private(set) var problem: String?
-    /// The builder's picks while it is open.
+    /// The builder's picks, our best trade's team until the member changes them.
     public private(set) var building: TradePicks?
     /// The builder's check is being read: the last answer stays, quieter.
     public private(set) var checking = false
-    /// The line under the builder's verb once pressed.
+    /// The line under the verb once pressed.
     public private(set) var builderCopied: CopiedLine?
+    /// The line beside Share once pressed.
+    public private(set) var shared: String?
+    /// Whether the ideas row shows every idea, or the best three and "N more".
+    public private(set) var allIdeas = false
+    /// The roster drawn where the two stack: the member's first.
+    public private(set) var drawn: TradePicks.Side = .give
 
     private let api: any TradesAPI
     private let cache: any AnswerCache
@@ -48,14 +41,15 @@ public final class TradesViewModel {
     private let me: TradeMe
     private let copy: @MainActor (String) -> Bool
     private let onSignedOut: @MainActor () -> Void
-    /// The answer shown, so the chips, the order and the picker redraw it.
+    /// The answer shown.
     private var answer: TradeAdvice?
-    /// The trades holding the picked player, as the API answered.
-    private var narrowed: TradeAdvice?
-    private var narrowAsk = 0
     private var builderAnswer: TradeCheck?
+    /// The picks the last answer was read for (builder.ts Answered).
+    private var answeredPicks: TradePicks?
     private var builderProblem: String?
     private var checkAsk = 0
+    /// The check being read: a newer tick cancels it, so only the latest is asked of the API.
+    private var checkTask: Task<TradeCheck?, any Error>?
 
     /// `me` is the member's team and standing as the switch names them; `copy` puts the offer on the
     /// clipboard and says whether it took; `onSignedOut` runs when the API refuses the device token.
@@ -79,7 +73,7 @@ public final class TradesViewModel {
         "/leagues/attached/\(leagueID)/trades"
     }
 
-    /// "Last read Sat 12:00 pm" while the finder shown is a saved one, or a read found no signal.
+    /// "Last read Sat 12:00 pm" while the trades shown are a saved read, or a read found no signal.
     public var stampWords: String? {
         guard case let .loaded(_, stamp, true) = state else {
             return nil
@@ -87,24 +81,20 @@ public final class TradesViewModel {
         return AppWords.lastRead(stamp, zone: zone)
     }
 
-    /// What the basis speaks to: the builder open, a trade opened, or the finder alone.
-    public var shownOpen: TradesOpened {
-        building != nil ? .builder : opened.isEmpty ? .none : .trade
-    }
-
-    /// The builder as its picks and its answer draw it, nil while it is closed.
+    /// The builder as its picks and its answer draw it, nil before the trades are read.
     public var builder: TradeBuilderModel? {
-        guard let building, let answer else {
+        guard let building, let answer, case let .loaded(model, _, _) = state else {
             return nil
         }
         return TradeBuilder.model(.init(
-            advice: TradeFinder.held(answer, now: clock.now), picks: building, answer: builderAnswer,
-            problem: builderProblem, me: me, pageKnown: !answer.hostTradesUrl.isEmpty, zone: zone, now: clock.now
+            advice: TradeFinder.held(answer, now: clock.now), ideas: model.ideas, allIdeas: allIdeas,
+            picks: building, answer: builderAnswer, answered: answeredPicks, problem: builderProblem, me: me,
+            pageKnown: !answer.hostTradesUrl.isEmpty, zone: zone, now: clock.now
         ))
     }
 
-    /// The saved finder at once on the first open, then the API's; a failed read keeps the finder shown,
-    /// dated; a refused token signs out.
+    /// The saved trades at once on the first open, then the API's; a failed read keeps the trades shown,
+    /// dated; a refused token signs out. The picks hold across a read again.
     public func load(leagueID: String) async {
         let route = Self.route(leagueID)
         if state == .loading, let saved = await cache.read(TradeAdvice.self, route: route) {
@@ -126,95 +116,39 @@ public final class TradesViewModel {
         }
     }
 
-    public func showEvery(_ every: Bool) {
-        self.every = every
-        redraw()
-    }
-
-    public func sort(by sort: TradeSort) {
-        self.sort = sort
-        redraw()
-    }
-
-    /// Opens a trade's players under its row, or closes them.
-    public func toggle(_ key: String) {
-        if opened.contains(key) {
-            opened.remove(key)
-        } else {
-            opened.insert(key)
-        }
-        redraw()
-    }
-
-    /// The Trades holding picker (TradeScreen's pick): every trade again, or the trades holding one
-    /// player read from the API; a player our board does not place is in no trade, so nothing is read.
-    /// The last rows stay while the next are read, and only the latest choice's answer lands.
-    public func pick(_ key: String?, leagueID: String) async {
-        holding = key
-        narrowed = nil
-        problem = nil
-        narrowAsk += 1
-        let mine = narrowAsk
-        guard let key, !key.hasPrefix(TradeFinder.unplaced) else {
-            narrowing = false
-            redraw()
-            return
-        }
-        narrowing = true
-        redraw()
-        do {
-            let answer = try await api.trades(id: leagueID, player: key)
-            guard mine == narrowAsk else {
-                return
+    /// One tap loads an idea into the ticks; the member changes it freely from there.
+    public func load(idea key: String, leagueID: String) async {
+        guard case let .loaded(model, _, _) = state, let preset = model.ideas.places.compactMap({ place in
+            if case let .idea(preset) = place, preset.id == key {
+                return preset
             }
-            narrowed = answer
-        } catch where APIError.signsOut(error) {
-            signOut()
-            return
-        } catch {
-            guard mine == narrowAsk else {
-                return
-            }
-            problem = Self.unread(error)
-            markStale(error)
-        }
-        narrowing = false
-        redraw()
-    }
-
-    /// Build a trade: the builder opened on the first team with a trade found.
-    public func buildNew() {
-        guard case let .loaded(model, _, _) = state else {
+            return nil
+        }).first else {
             return
         }
-        open(model.opening)
-    }
-
-    /// Build from this: the builder opened with a finder row's trade, its check read.
-    public func build(from key: String, leagueID: String) async {
-        guard let picks = line(key)?.built else {
-            return
+        if preset.picks.team != building?.team {
+            forgetAnswer()
         }
-        open(picks)
+        building = preset.picks
         await ask(leagueID: leagueID)
     }
 
-    /// Not now: the builder closed.
-    public func closeBuilder() {
-        building = nil
-        builderAnswer = nil
-        builderProblem = nil
-        builderCopied = nil
-        checking = false
-        checkAsk += 1
-        redraw()
+    /// "N more": every idea in place.
+    public func showAllIdeas() {
+        allIdeas = true
     }
 
-    /// Another team: their side starts again.
+    /// The roster switch: the member's roster or theirs.
+    public func show(_ side: TradePicks.Side) {
+        drawn = side
+    }
+
+    /// Another team: their side starts again, and the last answer, for the last team, goes.
     public func choose(team: Int, leagueID: String) async {
         guard let building else {
             return
         }
+        forgetAnswer()
         self.building = TradePicks(team: team, give: building.give, get: [])
         await ask(leagueID: leagueID)
     }
@@ -228,70 +162,85 @@ public final class TradesViewModel {
         await ask(leagueID: leagueID)
     }
 
-    /// The verb on a finder row or a strip card: the trade's offer on the clipboard and the line under
-    /// it. The caller opens the platform's trade page, as the web's verb does.
-    public func press(_ key: String) {
-        guard case let .loaded(model, _, _) = state, let line = line(key) ?? cardLine(key) else {
-            return
-        }
-        copied[key] = TradesWords.copied(copy(line.offer), platform: model.platform)
-    }
-
-    /// The builder's verb: the built trade's offer, once its check has answered.
+    /// The verb: the built trade's offer on the clipboard and the line under it, while the answer is the
+    /// picks'. The caller opens the platform's trade page, as the web's verb does.
     public func pressBuilder() {
-        guard let answer, let check = builderAnswer, let team = answer.teams.first(where: {
-            $0.rosterId == building?.team
-        }) else {
+        guard let (team, check) = liveTrade() else {
             return
         }
         let offer = TradesWords.offer(team: team.name, row: check.trade.value1)
         builderCopied = TradesWords.copied(copy(offer), platform: ValueWords.platform(host))
     }
 
+    /// Share: the built trade as text in our words, and the line beside it.
+    public func share() {
+        guard let (team, check) = liveTrade() else {
+            return
+        }
+        let text = TradesWords.share(team: team.name, row: check.trade.value1)
+        shared = copy(text) ? Words.Analyzer.shared : Words.Trades.copyFailed
+    }
+
+    /// The team and the answer the verbs act on: only while the answer is the picks' (proposable).
+    private func liveTrade() -> (TradeTeam, TradeCheck)? {
+        guard builder?.live == true, let answer, let check = builderAnswer,
+              let team = answer.teams.first(where: { $0.rosterId == building?.team })
+        else {
+            return nil
+        }
+        return (team, check)
+    }
+
     /// Reads the check for the picks, keeping only the latest answer; the last answer stays, quieter,
-    /// while the next is read (TradeBuilder's ask).
+    /// while the next is read (TradeBuilder's ask). A newer tick cancels the read before it, and an
+    /// answer that still lands after a newer ask is dropped.
     private func ask(leagueID: String) async {
         builderProblem = nil
         builderCopied = nil
+        shared = nil
         checkAsk += 1
         let mine = checkAsk
-        guard let input = building?.checkInput else {
-            builderAnswer = nil
+        checkTask?.cancel()
+        checkTask = nil
+        guard let picks = building, let input = picks.checkInput else {
+            forgetAnswer()
             checking = false
             return
         }
         checking = true
+        let api = api
+        let task = Task { try await api.checkTrade(id: leagueID, trade: input) }
+        checkTask = task
         do {
-            let answer = try await api.checkTrade(id: leagueID, trade: input)
+            let answer = try await task.value
             guard mine == checkAsk else {
                 return
             }
             builderAnswer = answer
+            answeredPicks = answer == nil ? nil : picks
             builderProblem = answer == nil ? Words.InSeason.narrowingUnread : nil
         } catch where APIError.signsOut(error) {
+            checking = false
             signOut()
             return
         } catch {
             guard mine == checkAsk else {
                 return
             }
-            builderAnswer = nil
+            forgetAnswer()
             builderProblem = Self.unread(error)
             markStale(error)
         }
         checking = false
     }
 
-    private func open(_ picks: TradePicks) {
-        building = picks
+    private func forgetAnswer() {
         builderAnswer = nil
-        builderProblem = nil
-        builderCopied = nil
-        redraw()
+        answeredPicks = nil
     }
 
-    /// Why a narrowed read or a check is missing: the API's own sentence where it refused, else the
-    /// web's line that the last read stands (state.ts Narrowing).
+    /// Why a check is missing: the API's own sentence where it refused, else the web's line that the last
+    /// read stands (state.ts Narrowing).
     static func unread(_ error: any Error) -> String {
         if case let APIError.envelope(_, message) = error, !message.isEmpty {
             return message
@@ -299,7 +248,7 @@ public final class TradesViewModel {
         return Words.InSeason.narrowingUnread
     }
 
-    /// A read that found no signal dates the finder shown; an API refusal does not (review L1).
+    /// A read that found no signal dates the trades shown; an API refusal does not (review L1).
     private func markStale(_ error: any Error) {
         guard !(error is APIError), case let .loaded(model, stamp, _) = state else {
             return
@@ -307,40 +256,13 @@ public final class TradesViewModel {
         state = .loaded(model, stamp: stamp, stale: true)
     }
 
-    private func line(_ key: String) -> TradeLine? {
-        guard case let .loaded(model, _, _) = state else {
-            return nil
-        }
-        return model.rows.first { $0.id == key }
-    }
-
-    /// A strip card's trade where the finder shown no longer lists it (narrowed to a player).
-    private func cardLine(_ key: String) -> TradeLine? {
-        guard let answer else {
-            return nil
-        }
-        return TradesModel(
-            advice: answer, host: host, me: me.name, every: true, sort: sort, now: clock.now, zone: zone
-        ).rows.first { $0.id == key }
-    }
-
     private func show(_ advice: TradeAdvice, stamp: Date, stale: Bool) {
         answer = advice
-        state = .loaded(model(advice), stamp: stamp, stale: stale)
-    }
-
-    private func redraw() {
-        guard case let .loaded(_, stamp, stale) = state, let answer else {
-            return
+        let model = TradesModel(advice: advice, host: host, now: clock.now, zone: zone)
+        if building == nil {
+            building = model.opening
         }
-        state = .loaded(model(answer), stamp: stamp, stale: stale)
-    }
-
-    private func model(_ advice: TradeAdvice) -> TradesModel {
-        TradesModel(
-            advice: advice, narrowed: narrowed, holding: holding, host: host, me: me.name, every: every, sort: sort,
-            now: clock.now, zone: zone
-        )
+        state = .loaded(model, stamp: stamp, stale: stale)
     }
 
     private func signOut() {

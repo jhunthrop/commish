@@ -177,6 +177,7 @@ void test("the tables: the League home's, the box score's, then the shell's and 
       "Trades",
       "TradePicker",
       "Builder",
+      "Analyzer",
       "HeldPage",
       "StatusHeld",
       "WeekTile",
@@ -295,6 +296,10 @@ void test("the web's own words land in the JSON, the Swift and the Kotlin", asyn
     "Every trade",
   );
   assert.equal(json("shared/words/league-builder.json").open, "Build a trade");
+  assert.equal(
+    json("shared/words/league-analyzer.json").ideas,
+    "Our ideas, by team",
+  );
   assert.match(
     String(json("shared/words/board-basis.json").gap),
     /^Gap, drafters' ADP less our rank/,

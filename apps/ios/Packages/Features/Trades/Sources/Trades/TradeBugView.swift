@@ -2,97 +2,167 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// The builder's scoreboard on the lit board as a phone stacks it (TradeBug.svelte under 760 px): the
-/// member's half over theirs, each with You or With and the team, this week's Proj and the
-/// rest-of-season Gain each before, after and its change; the room and the verb left to the builder's
-/// line and its pin, as the web's phone leaves them.
+/// The verdict's box score as a phone draws it (TradeBug.svelte under 760 px, Lanes 268 and 277): the
+/// heads once, then one row per side: You or With over the team's name whole and its room, this week's
+/// Proj before to after with its change, the gain a week before to after with its change and a short bar
+/// against the other side's, and the rest-of-season change; who would not take it is the answer line's
+/// and the pin's, as the web's phone says it.
 struct TradeBugView: View {
     @Environment(\.colorScheme) private var colorScheme
     let bug: TradeBug
 
+    /// The team's column, the web's 7.5rem at a phone's type.
+    static let who: Double = 96
+    /// The rest-of-season column, its head in two short lines.
+    static let rest: Double = 58
+
     var body: some View {
         let theme = Theme(colorScheme)
-        VStack(spacing: 0) {
-            half(bug.yours, theme: theme)
-            Rectangle().fill(theme.color(Tokens.Color.scoreboardLine)).frame(height: 1)
-            half(bug.theirs, theme: theme)
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 6, verticalSpacing: 0) {
+            GridRow(alignment: .bottom) {
+                Color.clear.frame(width: Self.who, height: 1)
+                    .accessibilityHidden(true)
+                head(Words.Trades.weekHead, theme: theme)
+                head(Words.Trades.gainHead, theme: theme)
+                head(Words.Trades.restHead, theme: theme)
+                    .frame(width: Self.rest, alignment: .leading)
+            }
+            .padding(.bottom, 2)
+            row(bug.yours, theme: theme)
+            Rectangle().fill(theme.color(Tokens.Color.line)).frame(height: 1)
+                .gridCellUnsizedAxes(.horizontal)
+            row(bug.theirs, theme: theme)
         }
-        .foregroundStyle(theme.color(Tokens.Color.scoreboardInk))
-        .background(theme.color(Tokens.Color.scoreboard))
-        .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.md))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Tokens.Space.s2)
+        .padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: Tokens.Radius.md).fill(theme.color(Tokens.Color.surface)))
+        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.md).strokeBorder(theme.color(Tokens.Color.lineStrong)))
         .accessibilityElement(children: .combine)
     }
 
-    private func half(_ side: TradeBugSide, theme: Theme) -> some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.s2) {
-            HStack(spacing: Tokens.Space.s2) {
-                Avatar(side.initials, side: 26, mine: side.mine, board: true)
-                VStack(alignment: .leading, spacing: 0) {
-                    label(side.label, theme: theme)
-                    Text(side.name)
-                        .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .bold))
-                        .lineLimit(1)
-                }
-            }
-            HStack(alignment: .top, spacing: Tokens.Space.s4) {
-                figure(Words.Trades.weekHead, Swing.week(side.figures), theme: theme)
-                figure(Words.Trades.gainHead, Swing.season(side.figures), theme: theme)
-                if !side.rest.text.isEmpty {
-                    rest(side.rest, theme: theme)
-                }
-                Spacer(minLength: 0)
+    private func row(_ side: TradeBugSide, theme: Theme) -> some View {
+        GridRow {
+            who(side, theme: theme)
+            swing(Swing.week(side.figures), bar: nil, theme: theme)
+            swing(Swing.season(side.figures), bar: side.bar, theme: theme)
+            if side.rest.text.isEmpty {
+                Color.clear.frame(width: 1, height: 1)
+            } else {
+                chip(side.rest.text, tone: side.rest.tone, theme: theme)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, Tokens.Space.s3)
-        .padding(.vertical, Tokens.Space.s2)
+        .padding(.vertical, 4)
     }
 
-    /// "THIS WEEK, PROJ" over "98.9 to 109.0 +10.1": before quiet, after strong, the change in its ink.
-    private func figure(_ head: String, _ swing: Swing, theme: Theme) -> some View {
+    /// "YOU" or "WITH" over the team's name, whole on a second line where it is long, and its room.
+    private func who(_ side: TradeBugSide, theme: Theme) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            label(head, theme: theme)
-            (Text(swing.before).foregroundStyle(theme.color(Tokens.Color.scoreboardInk2))
-                + Text(verbatim: " \(Words.Trades.to) ").font(Faces.font(.ui, size: Tokens.TypeScale.xs))
-                .foregroundStyle(theme.color(Tokens.Color.scoreboardInk2))
-                + Text(swing.after).bold()
-                + Text(verbatim: " \(swing.change)").bold().foregroundStyle(ink(swing.tone, theme: theme)))
-                .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .medium))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            Text(side.label)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .bold))
+                .textCase(.uppercase)
+                .foregroundStyle(theme.color(side.mine ? Tokens.Color.accentText : Tokens.Color.ink3))
+            Text(side.name)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .medium))
+                .foregroundStyle(theme.color(Tokens.Color.ink))
+                .fixedSize(horizontal: false, vertical: true)
+            if !side.room.isEmpty {
+                Text(side.room)
+                    .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
+                    .foregroundStyle(theme.color(Tokens.Color.ink2))
+            }
+        }
+        .frame(width: Self.who, alignment: .leading)
+    }
+
+    /// "98.9 to 109.0 +10.1": before quiet, after strong, the change in its chip; the gain's bar under.
+    private func swing(_ swing: Swing, bar: Double?, theme: Theme) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(swing.before)
+                    .font(Faces.font(.num, size: Tokens.TypeScale.sm, weight: .semibold))
+                    .foregroundStyle(theme.color(Tokens.Color.ink3))
+                Text(Words.Trades.to)
+                    .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
+                    .foregroundStyle(theme.color(Tokens.Color.ink3))
+                Text(swing.after)
+                    .font(Faces.font(.num, size: Tokens.TypeScale.sm, weight: .bold))
+                    .foregroundStyle(theme.color(Tokens.Color.ink))
+                chip(swing.change, tone: swing.tone, theme: theme)
+            }
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            if let bar {
+                GainBar(share: bar, tone: swing.tone)
+            }
         }
     }
 
-    /// "REST OF SEASON" over "−14.4" in its ink (TradeBug.svelte's phone cell, Lane 277); who would not
-    /// take it is the builder's line and its pin, as the web's phone says it.
-    private func rest(_ rest: TradeRest, theme: Theme) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            label(Words.Trades.restHead, theme: theme)
-            Text(rest.text)
-                .bold()
-                .foregroundStyle(ink(rest.tone, theme: theme))
-                .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .medium))
-                .monospacedDigit()
-                .lineLimit(1)
-        }
+    /// A change in its tone's chip: "+5.3" on the gain's ground, "−9.6" on the loss's.
+    private func chip(_ words: String, tone: Tone, theme: Theme) -> some View {
+        Text(words)
+            .font(Faces.font(.num, size: Tokens.TypeScale.xs, weight: .bold))
+            .monospacedDigit()
+            .lineLimit(1)
+            .foregroundStyle(theme.color(ink(tone)))
+            .padding(.horizontal, 3)
+            .background(RoundedRectangle(cornerRadius: Tokens.Radius.sm).fill(ground(tone, theme: theme)))
     }
 
-    private func ink(_ tone: Tone, theme: Theme) -> Color {
+    private func ink(_ tone: Tone) -> ThemedColor {
         switch tone {
-        case .gain: theme.color(Tokens.Color.scoreboardNum)
-        case .loss: theme.color(Tokens.Color.lossInk)
-        case .even: theme.color(Tokens.Color.scoreboardInk)
+        case .gain: Tokens.Color.gainInk
+        case .loss: Tokens.Color.lossInk
+        case .even: Tokens.Color.ink2
         }
     }
 
-    private func label(_ words: String, theme: Theme) -> some View {
+    private func ground(_ tone: Tone, theme: Theme) -> Color {
+        switch tone {
+        case .gain: theme.color(Tokens.Color.gainBg)
+        case .loss: theme.color(Tokens.Color.lossBg)
+        case .even: .clear
+        }
+    }
+
+    private func head(_ words: String, theme: Theme) -> some View {
         Text(words)
             .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
             .textCase(.uppercase)
             .tracking(Tokens.TypeScale.xs * 0.06)
-            .lineLimit(1)
-            .foregroundStyle(theme.color(Tokens.Color.scoreboardInk2))
+            .foregroundStyle(theme.color(Tokens.Color.ink3))
+            .lineLimit(2)
+            .minimumScaleFactor(0.85)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// A side's gain a week as a short bar, the longer side full, in the gain's or the loss's ink.
+struct GainBar: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let share: Double
+    let tone: Tone
+
+    var body: some View {
+        let theme = Theme(colorScheme)
+        Capsule()
+            .fill(theme.color(Tokens.Color.line))
+            .frame(width: 40, height: 4)
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(theme.color(fill))
+                    .frame(width: 40 * min(max(share, 0), 1), height: 4)
+            }
+            .accessibilityHidden(true)
+    }
+
+    private var fill: ThemedColor {
+        switch tone {
+        case .gain: Tokens.Color.gainInk
+        case .loss: Tokens.Color.lossInk
+        case .even: Tokens.Color.ink3
+        }
     }
 }
 

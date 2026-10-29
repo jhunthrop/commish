@@ -13,10 +13,8 @@ public enum Tone: String, Equatable, Sendable {
 /// and builder.ts), each a port held to the web's output by shared/fixtures/parity/trades.json.
 public enum TradesWords {
     static let minus = "\u{2212}"
-    static let countWords = ["No", "One", "Two"]
-    /// TradeStrip's words between a card's parts: "with Max_Jensen10", "Rodgers for Skattebo".
-    public static let with = "with"
-    public static let forWord = "for"
+    /// The word between an idea's sides: "Rodgers for Waddle and Strong".
+    static let forWord = "for"
 
     /// format/list.ts listWords: "Skattebo and Strong", "A, B and C".
     static func list(_ items: [String]) -> String {
@@ -63,41 +61,9 @@ public enum TradesWords {
         return figure > 0 ? .gain : .loss
     }
 
-    /// trades.ts worthTitle: "Two trades worth proposing", "One trade worth proposing".
-    static func worthTitle(_ count: Int) -> String {
-        let number = count < countWords.count ? countWords[count] : String(count)
-        return "\(number) \(count == 1 ? "trade" : "trades") worth proposing"
-    }
-
     /// trades.ts shortSide: a side by last names, "Skattebo and Strong".
     static func shortSide(_ side: [PlayerLine]) -> String {
         list(side.map { StartRows.lastName($0.player.name) })
-    }
-
-    /// trades.ts weekLine: "+10.1 Proj this week for your lineup, +2.5 for theirs", nil without a
-    /// projection read.
-    static func weekLine(_ row: TradeRow) -> String? {
-        guard let mine = row.myProjChange, let theirs = row.theirProjChange else {
-            return nil
-        }
-        return "\(week(mine)) \(Words.Trades.projForYou), \(week(theirs)) \(Words.Trades.forTheirs)"
-    }
-
-    /// trades.ts dropName: "Dart", "Williams, a starter".
-    static func dropName(_ row: TradeRow) -> String {
-        let name = row.drop.map { StartRows.lastName($0.value1.player.name) } ?? ""
-        return row.dropReason == nil ? name : "\(name), \(Words.Trades.aStarter)"
-    }
-
-    /// trades.ts roomWords' yours: "You drop Dart", else "You have room".
-    static func yourRoom(_ row: TradeRow) -> String {
-        row.drop == nil ? Words.Trades.youHaveRoom : "You drop \(dropName(row))"
-    }
-
-    /// trades.ts phoneWith: "with Max_Jensen10, you drop Dart".
-    static func phoneWith(team: String, row: TradeRow) -> String {
-        let drop = row.drop == nil ? "" : ", you drop \(dropName(row))"
-        return "with \(team)\(drop)"
     }
 
     /// trades.ts offerName: "Aaron Rodgers (QB PIT)".
@@ -123,41 +89,16 @@ public enum TradesWords {
         CopiedLine(said: done ? Words.Trades.copied : Words.Trades.copyFailed, page: "\(platform)'s trade page")
     }
 
-    /// trades.ts fromWords: "From McConkey Kong Country, you", "From Max_Jensen10".
-    static func from(_ team: String, mine: Bool) -> String {
-        mine ? "From \(team), you" : "From \(team)"
-    }
-
-    /// trades.ts weekHeadFor: "This week, Proj", "Week 7, Proj" on a turned page.
-    static func weekHead(week: Int, forWeek: Int?) -> String {
-        guard let forWeek, forWeek > week else {
-            return Words.Trades.weekHead
-        }
-        return "Week \(forWeek), \(Words.Box.proj)"
-    }
-
-    /// words.ts noTradeWith: "No trade we found includes Josh Downs."
-    static func noTradeWith(_ name: String) -> String {
-        "No trade we found includes \(name)."
-    }
-
     /// words.ts gainAmount: "2.1", "under 0.1" for a gain under what a page shows.
     static func gainAmount(_ gain: Double) -> String {
         gain > 0 && gain < 0.05 ? "under \(Formatting.fixed(0.1, 1))" : Formatting.fixed(gain, 1)
     }
 
-    /// words.ts tradeDecision: "Trade Aaron Rodgers to Max_Jensen10 for Cam Skattebo and Pierre Strong,
-    /// and drop Jaxson Dart to make room. Your lineup gains 5.7 points over replacement a week, theirs
-    /// 0.7.", or that no trade we found helps both lineups.
-    static func decision(_ best: (row: TradeRow, team: String)?) -> String {
-        guard let (row, team) = best else {
-            return "No trade we found helps both lineups."
-        }
-        let names = { (side: [PlayerLine]) in list(side.map(\.player.name)) }
-        let drop = row.drop.map { ", and drop \($0.value1.player.name) to make room" } ?? ""
-        return "Trade \(names(row.give)) to \(team) for \(names(row.get))\(drop). "
-            + "Your lineup gains \(gainAmount(row.myGain)) points over replacement a week, "
-            + "theirs \(gainAmount(row.theirGain))."
+    /// builder.ts shareText, the trade as Share copies it in our words: the offer, then each lineup's
+    /// change and the drop.
+    static func share(team: String, row: TradeRow) -> String {
+        let drop = row.drop.map { " You drop \($0.value1.player.name) to make room." } ?? ""
+        return "\(offer(team: team, row: row)) \(TradeChecks.change(row))\(drop)"
     }
 }
 

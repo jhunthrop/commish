@@ -44,6 +44,12 @@ public struct TradePicks: Equatable, Sendable {
         }
         return TradeCheckInput(team: team, give: give, get: get)
     }
+
+    /// builder.ts samePicks: the same trade in any order of ticks, so the idea the ticks hold is pressed.
+    func same(_ other: TradePicks) -> Bool {
+        let same = { (lhs: [String], rhs: [String]) in lhs.count == rhs.count && lhs.allSatisfy(rhs.contains) }
+        return team == other.team && same(give, other.give) && same(get, other.get)
+    }
 }
 
 /// A roster row's tick (BoxPick): picked or not (held back while the side is full), none for a player
@@ -55,11 +61,9 @@ public enum PickTick: Equatable, Sendable {
     case drop
 }
 
-/// One roster row of the builder (TradeBox's BoxLine at 390): the box's cells, the phone's line (Avg
-/// and Last, no Opp rank), his tick.
+/// One roster row of the builder (TradeBox's tight BoxLine at 390): the box's cells and his tick.
 public struct BuilderRow: Equatable, Sendable, Identifiable {
     public let cells: RowCells
-    public let line: String
     public let tick: PickTick
 
     public var id: String {
@@ -68,7 +72,8 @@ public struct BuilderRow: Equatable, Sendable, Identifiable {
 }
 
 /// One roster as the builder's box draws it: the team, "You" on the member's, its standing, what the
-/// side holds, its rows in the builder's order.
+/// side holds, its rows in the builder's order. Their box before a team is chosen has no team and no
+/// rows, its head the team choice alone.
 public struct BuilderBox: Equatable, Sendable {
     public let team: String
     public let initials: String
@@ -78,57 +83,60 @@ public struct BuilderBox: Equatable, Sendable {
     public let rows: [BuilderRow]
 }
 
-/// The builder (TradeBuilder.svelte at 390): the team chosen by name and record, the scoreboard of each
-/// side before and after, the answer line and the close call's chip, the builder's own line, the
-/// member's roster then theirs, and the pin with the gains and the verb.
+/// The roster switch where the rosters stack (TradeBuilder's .switch): "You, 1" and "Max_Jensen10, 2",
+/// "Pick a team" before one is chosen.
+public struct RosterSwitch: Equatable, Sendable {
+    public let yours: String
+    public let theirs: String
+}
+
+/// The builder as the screen (TradeBuilder.svelte at 390, Lanes 260, 268, 277): our ideas row, the
+/// roster switch, the member's roster or theirs with the team chosen at its head, the verdict (one
+/// box-score row per side) with the answer line, the close call's chip and the builder's own lines, and
+/// the pin with the gains, Share and the verb.
 public struct TradeBuilderModel: Equatable, Sendable {
     public struct TeamChoice: Equatable, Sendable, Identifiable {
         public let id: Int
         public let choice: String
     }
 
+    public let ideas: [IdeaPlace]
+    public let ideasHead: String
+    /// "8 more", nil once every idea shows.
+    public let more: String?
+    /// The idea the ticks hold, pressed.
+    public let pressed: String?
+    public let rosters: RosterSwitch
     public let teams: [TeamChoice]
     public let team: Int?
+    /// The team choice as its box shows it: "Max_Jensen10, Max Jensen, 3-2", or "Pick a team".
+    public let teamLabel: String
     public let bug: TradeBug
     public let sentence: String
     /// The answer line is the prompt, not an answer: drawn quieter.
     public let quiet: Bool
     public let close: String?
+    /// The platform's reason the verb cannot propose from here, or its note when it has no page.
+    public let hostLine: String?
     public let own: String
     public let yours: BuilderBox
-    public let theirs: BuilderBox?
-    /// "+5.7 a week for your lineup, +0.7 for theirs" once answered, its first figure strong; the answer
-    /// line before.
+    public let theirs: BuilderBox
+    /// "+5.3 a week for your lineup, +1.1 for theirs" once answered on a trade both rosters can make,
+    /// its first figure strong; who would not take it; else the answer line.
     public let pin: Pin
+    /// Propose and Share act on the answer only for the team and ticks it was read for, on a trade both
+    /// rosters can make (builder.ts proposable).
+    public let live: Bool
     public let verbEnabled: Bool
 
     public enum Pin: Equatable, Sendable {
         case gains(mine: String, rest: String)
         case words(String)
     }
-}
 
-/// The member's side as the builder names it: the team and where it stands.
-public struct TradeMe: Equatable, Sendable {
-    public let name: String
-    public let aside: String
-
-    public init(name: String, aside: String) {
-        self.name = name
-        self.aside = aside
-    }
-
-    /// The followed league's team and standing (TradeScreen's me: the switch's team name and
-    /// model.ts standingWords, "5-1, 2nd of 12"); "You" for a league saved before the app kept its team
-    /// (review L3).
-    public init(league: FollowedLeague) {
-        let team = league.teamName ?? ""
-        name = team.isEmpty ? Words.Box.you : team
-        aside = league.standing.map { standing in
-            let record = "\(standing.wins)-\(standing.losses)"
-            let words = standing.ties > 0 ? "\(record)-\(standing.ties)" : record
-            return "\(words), \(Formatting.ordinal(standing.place)) of \(standing.teams)"
-        } ?? ""
+    /// Every player both rosters show in the sheet.
+    public var sheetPlayers: [SheetPlayer] {
+        (yours.rows + theirs.rows).compactMap(\.cells.sheetPlayer)
     }
 }
 
@@ -136,6 +144,8 @@ public struct TradeMe: Equatable, Sendable {
 enum TradeBuilder {
     static let maxASide = 2
     static let traded: Set = ["QB", "RB", "WR", "TE"]
+    /// builder.ts BAR_FLOOR: the least a full bar stands for, in points a week.
+    static let barFloor = 1.0
 
     /// builder.ts pickable: at QB, RB, WR or TE, named by the platform, not on injured reserve.
     static func pickable(_ line: PlayerLine) -> Bool {
@@ -167,6 +177,19 @@ enum TradeBuilder {
         }
     }
 
+    /// builder.ts countWords: ", 1" after a side's name on the switch, nothing while none is ticked.
+    static func count(_ side: [String]) -> String {
+        side.isEmpty ? "" : ", \(side.count)"
+    }
+
+    /// builder.ts gainBars: each side's gain as a share of the longer one (at least the floor), 0 to 1.
+    static func bars(_ mine: Double?, _ theirs: Double?) -> (yours: Double, theirs: Double) {
+        let yours = abs(mine ?? 0)
+        let their = abs(theirs ?? 0)
+        let full = max(yours, their, barFloor)
+        return (yours / full, their / full)
+    }
+
     /// trades.ts rosterOrder: by position, each by this week's Proj highest first (none after), injured
     /// reserve last, then by name.
     static func rosterOrder(_ lines: [PlayerLine]) -> [PlayerLine] {
@@ -191,67 +214,15 @@ enum TradeBuilder {
         }.map(\.element)
     }
 
-    /// The builder at its picks and its answer, as TradeBuilder draws it.
-    static func model(_ inputs: Inputs) -> TradeBuilderModel {
-        let picks = inputs.picks
-        let team = inputs.advice.teams.first { $0.rosterId == picks.team }
-        let check = inputs.answer.map { TradeChecks.held($0, now: inputs.now) }
-        let trade = check?.trade.value1
-        let dropID = trade?.drop?.value1.player.hostId
-        let room = check.map(TradeChecks.room) ?? (yours: "", theirs: "")
-        let sentence = inputs.problem ?? check.map(TradeChecks.words) ?? prompt(picks)
-        let box = { (side: TradePicks.Side, lines: [PlayerLine], name: String, mine: Bool, aside: String) in
-            BuilderBox(
-                team: name, initials: Initials.of(name), mine: mine, aside: aside, holds: holds(picks, side),
-                rows: rosterOrder(lines).map { line in
-                    row(line, tick: tick(line, side: side, picks: picks, dropID: dropID), inputs: inputs)
-                }
-            )
-        }
-        return TradeBuilderModel(
-            teams: inputs.advice.teams.map { .init(id: $0.rosterId, choice: choice($0)) },
-            team: picks.team,
-            bug: TradeBug(
-                yours: TradeBugSide(
-                    me: true, name: inputs.me.name, totals: check?.totals.yours, gain: trade?.myGain,
-                    projChange: trade?.myProjChange, room: room.yours, rest: TradeRest.of(check, mine: true)
-                ),
-                theirs: TradeBugSide(
-                    me: false, name: team?.name ?? "", totals: check?.totals.theirs, gain: trade?.theirGain,
-                    projChange: trade?.theirProjChange, room: room.theirs,
-                    rest: TradeRest.of(check, mine: false)
-                )
-            ),
-            sentence: sentence,
-            quiet: check == nil && inputs.problem == nil,
-            close: check.flatMap(closeCall),
-            own: check?.basis ?? inputs.advice.checkBasis,
-            yours: box(.give, inputs.advice.roster, inputs.me.name, true, inputs.me.aside),
-            theirs: team.map { box(.get, $0.roster, $0.name, false, aside($0)) },
-            pin: pin(check: check, sentence: sentence),
-            verbEnabled: inputs.pageKnown && check != nil
-        )
-    }
-
-    /// The pin's line: why a side would not take it (TradeBuilder.svelte's refusal, Lane 277), else the
-    /// two gains a week, else the answer line.
-    static func pin(check: TradeCheck?, sentence: String) -> TradeBuilderModel.Pin {
-        if let check, TradeChecks.fillsBoth(check), let refusal = TradeChecks.refusal(check) {
-            return .words(refusal)
-        }
-        guard let trade = check?.trade.value1 else {
-            return .words(sentence)
-        }
-        return .gains(
-            mine: TradesWords.gain(trade.myGain),
-            rest: "\(Words.Trades.aWeekForYou), \(TradesWords.gain(trade.theirGain)) \(Words.Trades.forTheirs)"
-        )
-    }
-
     struct Inputs {
         let advice: TradeAdvice
+        let ideas: TradeIdeas
+        /// Whether the ideas row shows every idea.
+        let allIdeas: Bool
         let picks: TradePicks
+        /// The last answer and the picks it was read for.
         let answer: TradeCheck?
+        let answered: TradePicks?
         let problem: String?
         let me: TradeMe
         let pageKnown: Bool
@@ -259,13 +230,109 @@ enum TradeBuilder {
         let now: Date
     }
 
+    /// The builder at its picks and its answer, as TradeBuilder draws it.
+    static func model(_ inputs: Inputs) -> TradeBuilderModel {
+        let picks = inputs.picks
+        let team = inputs.advice.teams.first { $0.rosterId == picks.team }
+        let check = inputs.answer.map { TradeChecks.held($0, now: inputs.now) }
+        let sentence = inputs.problem ?? (team == nil
+            ? Words.Analyzer.noTeam : check.map(TradeChecks.words) ?? prompt(picks))
+        let live = team != nil && check.map(TradeChecks.fillsBoth) == true
+            && inputs.answered.map(picks.same) == true
+        let boxed = boxes(inputs, team: team, check: check)
+        return TradeBuilderModel(
+            ideas: inputs.ideas.visible(all: inputs.allIdeas),
+            ideasHead: inputs.ideas.head,
+            more: inputs.ideas.more(all: inputs.allIdeas),
+            pressed: inputs.ideas.places.compactMap { place -> String? in
+                guard case let .idea(preset) = place, preset.picks.same(picks) else {
+                    return nil
+                }
+                return preset.id
+            }.first,
+            rosters: RosterSwitch(
+                yours: "\(Words.Analyzer.you)\(count(picks.give))",
+                theirs: "\(team?.name ?? Words.Analyzer.pickTeam)\(count(picks.get))"
+            ),
+            teams: inputs.advice.teams.map { .init(id: $0.rosterId, choice: choice($0)) },
+            team: picks.team,
+            teamLabel: team.map(choice) ?? Words.Analyzer.pickTeam,
+            bug: bug(check, me: inputs.me.name, team: team?.name ?? ""),
+            sentence: sentence,
+            quiet: check == nil && inputs.problem == nil,
+            close: check.flatMap(closeCall),
+            hostLine: inputs.advice.moves.reason ?? inputs.advice.hostNote,
+            own: check?.basis ?? inputs.advice.checkBasis,
+            yours: boxed.yours,
+            theirs: boxed.theirs,
+            pin: pin(check: check, sentence: sentence),
+            live: live,
+            verbEnabled: live && inputs.pageKnown
+        )
+    }
+
+    /// The verdict's two rows (TradeBug over bugFigures, checkRoom, gainBars and restFigure).
+    static func bug(_ check: TradeCheck?, me: String, team: String) -> TradeBug {
+        let trade = check?.trade.value1
+        let room = check.map(TradeChecks.room) ?? (yours: "", theirs: "")
+        let bars = bars(trade?.myGain, trade?.theirGain)
+        return TradeBug(
+            yours: TradeBugSide(
+                me: true, name: me, totals: check?.totals.yours, gain: trade?.myGain,
+                projChange: trade?.myProjChange, room: room.yours, rest: TradeRest.of(check, mine: true),
+                bar: bars.yours
+            ),
+            theirs: TradeBugSide(
+                me: false, name: team, totals: check?.totals.theirs, gain: trade?.theirGain,
+                projChange: trade?.theirProjChange, room: room.theirs, rest: TradeRest.of(check, mine: false),
+                bar: bars.theirs
+            )
+        )
+    }
+
+    /// Both rosters as their boxes draw them: the member's, and theirs (empty before a team is chosen).
+    static func boxes(
+        _ inputs: Inputs, team: TradeTeam?, check: TradeCheck?
+    ) -> (yours: BuilderBox, theirs: BuilderBox) {
+        let picks = inputs.picks
+        let dropID = check?.trade.value1.drop?.value1.player.hostId
+        let rows = { (side: TradePicks.Side, lines: [PlayerLine]) in
+            rosterOrder(lines).map { line in
+                row(line, tick: tick(line, side: side, picks: picks, dropID: dropID), inputs: inputs)
+            }
+        }
+        let yours = BuilderBox(
+            team: inputs.me.name, initials: Initials.of(inputs.me.name), mine: true, aside: inputs.me.aside,
+            holds: holds(picks, .give), rows: rows(.give, inputs.advice.roster)
+        )
+        let theirs = BuilderBox(
+            team: team?.name ?? "", initials: team.map { Initials.of($0.name) } ?? "", mine: false,
+            aside: team.map(aside) ?? "", holds: team == nil ? "" : holds(picks, .get),
+            rows: rows(.get, team?.roster ?? [])
+        )
+        return (yours, theirs)
+    }
+
+    /// The pin's line (TradeBuilder.svelte's .pin-gains): why a side would not take it (Lane 277), else
+    /// the two gains a week on a trade both rosters can make, else the answer line.
+    static func pin(check: TradeCheck?, sentence: String) -> TradeBuilderModel.Pin {
+        guard let check, TradeChecks.fillsBoth(check) else {
+            return .words(sentence)
+        }
+        if let refusal = TradeChecks.refusal(check) {
+            return .words(refusal)
+        }
+        let trade = check.trade.value1
+        return .gains(
+            mine: TradesWords.gain(trade.myGain),
+            rest: "\(Words.Trades.aWeekForYou), \(TradesWords.gain(trade.theirGain)) \(Words.Trades.forTheirs)"
+        )
+    }
+
     /// TradeBuilder's close: a trade both rosters take that the member gains from, a close call for them.
     static func closeCall(_ check: TradeCheck) -> String? {
-        let fills = check.fills
         let trade = check.trade.value1
-        guard fills.yours, fills.theirs, fills.yoursRoom, fills.theirsRoom, trade.myGain > 0,
-              trade.closeForThem, trade.theirGain > 0
-        else {
+        guard TradeChecks.fillsBoth(check), trade.myGain > 0, trade.closeForThem, trade.theirGain > 0 else {
             return nil
         }
         return Words.TradePicker.closeForThem
@@ -297,15 +364,7 @@ enum TradeBuilder {
         let cells = RowCells(
             nil, row: StartRows.row(line, slot: "", zone: inputs.zone, now: inputs.now, ranked: false), reserve: nil
         )
-        let words = "\(Words.Box.avg) \(StartWords.number(cells.row.avg)), "
-            + "\(Words.Box.last) \(StartWords.number(cells.row.last))"
-        return BuilderRow(cells: cells, line: words, tick: tick)
-    }
-
-    /// The opening picks for Build a trade: the first team with a trade found, else the first team.
-    static func opening(_ advice: TradeAdvice) -> TradePicks {
-        let first = advice.teams.first { !$0.trades.isEmpty } ?? advice.teams.first
-        return TradePicks(team: first?.rosterId, give: [], get: [])
+        return BuilderRow(cells: cells, tick: tick)
     }
 
     /// builder.ts builtFrom: a finder row as picks, nil when a player in it has no host id.

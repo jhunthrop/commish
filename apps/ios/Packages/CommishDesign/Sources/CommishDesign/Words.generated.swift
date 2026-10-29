@@ -504,6 +504,19 @@ public enum Words {
         public static let full = "Two picked, tap one to put him back"
     }
 
+    public enum Analyzer {
+        public static let ideas = "Our ideas, by team"
+        public static let yours = "yours"
+        public static let theirs = "theirs"
+        public static let team = "Team"
+        public static let share = "Share"
+        public static let shared = "Copied the trade as text."
+        public static let pickTeam = "Pick a team"
+        public static let noTeam = "Pick a team to trade with, then tick a player on each side."
+        public static let rosters = "Rosters"
+        public static let you = "You"
+    }
+
     public enum HeldPage {
         public static let log = "His game log is not written yet."
         public static let basis = "His figures are the board's. His game log and our read of him are not written yet."
