@@ -23,7 +23,7 @@ from research.capsules.week.cadence import status_rewrite_capped
 from research.capsules.week.caption import PROJECTION_MOVED_CAPTION, status_changed_caption, written_caption
 from research.capsules.week.rollover import ReadsDue
 from research.capsules.week.store import StoredWeekRead
-from research.free_agent import run_club
+from research.free_agent import FREE_AGENT_CLUB, run_club
 from research.model.instants import js_iso
 from research.nightly.build.page_club import call_for, page_last_game_club
 from research.nightly.build.player_season import SeasonContext, prior_seasons, season_block
@@ -420,7 +420,8 @@ def _promised(who: Identity, has_season: bool, inputs: PageInputs) -> ReadsDue |
 
 def _week_read(who: Identity, universe_id: str | None, inputs: PageInputs) -> Json | None:
     stored = None if universe_id is None else inputs.week.reads.get(universe_id)
-    if stored is None:
+    # A free agent's stored read is about the club that let him go: none is served (Lane 301, B298).
+    if stored is None or who.team == FREE_AGENT_CLUB:
         return None
     kicked_off = _kicked_off(inputs.season.games.get(who.team, ()), stored.week, inputs.week.as_of)
     week = inputs.week

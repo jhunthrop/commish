@@ -124,3 +124,17 @@ func TestNoLiveReadOnceHisGameHasKickedOff(t *testing.T) {
 		t.Fatal("another club's kickoff leaves his read standing")
 	}
 }
+
+// A released player (no club) has no read: it was written about a club
+// that let him go (Lane 301, B298).
+func TestNoLiveReadForAPlayerWithNoClub(t *testing.T) {
+	games := []boards.TeamWeek{{Week: 6, Team: "NYJ", Kickoff: time.Date(2026, 10, 18, 17, 0, 0, 0, time.UTC)}}
+	s := &Service{Season: 2026, WeekReads: &fakeWeekReads{rows: map[string]*weekreads.Row{"p1": &rewrite}}}
+	before := time.Date(2026, 10, 18, 16, 0, 0, 0, time.UTC)
+	if s.liveWeekRead(context.Background(), games, boards.Player{ID: "p1", Team: "NYJ"}, before) == nil {
+		t.Fatal("a player on a club keeps his read")
+	}
+	if got := s.liveWeekRead(context.Background(), games, boards.Player{ID: "p1", Team: ""}, before); got != nil {
+		t.Fatalf("a free agent is served a read: %+v", got)
+	}
+}
