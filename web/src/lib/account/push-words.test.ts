@@ -1,5 +1,5 @@
 // The push switches' words (Lane 198), which the apps' Account screens print: the three kinds, quiet
-// hours, and where the switches are kept until the account carries them. Run with `npm test`.
+// hours, where the switches are kept, the permission and the channel. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedIn } from '#lib/format/copy-guard.ts';

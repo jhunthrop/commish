@@ -728,15 +728,18 @@ object Words {
         const val thursday = "The Thursday read"
         const val thursdayLine = "When the week's rankings are out"
         const val status = "A starter's status"
-        const val statusLine = "When a player in your lineup is ruled out or listed questionable"
+        const val statusLine = "When a player in your lineup is ruled out, doubtful or cleared to play"
         const val waivers = "Waivers clearing"
         const val waiversLine = "When your platform runs waivers and your claims go through or miss"
         const val quiet = "Quiet hours"
         const val quietLine = "Nothing arrives between these times, on your phone's clock"
         const val from = "From"
         const val to = "To"
-        const val savedHere = "Saved on this phone"
-        const val notYet = "Nothing is sent yet. These take effect when notifications start."
+        const val kept = "Kept with your account, for every phone you sign in on."
+        const val ask = "Turn one on and your phone asks to let Commish send notifications."
+        const val blocked = "Notifications for Commish are off in your phone's settings. Turn them on there first."
+        const val channel = "Your leagues"
+        const val channelLine = "Your starters' status, the Thursday read and waivers clearing"
     }
 
     object AccountFoot {
