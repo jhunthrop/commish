@@ -10,6 +10,8 @@ struct AppEnvironment {
     static let baseURLKey = "CommishAPIBaseURL"
     /// The launch argument a development build reads for the companion's replay.
     static let replayArgument = "CommishCompanionReplay"
+    /// The Keychain item a push removal left from a sign out is kept in (Lane 288 security M1).
+    static let pendingRemovalService = "app.trycommish.ios.push-pending"
 
     let baseURL: URL
     let session: any SessionStore
@@ -42,9 +44,11 @@ struct AppEnvironment {
             let replay = false
         #endif
         let session = KeychainSessionStore()
+        // A removal a sign out without signal could not finish, with the signed-out device's own token.
+        let pending = KeychainSessionStore(service: pendingRemovalService)
         let push = PushRegistrar(
-            api: APIClient(baseURL: url, tokens: session), platform: SystemPush(),
-            deviceID: { await session.deviceID() }
+            api: APIClient(baseURL: url, tokens: session), platform: SystemPush(), session: session,
+            pending: PendingRemoval(store: pending, api: APIClient(baseURL: url, tokens: pending))
         )
         return AppEnvironment(
             baseURL: url,

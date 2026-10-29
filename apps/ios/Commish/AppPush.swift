@@ -36,9 +36,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     nonisolated static let log = Logger(subsystem: "app.trycommish.ios", category: "push")
 
     @MainActor var registrar: PushRegistrar?
-    @MainActor private var held: PushRoute?
-    /// Where a tapped push's route goes, set by the app once its shell is up; a held one is delivered then.
-    @MainActor var opened: ((PushRoute) -> Void)? {
+    @MainActor private var held: PushTap?
+    /// Where a tapped push goes, set by the app once its shell is up; a held one is delivered then.
+    @MainActor var opened: ((PushTap) -> Void)? {
         didSet {
             if let held, let opened {
                 self.held = nil
@@ -71,17 +71,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     nonisolated func userNotificationCenter(
         _: UNUserNotificationCenter, didReceive response: UNNotificationResponse
     ) async {
-        guard let route = PushRoute.of(response.notification.request.content.userInfo) else {
-            return
-        }
-        await MainActor.run { open(route) }
+        let tap = PushTap(route: PushRoute.of(response.notification.request.content.userInfo))
+        await MainActor.run { open(tap) }
     }
 
-    @MainActor private func open(_ route: PushRoute) {
+    @MainActor private func open(_ tap: PushTap) {
         if let opened {
-            opened(route)
+            opened(tap)
         } else {
-            held = route
+            held = tap
         }
     }
 }

@@ -14,7 +14,7 @@ struct CommishApp: App {
     @State private var signIn = SignInModel()
     @State private var linked: ShellRoute?
     /// A tapped push's screen, opened by the shell once signed in.
-    @State private var pushed: PushRoute?
+    @State private var pushed: PushTap?
 
     init() {
         let environment = AppEnvironment.live()
@@ -86,6 +86,7 @@ struct CommishApp: App {
     /// Reads the account; signed in, a phone that allows push asks Apple for its token, which registers
     /// on this phone's device (never the permission prompt: only the Account's switch asks).
     private func restore() async {
+        await environment.push.launched()
         await session.restore()
         if session.isSignedIn {
             await environment.push.start()

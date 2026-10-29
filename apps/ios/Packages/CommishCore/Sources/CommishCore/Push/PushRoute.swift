@@ -21,6 +21,16 @@ public struct PushRoute: Equatable, Sendable {
         self.player = player
     }
 
+    /// Where a tapped push opens the shell (review M1): its route when it names a league the member
+    /// follows, else the league list (the switch), so a push for a league since detached, or a path this
+    /// build does not draw, still lands somewhere that says what is followed.
+    public static func destination(_ route: PushRoute?, following: [String]) -> PushDestination {
+        guard let route, following.contains(route.league) else {
+            return .leagueList
+        }
+        return .league(route)
+    }
+
     /// The payload's key that names the screen.
     static let pathKey = "path"
 
@@ -52,5 +62,22 @@ public struct PushRoute: Equatable, Sendable {
         default:
             return nil
         }
+    }
+}
+
+/// What a tapped push opens: a followed league's screen, or the league list.
+public enum PushDestination: Equatable, Sendable {
+    case league(PushRoute)
+    case leagueList
+}
+
+/// One tap on a push: the route its payload names (nil for none this build reads), new each tap so the
+/// same push tapped twice opens twice.
+public struct PushTap: Equatable, Sendable {
+    public let route: PushRoute?
+    let id = UUID()
+
+    public init(route: PushRoute?) {
+        self.route = route
     }
 }

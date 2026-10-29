@@ -43,23 +43,64 @@ struct AccountPushSwitchTests {
         #expect(relaunched.push.on(.status) == false)
     }
 
+    /// The fixture account holding the settings given (its zone the phone's unless named).
+    static func stub(
+        status: Bool, thursday: Bool, waivers: Bool, zone: String = Fixtures.zone.identifier
+    ) throws -> StubAccountScreen {
+        let answers = try AccountParityTests.answers()
+        var me = answers.me
+        me.notifications = .init(value1: NotificationSettingsAnswer(
+            timeZone: zone, quietStart: "23:00", quietEnd: "08:00",
+            kinds: .init(starterStatus: status, weekReads: thursday, waiverClaims: waivers)
+        ))
+        return StubAccountScreen(account: me, leagues: answers.attached, paired: answers.devices)
+    }
+
     /// Never asked, every switch draws off and the sentence says a switch asks; turning one on shows the
-    /// system prompt and, allowed, writes that one on and the others as drawn (off).
-    @Test func aSwitchOnAsksThePhoneOnceThenWritesWhatIsDrawn() async throws {
-        let stub = try StubAccountScreen.fixture()
+    /// system prompt and, allowed, writes the account's stored switches with only that kind changed, so
+    /// Status and Waivers already on stay on (review M3).
+    @Test func aSwitchOnAsksThePhoneOnceAndChangesOnlyItsKind() async throws {
+        let stub = try Self.stub(status: true, thursday: false, waivers: true)
         let push = StaticPush(.notAsked, asked: .allowed)
         let viewModel = AccountViewModelTests.viewModel(stub, push: push)
         await viewModel.load()
         #expect(viewModel.permission == .notAsked)
         #expect(viewModel.shownPush.anyOn == false)
-        await viewModel.set(.status, isOn: true)
+        await viewModel.set(.thursday, isOn: true)
         #expect(push.enabled == 1)
         #expect(viewModel.permission == .allowed)
         #expect(await stub.notificationChanges.last?.kinds == .init(
-            starterStatus: true, weekReads: false, waiverClaims: false
+            starterStatus: true, weekReads: true, waiverClaims: true
         ))
         #expect(viewModel.shownPush.on(.status))
-        #expect(viewModel.shownPush.on(.thursday) == false)
+        #expect(viewModel.shownPush.on(.thursday))
+    }
+
+    /// The account's zone is not the phone's (the API's New York default): the phone's is written once
+    /// on load, nothing else with it, and a second load writes nothing (review M2).
+    @Test func theAccountTakesThePhonesZoneOnceOnLoad() async throws {
+        let stub = try Self.stub(status: true, thursday: true, waivers: true, zone: "America/New_York")
+        let viewModel = AccountViewModelTests.viewModel(stub, push: StaticPush(.allowed))
+        await viewModel.load()
+        await viewModel.load()
+        let changes = await stub.notificationChanges
+        #expect(changes == [NotificationSettingsChange(timeZone: Fixtures.zone.identifier)])
+        let same = try Self.stub(status: true, thursday: true, waivers: true)
+        await AccountViewModelTests.viewModel(same, push: StaticPush(.allowed)).load()
+        #expect(await same.notificationChanges.isEmpty)
+    }
+
+    /// A quiet hours write that fails puts the account's last confirmed hours back (review M4).
+    @Test func aFailedQuietHoursWritePutsTheConfirmedHoursBack() async throws {
+        let stub = try StubAccountScreen.fixture()
+        let viewModel = AccountViewModelTests.viewModel(stub, push: StaticPush(.allowed))
+        await viewModel.load()
+        await stub.failWrites(with: URLError(.notConnectedToInternet))
+        viewModel.setQuiet(from: 21 * 60, to: 6 * 60)
+        #expect(viewModel.push.quietFrom == 21 * 60)
+        await viewModel.pendingQuietWrite?.value
+        #expect(viewModel.push == .standard)
+        #expect(viewModel.problem == AccountProblem(section: .notifications, text: Words.Account.failed))
     }
 
     /// The phone says no: nothing is written, the switch stays off and the sentence says where to allow it.

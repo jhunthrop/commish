@@ -2,6 +2,7 @@ import CommishAPI
 import CommishDesign
 import Foundation
 import Observation
+import os
 
 /// Which part of the screen an action's failure is said beside.
 public enum AccountSection: Sendable, Equatable {
@@ -32,12 +33,16 @@ public final class AccountViewModel {
 
     public private(set) var state: State = .loading
     /// The account's switches and quiet hours, as last read or written.
-    public private(set) var push = PushSettings.standard
+    public internal(set) var push = PushSettings.standard
+    /// The settings the account last confirmed (read or written), put back when a write fails.
+    @ObservationIgnored var confirmed = PushSettings.standard
+    /// Whether this view model has written the phone's zone to the account (once, on load).
+    @ObservationIgnored var zoneWritten = false
     /// Whether this phone may show a push; until it may, every switch draws off.
-    public private(set) var permission = PushPermission.notAsked
+    public internal(set) var permission = PushPermission.notAsked
     /// The row an action is under way on (a league's or a device's id).
     public private(set) var busy: String?
-    public private(set) var problem: AccountProblem?
+    public internal(set) var problem: AccountProblem?
     /// The last detach's undo window, kept so a test can await it; the app never waits on it.
     public var undoWindow: Task<Void, Never>? {
         lastDetached.flatMap { undoWindows[$0] }
@@ -47,9 +52,10 @@ public final class AccountViewModel {
     public static let undoSeconds: Double = 10
     /// The cache key of the screen's answer.
     public static let route = "/account"
+    nonisolated static let log = Logger(subsystem: "app.trycommish.ios", category: "account")
 
-    private var answer: AccountScreenAnswer?
-    private var stamp = Date.distantPast
+    var answer: AccountScreenAnswer?
+    var stamp = Date.distantPast
     private var stale = false
     private var detached: Set<String> = []
     private var thisDevice: String?
@@ -57,13 +63,13 @@ public final class AccountViewModel {
     @ObservationIgnored private var undoWindows: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var lastDetached: String?
 
-    private let api: any AccountScreenAPI
-    private let cache: any AnswerCache
+    let api: any AccountScreenAPI
+    let cache: any AnswerCache
     private let clock: any Clock
-    private let zone: TimeZone
-    private let control: any PushControl
+    let zone: TimeZone
+    let control: any PushControl
     /// The quiet hours' write, after the wheel has stopped a moment (one PATCH, not one per tick).
-    @ObservationIgnored private var quietWrite: Task<Void, Never>?
+    @ObservationIgnored var quietWrite: Task<Void, Never>?
     /// How long the wheel rests before quiet hours are written.
     static let quietPause: Double = 0.8
     private let deviceID: @Sendable () async -> String?
@@ -71,7 +77,7 @@ public final class AccountViewModel {
     private let onSignedOut: @MainActor () -> Void
     private let accountDeleted: @MainActor () async -> Void
     private let leaguesChanged: @MainActor () -> Void
-    private let wait: @Sendable (Double) async -> Void
+    let wait: @Sendable (Double) async -> Void
 
     /// `signOut` is the session's (it revokes this phone and forgets it); `onSignedOut` runs when the API
     /// refuses the token or this phone was unpaired here; `deleted` is the session's once the account is
@@ -133,7 +139,7 @@ public final class AccountViewModel {
     }
 
     /// The API refused the token: the pending detaches are let go, then the app signs out.
-    private func signedOut() {
+    func signedOut() {
         forgetPending()
         onSignedOut()
     }
@@ -159,6 +165,7 @@ public final class AccountViewModel {
             let now = clock.now
             await cache.write(read, route: Self.route, stamp: now)
             show(read, stamp: now, stale: false)
+            await writeZone(read.me)
         } catch where APIError.signsOut(error) {
             state = .failed(AppWords.Failure.signedOut)
             signedOut()
@@ -258,79 +265,6 @@ public final class AccountViewModel {
         busy = nil
     }
 
-    /// The switches as drawn: the account's, every one off while this phone may not show a push.
-    public var shownPush: PushSettings {
-        permission == .allowed ? push : push.allOff
-    }
-
-    /// A switch moved. On asks the phone first when it may not show a push yet (the system prompt once,
-    /// never at launch), and stays off when it says no. The switches as drawn are written whole, so what
-    /// the member sees is what the account keeps; every one off takes this phone's token off.
-    public func set(_ kind: PushKind, isOn: Bool) async {
-        let drawn = shownPush
-        if isOn {
-            permission = await control.enable()
-            guard permission == .allowed else {
-                return
-            }
-        }
-        let next = drawn.with(kind, isOn: isOn)
-        guard await write(next), !next.anyOn else {
-            return
-        }
-        await control.disable()
-    }
-
-    /// Quiet hours moved on the wheel: drawn at once, written once the wheel rests.
-    public func setQuiet(from: Int, to: Int) {
-        push = push.with(quietFrom: from, quietTo: to)
-        let settings = push
-        quietWrite?.cancel()
-        quietWrite = Task { [wait] in
-            await wait(Self.quietPause)
-            guard !Task.isCancelled else {
-                return
-            }
-            _ = await self.write(settings)
-            if !Task.isCancelled {
-                self.quietWrite = nil
-            }
-        }
-    }
-
-    /// The quiet hours' write under way, kept so a test can await it; the app never waits on it.
-    public var pendingQuietWrite: Task<Void, Never>? {
-        quietWrite
-    }
-
-    /// Writes the settings to the account and shows what it holds after; a write that fails puts the
-    /// account's back and says so beside the switches.
-    private func write(_ settings: PushSettings) async -> Bool {
-        let before = push
-        push = settings
-        problem = nil
-        do {
-            let me = try await api.updateNotifications(settings.change(zone: zone))
-            push = PushSettings(me.notifications?.value1)
-            if let written = answer?.with(me: me) {
-                answer = written
-                await cache.write(written, route: Self.route, stamp: stamp)
-            }
-            return true
-        } catch where APIError.signsOut(error) {
-            push = before
-            problem = AccountProblem(section: .notifications, text: AppWords.Failure.signedOut)
-            signedOut()
-        } catch let APIError.envelope(_, message) where !message.isEmpty {
-            push = before
-            problem = AccountProblem(section: .notifications, text: message)
-        } catch {
-            push = before
-            problem = AccountProblem(section: .notifications, text: Words.Account.failed)
-        }
-        return false
-    }
-
     private func act(_ id: String, _ section: AccountSection, _ step: @Sendable () async throws -> Void) async {
         busy = id
         problem = nil
@@ -365,6 +299,7 @@ public final class AccountViewModel {
         answer = read
         if let read, quietWrite == nil {
             push = PushSettings(read.me.notifications?.value1)
+            confirmed = push
         }
         self.stamp = stamp
         self.stale = stale

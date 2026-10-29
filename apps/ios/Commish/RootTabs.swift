@@ -42,7 +42,7 @@ struct RootTabs: View {
     /// A site link the app was opened with (a player's page), pushed on the tab in view once signed in.
     @Binding var linked: ShellRoute?
     /// A tapped push's screen (Lane 288), opened once signed in.
-    @Binding var pushed: PushRoute?
+    @Binding var pushed: PushTap?
     /// The API refused the token on a signed-in read: the app signs out and shows sign-in.
     let expired: @MainActor () -> Void
 
@@ -363,26 +363,33 @@ struct RootTabs: View {
 
 /// Push (Lane 288), apart from the struct's body.
 extension RootTabs {
-    /// A tapped push: its league chosen in the switch (one this account still follows), then the tab its
-    /// screen is where the bar has it, else the league's home as the switch opens it.
+    /// A tapped push (review M1): a followed league's screen, its league chosen in the switch, then the
+    /// tab its screen is where the bar has it, else the league's home as the switch opens it; a league no
+    /// longer followed, or a path this build does not draw, opens the league list. Signed out, the tap is
+    /// let go, so the next account never opens it (security L2).
     func openPushed() {
-        guard let route = pushed, signedIn else {
+        guard let tap = pushed else {
             return
         }
         pushed = nil
-        guard session.leagues.contains(where: { $0.id == route.league }) else {
+        guard signedIn else {
             return
         }
         sheet.close()
-        choose(route.league)
-        let key = switch route.screen {
-        case .league: PhoneRail.leagueKey
-        case .lineup: PhoneRail.lineupKey
-        case .waivers: PhoneRail.waiversKey
-        }
-        if session.tabs.contains(where: { $0.key == key }) {
-            paths[key] = []
-            selection = key
+        switch PushRoute.destination(tap.route, following: session.leagues.map(\.id)) {
+        case .leagueList:
+            switchOpen = true
+        case let .league(route):
+            choose(route.league)
+            let key = switch route.screen {
+            case .league: PhoneRail.leagueKey
+            case .lineup: PhoneRail.lineupKey
+            case .waivers: PhoneRail.waiversKey
+            }
+            if session.tabs.contains(where: { $0.key == key }) {
+                paths[key] = []
+                selection = key
+            }
         }
     }
 }

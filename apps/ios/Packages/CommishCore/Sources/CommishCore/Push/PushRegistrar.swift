@@ -33,29 +33,50 @@ public protocol PushControl: AnyObject {
     func disable() async
 }
 
+/// A removal the phone could not finish at sign out (no signal): the signed-out device's id and token kept
+/// in their own Keychain item, and the client that takes the token off with that token (Lane 288 security
+/// M1). Until it is done, the previous member's pushes would keep arriving here.
+public struct PendingRemoval: Sendable {
+    let store: any SessionStore
+    let api: any PushAPI
+
+    public init(store: any SessionStore, api: any PushAPI) {
+        self.store = store
+        self.api = api
+    }
+}
+
 /// This phone's push registration (spec §5.3, Lane 288): the APNs device token on its own device
-/// (PUT /devices/{id}/push) whenever Apple hands one over while push is wanted (each launch signed in,
-/// and after the Account's switch asks), taken off when every switch goes off and at sign out. Whether
-/// push is wanted is kept on the phone, so a launch after every switch went off registers nothing; it
-/// starts wanted, so a phone that allowed push registers on its first launch signed in. The permission
-/// is never asked here at launch: only the Account's switch asks.
+/// (PUT /devices/{id}/push) whenever Apple hands one over while push is wanted and allowed (each launch
+/// signed in, and after the Account's switch asks), taken off when every switch goes off and at sign
+/// out. Whether push is wanted is kept on the phone, so a launch after every switch went off registers
+/// nothing; it starts wanted, so a phone that allowed push registers on its first launch signed in. The
+/// permission is never asked here at launch: only the Account's switch asks. A removal that failed at
+/// sign out is kept and tried again at the next launch before any registration, and a registration the
+/// API refuses because another account's device holds the token tries that removal, then once more.
 @MainActor
 public final class PushRegistrar: PushControl {
     static let offKey = "app.trycommish.push.off"
     nonisolated static let log = Logger(subsystem: "app.trycommish.ios", category: "push")
+    /// The API's code for a token another account's device holds (devices/push.go ErrTokenTaken).
+    static let conflict = "conflict"
+    /// The API's code for a device that is gone.
+    static let notFound = "not_found"
 
     private let api: any PushAPI
     private let platform: any PushPlatform
-    private let deviceID: @Sendable () async -> String?
+    private let session: any SessionStore
+    private let pending: PendingRemoval
     private let defaults: UserDefaults
 
     public init(
-        api: any PushAPI, platform: any PushPlatform, deviceID: @escaping @Sendable () async -> String?,
+        api: any PushAPI, platform: any PushPlatform, session: any SessionStore, pending: PendingRemoval,
         defaults: UserDefaults = .standard
     ) {
         self.api = api
         self.platform = platform
-        self.deviceID = deviceID
+        self.session = session
+        self.pending = pending
         self.defaults = defaults
     }
 
@@ -64,9 +85,15 @@ public final class PushRegistrar: PushControl {
         !defaults.bool(forKey: Self.offKey)
     }
 
+    /// At launch, signed in or not: a removal left from a sign out without signal is tried again.
+    public func launched() async {
+        await finishPendingRemoval()
+    }
+
     /// Signed in (at launch, or a sign-in just finished): a phone that allowed push and wants it asks
     /// Apple for its token, which registers when it arrives. Never shows the prompt.
     public func start() async {
+        await finishPendingRemoval()
         guard wanted, await platform.permission() == .allowed else {
             return
         }
@@ -74,13 +101,19 @@ public final class PushRegistrar: PushControl {
     }
 
     /// Apple handed over the device token (each launch, and whenever it changes): registered on this
-    /// phone's device while push is wanted and the phone is signed in.
+    /// phone's device while push is wanted and allowed and the phone is signed in, after any removal left
+    /// from a sign out. A token another account's device holds tries that removal and registers once more.
     public func tokenArrived(_ token: Data) async {
-        guard wanted, let device = await deviceID() else {
+        await finishPendingRemoval()
+        guard wanted, await platform.permission() == .allowed, let device = await session.deviceID() else {
             return
         }
+        let hex = Self.hex(token)
         do {
-            try await api.registerPush(device: device, token: Self.hex(token))
+            try await api.registerPush(device: device, token: hex)
+        } catch APIError.envelope(Self.conflict, _) {
+            await finishPendingRemoval()
+            await registerOnce(device: device, token: hex)
         } catch {
             Self.log.error("push registration failed: \(String(describing: error), privacy: .public)")
         }
@@ -105,24 +138,64 @@ public final class PushRegistrar: PushControl {
 
     public func disable() async {
         defaults.set(true, forKey: Self.offKey)
-        await remove()
+        guard let device = await session.deviceID() else {
+            return
+        }
+        _ = await remove(device: device, with: api)
     }
 
     /// The phone signs out: its token comes off the account before the device is revoked, and the next
-    /// account on this phone starts wanting push again.
+    /// account on this phone starts wanting push again. Without signal the removal is kept, with this
+    /// device's token, for the next launch.
     public func signingOut() async {
-        await remove()
         defaults.removeObject(forKey: Self.offKey)
-    }
-
-    private func remove() async {
-        guard let device = await deviceID() else {
+        guard let device = await session.deviceID() else {
+            return
+        }
+        if await remove(device: device, with: api) {
+            return
+        }
+        guard let token = await session.token() else {
             return
         }
         do {
-            try await api.removePush(device: device)
+            try await pending.store.save(token: token, deviceID: device)
+        } catch {
+            Self.log.error("push removal not kept: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// The removal a sign out could not finish, with the signed-out device's own token; done once the API
+    /// takes it or says the device is gone (its token refused, or no such device).
+    func finishPendingRemoval() async {
+        guard let device = await pending.store.deviceID() else {
+            return
+        }
+        if await remove(device: device, with: pending.api) {
+            await pending.store.clear()
+        }
+    }
+
+    private func registerOnce(device: String, token: String) async {
+        do {
+            try await api.registerPush(device: device, token: token)
+        } catch {
+            Self.log.error("push registration failed again: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Whether the device's token is off the account: taken off, or the device is gone already.
+    private func remove(device: String, with client: any PushAPI) async -> Bool {
+        do {
+            try await client.removePush(device: device)
+            return true
+        } catch where APIError.signsOut(error) {
+            return true
+        } catch APIError.envelope(Self.notFound, _) {
+            return true
         } catch {
             Self.log.error("push removal failed: \(String(describing: error), privacy: .public)")
+            return false
         }
     }
 
