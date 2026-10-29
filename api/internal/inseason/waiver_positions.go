@@ -126,7 +126,7 @@ func (a *advisor) waiverPositions(run waiverRun, page apitypes.WaiverAdvice) *[]
 	ranks := map[draft.Position]int{}
 	cards := []apitypes.WaiverPositionCard{}
 	for _, p := range panelPositionsOf(a.slots) {
-		card :=apitypes.WaiverPositionCard{Position: apitypes.WaiverPositionCardPosition(p), Teams: len(teams),
+		card := apitypes.WaiverPositionCard{Position: apitypes.WaiverPositionCardPosition(p), Teams: len(teams),
 			Mine: panelMine(run.mine, p, starter, myStarts), Available: panelFree(run, page, p)}
 		if pointed[p] {
 			card.RestOfSeason = standingAt(teams, me, p, func(t panelTeam) map[draft.Position]float64 { return t.season })
