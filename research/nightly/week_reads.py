@@ -62,12 +62,13 @@ from research.capsules.sweep import FactsPassMemo
 from research.capsules.week.cadence import (
     PRIORITY,
     STATUS_CHANGED,
+    STATUS_REWRITES_A_DAY,
     UNWRITTEN,
     attempts_today,
     central_day,
     due_reason,
+    falls_since_written,
     kept_read,
-    status_rewrite_capped,
 )
 from research.capsules.week.collect import collect_week_sheets, read_week_facts
 from research.capsules.week.judge import JUDGE_MODEL, judge_model
@@ -411,18 +412,29 @@ def _reread(engine: Engine, week: int) -> dict[tuple[str, int], StoredWeekRead]:
         return stored_week_reads(conn, PRODUCT_SEASON, [week])
 
 
+# The day's status-rewrite falls (`cadence.STATUS_REWRITES_A_DAY`) a nightly's rounds leave for the hourly passes
+# (Lane 293 fix round 1): the nightly runs at 00:30 CT, so a status rewrite it asks twice and loses twice still has
+# one hourly retry that Central day.
+STATUS_FALLS_LEFT_FOR_HOURLY: Final = 1
+
+
+def status_reask_allowed(row: StoredWeekRead, now: datetime) -> bool:
+    """Whether a written read held over a fallen status rewrite is asked again in the pass's next round: while its
+    falls on `now`'s Central day leave `STATUS_FALLS_LEFT_FOR_HOURLY` of the day's status rewrites."""
+    return falls_since_written(row, now) < STATUS_REWRITES_A_DAY - STATUS_FALLS_LEFT_FOR_HOURLY
+
+
 def asked_again(
     due: Sequence[tuple[WeekSheet, str]],
     stored: Mapping[tuple[str, int], StoredWeekRead],
     spend: WeekReadSpend,
-    now: datetime,
 ) -> list[tuple[WeekSheet, str]]:
     """The due reads the next round asks again: every one whose read did not land and stand this pass. One with
     nothing written is asked as `UNWRITTEN`; a written read kept over a rewrite that fell, or that the demotion
     restored, is asked under its own reason (Lane 293: on 2026-10-29 the nightly's 404 rule-stale rewrites ran one
     round, and the 153 that fell kept the old reads, the held rows counting as written), a status rewrite while
-    its day's falls allow (`cadence.status_rewrite_capped`). One another pass replaced meanwhile is left to the
-    cadence."""
+    `status_reask_allowed` on the sheet's instant (the one its fall was counted on, `landed_row`). One another pass
+    replaced meanwhile is left to the cadence."""
     again = []
     for sheet, reason in due:
         key = (sheet.player_id, sheet.week)
@@ -431,7 +443,7 @@ def asked_again(
             continue
         if row is None or row.source != WRITTEN_SOURCE:
             again.append((sheet, UNWRITTEN))
-        elif reason != STATUS_CHANGED or not status_rewrite_capped(row, now):
+        elif reason != STATUS_CHANGED or status_reask_allowed(row, sheet.written_at):
             again.append((sheet, reason))
     return again
 
@@ -473,7 +485,7 @@ def _write_rounds(  # noqa: PLR0913 - the pass's parts
         spend.held += len(demotion.restored)
         spend.written_reads -= demotion.demoted | demotion.restored
         stored = _reread(engine, night.board_week)
-        batch = asked_again(due, stored, spend, now)
+        batch = asked_again(due, stored, spend)
     spend.rounds = max(spend.rounds, done)
     spend.unwritten += [sheet.name for sheet in _not_landed(due, spend.written_reads)]
 

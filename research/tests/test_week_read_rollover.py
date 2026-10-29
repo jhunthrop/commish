@@ -26,7 +26,7 @@ from research.capsules.gateway import GatewayClient
 from research.capsules.gateway_ledger import ModelPrice
 from research.capsules.narrative import ShapeMasks
 from research.capsules.store import WRITTEN_SOURCE
-from research.capsules.week.cadence import central_day
+from research.capsules.week.cadence import central_day, status_rewrite_capped
 from research.capsules.week.collect import board_week
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.rollover import NIGHTS, ReadsDue, Rollover, next_nightly, night_of, reads_due, rollover
@@ -684,19 +684,20 @@ def test_the_next_round_asks_every_due_read_that_did_not_land_and_stand() -> Non
     sheet, key, today = starter(), (starter().player_id, starter().week), central_day(_PASS)
     due = [(sheet, "rule")]
     spend = week_reads.WeekReadSpend()
-    assert week_reads.asked_again(due, {key: _row(FACTS_SOURCE)}, spend, _PASS) == [(sheet, "unwritten")]
-    assert week_reads.asked_again(due, {}, spend, _PASS) == [(sheet, "unwritten")]
+    assert week_reads.asked_again(due, {key: _row(FACTS_SOURCE)}, spend) == [(sheet, "unwritten")]
+    assert week_reads.asked_again(due, {}, spend) == [(sheet, "unwritten")]
     held = _row(WRITTEN_SOURCE, attempts=2, day=today)
-    assert week_reads.asked_again(due, {key: held}, spend, _PASS) == due
-    # A status rewrite whose day's falls are spent (`cadence.STATUS_REWRITES_A_DAY`) waits for the next day.
-    spent = _row(WRITTEN_SOURCE, attempts=1 + 3, day=today)
-    assert week_reads.asked_again([(sheet, "status")], {key: spent}, spend, _PASS) == []
-    assert week_reads.asked_again([(sheet, "status")], {key: held}, spend, _PASS) == [(sheet, "status")]
+    assert week_reads.asked_again(due, {key: held}, spend) == due
+    # A status rewrite the pass has lost twice is left for the day's last hourly retry (Lane 293 fix round 1).
+    twice = _row(WRITTEN_SOURCE, attempts=1 + 2, day=today)
+    assert week_reads.asked_again([(sheet, "status")], {key: twice}, spend) == []
+    assert not status_rewrite_capped(twice, _PASS)
+    assert week_reads.asked_again([(sheet, "status")], {key: held}, spend) == [(sheet, "status")]
     spend.written_reads.add(key)
-    assert week_reads.asked_again(due, {key: held}, spend, _PASS) == []
+    assert week_reads.asked_again(due, {key: held}, spend) == []
     spend.written_reads.clear()
     spend.superseded.add(key)  # another pass replaced the row meanwhile: left to the cadence
-    assert week_reads.asked_again(due, {key: held}, spend, _PASS) == []
+    assert week_reads.asked_again(due, {key: held}, spend) == []
 
 
 def test_the_dry_pass_says_what_it_would_ask_and_asks_and_writes_nothing(
@@ -721,3 +722,25 @@ def test_a_pass_admits_reads_at_their_worst_case_until_the_budget_cannot_take_an
     assert week_reads.admitted_at_worst(268, 2.50, 0.0033) == 268  # noqa: PLR2004 - the 2026-10-29 scratch night
     assert week_reads.admitted_at_worst(10, 0.01, 0.0033) == 3  # noqa: PLR2004
     assert week_reads.admitted_at_worst(5, 0.0, 0.0) == 5  # noqa: PLR2004 - no list price: nothing to hold them
+
+
+def test_a_nightly_status_rewrite_is_asked_twice_and_leaves_the_day_one_hourly_retry(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Lane 293 fix round 1: the nightly's rounds ask a status rewrite at most twice, so a rewrite both rounds lose
+    keeps the written read with one of the day's three status falls left, and the next hourly pass asks it."""
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    moved = [replace(starter(), status=Status("questionable", REPORT)), questionable()]
+    asked: list[str] = []
+    night = _PASS + timedelta(days=1)
+    failing = _Writer(fail_first=MAX_CALLS_PER_READ * week_reads.ROLLOVER_ROUNDS, asked=asked)
+    record = _step(engine, monkeypatch, moved, failing, at=night)
+    held = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert len(asked) == 2 * MAX_CALLS_PER_READ and "2 rounds" in record.summary
+    assert (
+        held.status != "questionable"
+        and held.attempts == 1 + 2
+        and not status_rewrite_capped(held, starter().written_at)
+    )
+    hour = _step(engine, monkeypatch, moved, _Writer(), hourly=True, at=night + timedelta(hours=1))
+    assert "1 reads due (status 1)" in hour.summary and "every due read written" in hour.summary
