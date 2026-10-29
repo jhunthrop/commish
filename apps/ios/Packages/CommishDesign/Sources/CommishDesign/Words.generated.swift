@@ -219,7 +219,7 @@ public enum Words {
         public static let copy = "Copy the lineup"
         public static let set = "Your lineup is set"
         public static let sit = "Sit"
-        public static let pastWeeks = "Past weeks of our order, on Our record"
+        public static let pastWeeks = "Past weeks of our order"
         public static let copied = "Copied."
         public static let setItOn = "Set it on"
         public static let copyFailed = "This browser would not copy it."
@@ -299,6 +299,14 @@ public enum Words {
         public static let suspended = "Susp"
         public static let pup = "PUP"
         public static let nfi = "NFI"
+    }
+
+    public enum Capture {
+        public static let status = "Status"
+        public static let read = "read"
+        public static let asOf = "as of"
+        public static let today = "today"
+        public static let old = "over 36 hours ago"
     }
 
     public enum Figure {
@@ -468,6 +476,13 @@ public enum Words {
         public static let sortBy = "Sort by"
         public static let to = "to"
         public static let projForYou = "Proj this week for your lineup"
+        public static let restHead = "Rest of season"
+        public static let wouldNotTake = "Would not take it"
+        public static let theyGiveUp = "They give up more rest of season than they get."
+        public static let youGiveUp = "You give up more rest of season than you get."
+        public static let bothGiveUp = "Both sides give up more rest of season than they get."
+        public static let restBasis = "Rest of season: points over the waiver level, weeks left."
+        public static let noIdea = "No idea they would take."
     }
 
     public enum TradePicker {
@@ -956,7 +971,7 @@ public enum Words {
     }
 
     public enum LiveOrder {
-
+        public static let fromRun = "from our board, not in our order right now"
     }
 
     public enum ClubOrder {

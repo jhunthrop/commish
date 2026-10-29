@@ -38,6 +38,31 @@ data class BoardCover(
     val restOfSeason: Boolean,
 )
 
+/** The capture a board's statuses come from (designation.ts CaptureStamp): when its list last changed, and
+ * the capture job's last check of it, null when none is recorded. */
+data class CaptureStamp(
+    val asOf: Instant,
+    val checkedAt: Instant?,
+) {
+    /** When it was last known to stand: its check, else its list's change. */
+    private val last: Instant get() = checkedAt ?: asOf
+
+    companion object {
+        /** designation.ts newerCapture (Lane 280, B257): the stamp a board's status column is as of, the
+         * newer of the run's capture and the live order's, the run's on a tie, either alone without the other.
+         * Held to board-run.json's liveStamps. */
+        fun newer(
+            run: CaptureStamp?,
+            live: CaptureStamp?,
+        ): CaptureStamp? =
+            when {
+                live == null || run == null -> live ?: run
+                live.last > run.last -> live
+                else -> run
+            }
+    }
+}
+
 /** The board's words as the web's season pages say them (season-words.ts boardWords, held to
  * shared/fixtures/parity/board.json): the bar's word, the document's title, the heading and the one
  * verb. In season the board is the rest of the season where the run ranks it, and the verb follows the
@@ -72,8 +97,9 @@ data class BoardWords(
             )
         }
 
-        /** designation.ts captureShort: "Status read Oct 16.", "as of" its last change with no check, and
-         * past a day and a half how old it is. */
+        /** designation.ts captureShort: "Status read Oct 16.", "as of" its last change with no check, the
+         * hour on the member's own day ("Status read today 9:15 am CT."), and past a day and a half how old
+         * it is. */
         fun capture(
             asOf: Instant,
             checkedAt: Instant?,
@@ -81,10 +107,25 @@ data class BoardWords(
             zone: ZoneId,
         ): String {
             val last = checkedAt ?: asOf
-            val said = checkedAt?.let { "read ${Format.shortDay(it, zone)}" } ?: "as of ${Format.shortDay(asOf, zone)}"
-            val old = if (Duration.between(last, now) > CAPTURE_BEHIND) ", over 36 hours ago" else ""
-            return "Status $said$old."
+            // On the member's own day the hour tells this hour's capture from last night's (Lane 280).
+            val day = { at: Instant ->
+                if (Format.sameDay(at, now, zone)) {
+                    "${Words.Capture.today} ${Format.timeOfDay(at, zone)} ${Format.zoneShort(at, zone)}"
+                } else {
+                    Format.shortDay(at, zone)
+                }
+            }
+            val said = checkedAt?.let { "${Words.Capture.read} ${day(it)}" } ?: "${Words.Capture.asOf} ${day(asOf)}"
+            val old = if (Duration.between(last, now) > CAPTURE_BEHIND) ", ${Words.Capture.old}" else ""
+            return "${Words.Capture.status} $said$old."
         }
+
+        /** The capture's words for a stamp (capture above). */
+        fun capture(
+            stamp: CaptureStamp,
+            now: Instant,
+            zone: ZoneId,
+        ): String = capture(stamp.asOf, stamp.checkedAt, now, zone)
 
         /** designation.ts CAPTURE_BEHIND_MS: past it the capture says how old it is. */
         private val CAPTURE_BEHIND: Duration = Duration.ofHours(36)

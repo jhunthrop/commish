@@ -2,7 +2,16 @@
  * screens' week mark, and the board and player pages' status. The statuses are the API's
  * (`DesignationStatus`) and the run's (`designations.json`). */
 import type { components } from '#lib/api/types.ts';
-import { memberZone, monthDay, shortDay, stampAt, weekdayTime } from './clock.ts';
+import {
+	memberZone,
+	monthDay,
+	sameDay,
+	shortDay,
+	stampAt,
+	timeOfDay,
+	weekdayTime,
+	zoneShort
+} from './clock.ts';
 
 export type DesignationStatus = components['schemas']['DesignationStatus'];
 
@@ -130,22 +139,50 @@ export function stampWords(iso: string, zone: string = memberZone()): string {
 	return stampAt(iso, zone);
 }
 
+/** The capture's few words on a board's basis, shared with the apps (shared/words/capture.json). */
+export const CAPTURE_WORDS = {
+	status: 'Status',
+	read: 'read',
+	asOf: 'as of',
+	today: 'today',
+	old: 'over 36 hours ago'
+} as const;
+
+/** When a capture was last known to stand: its check, else its list's last change. */
+function captureLast(capture: CaptureStamp): number {
+	return Date.parse(capture.checkedAt ?? capture.readAt);
+}
+
+/** The capture a board's status column is as of (Lane 280, B257), one rule for the web and the apps:
+ * the newer of the run's capture and the live order's (its answer's status_read), which carries the
+ * hourly capture that landed since the run; the run's on a tie, either alone when the other is none. */
+export function newerCapture(
+	run: CaptureStamp | null,
+	live: CaptureStamp | null
+): CaptureStamp | null {
+	if (live === null || run === null) return live ?? run;
+	return captureLast(live) > captureLast(run) ? live : run;
+}
+
 /** The capture in the few words a page of board rows has left in its five-line basis (Lane 66n):
- * "Status read Oct 16.", "as of" its last change with no check, and past
- * CAPTURE_BEHIND_MS how old it is. The player page keeps captureLine's fuller words. */
+ * "Status read Oct 16.", "as of" its last change with no check, the hour on the member's own day
+ * ("Status read today 9:15 am CT."), and past CAPTURE_BEHIND_MS how old it is. The player page keeps captureLine's fuller words. */
 export function captureShort(
 	capture: CaptureStamp,
 	now: number,
 	zone: string = memberZone()
 ): string {
-	const last = capture.checkedAt ?? capture.readAt;
-	const stamp = (iso: string): string => shortDay(iso, zone);
+	// On the member's own day the hour tells this hour's capture from last night's (Lane 280).
+	const stamp = (iso: string): string =>
+		sameDay(new Date(iso), new Date(now), zone)
+			? `${CAPTURE_WORDS.today} ${timeOfDay(iso, zone)} ${zoneShort(iso, zone)}`
+			: shortDay(iso, zone);
 	const when =
 		capture.checkedAt === null
-			? `as of ${stamp(capture.readAt)}`
-			: `read ${stamp(capture.checkedAt)}`;
-	const old = now - Date.parse(last) > CAPTURE_BEHIND_MS ? ', over 36 hours ago' : '';
-	return `Status ${when}${old}.`;
+			? `${CAPTURE_WORDS.asOf} ${stamp(capture.readAt)}`
+			: `${CAPTURE_WORDS.read} ${stamp(capture.checkedAt)}`;
+	const old = now - captureLast(capture) > CAPTURE_BEHIND_MS ? `, ${CAPTURE_WORDS.old}` : '';
+	return `${CAPTURE_WORDS.status} ${when}${old}.`;
 }
 
 /** The basis line's sentence naming the capture and when it was read, "read" only for a real check:

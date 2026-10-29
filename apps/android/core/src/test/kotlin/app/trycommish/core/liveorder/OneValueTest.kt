@@ -3,6 +3,7 @@ package app.trycommish.core.liveorder
 import app.trycommish.api.decodeEnvelope
 import app.trycommish.api.models.DesignationStatus
 import app.trycommish.api.models.RunDesignationsAnswer
+import app.trycommish.api.models.StatusRead
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
 import app.trycommish.core.SessionEnd
@@ -21,6 +22,7 @@ import app.trycommish.core.liveorder.OneValueReads.obj
 import app.trycommish.core.liveorder.OneValueReads.strings
 import app.trycommish.core.liveorder.OneValueReads.text
 import app.trycommish.core.rankings.OrderQuery
+import app.trycommish.core.rankings.RankingsReads
 import app.trycommish.design.Words
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -45,6 +47,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.net.UnknownHostException
 
 /**
  * One value and one order for a player on every in-season screen (Lane 226, the iOS Lane 224's tests, the
@@ -151,13 +154,16 @@ class OneValueTest {
             val trimmed = StubOrderSearch(rows = { rows -> rows.filter { it.boardId() != swift } })
             val model = reads.board(reads.order(trimmed))
             assertTrue(model.atClock)
+            // An uncut answer that omits him: drawn from the run after the order's rows, counted once (Lane 280).
             assertEquals(
                 reads.parity
                     .obj("board")
                     .strings("ids")
-                    .filter { it != swift },
+                    .filter { it != swift } + swift,
                 model.rows.map { it.id },
             )
+            assertEquals(Words.Box.none, model.rows.last().projected, "a row from the run carries no figure of either clock")
+            assertEquals(LiveOrderWords.fromRun(1), model.basis.last())
             assertFalse(model.basis.any { it.startsWith("The first") }, "an answer the order did not cut says no count")
             // A cut answer: the view holds more players than the rows it returned.
             val whole = reads.order()
@@ -169,8 +175,30 @@ class OneValueTest {
                     .run()
                     .board.rows.size
             assertEquals(LiveOrderWords.reach(short.rows.size, total), short.basis.last())
+            assertFalse(short.basis.any { it.contains(Words.LiveOrder.fromRun) }, "a cut answer omits by its limit: none from the run")
             assertFalse(reads.board(reads.order()).basis.any { it.startsWith("The first") }, "a read that reaches every row says no count")
+            assertFalse(
+                reads.board(reads.order()).basis.any { it.contains(Words.LiveOrder.fromRun) },
+                "an answer with every row omits none",
+            )
             assertTrue(reads.board(null).restLine?.contains("refreshed") == true)
+        }
+
+    @Test
+    fun `the status column is dated by the newer of the run's capture and the order's (Lane 280)`() =
+        runTest {
+            val run = "Status as of Oct 13, over 36 hours ago."
+            val whole = reads.order()
+            assertNull(whole.capture, "an answer without status_read parses, and names no capture")
+            assertTrue(run in reads.board(whole).basis, "the run's alone")
+            val newer = StatusRead(asOf = "2026-10-18T15:00:00Z", checkedAt = "2026-10-18T18:00:00Z", source = "feed")
+            val live = reads.board(OrderAtClock(whole.body, whole.answer.copy(statusRead = newer), whole.landed))
+            assertTrue("Status read today 1:00 pm CT." in live.basis, "${live.basis}")
+            assertFalse(run in live.basis)
+            val older = StatusRead(asOf = "2026-10-12T15:00:00Z", checkedAt = "2026-10-13T15:00:00Z", source = "feed")
+            assertTrue(run in reads.board(OrderAtClock(whole.body, whole.answer.copy(statusRead = older), whole.landed)).basis)
+            // Before the order answers, the run's capture stands whatever the order would say.
+            assertTrue(run in reads.board(null).basis)
         }
 
     @Test
@@ -461,6 +489,30 @@ class OneValueTest {
             val later = OrderReader(OrderShare(search, FixedClock(reads.now.plus(OrderShare.WINDOW))))
             later.read()
             assertEquals(4, search.routes.size, "an answer stands for its window alone")
+        }
+
+    @Test
+    fun `the reader pages the whole order into one uncut answer, a failed later page leaves it cut (Lane 280)`() =
+        runTest {
+            val search = StubOrderSearch()
+            val whole = reads.order()
+            val page = 50
+            val paged = OrderReader(OrderShare(search, FixedClock(reads.now)), pageSize = page).read()
+            assertEquals(whole.answer.rows.map { it.line.player.boardId }, paged.answer.rows.map { it.line.player.boardId })
+            assertFalse(LiveOrder.cut(paged.answer), "every page read: the merged answer is uncut")
+            assertEquals(
+                listOf(0, page, 2 * page).map { OrderReader.query(null, page, it).route },
+                search.routes,
+                "pages from where the last ended until the total",
+            )
+            val failing =
+                object : RankingsReads by search {
+                    override suspend fun order(query: OrderQuery): String =
+                        if (query.offset > 0) throw UnknownHostException("api.test") else search.order(query)
+                }
+            val first = OrderReader(OrderShare(failing, FixedClock(reads.now)), pageSize = page).read()
+            assertEquals(page, first.answer.rows.size)
+            assertTrue(LiveOrder.cut(first.answer), "a later page that fails leaves the first, cut")
         }
 
     @Test

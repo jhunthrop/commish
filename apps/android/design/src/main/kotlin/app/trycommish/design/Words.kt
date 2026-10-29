@@ -221,7 +221,7 @@ object Words {
         const val copy = "Copy the lineup"
         const val set = "Your lineup is set"
         const val sit = "Sit"
-        const val pastWeeks = "Past weeks of our order, on Our record"
+        const val pastWeeks = "Past weeks of our order"
         const val copied = "Copied."
         const val setItOn = "Set it on"
         const val copyFailed = "This browser would not copy it."
@@ -301,6 +301,14 @@ object Words {
         const val suspended = "Susp"
         const val pup = "PUP"
         const val nfi = "NFI"
+    }
+
+    object Capture {
+        const val status = "Status"
+        const val read = "read"
+        const val asOf = "as of"
+        const val today = "today"
+        const val old = "over 36 hours ago"
     }
 
     object Figure {
@@ -470,6 +478,13 @@ object Words {
         const val sortBy = "Sort by"
         const val to = "to"
         const val projForYou = "Proj this week for your lineup"
+        const val restHead = "Rest of season"
+        const val wouldNotTake = "Would not take it"
+        const val theyGiveUp = "They give up more rest of season than they get."
+        const val youGiveUp = "You give up more rest of season than you get."
+        const val bothGiveUp = "Both sides give up more rest of season than they get."
+        const val restBasis = "Rest of season: points over the waiver level, weeks left."
+        const val noIdea = "No idea they would take."
     }
 
     object TradePicker {
@@ -958,7 +973,7 @@ object Words {
     }
 
     object LiveOrder {
-
+        const val fromRun = "from our board, not in our order right now"
     }
 
     object ClubOrder {

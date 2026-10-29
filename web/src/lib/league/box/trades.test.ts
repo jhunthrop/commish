@@ -5,6 +5,8 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { basisText, drawnText, KICKED_OFF_PART, phoneFinalsPart } from './basis.ts';
 import { stripLead, stripMark } from './strip.ts';
+import { BOX } from './box.ts';
+import { MINUS } from '#lib/format/number.ts';
 import type { PlayerLine, TradeAdvice, TradeCheck, TradeRow, TradeTeam } from '../inseason/api.ts';
 import {
 	bugFigures,
@@ -18,6 +20,8 @@ import {
 	offerText,
 	phoneWith,
 	proposeVerb,
+	refusalWords,
+	restFigure,
 	roomWords,
 	rosterOrder,
 	shortSide,
@@ -403,7 +407,7 @@ void test("a trade opened or the builder open adds the players' columns, each on
 	);
 	assert.equal(
 		basisText(parts),
-		`${advice.basis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. ${advice.basis_note} ${WEEK_ROOM} How the order has done`
+		`${advice.basis} ${TRADES.restBasis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. ${advice.basis_note} ${WEEK_ROOM} How the order has done`
 	);
 	assert.deepEqual(
 		parts.filter((p) => p.href !== undefined).map((p) => p.href),
@@ -534,4 +538,44 @@ void test("an opened trade's and the builder's phone say what Avg and Last count
 		assert.ok(phone.includes(phoneFinalsPart('sleeper')), `${opened}: ${phone}`);
 		assert.ok(!phone.includes(KICKED_OFF_PART), `${opened}: ${phone}`);
 	}
+});
+
+void test('the verdict draws each side rest of season, tagged where that side would not take it (Lane 277)', () => {
+	const answered = {
+		...check(),
+		trade: { ...check().trade, my_rest_of_season: 21.6, their_rest_of_season: -21.6 },
+		acceptable: { yours: true, theirs: false }
+	};
+	assert.deepEqual(restFigure(answered, 'yours'), { text: '+21.6', tone: 'gain', refuses: false });
+	assert.deepEqual(restFigure(answered, 'theirs'), {
+		text: `${MINUS}21.6`,
+		tone: 'loss',
+		refuses: true
+	});
+	// Before an answer, the none mark every verdict cell draws.
+	assert.deepEqual(restFigure(null, 'yours'), { text: BOX.none, tone: 'even', refuses: false });
+	// An older answer with no figure draws the cell empty, never a figure we did not read.
+	assert.deepEqual(restFigure(check(), 'theirs'), { text: '', tone: 'even', refuses: false });
+	// A figure with no acceptable (an older answer) tags no side.
+	const untold = { ...answered, acceptable: undefined };
+	assert.equal(restFigure(untold, 'theirs').refuses, false);
+});
+
+void test('the answer line leads with the side that would not take it (Lane 277)', () => {
+	assert.equal(refusalWords({ yours: true, theirs: false }), TRADES.theyGiveUp);
+	assert.equal(refusalWords({ yours: false, theirs: true }), TRADES.youGiveUp);
+	assert.equal(refusalWords({ yours: false, theirs: false }), TRADES.bothGiveUp);
+	assert.equal(refusalWords({ yours: true, theirs: true }), null);
+	assert.equal(refusalWords(undefined), null);
+	assert.equal(TRADES.theyGiveUp, 'They give up more rest of season than they get.');
+	assert.equal(TRADES.noIdea, 'No idea they would take.');
+});
+
+void test('what rest of season is, said once with the builder open, desk and phone alike (Lane 277)', () => {
+	for (const opened of ['none', 'trade'] as const) {
+		const parts = tradeBasis(advice, 'sleeper', [], opened, TRADE_LINKS, TRADE_CLOCK, NOW_66T);
+		assert.doesNotMatch(basisText(parts), /Rest of season:/, opened);
+	}
+	const built = tradeBasis(advice, 'sleeper', [], 'builder', TRADE_LINKS, TRADE_CLOCK, NOW_66T);
+	assert.deepEqual(built[1], { text: TRADES.restBasis, phone: true });
 });

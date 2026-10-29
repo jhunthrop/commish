@@ -18,18 +18,21 @@ public struct OrderQuery: Equatable, Hashable, Sendable {
     public let search: String?
     public let limit: Int
     public let byesLast: Bool
+    /// The view's rows skipped before this page's first (Lane 280), 0 for the top.
+    public let offset: Int
 
     /// The fewest letters a search sends (the API's minimum).
     public static let minSearch = 2
     /// The most rows one read gives (the API's MaxOrderRows).
     public static let maxLimit = 400
 
-    public init(position: OrderPosition?, search: String?, limit: Int, byesLast: Bool = true) {
+    public init(position: OrderPosition?, search: String?, limit: Int, byesLast: Bool = true, offset: Int = 0) {
         self.position = position
         let trimmed = search?.trimmingCharacters(in: .whitespaces) ?? ""
         self.search = trimmed.count >= Self.minSearch ? trimmed : nil
         self.limit = limit
         self.byesLast = byesLast
+        self.offset = offset
     }
 
     /// The read's route with its query, the cache key of its answer (path.ts orderPath with no league).
@@ -43,6 +46,9 @@ public struct OrderQuery: Equatable, Hashable, Sendable {
         }
         if byesLast {
             parts.append("byes=last")
+        }
+        if offset > 0 {
+            parts.append("offset=\(offset)")
         }
         return "/order?\(parts.joined(separator: "&"))"
     }
@@ -59,7 +65,8 @@ public protocol RankingsAPI: Sendable {
 extension APIClient: RankingsAPI {
     public func order(_ query: OrderQuery) async throws -> OrderAdvice {
         let input = Operations.Order.Input(query: .init(
-            position: query.position, q: query.search, limit: query.limit, byes: query.byesLast ? .last : nil
+            position: query.position, q: query.search, limit: query.limit, byes: query.byesLast ? .last : nil,
+            offset: query.offset > 0 ? query.offset : nil
         ))
         switch try await Self.unwrapped({ try await client.order(input) }) {
         case let .ok(answer):

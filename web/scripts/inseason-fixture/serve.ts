@@ -74,11 +74,12 @@ import {
 import { CLAIM_FORM_WORDS, HOLD_MS, HOST_ID, espnMoves } from './espn-moves.ts';
 import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-order-serve.ts';
 import { tradeChecker } from './trade-check.ts';
+import { acceptedTrades, checkWithRest } from './trade-rest.ts';
 import { proposedTrades } from './trade-needs.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
 import { servedWaivers } from './run-lines.ts';
 import { FIXTURE_DEVICES } from './devices.ts';
-import { finalWords, rateWords, titleWeekHorizon, withRuleList } from './week.ts';
+import { finalWords, rateWords, titleWeekHorizon, weeksCovered, withRuleList } from './week.ts';
 import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
 import {
 	irDropLine,
@@ -276,8 +277,11 @@ const irDrop = process.env[IR_DROP_VARIABLE] === '1';
 /** Waivers as for a league that states no regular season's end, when asked (Lane 121, B99). */
 const seasonTaken = process.env[SEASON_TAKEN_VARIABLE] === '1';
 const lineup = irDrop ? irDropLineup(lineupRead) : lineupRead;
-/** The trades as the API's search lists them, each need named (trade-needs.ts, Lane 103). */
-const trades = proposedTrades(tradesRead, lineup);
+/** Every trade the search finds, each need named (trade-needs.ts, Lane 103): the check answers any of
+ * them as the finder reckons it. */
+const everyTrade = proposedTrades(tradesRead, lineup);
+/** The trades as the API's search lists them: only those both sides take (trade-rest.ts, Lane 269). */
+const trades = acceptedTrades(everyTrade);
 /** The adds the API lists (waiver-beats.ts listedAdd), before any order is taken over them. */
 const waivers = listedOnly(
 	irDrop ? irDropWaivers(waiversRead) : waiversRead,
@@ -605,7 +609,12 @@ const platformNow = (): ReturnType<typeof platformGames> =>
 	afterSunday() ? platformGames(sync.host, sleeperAfter(), now()) : new Map();
 
 /** The trade builder's check (trade-check.ts). */
-const tradeCheck = tradeChecker({ trades, lineup, readAt });
+const tradeCheck = tradeChecker({
+	trades: everyTrade,
+	lineup,
+	readAt,
+	rest: (check) => checkWithRest(check, weeksCovered(fromWeekNow(), HORIZON), HORIZON)
+});
 
 const CHECK = /^\/leagues\/attached\/([^/]+)\/trades\/check$/;
 const IN_SEASON = /^\/leagues\/attached\/([^/]+)\/(lineup|matchup|scoreboard|waivers|trades)$/;

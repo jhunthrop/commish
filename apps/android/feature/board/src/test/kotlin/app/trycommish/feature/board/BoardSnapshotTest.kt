@@ -20,6 +20,7 @@ import app.trycommish.core.board.BoardPosition
 import app.trycommish.core.board.BoardSection
 import app.trycommish.core.board.RunFixture
 import app.trycommish.core.board.RunWords
+import app.trycommish.core.liveorder.LiveOrderWords
 import app.trycommish.core.liveorder.OneValueFixture
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Tokens
@@ -89,6 +90,11 @@ class BoardSnapshotTest(
          * every available player with the list's word in his pill, and no count line under the All view's
          * foot. */
         ClockMissing("clock-missing", null, true),
+
+        /** At the order's clock with an uncut answer that no longer returns a player the run holds, its
+         * statuses from a capture newer than the run's (Lane 280, B257): he is drawn from the run at the
+         * foot, the basis says once how many come from the run, and its status stamp is the order's. */
+        ClockFromRun("clock-from-run", null, true),
     }
 
     enum class Phone(
@@ -123,7 +129,7 @@ class BoardSnapshotTest(
 
     companion object {
         /** The scenes drawn on the one-value stand-in at the Sunday clock. */
-        val CLOCK_SCENES = setOf(Scene.Clock, Scene.ClockUnread, Scene.ClockMissing)
+        val CLOCK_SCENES = setOf(Scene.Clock, Scene.ClockUnread, Scene.ClockMissing, Scene.ClockFromRun)
 
         @JvmStatic
         @Parameterized.Parameters(name = "{0}-{2}-dark={1}")
@@ -157,6 +163,11 @@ class BoardSceneTest {
         assertTrue("the foot draws him", row in missing.rows.takeLast(AROUND))
         assertTrue(row.pill.endsWith(" IR"))
         assertFalse(missing.basis.any { it.startsWith("The first") })
+        val fromRun = modelOf(BoardSnapshotTest.Scene.ClockFromRun)
+        assertTrue(fromRun.atClock)
+        assertEquals("the foot draws him, from the run", MISSING, fromRun.rows.last().id)
+        assertEquals(LiveOrderWords.fromRun(1), fromRun.basis.last())
+        assertTrue(fromRun.basis.toString(), "Status read today 1:00 pm CT." in fromRun.basis)
     }
 
     @Test
@@ -197,6 +208,7 @@ private fun modelOf(scene: BoardSnapshotTest.Scene): BoardModel {
             when (scene) {
                 BoardSnapshotTest.Scene.Clock -> OneValueFixture.order()
                 BoardSnapshotTest.Scene.ClockMissing -> OneValueFixture.listing(MISSING)
+                BoardSnapshotTest.Scene.ClockFromRun -> OneValueFixture.omitting(MISSING)
                 else -> null
             }
         return BoardModel.of(
@@ -258,7 +270,7 @@ private fun Mock(
             Column(bg.fillMaxWidth()) { BoardPage(model, null, firstScreen(model.sections, CLOCK_ROWS)) }
         BoardSnapshotTest.Scene.Cliff ->
             Column(bg.fillMaxWidth().padding(vertical = Tokens.Space.s4.dp)) { BoardTable(model, aroundCliff(model.sections)) }
-        BoardSnapshotTest.Scene.Foot, BoardSnapshotTest.Scene.ClockMissing ->
+        BoardSnapshotTest.Scene.Foot, BoardSnapshotTest.Scene.ClockMissing, BoardSnapshotTest.Scene.ClockFromRun ->
             Column(bg.fillMaxWidth().padding(top = Tokens.Space.s4.dp)) {
                 BoardTable(model, model.sections.takeLast(1).map { it.copy(rows = it.rows.takeLast(AROUND)) })
                 BoardBasis(model.basis, Modifier.padding(vertical = Tokens.Space.s4.dp))

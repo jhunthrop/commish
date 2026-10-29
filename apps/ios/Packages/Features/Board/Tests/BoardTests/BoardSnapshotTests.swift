@@ -54,6 +54,10 @@ struct BoardSnapshotTests {
         /// after every available player with the list's word in his pill, and no count line under the
         /// All view's foot.
         case clockMissing = "clock-missing"
+        /// At the order's clock with an uncut answer that no longer returns a player the run holds, its
+        /// statuses from a capture newer than the run's (Lane 280, B257): he is drawn from the run at the
+        /// foot, the basis says once how many come from the run, and its status stamp is the order's.
+        case clockFromRun = "clock-from-run"
 
         var position: BoardPosition? {
             switch self {
@@ -65,12 +69,12 @@ struct BoardSnapshotTests {
         }
 
         var inSeason: Bool {
-            [.rest, .stale, .clock, .clockUnread, .clockMissing].contains(self)
+            [.rest, .stale, .clock, .clockUnread, .clockMissing, .clockFromRun].contains(self)
         }
 
         /// The scenes at the order's clock, read or unread.
         var atClock: Bool {
-            [.clock, .clockUnread, .clockMissing].contains(self)
+            [.clock, .clockUnread, .clockMissing, .clockFromRun].contains(self)
         }
 
         var fixture: RunFixture {
@@ -88,7 +92,8 @@ struct BoardSnapshotTests {
             }
             return OrderReader(
                 api: StubOrderSearch(
-                    offline: self == .clockUnread, listing: self == .clockMissing ? BoardSnapshotTests.missing : nil
+                    offline: self == .clockUnread, listing: self == .clockMissing ? BoardSnapshotTests.missing : nil,
+                    omitting: self == .clockFromRun ? BoardSnapshotTests.missing : nil
                 ),
                 clock: FixedClock(now), memo: OrderMemo()
             )
@@ -188,6 +193,17 @@ struct BoardSnapshotTests {
         #expect(!model.basis.contains { $0.hasPrefix("The first") })
     }
 
+    @Test func theFromRunSceneDrawsHimFromTheRunAndDatesTheStatusesByTheOrder() async throws {
+        let viewModel = try await Self.viewModel(.clockFromRun)
+        guard case let .loaded(model, _, _) = viewModel.state else {
+            throw SceneError.notLoaded("clock-from-run")
+        }
+        #expect(model.atClock)
+        #expect(model.rows.last?.id == Self.missing, "the foot draws him, from the run")
+        #expect(model.basis.last == LiveOrderWords.fromRun(1))
+        #expect(model.basis.contains("Status read today 1:00 pm CT."), "\(model.basis)")
+    }
+
     @Test func theStaleSceneSaysWhyItsBoardShows() async throws {
         let viewModel = try await Self.viewModel(.stale)
         #expect(viewModel.stampWords == "You're offline, so this is the last board this device saved, updated Oct 21.")
@@ -224,7 +240,7 @@ struct BoardMock: View {
                 columns: model.columns, sections: Self.aroundCliff(model.sections), open: { _ in }, live: false
             )
             .padding(.vertical, Tokens.Space.s4)
-        case .foot, .clockMissing:
+        case .foot, .clockMissing, .clockFromRun:
             VStack(alignment: .leading, spacing: Tokens.Space.s4) {
                 BoardTableView(columns: model.columns, sections: lastRows, open: { _ in }, live: false)
                 BoardBasisView(lines: model.basis)

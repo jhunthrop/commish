@@ -10,6 +10,7 @@ import { fixed, MINUS, signed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
 import type {
 	PlayerLine,
+	TradeAcceptable,
 	TradeAdvice,
 	TradeCheck,
 	TradeMoves,
@@ -87,7 +88,21 @@ export const TRADES = {
 	sortBy: 'Sort by',
 	/** Between a total before the trade and after it, on the builder's scoreboard. */
 	to: 'to',
-	projForYou: 'Proj this week for your lineup'
+	projForYou: 'Proj this week for your lineup',
+	/** The verdict's rest-of-season cell (Lane 277, B272): its head, and the tag beside a side's change
+	 * when that side would not take the trade (the API's acceptable). */
+	restHead: 'Rest of season',
+	wouldNotTake: 'Would not take it',
+	/** The answer line when a side would not take the trade (Lane 269's rule), in place of the gains. */
+	theyGiveUp: 'They give up more rest of season than they get.',
+	youGiveUp: 'You give up more rest of season than you get.',
+	bothGiveUp: 'Both sides give up more rest of season than they get.',
+	/** What the verdict's rest-of-season cells are, said once in the basis with the builder open, at a
+	 * desk and on a phone alike (coordinator ruling, Lane 277). */
+	restBasis: 'Rest of season: points over the waiver level, weeks left.',
+	/** The ideas row's line for a team the finder lists no trade with (B271): every idea it found with
+	 * them, they would not take. */
+	noIdea: 'No idea they would take.'
 } as const;
 
 /** A trade as the table lists it: its team and its row, keyed as the screen marks it. */
@@ -404,6 +419,35 @@ export function bugFigures(
 	};
 }
 
+/** A side's rest-of-season cell on the verdict (Lane 277): its change over the weeks the check covers,
+ * toned as a gain or a loss, and whether that side would not take the trade. Before an answer it is the
+ * none mark every verdict cell draws; on an answer without the figure (an older API) it is empty, never
+ * a figure we did not read. */
+export interface RestFigure {
+	text: string;
+	tone: 'gain' | 'loss' | 'even';
+	refuses: boolean;
+}
+
+export function restFigure(
+	check: Pick<TradeCheck, 'trade' | 'acceptable'> | null,
+	side: 'yours' | 'theirs'
+): RestFigure {
+	if (check === null) return { text: BOX.none, tone: 'even', refuses: false };
+	const rest = side === 'yours' ? check.trade.my_rest_of_season : check.trade.their_rest_of_season;
+	if (rest === undefined) return { text: '', tone: 'even', refuses: false };
+	return { text: gainWord(rest), tone: toneOf(rest), refuses: check.acceptable?.[side] === false };
+}
+
+/** The answer line's lead when a side would not take the trade, null when both would or the answer
+ * does not say (an older API). */
+export function refusalWords(acceptable: TradeAcceptable | undefined): string | null {
+	if (acceptable === undefined) return null;
+	if (!acceptable.yours && !acceptable.theirs) return TRADES.bothGiveUp;
+	if (!acceptable.theirs) return TRADES.theyGiveUp;
+	return acceptable.yours ? null : TRADES.youGiveUp;
+}
+
 /** "From McConkey Kong Country, you", "From Max_Jensen10". */
 export function fromWords(team: string, mine: boolean): string {
 	return mine ? `From ${team}, you` : `From ${team}`;
@@ -484,6 +528,7 @@ export function tradeBasis(
 			: [];
 	return [
 		...said(advice.basis),
+		...(opened === 'builder' ? said(TRADES.restBasis) : []),
 		...(opened === 'none' ? [] : said(advice.per_game_basis)),
 		...proj,
 		...waiting,

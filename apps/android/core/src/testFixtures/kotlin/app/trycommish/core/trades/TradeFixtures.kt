@@ -23,8 +23,8 @@ object TradeFixtures {
     /** The board id the holding fixture narrows to (Aaron Rodgers). */
     const val RODGERS = "8439"
 
-    /** The best trade's key at the week's clock: Rodgers to Max_Jensen10 for Skattebo and Strong. */
-    const val BEST = "8:96>12481+8116"
+    /** The best trade's key at the week's clock: Rodgers to Max_Jensen10 for Waddle and Strong. */
+    const val BEST = "8:96>7526+8116"
 
     private val inseason = File(System.getProperty("fixtures"), "inseason")
 

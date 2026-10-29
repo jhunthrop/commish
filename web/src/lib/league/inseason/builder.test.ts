@@ -16,7 +16,9 @@ import {
 	countWords,
 	fillsBoth,
 	gainBars,
+	ideaPlaces,
 	moreWords,
+	noIdeasFrom,
 	openingPicks,
 	pickPrompt,
 	pickable,
@@ -430,4 +432,55 @@ void test('copy guard: the builder says no trading words, dashes or semicolons',
 	for (const text of said) {
 		assert.doesNotMatch(text, bannedPattern(/\b(value|win|wins|lose a trade|fair|grade)\b/), text);
 	}
+});
+
+void test('a side that would not take the trade leads the answer line, the players and drop after (Lane 277)', () => {
+	const refused = {
+		...check({ drop: line('Jaxson Dart', 'QB') }),
+		acceptable: { yours: true, theirs: false }
+	};
+	assert.equal(
+		checkWords(refused),
+		'They give up more rest of season than they get. You drop Jaxson Dart to make room.'
+	);
+	assert.match(
+		checkWords({ ...check(), acceptable: { yours: false, theirs: true } }),
+		/^You give up more rest of season than you get\./
+	);
+	// A roster the trade leaves short is said first: no trade to take.
+	assert.equal(
+		checkWords({
+			...check({}, { yours: false, yours_open: 'RB2' }),
+			acceptable: refused.acceptable
+		}),
+		'Your roster would not fill RB2.'
+	);
+	// Both take it, or an older answer: the gains, as before.
+	assert.match(
+		checkWords({ ...check(), acceptable: { yours: true, theirs: true } }),
+		/^Your lineup gains/
+	);
+	assert.match(checkWords(check()), /^Your lineup gains/);
+});
+
+void test('a team the finder lists no trade with keeps its place in the ideas row, said (B271)', () => {
+	const muttdogs = team(4, 'Muttdogs', [
+		row({ my_gain: 1.8, their_gain: 0.5, close_for_them: false })
+	]);
+	const quiet = team(7, 'Carried by QJs', []);
+	const none = noIdeasFrom([muttdogs, quiet]);
+	assert.deepEqual(
+		none.map((n) => [n.key, n.team.name, n.note]),
+		[['none:7', 'Carried by QJs', 'No idea they would take.']]
+	);
+	const places = ideaPlaces(presetsFrom([muttdogs, quiet]), none);
+	assert.deepEqual(
+		places.map((p) => p.kind),
+		['idea', 'none']
+	);
+	// No idea with any team: every team's line, nothing to load.
+	assert.deepEqual(
+		ideaPlaces(presetsFrom([quiet]), noIdeasFrom([quiet])).map((p) => p.kind),
+		['none']
+	);
 });

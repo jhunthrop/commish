@@ -122,6 +122,25 @@ enum class TradeSort(
     Theirs("theirs", Words.Trades.theirGain),
 }
 
+/** A team the finder lists no trade with (builder.ts noIdeasFrom, B271): every idea it found with them,
+ * they would not take (Lane 269), so its place says so rather than leaving the team out. */
+data class NoIdeaLine(
+    val id: Int,
+    val team: String,
+    /** "With Carried by QJs", over its line. */
+    val with: String,
+    /** "No idea they would take." */
+    val note: String,
+) {
+    companion object {
+        /** The teams with no trade, in the answer's order. */
+        fun of(teams: List<TradeTeam>): List<NoIdeaLine> =
+            teams.filter { it.trades.isEmpty() }.map {
+                NoIdeaLine(it.rosterId, it.name, "${Words.Trades.with} ${it.name}", Words.Trades.noIdea)
+            }
+    }
+}
+
 /**
  * The Trades screen at one read (TradeScreen.svelte at 390): the decision as a strip, the chips, the
  * finder in the chosen order, the verb, the basis with no trade opened, with one, and with the builder.
@@ -181,6 +200,10 @@ class TradesModel(
 
     /** The builder's opening picks for Build a trade. */
     val opening: TradePicks = TradeBuilder.opening(advice)
+
+    /** Each team the finder lists no trade with, its line in its place under the rows (B271), none
+     * while a player is picked. */
+    val noIdeas: List<NoIdeaLine> = if (holding == null) NoIdeaLine.of(advice.teams) else emptyList()
 
     val rows: List<TradeLine> =
         TradeFinder

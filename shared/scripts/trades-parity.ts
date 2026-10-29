@@ -24,6 +24,8 @@ import {
 	offerText,
 	phoneWith,
 	proposeVerb,
+	refusalWords,
+	restFigure,
 	roomWords,
 	shortSide,
 	sideRows,
@@ -40,14 +42,23 @@ import {
 	type SortKey
 } from '../../web/src/lib/league/box/trades.ts';
 import type { LeagueHost } from '../../web/src/lib/league/api.ts';
-import type { PlayerLine, TradeAdvice, TradeCheck } from '../../web/src/lib/league/inseason/api.ts';
+import type {
+	PlayerLine,
+	TradeAcceptable,
+	TradeAdvice,
+	TradeCheck
+} from '../../web/src/lib/league/inseason/api.ts';
 import {
+	ANALYZER_LINES,
 	BUILDER_LINES,
 	MAX_A_SIDE,
 	builtFrom,
 	checkWords,
+	ideaPlaces,
+	noIdeasFrom,
 	pickable,
 	pickPrompt,
+	presetsFrom,
 	teamChoice,
 	type Picks
 } from '../../web/src/lib/league/inseason/builder.ts';
@@ -180,7 +191,45 @@ export function tradesAt(
 		verb: proposeVerb(advice.moves, host),
 		reason: advice.host_trades_url === '' ? advice.host_note : null,
 		finder: { best: finder(false), every: finder(true) },
-		basis: { closed: basis('none'), opened: basis('trade'), builder: basis('builder') }
+		basis: {
+			closed: basis('none'),
+			opened: basis('trade'),
+			builder: basis('builder')
+		},
+		restBasis: advice.rest_of_season_basis ?? null,
+		ideas: ideasOf(advice)
+	};
+}
+
+/** The builder-first screen's ideas row (Lane 260, Lane 268, Lane 277) as TradeBuilder draws it: our
+ * ideas, best first, each card's team, gains and deal, then each team the finder lists no trade with,
+ * its line in its place (B271), in the row's order. */
+function ideasOf(advice: TradeAdvice): unknown {
+	return {
+		head: ANALYZER_LINES.ideas,
+		places: ideaPlaces(presetsFrom(advice.teams), noIdeasFrom(advice.teams)).map((place) =>
+			place.kind === 'idea'
+				? {
+						kind: 'idea',
+						key: place.preset.key,
+						rosterId: place.preset.team.roster_id,
+						team: place.preset.team.name,
+						mark: place.preset.mark,
+						gains: place.preset.gains,
+						deal: place.preset.deal,
+						note: null
+					}
+				: {
+						kind: 'none',
+						key: place.none.key,
+						rosterId: place.none.team.roster_id,
+						team: place.none.team.name,
+						mark: null,
+						gains: null,
+						deal: null,
+						note: place.none.note
+					}
+		)
 	};
 }
 
@@ -195,7 +244,8 @@ export function checkAt(answer: TradeCheck, me: string, team: string, clock: str
 		figures: mine
 			? bugFigures(check.totals.yours, check.trade.my_gain, check.trade.my_proj_change)
 			: bugFigures(check.totals.theirs, check.trade.their_gain, check.trade.their_proj_change),
-		room: mine ? room.yours : room.theirs
+		room: mine ? room.yours : room.theirs,
+		rest: restFigure(check, mine ? 'yours' : 'theirs')
 	});
 	return {
 		clock,
@@ -203,12 +253,15 @@ export function checkAt(answer: TradeCheck, me: string, team: string, clock: str
 			week: TRADES.weekHead,
 			gain: TRADES.gainHead,
 			room: TRADES.room,
-			to: TRADES.to
+			to: TRADES.to,
+			rest: TRADES.restHead,
+			refuses: TRADES.wouldNotTake
 		},
 		yours: side(me, true),
 		theirs: side(team, false),
 		sentence: checkWords(check),
-		basis: check.basis
+		basis: check.basis,
+		restBasis: check.rest_of_season_basis ?? null
 	};
 }
 
@@ -232,6 +285,10 @@ export interface CheckEdit {
 	keepDrop: boolean;
 	dropReason: string | null;
 	perGame: boolean;
+	/** Whether each side takes it on its rest of season (Lane 277); absent keeps the fixture's. */
+	acceptable?: TradeAcceptable | null;
+	/** Each side's rest of season; absent keeps the fixture's, null drops both (an older API). */
+	rest?: { yours: number; theirs: number } | null;
 }
 
 const FILLS: TradeCheck['fills'] = {
@@ -390,6 +447,74 @@ const CHECK_EDITS: readonly CheckEdit[] = [
 		keepDrop: false,
 		dropReason: null,
 		perGame: true
+	},
+	// Lane 277: a side that would not take it on its rest of season, the answer's sentence in place of
+	// the gains, its cell tagged; an older answer with neither field.
+	{
+		name: 'they would not take it',
+		myGain: 1.4,
+		theirGain: 1.8,
+		fills: FILLS,
+		keepDrop: true,
+		dropReason: null,
+		perGame: true,
+		acceptable: { yours: true, theirs: false },
+		rest: { yours: 21.6, theirs: -21.6 }
+	},
+	{
+		name: 'you would not take it',
+		myGain: 0.6,
+		theirGain: 2.4,
+		fills: FILLS,
+		keepDrop: false,
+		dropReason: null,
+		perGame: true,
+		acceptable: { yours: false, theirs: true },
+		rest: { yours: -14.2, theirs: 14.2 }
+	},
+	{
+		name: 'neither would take it',
+		myGain: 0.6,
+		theirGain: 0.4,
+		fills: FILLS,
+		keepDrop: false,
+		dropReason: null,
+		perGame: false,
+		acceptable: { yours: false, theirs: false },
+		rest: { yours: -12.5, theirs: -11.4 }
+	},
+	{
+		name: 'they would not take it, yours would not fill RB2',
+		myGain: 2.1,
+		theirGain: 0.8,
+		fills: { ...FILLS, yours: false, yours_open: 'RB2' },
+		keepDrop: false,
+		dropReason: null,
+		perGame: true,
+		acceptable: { yours: true, theirs: false },
+		rest: { yours: 30, theirs: -30 }
+	},
+	{
+		name: 'both take it within the limit',
+		myGain: 2.1,
+		theirGain: 0.8,
+		fills: FILLS,
+		keepDrop: false,
+		dropReason: null,
+		perGame: true,
+		acceptable: { yours: true, theirs: true },
+		rest: { yours: 5, theirs: -5 }
+	},
+	{
+		name: 'an older answer',
+		myGain: 2.1,
+		theirGain: 0.8,
+		fills: FILLS,
+		keepDrop: false,
+		dropReason: null,
+		perGame: true,
+		acceptable: null,
+		rest: null
 	}
 ];
 
@@ -397,11 +522,27 @@ const CHECK_EDITS: readonly CheckEdit[] = [
 export function editedCheck(check: TradeCheck, edit: CheckEdit): TradeCheck {
 	const figured = (line: PlayerLine): PlayerLine =>
 		edit.perGame ? line : { ...line, rest_of_season_per_game: null };
+	const { acceptable: _acceptable, rest_of_season_basis: _restBasis, ...older } = check;
+	const { my_rest_of_season: _mine, their_rest_of_season: _theirs, ...olderTrade } = check.trade;
+	const base = edit.acceptable === null ? older : check;
+	const acceptable =
+		edit.acceptable === undefined || edit.acceptable === null
+			? {}
+			: { acceptable: edit.acceptable };
+	const rest =
+		edit.rest === undefined || edit.rest === null
+			? {}
+			: {
+					my_rest_of_season: edit.rest.yours,
+					their_rest_of_season: edit.rest.theirs
+				};
 	return {
-		...check,
+		...base,
+		...acceptable,
 		fills: edit.fills,
 		trade: {
-			...check.trade,
+			...(edit.rest === null ? olderTrade : check.trade),
+			...rest,
 			my_gain: edit.myGain,
 			their_gain: edit.theirGain,
 			drop: edit.keepDrop ? check.trade.drop : null,
@@ -422,10 +563,28 @@ export function wordCases(check: TradeCheck): unknown {
 		get: Array.from({ length: get }, (_, i) => `t${String(i)}`)
 	});
 	return {
-		checks: CHECK_EDITS.map((edit) => ({
-			...edit,
-			sentence: checkWords(editedCheck(check, edit))
-		})),
+		checks: CHECK_EDITS.map((edit) => {
+			const edited = editedCheck(check, edit);
+			return {
+				...edit,
+				// The edited check's own: the fixture's where the edit keeps them, none for an older answer.
+				acceptable: edited.acceptable ?? null,
+				rest:
+					edited.trade.my_rest_of_season === undefined ||
+					edited.trade.their_rest_of_season === undefined
+						? null
+						: {
+								yours: edited.trade.my_rest_of_season,
+								theirs: edited.trade.their_rest_of_season
+							},
+				sentence: checkWords(edited),
+				cells: {
+					yours: restFigure(edited, 'yours'),
+					theirs: restFigure(edited, 'theirs')
+				},
+				refusal: refusalWords(edited.acceptable)
+			};
+		}),
 		noTrade: tradeDecision(null),
 		// A gain under what a page shows (words.ts gainAmount), said as under 0.1.
 		under: tradeDecision({
@@ -439,7 +598,11 @@ export function wordCases(check: TradeCheck): unknown {
 			[0, 1],
 			[1, 0],
 			[1, 1]
-		].map(([give = 0, get = 0]) => ({ give, get, prompt: pickPrompt(picks(give, get)) }))
+		].map(([give = 0, get = 0]) => ({
+			give,
+			get,
+			prompt: pickPrompt(picks(give, get))
+		}))
 	};
 }
 
@@ -456,11 +619,17 @@ export function holdingAt(
 ): unknown {
 	const now = Date.parse(clock);
 	const players = pickerPlayers(advice.roster, advice.teams);
-	const option = (line: PlayerLine) => ({ key: pickKey(line), name: line.player.name });
+	const option = (line: PlayerLine) => ({
+		key: pickKey(line),
+		name: line.player.name
+	});
 	const shown = heldTrades(narrowed, now);
 	const holds = (row: (typeof shown.teams)[number]['trades'][number]): boolean =>
 		[...row.give, ...row.get].some((line) => line.player.board_id === player);
-	const teams = shown.teams.map((team) => ({ ...team, trades: team.trades.filter(holds) }));
+	const teams = shown.teams.map((team) => ({
+		...team,
+		trades: team.trades.filter(holds)
+	}));
 	const worth = worthProposing(heldTrades(advice, now).teams);
 	const name =
 		[...players.yours, ...players.theirs].find((l) => pickKey(l) === player)?.player.name ?? '';
@@ -536,7 +705,10 @@ export function builderAt(
 	return {
 		clock,
 		picks,
-		teams: shown.teams.map((team) => ({ rosterId: team.roster_id, choice: teamChoice(team) })),
+		teams: shown.teams.map((team) => ({
+			rosterId: team.roster_id,
+			choice: teamChoice(team)
+		})),
 		sentence: checkWords(check),
 		close: close ? CLOSE_FOR_THEM : null,
 		own: check.basis,
@@ -553,6 +725,11 @@ export function builderAt(
 				rosterRow(line, tick('get')(line), zone, now)
 			)
 		},
-		pin: `${gainWord(trade.my_gain)} ${TRADES.aWeekForYou}, ${gainWord(trade.their_gain)} ${TRADES.forTheirs}`
+		pin: `${gainWord(trade.my_gain)} ${TRADES.aWeekForYou}, ${gainWord(trade.their_gain)} ${TRADES.forTheirs}`,
+		restBasis: check.rest_of_season_basis ?? null,
+		rest: {
+			yours: restFigure(check, 'yours'),
+			theirs: restFigure(check, 'theirs')
+		}
 	};
 }

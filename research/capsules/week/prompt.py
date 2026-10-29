@@ -24,7 +24,7 @@ from research.capsules.week.render import render_week_sheet
 from research.capsules.week.rules import MAX_FIGURES, MAX_SENTENCES, MIN_SENTENCES, shown_week_words
 from research.capsules.week.sheet import PROJECTION_BASIS, WeekSheet
 from research.capsules.week.validate import WEEK_BAND
-from research.capsules.week.voices import voice_section
+from research.capsules.week.voices import voice_reminder, voice_section
 
 _LOW, _HIGH = WEEK_BAND
 # The words to aim at, well under the cap (80 at Lane 100, B44; 95 since Lane 117 fix round 3): the recorded model ran 91 to 104 words
@@ -167,7 +167,8 @@ def length_move(words: int) -> str | None:
 
 def week_correction(sheet: WeekSheet, body: str, ledger: Sequence[RuleNote], avoid: Sequence[str]) -> str:
     """A rewrite: the facts, the attempt, how far it is from its length, every rule broken so far with its
-    sentence, the answer's shape."""
+    sentence, his voice's reminder once (Lane 282, `voices.voice_reminder`), the answer's shape. The retry
+    writer's ask on a written draft is this correction."""
     lines = "\n".join(note.line() for note in ledger)
     move = length_move(word_count(body))
     return "\n\n".join(
@@ -180,6 +181,7 @@ def week_correction(sheet: WeekSheet, body: str, ledger: Sequence[RuleNote], avo
             f"{ASKED_WORDS[1]} words and never more than {_HIGH}, keeping what was right. Every rule this read has broken so far, on this "
             "attempt and the ones before it. What you return breaks none of them and brings none of them back:"
             f"\n{lines}",
+            *voice_reminder(sheet),
             _RETURN,
         ]
     )

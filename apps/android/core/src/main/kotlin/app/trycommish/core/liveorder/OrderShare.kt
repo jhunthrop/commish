@@ -4,6 +4,7 @@ import app.trycommish.api.decodeEnvelope
 import app.trycommish.api.models.OrderAdvice
 import app.trycommish.api.models.OrderRow
 import app.trycommish.core.Clock
+import app.trycommish.core.board.CaptureStamp
 import app.trycommish.core.instantOrNull
 import app.trycommish.core.rankings.OrderQuery
 import app.trycommish.core.rankings.RankingsReads
@@ -35,6 +36,14 @@ class OrderAtClock(
     /** When it was read (live-board.ts answerReadAt): the league's read when it says one, else the
      * screen's clock as it landed. */
     val readAt: Instant get() = instantOrNull(answer.readAt) ?: landed
+
+    /** The capture its rows' statuses come from (live-order.ts liveCapture), null when the answer names
+     * none or is older than the field (Lane 280, B257). */
+    val capture: CaptureStamp?
+        get() =
+            answer.statusRead?.let { read ->
+                instantOrNull(read.asOf)?.let { CaptureStamp(it, instantOrNull(read.checkedAt)) }
+            }
 
     /** The lead a screen's basis says in place of the run's board sentence, for a board of `teams`. */
     fun lead(
@@ -152,8 +161,40 @@ class OrderShare(
  */
 class OrderReader(
     private val share: OrderShare,
+    /** The rows one page asks for, the API's most ([RankingsUi.MAX_ROWS]); a test pages smaller. */
+    private val pageSize: Int = RankingsUi.MAX_ROWS,
 ) {
-    suspend fun read(search: String? = null): OrderAtClock = share.read(query(search))
+    /** The whole order (Lane 280): its first page, then the next from where the last ended until the
+     * answer holds every row its total counts, merged to one answer, so an uncut answer is the normal
+     * state and a player the order omits is drawn from the run. A later page that fails, or adds no row,
+     * stops the reading: the answer stays cut and the screen says its reach, as before. */
+    suspend fun read(search: String? = null): OrderAtClock {
+        val first = share.read(query(search, pageSize))
+        val pages = mutableListOf(first)
+        var read = first.answer.rows.size
+        while (read < first.answer.total) {
+            val next = laterPage(search, read) ?: break
+            if (next.answer.rows.isEmpty()) break
+            pages += next
+            read += next.answer.rows.size
+        }
+        return OrderAtClock.merged(pages) ?: first
+    }
+
+    /** A page after the first, or null where it fails (a cancelled read is still cancelled). */
+    private suspend fun laterPage(
+        search: String?,
+        offset: Int,
+    ): OrderAtClock? =
+        try {
+            share.read(query(search, pageSize, offset))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            null
+        }
 
     /** The read, or null where it fails: a screen with no answer keeps the run's (a cancelled read is
      * still cancelled). */
@@ -170,6 +211,10 @@ class OrderReader(
 
     companion object {
         /** The in-season pages' read for `search` (letters of a name or a club), every player with none. */
-        fun query(search: String?): OrderQuery = OrderQuery(null, search, RankingsUi.MAX_ROWS, byesLast = false)
+        fun query(
+            search: String?,
+            limit: Int = RankingsUi.MAX_ROWS,
+            offset: Int = 0,
+        ): OrderQuery = OrderQuery(null, search, limit, byesLast = false, offset = offset)
     }
 }

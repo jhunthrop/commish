@@ -246,15 +246,15 @@ public struct BoardModel: Equatable, Sendable {
             ))
         // A kicker's or a defense's view says the capture only when one of its rows is listed.
         let listed = position?.draftOrder != true || sections.flatMap(\.rows).contains { $0.status != nil }
-        let capture = read.designations.value.flatMap { designations in
-            listed ? BoardWords.capture(
-                asOf: designations.readAt, checkedAt: designations.checkedAt, now: now, zone: zone
-            ) : nil
-        }
+        let runCapture = read.designations.value.map { CaptureStamp(asOf: $0.readAt, checkedAt: $0.checkedAt) }
+        // At the order's clock the statuses are the order's: the status column is as of the newer capture.
+        let stamp = CaptureStamp.newer(run: runCapture, live: view.atClock ? order?.capture : nil)
+        let capture = listed ? stamp.map { BoardWords.capture($0, now: now, zone: zone) } : nil
         let run = said + (capture.map { [$0] } ?? [])
         basis = position?.draftOrder == true || !ranksRest ? run
             : Self.atClock(run, format: format, season: manifest.season, lead: view.atClock ? order : nil, zone: zone)
             + (view.reach.map { [LiveOrderWords.reach(shown: $0.shown, total: $0.total)] } ?? [])
+            + (LiveOrderWords.fromRun(view.fromRun).map { [$0] } ?? [])
     }
 
     /// A ranked view's basis in season on its rows' clock: the order's lead in the board sentence's
@@ -287,9 +287,10 @@ public struct BoardModel: Equatable, Sendable {
 /// no tiers, then the view's players it does not place, in the run's order with no figure: those on a
 /// season-long list (review M1) and those the order returns with no figure (a player put on a list after
 /// the nightly, Lane 243, B251), each with the word of the order's own row's status, else the run's,
-/// else "--", as the Rankings draw him. The rows its read does not reach are not drawn, so no row of the
-/// run's clock stands among them, and `reach` says how many of the view's rows are drawn only when the
-/// answer is truly cut.
+/// else "--", as the Rankings draw him. On a cut answer the rows its read does not reach are not drawn,
+/// so no row of the run's clock stands among them, and `reach` says how many of the view's rows are
+/// drawn; on an uncut one a run player the order omits is drawn from the run with the run's status and
+/// counted once in `fromRun` (Lane 280, B257).
 private struct ViewRows {
     let sections: [BoardSection]
     /// The view's ranked rows carry a Gap (format/gap.ts carriesGap).
@@ -298,6 +299,8 @@ private struct ViewRows {
     let atClock: Bool
     /// At the order's clock, the view's rows drawn and its rows on the run, when fewer are drawn.
     let reach: (shown: Int, total: Int)?
+    /// The view's run players an uncut order omits, drawn from the run (Lane 280, B257).
+    let fromRun: Int
 
     init(
         board: RunBoardAnswer,
@@ -318,20 +321,18 @@ private struct ViewRows {
                     said: clock.said($0.row.id)
                 )
             }
-            let listed = BoardOrder.withStatuses(drawn, statuses)
-                .filter { row in
-                    clock.places[row.id] == nil && (BoardOrder.heldOut(row, statuses) || clock.rows[row.id] != nil)
-                }
-                .map { row in cells.listed(row, said: clock.said(row.id) ?? cells.held(row.id)) }
-            sections = Self.atClock(rows, listed: listed, position: position)
+            let unplaced = ClockRows.unplaced(drawn, statuses: statuses, cells: cells, clock: clock)
+            sections = ClockRows.sections(rows, listed: unplaced.rows, position: position)
             carriesGap = false
             atClock = true
-            let shown = rows.count + listed.count
+            let shown = rows.count + unplaced.rows.count
             reach = clock.cut && shown < drawn.count ? (shown, drawn.count) : nil
+            fromRun = unplaced.fromRun
             return
         }
         atClock = false
         reach = nil
+        fromRun = 0
         guard let position else {
             let rows = BoardOrder.withStatuses(board.rows, statuses)
             sections = [BoardSection(id: "all", head: nil, band: nil, rows: rows.map(cells.ranked))]
@@ -356,25 +357,6 @@ private struct ViewRows {
             id: "\(position.rawValue)-held", head: Words.Board.heldHead, band: nil, rows: held.map(cells.ranked)
         )])
         carriesGap = rows.contains { $0.gap != nil }
-    }
-
-    /// A view at the order's clock: the order's rows, then its players on a season-long list, after
-    /// them in All and under the list's head in a position's view, as the run's view draws them.
-    /// A position's held head sits over the rows on a season-long list alone; the other unplaced rows
-    /// follow with no head (Lane 243 fix round 1, M1: a row on no list never sits under it).
-    static func atClock(_ rows: [BoardRow], listed: [BoardRow], position: BoardPosition?) -> [BoardSection] {
-        guard let position else {
-            return [BoardSection(id: "all", head: nil, band: nil, rows: rows + listed)]
-        }
-        let held = listed.filter { $0.status?.onList == true }
-        let others = listed.filter { $0.status?.onList != true }
-        return [BoardSection(id: position.rawValue, head: nil, band: nil, rows: rows)]
-            + (held.isEmpty ? [] : [BoardSection(
-                id: "\(position.rawValue)-held", head: Words.Board.heldHead, band: nil, rows: held
-            )])
-            + (others.isEmpty ? [] : [BoardSection(
-                id: "\(position.rawValue)-unplaced", head: nil, band: nil, rows: others
-            )])
     }
 
     /// TierStrip.svelte's words for a tier.

@@ -24,7 +24,7 @@ func withStatuses(view apitypes.RoomBoard, designations map[string]boards.Design
 	out := view
 	out.Players = make([]apitypes.BoardPlayer, len(view.Players))
 	copy(out.Players, view.Players)
-	read := statusRead(designations)
+	read := boards.StatusRead(designations)
 	if read == nil {
 		return out
 	}
@@ -43,22 +43,6 @@ func withStatuses(view apitypes.RoomBoard, designations map[string]boards.Design
 	}
 	out.Players = belowTheAvailable(out.Players, held)
 	return out
-}
-
-// statusRead is the capture the designations come from, nil with none.
-func statusRead(designations map[string]boards.Designation) *apitypes.StatusRead {
-	if len(designations) == 0 {
-		return nil
-	}
-	read := &apitypes.StatusRead{AsOf: boards.Newest(designations)}
-	for _, d := range designations {
-		// One capture: every designation carries its source and its check.
-		read.Source = d.Source
-		if d.CheckedAt != nil && (read.CheckedAt == nil || d.CheckedAt.After(*read.CheckedAt)) {
-			read.CheckedAt = d.CheckedAt
-		}
-	}
-	return read
 }
 
 // belowTheAvailable moves each held player (on a season-long list) to

@@ -1,7 +1,7 @@
 """Lane 266: the week read's writer voices. A player's voice is a pure function of the season and his id,
 stable across rewrites and weeks, with the board's shares about even; the ask carries his voice's brief
-after the facts on the first ask (a correction quotes the draft, already in his voice), and nothing when the voices are off; every brief keeps
-the site's words."""
+after the facts on the first ask, a correction (and the retry writer's ask) carries his voice's two-line reminder
+once (Lane 282), and neither goes out when the voices are off; every brief and reminder keeps the site's words."""
 
 from collections import Counter
 from dataclasses import replace
@@ -15,7 +15,8 @@ from research.capsules.week import voices
 from research.capsules.week.prompt import WEEK_RULES, week_correction, week_prompt
 from research.capsules.week.rules import WEEK_NEVER_WORDS
 from research.capsules.week.validate import SHARED_SENTENCE, sentence_shapes, validate_week_read, week_masks
-from research.capsules.week.voices import VOICES, voice_for, voice_section
+from research.capsules.week.voices import VOICES, voice_for, voice_reminder, voice_section
+from research.capsules.week.write import WeekAttempt, _retry_prompt
 from research.tests.week_read_fixtures import questionable, starter
 
 _BOARD: tuple[str, ...] = tuple(f"p{n:05d}" for n in range(3000))
@@ -62,8 +63,8 @@ def test_the_ask_carries_his_voice_after_the_facts() -> None:
     if on:
         assert user.index("Facts for the week") < user.index(brief) < user.index("Write the week-ahead read")
     ledger = notes_of([("Buy him.", validate_week_read("Buy him.", sheet).violations)])
-    # A correction quotes the draft, already in his voice, and carries no brief: the heaviest correction's
-    # prompt bound (`WORST_PROMPT_TOKENS`, which the budgets price) is unchanged.
+    # A correction carries the two-line reminder, never the whole brief (Lane 282): the heaviest correction stays
+    # inside the prompt bound (`WORST_PROMPT_TOKENS`, which the budgets price).
     assert brief not in week_correction(sheet, "Buy him.", ledger, ())
     # The system prompt is the same for every player, voices or not.
     assert brief not in WEEK_RULES
@@ -72,18 +73,48 @@ def test_the_ask_carries_his_voice_after_the_facts() -> None:
 def test_off_the_ask_is_as_it_was(monkeypatch: pytest.MonkeyPatch) -> None:
     sheet = starter()
     monkeypatch.setattr(voices, "VOICES_ON", False)
-    assert voice_section(sheet) == []
+    assert voice_section(sheet) == [] and voice_reminder(sheet) == []
     assert all(v.brief not in week_prompt(sheet, ()) for v in VOICES)
+    correction = week_correction(sheet, "Buy him.", (), ())
+    assert all(v.reminder not in correction for v in VOICES)
     monkeypatch.setattr(voices, "VOICES_ON", True)
     assert voice_section(sheet) == [voice_section(sheet, on=True)[0]]
 
 
 @pytest.mark.parametrize("voice", VOICES, ids=lambda v: v.key)
-def test_every_brief_keeps_the_sites_words(voice: voices.Voice) -> None:
-    text = voice.brief
-    assert "—" not in text and ";" not in text and "?" not in text
-    assert gate_hits(text, ()) == []
-    assert [rule.name for rule in WEEK_NEVER_WORDS if rule.pattern.search(text)] == []
+def test_every_brief_and_reminder_keeps_the_sites_words(voice: voices.Voice) -> None:
+    for text in (voice.brief, voice.reminder):
+        assert "—" not in text and ";" not in text and "?" not in text
+        assert gate_hits(text, ()) == []
+        assert [rule.name for rule in WEEK_NEVER_WORDS if rule.pattern.search(text)] == []
+
+
+@pytest.mark.parametrize("voice", VOICES, ids=lambda v: v.key)
+def test_a_reminder_is_two_lines_how_it_opens_and_what_it_leans_on(voice: voices.Voice) -> None:
+    opens, leans = voice.reminder.split("\n")
+    assert opens.startswith("Open on ") and leans.startswith("Lean on ")
+    assert len(voice.reminder) < len(voice.brief)
+
+
+def test_a_correction_carries_his_voices_reminder_once_after_the_rules_broken() -> None:
+    """Lane 282: about nine written reads in ten are corrections (Lane 281), so the correction names his voice and
+    its two lines once, after every rule broken so far and before the answer's shape."""
+    sheet = starter()
+    voice = voice_for(sheet.season, sheet.player_id)
+    ledger = notes_of([("Buy him.", validate_week_read("Buy him.", sheet).violations)])
+    user = week_correction(sheet, "Buy him.", ledger, ("Start him with confidence.",))
+    (part,) = voice_reminder(sheet, on=True)
+    assert voices.VOICES_ON and user.count(part) == 1 and user.count(voice.reminder) == 1
+    assert f"voice, {voice.name}," in part
+    assert user.index("Every rule this read has broken") < user.index(part) < user.index("Return ONE JSON object")
+
+
+def test_the_retry_writers_ask_carries_the_reminder_too() -> None:
+    """The retry writer's ask on a written draft is the correction, so it carries the reminder the same way."""
+    sheet = starter()
+    (part,) = voice_reminder(sheet, on=True)
+    attempts = [WeekAttempt("Buy him.", "start", validate_week_read("Buy him.", sheet).violations)]
+    assert _retry_prompt(sheet, attempts, ()).count(part) == 1
 
 
 # One sentence in each voice's manner, written for Bijan Robinson and for Puka Nacua: the same shape with his

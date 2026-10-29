@@ -14,13 +14,16 @@ export interface CheckReads {
 	trades: TradeAdvice;
 	lineup: LineupAdvice;
 	readAt: () => string;
+	/** The check with its rest of season and whether each side takes it, at the clock (trade-rest.ts). */
+	rest: (check: TradeCheck) => TradeCheck;
 }
 
 /** The check for one league's recorded answers. */
 export function tradeChecker({
 	trades,
 	lineup,
-	readAt
+	readAt,
+	rest
 }: CheckReads): (input: TradeCheckInput) => TradeCheck | string {
 	/** The trade builder's honesty line, as the finder's answer carries it (inseason words.go
 	 * TradeCheckBasis). */
@@ -117,7 +120,7 @@ export function tradeChecker({
 			};
 		};
 		const yoursOpen = openSlot([...trades.roster.filter((line) => !gives.includes(line)), ...gets]);
-		return {
+		return rest({
 			week: trades.week,
 			basis: checkBasis,
 			basis_note: trades.basis_note,
@@ -140,6 +143,6 @@ export function tradeChecker({
 			},
 			host_trades_url: trades.host_trades_url,
 			host_note: trades.host_note
-		};
+		});
 	};
 }

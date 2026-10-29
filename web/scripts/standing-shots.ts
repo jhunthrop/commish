@@ -146,7 +146,7 @@ async function lineupScreen(page: Page, at: string, width: number): Promise<void
 		);
 	const strip = await page.locator('div.strip:not(.words)').innerText();
 	expect(strip.includes('as set on ESPN'), `${at}: the strip does not name whose lineup it is`);
-	expect(strip.includes(LINEUP.pastWeeks), `${at}: the strip's link does not say where it goes`);
+	expect(strip.includes(LINEUP.pastWeeks), `${at}: the strip has no link to past weeks`);
 	expect(
 		(await page.locator('[data-basis="rule"]').count()) === 0,
 		`${at}: the rule for our pick above the rows`
