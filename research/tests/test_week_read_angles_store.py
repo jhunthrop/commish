@@ -203,7 +203,8 @@ def test_the_sheets_carry_angles_from_the_stored_usage(engine: Engine) -> None:
     top = sheets["Back Number10"]
     carries = next(a for a in top.angles if a.key == "carry_share")
     assert carries.text == (
-        "Carries: 40% of the Texans' carries in his games this season, the highest among the running backs we rank."
+        "Carries: 40% of the Texans' carries in his games this season, the highest among the running backs we rank "
+        "(far out of the ordinary for a running back)."
     )
     assert carries.figures == (AngleFigure(40.0, Measure.CARRIES),)
     assert carries.basis is not None and (carries.basis.games, carries.basis.count) == (6, 60)
@@ -212,7 +213,7 @@ def test_the_sheets_carry_angles_from_the_stored_usage(engine: Engine) -> None:
         "2026. Seattle comes to Houston on Sunday. Start him."
     )
     result = validate_week_read(read, top, call="start")
-    assert not any("angle" in v or "peers" in v for v in result.violations), result.violations
+    assert not any("usage fact" in v for v in result.violations), result.violations
     # A back on 1 carry a game (6 of his own) is on a thin basis: no carry angle reaches his sheet.
     assert all(a.key != "carry_share" for a in sheets["Back Number1"].angles)
 

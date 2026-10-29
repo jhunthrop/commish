@@ -1,6 +1,7 @@
-"""WHEN A GENERIC FACT BITES (Lane 300, ruling 2): the weather, the depth chart and the opponent's rank reach the
-writer only past these lines, so the read cannot tour them. His status always reaches it (it can decide the
-call). The card's cells still print every one of them; only the sheet the writer reads leaves them off.
+"""WHEN A GENERIC FACT BITES (Lane 300): the lines past which the weather, the depth chart, the opponent's rank and
+the expected score decide a week. Since fix round 2 (the founder: "dump in all of the information we have") every
+one reaches the writer, and these lines are the words that say whether it bites ("wind of 15 mph or more, it
+bites"; "ordinary football weather, it does not bite"), so the writer leaves the ordinary out.
 """
 
 from datetime import timedelta
@@ -44,6 +45,44 @@ def weather_bites(sheet: WeekSheet) -> bool:
 def rank_bites(allowed: Allowed | None) -> bool:
     """The opponent's rank against his position in the top or bottom `RANK_EDGE`."""
     return allowed is not None and (allowed.rank <= RANK_EDGE or allowed.rank > allowed.of - RANK_EDGE)
+
+
+def weather_words(sheet: WeekSheet) -> str:
+    """Whether the forecast bites, in words for the sheet."""
+    w = sheet.weather
+    if w is not None and w.roof in _ROOFED:
+        return "Under a roof, the weather does not bite."
+    if not weather_bites(sheet):
+        return "Ordinary football weather: it does not bite."
+    if w is not None and w.wind_mph is not None and w.wind_mph >= WIND_BITES_MPH:
+        return f"Wind of {WIND_BITES_MPH:g} mph or more: it bites."
+    return "Rain or snow likely: it bites."
+
+
+def rank_bite_words(allowed: Allowed | None) -> str:
+    """Whether the opponent's rank bites, in words for the sheet."""
+    if rank_bites(allowed):
+        return f"Within {RANK_EDGE} of either end of the league: it bites."
+    return "In the middle of the league: ordinary, it does not bite."
+
+
+def depth_words(sheet: WeekSheet) -> str:
+    """Whether his place on the chart bites, in words for the sheet."""
+    d = sheet.depth
+    if d is not None and any(slot == d.slot for _, slot in d.around):
+        return "He shares his spot: it bites."
+    if depth_bites(sheet):
+        return "His place moved: it bites."
+    return "Unchanged: ordinary, it does not bite."
+
+
+def expected_words(sheet: WeekSheet) -> str:
+    """Whether the club's expected score bites: its place when it is among the week's three highest or lowest (the
+    expected-score fact on his sheet), else ordinary."""
+    place = next((f"{w} {g}" for a in sheet.angles if a.key == "expected" for w, g in a.places), None)
+    if place is not None:
+        return f"It is {place}: it bites."
+    return "Neither among the week's highest nor its lowest: ordinary, it does not bite."
 
 
 def depth_bites(sheet: WeekSheet) -> bool:

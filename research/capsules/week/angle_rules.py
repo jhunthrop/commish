@@ -80,7 +80,7 @@ def _figures(sheet: WeekSheet) -> list[AngleFigure]:
 
 
 _SAY_ITS_MEASURE: Final = (
-    "Quote an angle's figure as its angle says it, beside what it measures (\"32% of the Rams' targets\"), never "
+    "Quote a usage fact's figure as its line says it, beside what it measures (\"32% of the Rams' targets\"), never "
     "as another measure, and never a share as a count."
 )
 
@@ -95,20 +95,20 @@ def _figure_violation(raw: str, value: float, before: str, after: str, sheet: We
             return None
         matching = [f for f in figures if f.percent and f.value == value]
         if not matching:
-            return f'states "{raw}" as a share no angle states'
+            return f'states "{raw}" as a share no usage fact states'
     else:
         if value in card_figures(sheet):
             return None
         matching = [f for f in figures if not f.percent and f.value == value]
         if not matching:
             shares = [f for f in figures if f.percent and f.value == value]
-            return None if not shares else f'states "{raw}", an angle\'s share, as a count'
+            return None if not shares else f'states "{raw}", a usage fact\'s share, as a count'
     named = _named(_clause(before, after))
     measures = {f.measure for f in matching}
     if named & measures or (not named - measures and _named(before + after) & measures):
         return None
     said = ", ".join(sorted(named)) or "no measure"
-    return f'names "{raw}" as {said}, where the angle that states it measures {matching[0].measure}'
+    return f'names "{raw}" as {said}, where the usage fact that states it measures {matching[0].measure}'
 
 
 def named_chance_of(sheet: WeekSheet) -> float | None:
@@ -137,7 +137,7 @@ def _remedy(sheet: WeekSheet) -> str:
     said = [f"{w} {g}" for a in sheet.angles for w, g in a.places]
     if not said:
         return "The facts place him among no peers: say nothing of where he ranks among them."
-    return "Say his place among his peers only as his angles do: " + "; ".join(f'"{p}"' for p in said) + "."
+    return "Say his place among his peers only as his usage facts do: " + "; ".join(f'"{p}"' for p in said) + "."
 
 
 def _group_stated(said: str, groups: set[str]) -> bool:
@@ -165,5 +165,5 @@ def place_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
         bad += [m.group(0) for m in _AMONG_RANKED.finditer(s) if not _group_stated(m.group(1), groups)]
         if bad:
             quoted = ", ".join(f'"{b}"' for b in dict.fromkeys(bad))
-            out.append(_violation(f"places him among his peers as no angle does ({quoted})", s, _remedy(sheet)))
+            out.append(_violation(f"places him among his peers as no usage fact does ({quoted})", s, _remedy(sheet)))
     return out

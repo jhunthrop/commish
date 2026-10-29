@@ -71,10 +71,10 @@ _PICK: Final = (
     "rate) and build on those. Leave the rest unquoted."
 )
 _PICK_ANGLES: Final = (
-    'Build the read on his angles, the facts under "What sets his week apart", in their order: open on the first, '
-    "and for each one say why it matters to this week's call. Bring in another fact (his status, his game, his "
-    "season, the weather, the opponent, his depth chart) only when it decides the call, and leave the rest unquoted. "
-    "A player with no angle is read from his status, his game and his season."
+    "Read every fact: his usage in full, each with how unusual it is, and the game's facts, each with whether it "
+    "bites. Decide which one or two actually decide this player's week, lead with that, and say why it matters to "
+    "this week's call. Leave out what is ordinary: a fact the sheet calls ordinary, or one that does not bite, earns "
+    "no sentence unless it decides the call. Never tour the list."
 )
 _CAP: Final = f"quote at most {MAX_FIGURES} figures in all"
 _CAP_ANGLES: Final = (
@@ -82,13 +82,13 @@ _CAP_ANGLES: Final = (
     "carry two figures each, say one of them in words"
 )
 _SAY: Final = "why his week looks the way it does (his status, his role, the matchup, the weather)"
-_SAY_ANGLES: Final = "what his angles mean for this week's call"
+_SAY_ANGLES: Final = "what the facts that decide his week mean for this week's call"
 _SEE: Final = "Say what you see in his status, his role, the matchup or his rate."
-_SEE_ANGLES: Final = "Say what his angles and his status tell you."
+_SEE_ANGLES: Final = "Say what the facts that decide his week and his status tell you."
 _NAMED: Final = "Every figure in the facts is one the page prints as a cell: name it the way the cell does"
 _NAMED_ANGLES: Final = (
-    "Every figure in the facts is one the page prints as a cell or one his angles state: name an angle's figure "
-    "the way its angle does (\"32% of the Rams' targets\"), and a cell's the way the cell does"
+    "Every figure in the facts is one the page prints as a cell or one his usage facts state: name a usage figure "
+    "the way its line does (\"32% of the Rams' targets\"), and a cell's the way the cell does"
 )
 
 
@@ -195,7 +195,8 @@ def week_prompt(sheet: WeekSheet, avoid: Sequence[str]) -> str:
 
 
 ANGLES_REMINDER: Final = (
-    "Keep the read built on his angles, in their order, each with why it matters to this week's call."
+    "Keep the read built on the one or two facts that decide his week, with why they matter to this week's call; "
+    "leave out what is ordinary, and never tour the list."
 )
 
 

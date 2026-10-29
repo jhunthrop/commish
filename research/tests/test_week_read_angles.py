@@ -1,4 +1,4 @@
-"""Lane 300: each week read is built on its own angle, chosen by code from the stored usage, and the generic facts
+"""Lane 300: each week read is built from his usage facts in full, each with how unusual it is, and the generic facts
 reach the writer only when they bite (`capsules.week.angles`, `bites`, `render`, `prompt`, `cells`)."""
 
 from collections.abc import Iterator
@@ -9,13 +9,14 @@ import pytest
 from research.capsules.week import angles as angles_module
 from research.capsules.week.angle_candidates import AngleFigure, Basis, Measure
 from research.capsules.week.angles import (
-    MAX_ANGLES,
-    MIN_ANGLE_SCORE,
+    FAR_FROM,
+    ORDINARY_UNDER,
     Angle,
     AnglePlayer,
     board_angles,
-    chosen,
     place_words,
+    summary,
+    unusual_words,
 )
 from research.capsules.week.bites import RANK_EDGE, depth_bites, rank_bites, weather_bites
 from research.capsules.week.prompt import (
@@ -139,18 +140,29 @@ def _angle(key: str, score: float) -> Angle:
     return Angle(key, f"{key}.", (AngleFigure(1.0, Measure.SNAPS),), (), score, Basis(5, 100, "snaps"))
 
 
-def test_one_angle_a_family_and_two_at_most() -> None:
-    picked = chosen(
-        [_angle("target_share", 2.0), _angle("target_trend", 1.5), _angle("snap_share", 1.2), _angle("spread", 1.1)]
-    )
-    assert [a.key for a in picked] == ["target_share", "snap_share"]
-    assert len(picked) == MAX_ANGLES
+def test_the_summary_carries_every_fact_once_most_unusual_first() -> None:
+    """The founder's direction (fix round 2): every fact, ordinary ones too, for the writer to weigh."""
+    facts = [_angle("target_share", 2.0), _angle("target_trend", 1.5), _angle("snap_share", 0.2), _angle("spread", 1.1)]
+    assert [a.key for a in summary([*facts, _angle("spread", 0.5)])] == [
+        "target_share",
+        "target_trend",
+        "spread",
+        "snap_share",
+    ]
 
 
-def test_an_angle_under_the_minimum_never_reaches_the_sheet() -> None:
-    under = MIN_ANGLE_SCORE - 0.01
-    assert [a.key for a in chosen([_angle("spread", 2.0), _angle("red_zone", under)])] == ["spread"]
-    assert chosen([_angle("spread", under), _angle("red_zone", under / 2)]) == ()
+def test_a_facts_unusualness_is_said_in_plain_words() -> None:
+    assert unusual_words(ORDINARY_UNDER - 0.01, "WR") == "ordinary for a wide receiver"
+    assert unusual_words(ORDINARY_UNDER, "TE") == "out of the ordinary for a tight end"
+    assert unusual_words(FAR_FROM, "RB") == "far out of the ordinary for a running back"
+    assert unusual_words(0.1, "WR", club=True) == "ordinary this week"
+
+
+def test_an_ordinary_share_reaches_the_sheet_with_its_words() -> None:
+    middling = _receiver(93, 6)
+    got = board_angles([*_board(), middling], {}, 8)[middling.player_id]
+    share = next(a for a in got if a.key == "target_share")
+    assert share.text.endswith("(ordinary for a wide receiver).")
 
 
 def test_place_words_count_from_the_nearer_end() -> None:
@@ -215,14 +227,17 @@ def _angled() -> WeekSheet:
 
 
 @pytest.mark.usefixtures("angles_on")
-def test_the_sheet_leads_with_the_angles_and_leaves_off_what_does_not_bite() -> None:
+def test_the_sheet_carries_every_fact_with_the_words_that_say_whether_it_bites() -> None:
+    """Fix round 2 (ruling 2): the generic facts reach the writer below their lines too, said as ordinary."""
     text = render_week_sheet(_angled())
     assert ANGLES_HEAD in text and f"1. {_TARGETS.text}" in text and f"2. {_VACATED.text}" in text
-    assert "Venue:" not in text and "Expected points:" not in text and "Depth chart" not in text
-    assert "ARI against WRs" not in text  # 26th of 32 is outside the four either end
-    assert "ARI against WRs" in render_week_sheet(
-        replace(_angled(), allowed=Allowed(29, 32, 41.3, "WR", 5, starter().written_at))
-    )
+    assert "Under a roof, the weather does not bite." in text
+    assert "Neither among the week's highest nor its lowest: ordinary, it does not bite." in text
+    assert "Unchanged: ordinary, it does not bite." in text
+    # 26th of 32 is outside the four either end; 29th of 32 is inside.
+    assert "In the middle of the league: ordinary, it does not bite." in text
+    biting = replace(_angled(), allowed=Allowed(29, 32, 41.3, "WR", 5, starter().written_at))
+    assert "Within 4 of either end of the league: it bites." in render_week_sheet(biting)
     assert NO_ANGLE in render_week_sheet(starter())
 
 
@@ -255,7 +270,7 @@ def test_a_sheet_with_angles_may_state_one_figure_more() -> None:
 @pytest.mark.usefixtures("angles_on")
 def test_the_prompt_and_the_correction_carry_the_angles() -> None:
     assert week_rules() == WEEK_RULES_ANGLES
-    assert "Build the read on his angles" in WEEK_RULES_ANGLES and "Build the read on his angles" not in WEEK_RULES
+    assert "Never tour the list." in WEEK_RULES_ANGLES and "Never tour the list." not in WEEK_RULES
     assert "Pick the two or three facts" not in WEEK_RULES_ANGLES
     correction = week_correction(_angled(), "A read.", (), ())
     assert ANGLES_REMINDER in correction and _TARGETS.text in correction
@@ -362,7 +377,7 @@ def test_an_angle_figure_or_place_misquoted_is_refused(said: str, misquoted: str
     read = _ACCEPTED.replace(said, misquoted)
     assert read != _ACCEPTED
     violations = validate_week_read(read, _angled(), call="start").violations
-    assert any("angle" in v for v in violations), violations
+    assert any("usage fact" in v for v in violations), violations
 
 
 @pytest.mark.usefixtures("angles_on")
@@ -467,4 +482,4 @@ _SNAP_TREND = Angle(
 def test_an_honest_paraphrase_of_an_angle_is_not_refused(honest: str) -> None:
     sheet = replace(_angled(), angles=(_TARGETS, _SNAP_TREND))
     result = validate_week_read(f"{honest} Start him in week 6 of 2026 against Arizona.", sheet, call="start")
-    assert not any("angle" in v or "among his peers" in v for v in result.violations), result.violations
+    assert not any("usage fact" in v for v in result.violations), result.violations

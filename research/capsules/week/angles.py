@@ -1,26 +1,26 @@
-"""THE WEEK'S ANGLES (Lane 300, the founder 2026-10-29: "They all read the same to me"): what is distinct about
-this player's week, chosen by code.
+"""THE WEEK'S FACTS IN FULL (Lane 300). The founder, 2026-10-29: "They all read the same to me", and the same day,
+"just dump in all of the information we have (summarized) and let it make an intelligent read": every usage fact
+the store holds for him this week, each with how unusual it is, most unusual first; the writer reads them all and
+leads with what decides his week.
 
 Every board player's candidates (`angle_candidates`) are built from the stored usage (`usage_reads`), his games'
 points and the night's facts, then each is scored by how unusual it is: its measure's distance from his
 position's peers, in their standard deviations (a z-score among the board players at his position whose basis
 clears the thin floors, `MIN_PEERS` of them at least). A trend is his last three games against his games before
 them, so its score is unusual against his own baseline as well as his peers'. A candidate with no peer measure
-(work vacated by a teammate ruled out, a return from missed games) carries a score of its own. One angle a
-family (his snaps, his targets, his carries, his air yards, his red-zone work, his spread, the club's expected
-score, vacated work, his return), the strongest.
+(work vacated by a teammate ruled out, a return from missed games, the club's expected score) carries a score of
+its own. Each fact's sentence ends on its unusualness in plain words (`unusual_words`), and the sheet carries them
+all, most unusual first (`summary`, `render`).
 
-The sheet carries at most `MAX_ANGLES`, most unusual first (`render`), and only angles that score
-`MIN_ANGLE_SCORE` or more: a sheet with none over it carries none, and the writer leans on his status and his game
-(the coordinator's fix round 1). An angle on a thin basis (`THIN_FLOORS`, on HIS OWN counts: under three games,
-a share on fewer than 20 of his snaps or 10 of his targets, carries or red-zone chances, each window of a trend and
-a return; the review's H2) is never carried, so it never leads. A trend or a return is built only while his usage
-reaches the newest game of his log (review M4), so "his last three games" are the log's.
+A fact on a thin basis (`THIN_FLOORS`, on HIS OWN counts: under three games, a share on fewer than 20 of his snaps
+or 10 of his targets, carries or red-zone chances, each window of a trend and a return; the review's H2) is left
+off the sheet, so it never leads. A trend or a return is built only while his usage reaches the newest game of his
+log (review M4), so "his last three games" are the log's.
 
-Every figure an angle prints is bound to what it measures (`AngleFigure`), and every place among his peers it
-states is kept (`Angle.places`): the read may quote a figure only as its measure and a place only as stated
-(`angle_rules`, the review's H1). `ANGLES_ON` is the one switch: off, the sheet, the
-prompt and the validator are main's before Lane 300.
+Every figure a fact prints is bound to what it measures (`AngleFigure`), and every place among his peers it states
+is kept (`Angle.places`): the read may quote a figure only as its measure and a place only as stated
+(`angle_rules`, the review's H1). `ANGLES_ON` is the one switch: off, the sheet, the prompt and the validator are
+main's before Lane 300.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -75,12 +75,11 @@ THIN_FLOORS: Final = {SNAPS: 20.0, TARGETS: 10.0, CARRIES: 10.0, RED_ZONE: 10.0,
 THIN_GAMES: Final = 3
 # A peer z-score needs this many peers at his position, or the candidate has no score.
 MIN_PEERS: Final = 8
-# Two angles at most (fix round 1): a third ran the reads past the figure cap and the word band, the two
-# largest of the angles arm's fall causes in Lane 300's first three pairs.
-MAX_ANGLES: Final = 2
-# An angle under this score never reaches the sheet (fix round 1): about three quarters of a standard deviation
-# from his position's middle, so "the 26th-highest snap share among tight ends" is left to his card.
-MIN_ANGLE_SCORE: Final = 0.75
+# The words for a fact's unusualness, by its score (peer standard deviations): under `ORDINARY_UNDER` it is
+# ordinary (about the middle 55% of his peers), from `FAR_FROM` far out of the ordinary (about the outer 13%).
+ORDINARY_UNDER: Final = 0.75
+FAR_FROM: Final = 1.5
+POSITION_ONE: Final = {"QB": "quarterback", "RB": "running back", "WR": "wide receiver", "TE": "tight end"}
 # Work vacated: a teammate ruled out this week who drew at least this share of his club's targets (or carries,
 # for a back) in his games, and played within this many weeks of this one (a player out for a month has had
 # his work taken already). Targets pass only to the mate's own position, or between receivers and tight ends;
@@ -318,9 +317,26 @@ def _pools(
     return pools
 
 
+def unusual_words(score: float, position: str, *, club: bool = False) -> str:
+    """A fact's unusualness in plain words: "ordinary for a wide receiver", "far out of the ordinary this week"."""
+    level = (
+        "ordinary"
+        if score < ORDINARY_UNDER
+        else "out of the ordinary"
+        if score < FAR_FROM
+        else "far out of the ordinary"
+    )
+    return f"{level} this week" if club else f"{level} for a {POSITION_ONE.get(position, 'player')}"
+
+
+def _ended(text: str, score: float, position: str, *, club: bool = False) -> str:
+    return f"{text} ({unusual_words(score, position, club=club)})."
+
+
 def _scored(c: Candidate, pool: Sequence[float], position: str) -> Angle | None:
     if c.fixed is not None:
-        return Angle(c.key, f"{c.text}.", c.figures, c.names, round(c.fixed, 2), c.basis, _expected_places(c))
+        text = _ended(c.text, c.fixed, position, club=c.key == "expected")
+        return Angle(c.key, text, c.figures, c.names, round(c.fixed, 2), c.basis, _expected_places(c))
     z = None if c.measure is None else _z(c.measure, pool)
     if z is None:
         return None
@@ -330,7 +346,7 @@ def _scored(c: Candidate, pool: Sequence[float], position: str) -> Angle | None:
         text, places = f"{text}, {words} {group}", ((words, group),)
     if c.key == "spread":
         text = f"{'Boom or bust' if z > 0 else 'Steady week to week'}: {text}"
-    return Angle(c.key, f"{text}.", c.figures, c.names, round(abs(z), 2), c.basis, places)
+    return Angle(c.key, _ended(text, abs(z), position), c.figures, c.names, round(abs(z), 2), c.basis, places)
 
 
 def _expected_places(c: Candidate) -> tuple[tuple[str, str], ...]:
@@ -349,27 +365,18 @@ def place_words(value: float, pool: Sequence[float], ends: tuple[str, str]) -> s
     return f"the {end}" if place == 1 else f"the {ordinal(place)}-{end}"
 
 
-# Each key's family, one angle a family (a level and its trend say one thing twice).
-_FAMILY: Final = {
-    **{f"{kind.key}_{part}": kind.family for kind in SHARE_KINDS for part in ("share", "trend")},
-    "target_depth": "air",
-}
-
-
-def chosen(angles: Iterable[Angle]) -> tuple[Angle, ...]:
-    """The strongest angle a family, most unusual first, `MAX_ANGLES` of those at `MIN_ANGLE_SCORE` or more."""
+def summary(angles: Iterable[Angle]) -> tuple[Angle, ...]:
+    """Every fact once, most unusual first (the founder's direction: the writer reads them all)."""
     best: dict[str, Angle] = {}
     for angle in angles:
-        family = _FAMILY.get(angle.key, angle.key)
-        if family not in best or angle.score > best[family].score:
-            best[family] = angle
-    ordered = sorted(best.values(), key=lambda a: (-a.score, a.key))
-    return tuple(a for a in ordered if a.score >= MIN_ANGLE_SCORE)[:MAX_ANGLES]
+        if angle.key not in best or angle.score > best[angle.key].score:
+            best[angle.key] = angle
+    return tuple(sorted(best.values(), key=lambda a: (-a.score, a.key)))
 
 
 def board_angles(players: Sequence[AnglePlayer], clubs: Mapping[str, float], week: int) -> dict[str, tuple[Angle, ...]]:
-    """Every board player's angles by universe id: his candidates, scored against his position's peers, the
-    thin ones left off, the strongest a family carried."""
+    """Every board player's facts by universe id: his candidates, scored against his position's peers, the thin
+    ones left off, every other one carried, most unusual first."""
     built = {p.player_id: own_candidates(p) for p in players}
     rates = _red_zone_rates(players, built)
     own = {
@@ -392,5 +399,5 @@ def board_angles(players: Sequence[AnglePlayer], clubs: Mapping[str, float], wee
             for c in candidates
             if c is not None and not _thin(c.basis)
         )
-        out[player.player_id] = chosen(a for a in scored if a is not None)
+        out[player.player_id] = summary(a for a in scored if a is not None)
     return out

@@ -17,7 +17,7 @@ from research.capsules.render_depth import slot_word
 from research.capsules.render_season import week_list
 from research.capsules.render_words import IN_OUR_RECORDS, ordinal, week_of
 from research.capsules.week.angles import angles_on
-from research.capsules.week.bites import depth_bites, rank_bites, weather_bites
+from research.capsules.week.bites import depth_words, expected_words, rank_bite_words, weather_words
 from research.capsules.week.cells import named_chance
 from research.capsules.week.rank_words import rank_words
 from research.capsules.week.report_day import report_words
@@ -227,15 +227,15 @@ def _board_line(sheet: WeekSheet) -> str | None:
     return f"Our preseason order, set before the season{_as_of(b.published_at)}: {place}. {say}"
 
 
-ANGLES_HEAD: Final = "What sets his week apart, the most unusual first (build the read on these, in this order):"
-NO_ANGLE: Final = (
-    "What sets his week apart: no usage fact of his stands out this week. Build the read on his status, his game "
-    "and his season."
+ANGLES_HEAD: Final = (
+    "His usage this week in full, the most unusual first, each with how unusual it is (read them all, lead with what "
+    "decides his week, leave out what is ordinary):"
 )
+NO_ANGLE: Final = "His usage this week: no usage fact of his clears its sample this week."
 
 
 def _angles_lines(sheet: WeekSheet) -> list[str]:
-    """His angles (Lane 300), one to a line, for a player who can play this week."""
+    """His facts in full (Lane 300), one to a line, for a player who can play this week."""
     if not sheet.can_play:
         return []
     if not sheet.angles:
@@ -243,13 +243,19 @@ def _angles_lines(sheet: WeekSheet) -> list[str]:
     return [ANGLES_HEAD, *(f"{n}. {angle.text}" for n, angle in enumerate(sheet.angles, start=1))]
 
 
-def _biting(sheet: WeekSheet) -> list[str | None]:
-    """The generic facts that bite this week (`bites`), with his angles: the sheet under the angles."""
+def _with_words(line: str | None, words: str) -> str | None:
+    return None if line is None else f"{line} {words}"
+
+
+def _in_full(sheet: WeekSheet) -> list[str | None]:
+    """His facts in full, then the game's: the expected score, the forecast, the opponent's rank and the depth
+    chart, each with the words that say whether it bites (`bites`, the coordinator's ruling 2 of fix round 2)."""
     return [
         *_angles_lines(sheet),
-        _weather_line(sheet) if weather_bites(sheet) else None,
-        _allowed_line(sheet) if rank_bites(sheet.allowed) else None,
-        _depth_line(sheet) if depth_bites(sheet) else None,
+        _with_words(_expected_line(sheet), expected_words(sheet)),
+        _with_words(_weather_line(sheet), weather_words(sheet)),
+        _with_words(_allowed_line(sheet), rank_bite_words(sheet.allowed)),
+        _with_words(_depth_line(sheet), depth_words(sheet)),
     ]
 
 
@@ -271,7 +277,7 @@ def render_week_sheet(sheet: WeekSheet) -> str:
         _status_line(sheet),
         _projection_line(sheet),
         *(
-            _biting(sheet)
+            _in_full(sheet)
             if angles_on()
             else (_expected_line(sheet), _weather_line(sheet), _allowed_line(sheet), _depth_line(sheet))
         ),
