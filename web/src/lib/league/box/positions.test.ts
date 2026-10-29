@@ -225,7 +225,10 @@ void test("the panel's words say what the rank is and pass the copy guard", () =
 		panelExplain('season', [{ need: false }]),
 		"Rank is your starters' rest of season at the position against the league's."
 	);
-	assert.match(panelExplain('week', [{ need: true }]), /Proj this week.*Need marks/);
+	assert.equal(
+		panelExplain('season', [{ need: true }]),
+		"Rank is your starters' rest of season at the position against the league's. Need: your rest of season at this position is under the league's median. The Trades screen's needs are by starting slot."
+	);
 	const words = [
 		...Object.values(PANEL).flatMap((v) => (typeof v === 'string' ? [v] : Object.values(v))),
 		...panelCards(advice, 'season', ZONE, NOW).flatMap((c) => [c.rank, c.figure, c.median])

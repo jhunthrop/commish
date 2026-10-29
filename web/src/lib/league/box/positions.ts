@@ -35,8 +35,11 @@ export const PANEL = {
 		season: "Rank is your starters' rest of season at the position against the league's.",
 		week: "Rank is your starters' Proj this week at the position against the league's."
 	},
-	/** Said with the need mark's meaning, after the rank's line. */
-	needSays: 'Need marks a starting spot below the league median.'
+	/** The need mark's meaning, its real measure (the position's rest of season against the median
+	 * team's), said after the rank's line where a Need is drawn (Lane 291 re-review N2). */
+	needSays: "Need: your rest of season at this position is under the league's median.",
+	/** One line where a Need is drawn: the Trades screen reads needs another way. */
+	tradesNeeds: "The Trades screen's needs are by starting slot."
 } as const;
 
 /** One player on a card's ranked list. */
@@ -205,8 +208,9 @@ export function panelHasWeek(advice: Pick<WaiverAdvice, 'positions'>): boolean {
 	return (advice.positions ?? []).some((c) => c.week !== null);
 }
 
-/** The panel's line under the cards: what the rank is, and the need mark where one is drawn. */
+/** The panel's line under the cards: what the rank is, and where a Need is drawn what it is and how
+ * the Trades screen's needs differ. */
 export function panelExplain(mode: PanelMode, cards: readonly Pick<PanelCard, 'need'>[]): string {
 	const rank = PANEL.explain[mode];
-	return cards.some((c) => c.need) ? `${rank} ${PANEL.needSays}` : rank;
+	return cards.some((c) => c.need) ? `${rank} ${PANEL.needSays} ${PANEL.tradesNeeds}` : rank;
 }

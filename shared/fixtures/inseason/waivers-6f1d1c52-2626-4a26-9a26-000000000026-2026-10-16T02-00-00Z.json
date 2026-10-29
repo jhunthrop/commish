@@ -16667,7 +16667,11 @@
 				"teams": 12,
 				"need": false,
 				"rest_of_season": null,
-				"week": null,
+				"week": {
+					"rank": 1,
+					"points": 7.9,
+					"median": 0
+				},
 				"mine": [
 					{
 						"line": {
@@ -16723,8 +16727,8 @@
 								"word": "Next kickoff"
 							}
 						},
-						"starter": false,
-						"starts_this_week": false,
+						"starter": true,
+						"starts_this_week": true,
 						"rest_of_season_points": null
 					},
 					{
@@ -16775,7 +16779,147 @@
 						"rest_of_season_points": null
 					}
 				],
-				"available": []
+				"available": [],
+				"available_week": [
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": null,
+									"name": "Kansas City Chiefs",
+									"position": "DEF",
+									"team": "KC",
+									"injured_reserve": false
+								},
+								"headshot": null,
+								"slug": null,
+								"position_rank": null,
+								"points_over_replacement": null,
+								"rest_of_season_per_game": null,
+								"week_projection": 9.6,
+								"projection_delta": 0.1,
+								"opp_rank": null,
+								"season_avg": null,
+								"last_points": null,
+								"held": false,
+								"facts": {
+									"week": 6,
+									"opponent": "LAC",
+									"home": true,
+									"kickoff": "2026-10-18T20:25:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [],
+									"allowed_to_position": null,
+									"game_total": {
+										"points": 42.5,
+										"team_points": 25.5,
+										"read_at": "2026-10-16T21:01:26.774Z"
+									},
+									"spread": {
+										"side": "win",
+										"points": 8.5,
+										"read_at": "2026-10-16T21:01:26.774Z"
+									},
+									"roof": {
+										"kind": "outdoors",
+										"abroad": false
+									},
+									"weather": {
+										"temperature_f": 66,
+										"wind_mph": 10.4,
+										"precipitation_chance": 0,
+										"precipitation_kind": "none",
+										"read_at": "2026-10-16T21:01:34.611Z"
+									},
+									"game_state": "upcoming"
+								},
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "HOU",
+									"board_id": null,
+									"name": "Houston Texans",
+									"position": "DEF",
+									"team": "HOU",
+									"injured_reserve": false
+								},
+								"headshot": null,
+								"slug": null,
+								"position_rank": null,
+								"points_over_replacement": null,
+								"rest_of_season_per_game": null,
+								"held": false,
+								"facts": {
+									"week": 6,
+									"opponent": "JAX",
+									"home": false,
+									"kickoff": "2026-10-18T13:30:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [],
+									"allowed_to_position": null,
+									"game_total": {
+										"points": 42.5,
+										"team_points": 20,
+										"read_at": "2026-10-16T21:01:26.774Z"
+									},
+									"spread": {
+										"side": "lose",
+										"points": 3,
+										"read_at": "2026-10-16T21:01:26.774Z"
+									},
+									"roof": {
+										"kind": "outdoors",
+										"abroad": true
+									},
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": 7.9,
+								"projection_delta": -0.3,
+								"opp_rank": null,
+								"season_avg": null,
+								"last_points": null,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0.3,
+							"starts": true,
+							"sentence": "Kansas City Chiefs would start for you this week on the Proj shown.",
+							"week_gain": 1.7,
+							"pickup": true,
+							"beats": {
+								"host_id": "HOU",
+								"name": "Houston Texans",
+								"starter": true,
+								"gain": 1.7,
+								"open_spot": false
+							},
+							"drops": [
+								{
+									"host_id": "HOU",
+									"gain": 0.3,
+									"week_gain": 1.7,
+									"starts_this_week": true
+								}
+							],
+							"clears": null
+						},
+						"rest_of_season_points": null
+					}
+				]
 			}
 		],
 		"basis_note_list": "two-point, missed kick, fumble recovery and safety"

@@ -11721,7 +11721,7 @@
 								"word": "Next kickoff"
 							}
 						},
-						"starter": false,
+						"starter": true,
 						"starts_this_week": false,
 						"rest_of_season_points": null
 					},

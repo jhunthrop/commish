@@ -16,7 +16,10 @@
 //   InjuredReserve); other teams' designations are not in the fixture, so theirs all may start;
 // - this week's figures are the member's lines' own Proj (a player without one sits) and, for every
 //   other team, the one projection snapshot (projection.json), a player it has no row for
-//   at his board points over the weeks left; a position with no figure at all has no week standing.
+//   at his board points over the weeks left; a position ranks this week where any rostered player
+//   there carries a week figure (the API's rule);
+// - the board places no defense, so only the member's own defenses (his lines) fill a D/ST spot:
+//   the D/ST card ranks him against teams the fixture gives none.
 import type { LeagueSync } from '../../src/lib/league/api.ts';
 import type { PlayerLine, WaiverAdvice, WaiverRow } from '../../src/lib/league/inseason/api.ts';
 import type { components } from '../../src/lib/api/types.ts';
@@ -88,20 +91,18 @@ export function fill(
 	order: (p: PanelPlayer) => number | null,
 	figure: (p: PanelPlayer) => number | null,
 	out: ReadonlySet<string> = new Set()
-): { by: Map<Position, number>; starts: Set<string>; figured: Set<Position> } {
+): { by: Map<Position, number>; starts: Set<string> } {
 	const ranked = [...players].filter((p) => !out.has(p.id)).sort(desc(order));
 	const by = new Map<Position, number>();
 	const starts = new Set<string>();
-	const figured = new Set<Position>();
 	for (const spot of spots) {
 		const p = ranked.find((c) => !starts.has(c.id) && spot.includes(c.position));
 		if (p === undefined) continue;
 		starts.add(p.id);
 		const v = figure(p);
-		if (v !== null) figured.add(p.position);
 		by.set(p.position, (by.get(p.position) ?? 0) + (v ?? 0));
 	}
-	return { by, starts, figured };
+	return { by, starts };
 }
 
 function median(values: readonly number[]): number {
@@ -127,16 +128,29 @@ export function positionNeed(p: Position, s: Standing | null, weeks: number): bo
 	return roundTenth(s.median - s.points) >= roundTenth(CLOSE_CALL * Math.max(1, weeks));
 }
 
-function playersOf(inputs: PanelInputs): Map<number, PanelPlayer[]> {
+/** A line's id in the fills: his board id, or his host id where the board does not place him (a
+ * defense on this fixture). */
+const idOf = (line: PlayerLine): string => line.player.board_id ?? `host:${line.player.host_id}`;
+
+/** Every team's players the board places, and the member's lines it does not (his defenses), so the
+ * member's whole active roster fills his lineups as the engine's does. */
+function playersOf(inputs: PanelInputs, roster: readonly PlayerLine[]): Map<number, PanelPlayer[]> {
 	const out = new Map<number, PanelPlayer[]>();
-	for (const [id, roster] of Object.entries(inputs.sync.held_by)) {
+	for (const [id, team] of Object.entries(inputs.sync.held_by)) {
 		const b = inputs.board.get(id);
 		if (b === undefined || !POSITIONS.includes(b.position as Position)) continue;
-		const list = out.get(roster) ?? [];
+		const list = out.get(team) ?? [];
 		const position = b.position as Position;
 		list.push({ id, position, points: b.points, por: b.vor, proj: inputs.proj(id) });
-		out.set(roster, list);
+		out.set(team, list);
 	}
+	const mine = out.get(inputs.sync.me) ?? [];
+	for (const line of roster) {
+		const position = line.player.position as Position;
+		if (mine.some((p) => p.id === idOf(line)) || !POSITIONS.includes(position)) continue;
+		mine.push({ id: idOf(line), position, points: null, por: null, proj: null });
+	}
+	out.set(inputs.sync.me, mine);
 	return out;
 }
 
@@ -148,7 +162,7 @@ function keptOut(roster: readonly PlayerLine[]): Set<string> {
 		const d = line.facts.designation;
 		const away =
 			line.player.injured_reserve || d?.status === 'injured_reserve' || d?.season_long === true;
-		if (away && line.player.board_id !== null) out.add(line.player.board_id);
+		if (away) out.add(idOf(line));
 	}
 	return out;
 }
@@ -179,7 +193,7 @@ export function withPositions(answer: WaiverAdvice, inputs: PanelInputs): Waiver
 	const spots = spotsOf(inputs.sync.terms.roster);
 	const teams = inputs.sync.teams.map((t) => t.roster_id);
 	const me = teams.indexOf(inputs.sync.me);
-	const players = playersOf(inputs);
+	const players = playersOf(inputs, answer.roster);
 	const out = keptOut(answer.roster);
 	const outFor = (t: number): Set<string> => (t === inputs.sync.me ? out : new Set());
 	const season = teams.map((t) =>
@@ -193,11 +207,7 @@ export function withPositions(answer: WaiverAdvice, inputs: PanelInputs): Waiver
 	);
 	// The member's week is his lines' own Proj, a player without one (a bye) never starting, as the
 	// Lineup rule has it; every other team's is the stand-in's.
-	const myProj = new Map(
-		answer.roster.flatMap((l) =>
-			l.player.board_id === null ? [] : [[l.player.board_id, l.week_projection] as const]
-		)
-	);
+	const myProj = new Map(answer.roster.map((l) => [idOf(l), l.week_projection] as const));
 	const weekFigure = (p: PanelPlayer): number | null =>
 		myProj.has(p.id)
 			? (myProj.get(p.id) ?? null)
@@ -226,14 +236,19 @@ export function withPositions(answer: WaiverAdvice, inputs: PanelInputs): Waiver
 					me
 				)
 			: null;
-		// A position no starter has a week figure at ranks nobody this week (review M4).
-		const projected = weekRead && week.some((f) => f.figured.has(p));
+		// The API's rule (panelLeagueOf): a position ranks this week where any rostered player there
+		// carries a week figure, bench included; none, and it ranks nobody (review M4, re-review N1).
+		const projected =
+			weekRead &&
+			[...players.values()].some((list) =>
+				list.some((c) => c.position === p && weekFigure(c) !== null)
+			);
 		const mine = answer.roster
 			.filter((l) => l.player.position === p)
 			.map((line) => ({
 				line,
-				starter: (season[me]?.starts ?? new Set()).has(line.player.board_id ?? ''),
-				starts_this_week: (week[me]?.starts ?? new Set()).has(line.player.board_id ?? ''),
+				starter: (season[me]?.starts ?? new Set()).has(idOf(line)),
+				starts_this_week: (week[me]?.starts ?? new Set()).has(idOf(line)),
 				rest_of_season_points: pointsOf(inputs, line)
 			}))
 			.sort(desc((m) => m.rest_of_season_points));

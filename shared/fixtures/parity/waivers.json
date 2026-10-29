@@ -52,9 +52,9 @@
 				}
 			],
 			"panel": {
-				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.",
 				"season": {
-					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need: your rest of season at this position is under the league's median. The Trades screen's needs are by starting slot.",
 					"cards": [
 						{
 							"key": "QB",
@@ -361,7 +361,7 @@
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "--"
 								},
 								{
@@ -635,15 +635,15 @@
 						},
 						{
 							"key": "DEF",
-							"rank": "D/ST --",
-							"figure": "--",
-							"median": null,
+							"rank": "D/ST rank 1 of 12",
+							"figure": "7.9",
+							"median": "0.0 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "7.9"
 								},
 								{
@@ -653,7 +653,18 @@
 									"figure": "--"
 								}
 							],
-							"free": []
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "9.6",
+									"beats": "Texans, Starter, +0.3 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
 						}
 					]
 				}
@@ -3759,9 +3770,9 @@
 				}
 			],
 			"panel": {
-				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.",
 				"season": {
-					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need: your rest of season at this position is under the league's median. The Trades screen's needs are by starting slot.",
 					"cards": [
 						{
 							"key": "QB",
@@ -4068,7 +4079,7 @@
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "--"
 								},
 								{
@@ -4342,15 +4353,15 @@
 						},
 						{
 							"key": "DEF",
-							"rank": "D/ST --",
-							"figure": "--",
-							"median": null,
+							"rank": "D/ST rank 1 of 12",
+							"figure": "7.9",
+							"median": "0.0 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "7.9"
 								},
 								{
@@ -4360,7 +4371,18 @@
 									"figure": "--"
 								}
 							],
-							"free": []
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "9.6",
+									"beats": "Texans, Starter, +0.3 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
 						}
 					]
 				}
@@ -7453,9 +7475,9 @@
 				}
 			],
 			"panel": {
-				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.",
 				"season": {
-					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need: your rest of season at this position is under the league's median. The Trades screen's needs are by starting slot.",
 					"cards": [
 						{
 							"key": "QB",
@@ -7762,7 +7784,7 @@
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "--"
 								},
 								{
@@ -8036,15 +8058,15 @@
 						},
 						{
 							"key": "DEF",
-							"rank": "D/ST --",
-							"figure": "--",
-							"median": null,
+							"rank": "D/ST rank 1 of 12",
+							"figure": "7.9",
+							"median": "0.0 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "7.9"
 								},
 								{
@@ -8054,7 +8076,18 @@
 									"figure": "--"
 								}
 							],
-							"free": []
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "9.6",
+									"beats": "--",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
 						}
 					]
 				}
@@ -11024,9 +11057,9 @@
 				}
 			],
 			"panel": {
-				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.",
 				"season": {
-					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need: your rest of season at this position is under the league's median. The Trades screen's needs are by starting slot.",
 					"cards": [
 						{
 							"key": "QB",
@@ -11333,7 +11366,7 @@
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "--"
 								},
 								{
@@ -11607,15 +11640,15 @@
 						},
 						{
 							"key": "DEF",
-							"rank": "D/ST --",
-							"figure": "--",
-							"median": null,
+							"rank": "D/ST rank 1 of 12",
+							"figure": "7.9",
+							"median": "0.0 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "7.9"
 								},
 								{
@@ -11625,7 +11658,18 @@
 									"figure": "--"
 								}
 							],
-							"free": []
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "9.6",
+									"beats": "--",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
 						}
 					]
 				}
@@ -14553,9 +14597,9 @@
 				}
 			],
 			"panel": {
-				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.",
 				"season": {
-					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need: your rest of season at this position is under the league's median. The Trades screen's needs are by starting slot.",
 					"cards": [
 						{
 							"key": "QB",
@@ -14862,7 +14906,7 @@
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "--"
 								},
 								{
@@ -17815,9 +17859,9 @@
 				}
 			],
 			"panel": {
-				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.",
 				"season": {
-					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need: your rest of season at this position is under the league's median. The Trades screen's needs are by starting slot.",
 					"cards": [
 						{
 							"key": "QB",
@@ -18124,7 +18168,7 @@
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "--"
 								},
 								{
@@ -21095,9 +21139,9 @@
 					}
 				],
 				"panel": {
-					"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
+					"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.",
 					"season": {
-						"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+						"explain": "Rank is your starters' rest of season at the position against the league's. Need: your rest of season at this position is under the league's median. The Trades screen's needs are by starting slot.",
 						"cards": [
 							{
 								"key": "QB",
@@ -21404,7 +21448,7 @@
 									{
 										"name": "Texans",
 										"team": "HOU",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "--"
 									},
 									{
@@ -21678,15 +21722,15 @@
 							},
 							{
 								"key": "DEF",
-								"rank": "D/ST --",
-								"figure": "--",
-								"median": null,
+								"rank": "D/ST rank 1 of 12",
+								"figure": "7.9",
+								"median": "0.0 median",
 								"need": null,
 								"mine": [
 									{
 										"name": "Texans",
 										"team": "HOU",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "7.9"
 									},
 									{
@@ -21696,7 +21740,18 @@
 										"figure": "--"
 									}
 								],
-								"free": []
+								"free": [
+									{
+										"key": "free:board:Kansas City Chiefs",
+										"name": "Chiefs",
+										"team": "KC",
+										"mark": "Free",
+										"figure": "9.6",
+										"beats": "Texans, Starter, +0.3 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
 							}
 						]
 					}
@@ -24805,9 +24860,9 @@
 					}
 				],
 				"panel": {
-					"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
+					"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.",
 					"season": {
-						"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+						"explain": "Rank is your starters' rest of season at the position against the league's. Need: your rest of season at this position is under the league's median. The Trades screen's needs are by starting slot.",
 						"cards": [
 							{
 								"key": "QB",
@@ -25114,7 +25169,7 @@
 									{
 										"name": "Texans",
 										"team": "HOU",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "--"
 									},
 									{
@@ -25388,15 +25443,15 @@
 							},
 							{
 								"key": "DEF",
-								"rank": "D/ST --",
-								"figure": "--",
-								"median": null,
+								"rank": "D/ST rank 1 of 12",
+								"figure": "7.9",
+								"median": "0.0 median",
 								"need": null,
 								"mine": [
 									{
 										"name": "Texans",
 										"team": "HOU",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "7.9"
 									},
 									{
@@ -25406,7 +25461,18 @@
 										"figure": "--"
 									}
 								],
-								"free": []
+								"free": [
+									{
+										"key": "free:board:Kansas City Chiefs",
+										"name": "Chiefs",
+										"team": "KC",
+										"mark": "Free",
+										"figure": "9.6",
+										"beats": "Texans, Starter, +0.3 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
 							}
 						]
 					}
@@ -28515,9 +28581,9 @@
 					}
 				],
 				"panel": {
-					"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
+					"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.",
 					"season": {
-						"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+						"explain": "Rank is your starters' rest of season at the position against the league's. Need: your rest of season at this position is under the league's median. The Trades screen's needs are by starting slot.",
 						"cards": [
 							{
 								"key": "QB",
@@ -28824,7 +28890,7 @@
 									{
 										"name": "Texans",
 										"team": "HOU",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "--"
 									},
 									{
@@ -29098,15 +29164,15 @@
 							},
 							{
 								"key": "DEF",
-								"rank": "D/ST --",
-								"figure": "--",
-								"median": null,
+								"rank": "D/ST rank 1 of 12",
+								"figure": "7.9",
+								"median": "0.0 median",
 								"need": null,
 								"mine": [
 									{
 										"name": "Texans",
 										"team": "HOU",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "7.9"
 									},
 									{
@@ -29116,7 +29182,18 @@
 										"figure": "--"
 									}
 								],
-								"free": []
+								"free": [
+									{
+										"key": "free:board:Kansas City Chiefs",
+										"name": "Chiefs",
+										"team": "KC",
+										"mark": "Free",
+										"figure": "9.6",
+										"beats": "Texans, Starter, +0.3 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
 							}
 						]
 					}
@@ -32225,9 +32302,9 @@
 				}
 			],
 			"panel": {
-				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.",
 				"season": {
-					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need: your rest of season at this position is under the league's median. The Trades screen's needs are by starting slot.",
 					"cards": [
 						{
 							"key": "QB",
@@ -32534,7 +32611,7 @@
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "--"
 								},
 								{
@@ -32808,15 +32885,15 @@
 						},
 						{
 							"key": "DEF",
-							"rank": "D/ST --",
-							"figure": "--",
-							"median": null,
+							"rank": "D/ST rank 1 of 12",
+							"figure": "7.9",
+							"median": "0.0 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Texans",
 									"team": "HOU",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "7.9"
 								},
 								{
@@ -32826,7 +32903,18 @@
 									"figure": "--"
 								}
 							],
-							"free": []
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "9.6",
+									"beats": "Texans, Starter, +0.3 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
 						}
 					]
 				}

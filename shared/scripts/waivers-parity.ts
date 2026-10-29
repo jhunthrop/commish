@@ -210,7 +210,7 @@ function tableKeys(
 /** What the panel's figures are, said once in each clock's panel: an app holds the words and the
  * rules, never the stand-in's numbers (Lane 291 review M6). */
 const PANEL_FIGURES =
-  "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.";
+  "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.";
 
 /** The position panel as the web draws it (PositionPanel.svelte over positions.ts, Lane 291): for each
  * figure the toggle reads, each card's words and its ranked list, each free agent's Beats words and
