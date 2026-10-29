@@ -216,6 +216,11 @@ def test_the_gate_counts_a_held_page_written_and_names_the_held() -> None:
     assert held.ok and held.written == 532  # noqa: PLR2004
     summary = replace(held, held=13).summary()
     assert "532 written (13 held over a rewrite that fell tonight), 4 facts blocks" in summary
+    # A held page whose old prose failed tonight's page gate is one more facts block, named, and the run
+    # still passes on the line (review H1).
+    stale = replace(judge_capsules(ids, {**after, "p4": _facts_row("p4")}, rules, line), held=12, held_stale=1)
+    assert stale.ok
+    assert "5 facts blocks (1 held and stale: their old prose failed tonight's page gate)" in stale.summary()
 
 
 # The retry writer.
@@ -230,6 +235,9 @@ class _Stub:
         self.calls = 0
         self.asked: list[str] = []
         self.waits = RunWaits()
+
+    def sleep(self, seconds: float) -> None:
+        del seconds
 
     def with_model(self, model: str) -> "_Stub":
         return _Stub(model, self.scripts)
@@ -262,10 +270,18 @@ def strict_page(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         generate,
         "validate_capsule",
-        lambda body, facts, size, asked_shorter=False: ValidationResult(
-            body == _FIXED, () if body == _FIXED else ("A rule.",)
-        ),
+        lambda body, facts, size, asked_shorter=False: _graded(body),
     )
+
+
+_RETRY_BAD = Completion("the retry's bad note", Usage(cost_usd=0.001))
+
+
+def _graded(body: str) -> ValidationResult:
+    """The retry writer's note passes; its bad note breaks its own rule, so a fall names whose draft it was."""
+    if body == _FIXED:
+        return ValidationResult(True, ())
+    return ValidationResult(False, ("Another rule.",) if body == _RETRY_BAD.content else ("A rule.",))
 
 
 _BUNDLE = Completion(json.dumps({"compact": "bad", "full": "bad", "narrative": {}}), Usage(cost_usd=0.001))
@@ -294,18 +310,39 @@ def test_a_read_the_writer_could_not_write_is_written_by_the_retry_writer() -> N
 
 @pytest.mark.usefixtures("strict_page")
 def test_a_retry_draft_that_fails_too_is_the_facts_block() -> None:
-    result, _ = _write({_WRITER: list(_WRITER_ASKS), _RETRY: [_BAD, _BAD]}, _RETRY)
+    result, _ = _write({_WRITER: list(_WRITER_ASKS), _RETRY: [_RETRY_BAD, _RETRY_BAD]}, _RETRY)
     assert result.source == FACTS_SOURCE and not result.rescued and result.model is None
     assert result.retry_asks == 2  # noqa: PLR2004
-    assert result.full.fallback == Fallback("failed_validation", "A rule.")
+    # The fall names the retry writer's own draft, graded as the writer's are.
+    assert result.full.fallback == Fallback("failed_validation", "Another rule.")
+    assert result.full.attempts[-1].stage == "retry"
 
 
 @pytest.mark.usefixtures("strict_page")
 def test_a_refused_retry_ask_keeps_the_writers_own_fall() -> None:
     refused = GenerationError("the gateway refused the request", False)
     result, _ = _write({_WRITER: list(_WRITER_ASKS), _RETRY: [refused, refused]}, _RETRY)
-    assert result.source == FACTS_SOURCE
+    assert result.source == FACTS_SOURCE and result.retry_asks == 2  # noqa: PLR2004
+    # Nothing was graded: the writer's own fall and attempts stand.
     assert result.compact.fallback == Fallback("failed_validation", "A rule.")
+    assert all(attempt.stage != "retry" for attempt in (*result.compact.attempts, *result.full.attempts))
+
+
+@pytest.mark.usefixtures("strict_page")
+@pytest.mark.parametrize(
+    "first",
+    [
+        GenerationError("the line is down", True, transport=True),
+        Completion("not one JSON object", Usage(cost_usd=0.001)),
+    ],
+    ids=["a throttled bundle", "a lost bundle"],
+)
+def test_a_page_whose_bundle_never_came_back_asks_no_retry_writer(first: Completion | GenerationError) -> None:
+    """The retry writer answers a read the writer's asks could not write, never the gateway's own failure."""
+    retry: list[Completion | GenerationError] = [Completion(_FIXED, None)] * 2
+    result, _ = _write({_WRITER: [first] * 12, _RETRY: retry}, _RETRY)
+    assert result.source == FACTS_SOURCE and result.retry_asks == 0
+    assert len(retry) == 2  # noqa: PLR2004 - neither was asked
 
 
 @pytest.mark.usefixtures("strict_page")

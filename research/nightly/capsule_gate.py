@@ -87,6 +87,9 @@ class CapsuleGateResult:
     # The written pages whose rewrite fell tonight and that keep their written capsule (the hold path,
     # `capsules.sweep`): counted written, since the page still shows a written read (Lane 294 ruling 3).
     held: int = 0
+    # Held pages whose old prose failed tonight's page gate and fell to their facts blocks
+    # (`_Passes.check_held`): counted among the facts blocks, so unwritten, never a failure on their own.
+    held_stale: int = 0
 
     @property
     def unwritten_share(self) -> float:
@@ -104,11 +107,16 @@ class CapsuleGateResult:
     def _held_note(self) -> str:
         return "" if not self.held else f" ({self.held} held over a rewrite that fell tonight)"
 
+    def _stale_note(self) -> str:
+        if not self.held_stale:
+            return ""
+        return f" ({self.held_stale} held and stale: their old prose failed tonight's page gate)"
+
     def summary(self) -> str:
         verdict = "passed" if self.ok else "failed"
         line = (
             f"capsule gate: {verdict}, {self.board_players} board pages, {self.written} written{self._held_note()}, "
-            f"{self.facts_blocks} facts blocks{self._demoted_note()}, {self.template} on the oracle's template, "
+            f"{self.facts_blocks} facts blocks{self._demoted_note()}{self._stale_note()}, {self.template} on the oracle's template, "
             f"{self.missing} missing "
             f"({self.unwritten_share:.1%} unwritten, the {self.line.voice} line {self.line.share_max:.0%}: "
             f"{self.line.basis}), "

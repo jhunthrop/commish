@@ -466,6 +466,39 @@ def test_a_hard_target_whose_rewrite_was_refused_is_checked_though_the_pass_wrot
     assert writes == [("b", FACTS_SOURCE, RETRY_FIRST_FACTS_HASH)]
 
 
+def test_a_held_spent_page_whose_old_prose_fails_tonights_page_gate_falls_to_its_facts_block(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lane 294 review H1: page b is held over a fallen rewrite and spent at the night's ceiling, so no checked
+    pass reached it; its old prose fails tonight's page gate. The night's last check drops it to its facts
+    block (held and stale, counted unwritten), and page a, held with prose that passes, keeps it."""
+    passes, lines, writes = _checking_passes(monkeypatch)
+    passes.held = frozenset({"a", "b"})
+    passes.asks_by_player = {"a": NIGHT_CALLS_PER_PLAYER, "b": NIGHT_CALLS_PER_PLAYER}
+    passes.graced = {"a", "b"}
+    passes.check_held()
+    assert writes == [("b", FACTS_SOURCE, RETRY_FIRST_FACTS_HASH)]
+    assert passes.held == {"a"} and passes.dropped == {"b"}
+    assert (passes.spend.held, passes.spend.held_stale) == (1, 1)
+    assert lines == [
+        "capsules held over a fallen rewrite, checked against tonight's page gate: 1 pages failed the page gate "
+        "and fell to their facts blocks: Player B (rank_off_page:b:WR3)"
+    ]
+    # Every held page is spent, so no retry pass is asked for them (review L2).
+    assert passes._askable_held() == frozenset()
+
+
+def test_a_held_page_the_night_demoted_or_dropped_is_not_counted_held(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Review L1: the held count is settled at the night's end against what the demotion and the checks left."""
+    passes, _, writes = _checking_passes(monkeypatch)
+    passes.held = frozenset({"a", "c", "d"})
+    passes.dropped = frozenset({"c"})
+    passes.demoted = [Demotion("d", "slug-d", "the role explains it", 2)]
+    passes.check_held()
+    assert writes == []
+    assert passes.held == {"a"} and (passes.spend.held, passes.spend.held_stale) == (1, 0)
+
+
 def test_a_page_the_check_drops_is_never_written_again_that_night(monkeypatch: pytest.MonkeyPatch) -> None:
     """Review 73 item 1: a dropped page keeps its write-first-next-night stamp: no later pass tonight
     (the blocked retries, the retry after the demotion) may write it."""
