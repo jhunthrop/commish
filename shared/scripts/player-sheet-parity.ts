@@ -2,6 +2,8 @@
  * (PlayerShelf.svelte over week-read.ts, status-held.ts, card.ts, shelf.ts and week-words.ts) and its
  * player page (server/pages/player.ts and its words) print, as JSON the apps' ports are held to.
  *
+ * - `liveRead`: which read is shown, the run's or the card answer's newer one (week-read.ts
+ *   newestWeekRead, Lane 284), the run's read, the answer and its read in, the read shown out.
  * - `weekRead`, `noRead`, `statusHeld` and `nextPass`: every held-read case of the web's own tests
  *   (week-read.test.ts and status-held.test.ts), the read, the card's projection and the clock in, the
  *   words shown out.
@@ -34,8 +36,10 @@ import {
   readAtStatus,
 } from "../../web/src/lib/player/status-held.ts";
 import {
+  newestWeekRead,
   noReadWords,
   shownWeekRead,
+  type LiveWeekRead,
   type CardProjection,
   type ReadGameState,
   type ShownRead,
@@ -1134,6 +1138,64 @@ function noReadCases(): unknown[] {
   );
 }
 
+// MARK: the live read (Lane 284): which read is shown, the card's answer beside the run's
+
+const LIVE: LiveWeekRead = {
+  week: 7,
+  body: "Josh Allen is questionable and gets the Jets at home. Start him if he is active.",
+  caption: "Written Sat Oct 17, 10:00 am CT, for week 7",
+  status: "questionable",
+  call: "start",
+  writtenAt: "2026-10-17T15:00:00.000Z",
+  factsAt: "2026-10-17T14:40:00.000Z",
+  projection: 25.1,
+  source: "llm",
+};
+
+interface LiveReadCase {
+  name: string;
+  run: WeekRead | null;
+  /** The card's answer was read: false when it failed, so no live read either way. */
+  answered: boolean;
+  /** The answer's weekRead, null when the answer carries none. */
+  live: LiveWeekRead | null;
+  shown: WeekRead | null;
+}
+
+function liveReadCase(
+  name: string,
+  run: WeekRead | null,
+  live: LiveWeekRead | null,
+  answered = true,
+): LiveReadCase {
+  const shown = answered ? newestWeekRead(run, live ?? undefined, null) : run;
+  return { name, run, answered, live, shown };
+}
+
+/** The web's newestWeekRead with no build capture (the apps judge his status on the read shown with
+ * their own capture, StatusHeld): the live read written after the run's, else the run's. */
+function liveReadCases(): LiveReadCase[] {
+  return [
+    liveReadCase("live newer: the live read", READ, LIVE),
+    liveReadCase("run newer: the run's read", READ, {
+      ...LIVE,
+      writtenAt: "2026-10-16T15:00:00.000Z",
+    }),
+    liveReadCase("the same write: the run's read", READ, {
+      ...LIVE,
+      writtenAt: READ.writtenAt,
+    }),
+    liveReadCase("live absent: the run's read", READ, null),
+    liveReadCase("live failed: the run's read", READ, null, false),
+    liveReadCase("no run read: the live read", null, LIVE),
+    liveReadCase("no run read and none live", null, null),
+    liveReadCase("a live read with no projection", READ, {
+      ...LIVE,
+      projection: null,
+    }),
+  ];
+}
+
 export async function renderPlayerSheet(about: string): Promise<string> {
   const [standin, contract] = await Promise.all([
     runOf("standin"),
@@ -1143,6 +1205,7 @@ export async function renderPlayerSheet(about: string): Promise<string> {
     about,
     zone: ZONE,
     weekRead: weekReadCases(),
+    liveRead: liveReadCases(),
     noRead: noReadCases(),
     statusHeld: await statusHeldCases(standin),
     nextPass: nextPassCases(),

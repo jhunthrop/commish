@@ -54,6 +54,7 @@ import { unwrittenByFormat } from './player-unwritten.ts';
 import { playerHead } from './head.ts';
 import type { HeadMarkup } from '#lib/site/head.ts';
 import { lastRead, statusCaption } from '#lib/player/status-held.ts';
+import type { BuiltStatus } from '#lib/player/week-read.ts';
 import { scheduleKickoffs, standingByline } from '#lib/player/read-byline.ts';
 import type { BasisTile, CardTile, RestParts } from '#lib/player/card.ts';
 import {
@@ -165,6 +166,9 @@ export interface PlayerPage {
 	weekRead: WeekRead | null;
 	/** The night the coming week's reads are written, while they are not (Lane 256); null otherwise. */
 	weekReadsDue: ReadsDue | null;
+	/** The injury capture his read was judged on and his status in it, which the card judges a newer
+	 * live read against (Lane 284); null when the run carries no capture. */
+	builtStatus: BuiltStatus | null;
 	/** Each week's last kickoff on the run's schedule, after which its lineup can no longer be set
 	 * (Lane 100, B64). */
 	lastKickoffs: Record<number, string>;
@@ -492,6 +496,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 				? null
 				: weekReadAt(loaded.weekRead, capture, entry.id, slate.slates, now),
 		weekReadsDue: loaded.weekReadsDue,
+		builtStatus: capture === null ? null : { capture: captureStamp(capture), listed },
 		lastKickoffs,
 		copyOf: loaded.copyOf,
 		unwritten: unwrittenByFormat({

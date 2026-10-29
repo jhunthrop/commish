@@ -8,9 +8,9 @@
 import type { components } from '#lib/api/types.ts';
 import type { GameHead } from '#lib/league/box/kickoff.ts';
 import { weekdayWord } from '#lib/format/date.ts';
-import type { ReadsDue, WeekRead } from '#lib/run/schema.ts';
+import type { Designations, PlayerStatus, ReadsDue, WeekRead } from '#lib/run/schema.ts';
 import { CARD } from './card.ts';
-import { STATUS_HELD_WORDS, isStatusCaption } from './status-words.ts';
+import { STATUS_HELD_WORDS, isStatusCaption, statusChangedSince } from './status-words.ts';
 
 /** A nightly in the small hours belongs to the night before: its night is the Eastern day this long
  * before it (research capsules/week/rollover.py NIGHT_RUNS_PAST_MIDNIGHT, ported to both apps). */
@@ -64,6 +64,32 @@ export function shownWeekRead(read: WeekRead, card: CardProjection | null): Show
 function shownCaption(read: WeekRead, card: CardProjection | null): string {
 	const played = card?.week === read.week && underway(card.state);
 	return played && isStatusCaption(read.caption) ? STATUS_HELD_WORDS.changedLead : read.caption;
+}
+
+/** The read the card's answer carries from the store (Lane 284): the newest written for the board week. */
+export type LiveWeekRead = components['schemas']['PlayerWeekRead'];
+
+/** The injury capture the page was built on and his status in it (none when it lists him not), which a
+ * live read is judged against as the build judged the run's (status-held.ts). */
+export interface BuiltStatus {
+	capture: Pick<Designations, 'readAt' | 'checkedAt'>;
+	listed: PlayerStatus | undefined;
+}
+
+/** The read to show (Lane 284, B277): the card's live read when its answer carries one written after the
+ * run's, so an hourly rewrite or a rescue shows within the hour; else the run's as the build served it. A
+ * live read his designation moved past on the build's capture keeps its body under the status caption: the
+ * build's own over the run's read (it names the next pass at the build's clock), else its lead alone. */
+export function newestWeekRead(
+	run: WeekRead | null,
+	live: LiveWeekRead | undefined,
+	built: BuiltStatus | null
+): WeekRead | null {
+	if (live === undefined) return run;
+	if (run !== null && Date.parse(live.writtenAt) <= Date.parse(run.writtenAt)) return run;
+	if (built === null || !statusChangedSince(live, built.capture, built.listed)) return live;
+	const held = run !== null && isStatusCaption(run.caption);
+	return { ...live, caption: held ? run.caption : STATUS_HELD_WORDS.changedLead };
 }
 
 /** The night a nightly at `at` belongs to, on the Eastern clock: "Tuesday" for Wednesday 05:30 UTC. */

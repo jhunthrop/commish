@@ -833,6 +833,244 @@
 			}
 		}
 	],
+	"liveRead": [
+		{
+			"name": "live newer: the live read",
+			"run": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"answered": true,
+			"live": {
+				"week": 7,
+				"body": "Josh Allen is questionable and gets the Jets at home. Start him if he is active.",
+				"caption": "Written Sat Oct 17, 10:00 am CT, for week 7",
+				"status": "questionable",
+				"call": "start",
+				"writtenAt": "2026-10-17T15:00:00.000Z",
+				"factsAt": "2026-10-17T14:40:00.000Z",
+				"projection": 25.1,
+				"source": "llm"
+			},
+			"shown": {
+				"week": 7,
+				"body": "Josh Allen is questionable and gets the Jets at home. Start him if he is active.",
+				"caption": "Written Sat Oct 17, 10:00 am CT, for week 7",
+				"status": "questionable",
+				"call": "start",
+				"writtenAt": "2026-10-17T15:00:00.000Z",
+				"factsAt": "2026-10-17T14:40:00.000Z",
+				"projection": 25.1,
+				"source": "llm"
+			}
+		},
+		{
+			"name": "run newer: the run's read",
+			"run": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"answered": true,
+			"live": {
+				"week": 7,
+				"body": "Josh Allen is questionable and gets the Jets at home. Start him if he is active.",
+				"caption": "Written Sat Oct 17, 10:00 am CT, for week 7",
+				"status": "questionable",
+				"call": "start",
+				"writtenAt": "2026-10-16T15:00:00.000Z",
+				"factsAt": "2026-10-17T14:40:00.000Z",
+				"projection": 25.1,
+				"source": "llm"
+			},
+			"shown": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			}
+		},
+		{
+			"name": "the same write: the run's read",
+			"run": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"answered": true,
+			"live": {
+				"week": 7,
+				"body": "Josh Allen is questionable and gets the Jets at home. Start him if he is active.",
+				"caption": "Written Sat Oct 17, 10:00 am CT, for week 7",
+				"status": "questionable",
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T14:40:00.000Z",
+				"projection": 25.1,
+				"source": "llm"
+			},
+			"shown": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			}
+		},
+		{
+			"name": "live absent: the run's read",
+			"run": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"answered": true,
+			"live": null,
+			"shown": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			}
+		},
+		{
+			"name": "live failed: the run's read",
+			"run": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"answered": false,
+			"live": null,
+			"shown": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			}
+		},
+		{
+			"name": "no run read: the live read",
+			"run": null,
+			"answered": true,
+			"live": {
+				"week": 7,
+				"body": "Josh Allen is questionable and gets the Jets at home. Start him if he is active.",
+				"caption": "Written Sat Oct 17, 10:00 am CT, for week 7",
+				"status": "questionable",
+				"call": "start",
+				"writtenAt": "2026-10-17T15:00:00.000Z",
+				"factsAt": "2026-10-17T14:40:00.000Z",
+				"projection": 25.1,
+				"source": "llm"
+			},
+			"shown": {
+				"week": 7,
+				"body": "Josh Allen is questionable and gets the Jets at home. Start him if he is active.",
+				"caption": "Written Sat Oct 17, 10:00 am CT, for week 7",
+				"status": "questionable",
+				"call": "start",
+				"writtenAt": "2026-10-17T15:00:00.000Z",
+				"factsAt": "2026-10-17T14:40:00.000Z",
+				"projection": 25.1,
+				"source": "llm"
+			}
+		},
+		{
+			"name": "no run read and none live",
+			"run": null,
+			"answered": true,
+			"live": null,
+			"shown": null
+		},
+		{
+			"name": "a live read with no projection",
+			"run": {
+				"week": 7,
+				"body": "Josh Allen gets the Jets at home, and the published projection has him at 26.4 points.",
+				"caption": "Written Fri 9:00 pm Central, for week 7",
+				"status": null,
+				"call": "start",
+				"writtenAt": "2026-10-17T02:00:00.000Z",
+				"factsAt": "2026-10-17T02:00:00.000Z",
+				"projection": 26.4,
+				"movedCaption": "The published projection moved since this read was written."
+			},
+			"answered": true,
+			"live": {
+				"week": 7,
+				"body": "Josh Allen is questionable and gets the Jets at home. Start him if he is active.",
+				"caption": "Written Sat Oct 17, 10:00 am CT, for week 7",
+				"status": "questionable",
+				"call": "start",
+				"writtenAt": "2026-10-17T15:00:00.000Z",
+				"factsAt": "2026-10-17T14:40:00.000Z",
+				"projection": null,
+				"source": "llm"
+			},
+			"shown": {
+				"week": 7,
+				"body": "Josh Allen is questionable and gets the Jets at home. Start him if he is active.",
+				"caption": "Written Sat Oct 17, 10:00 am CT, for week 7",
+				"status": "questionable",
+				"call": "start",
+				"writtenAt": "2026-10-17T15:00:00.000Z",
+				"factsAt": "2026-10-17T14:40:00.000Z",
+				"projection": null,
+				"source": "llm"
+			}
+		}
+	],
 	"noRead": [
 		{
 			"state": "upcoming",

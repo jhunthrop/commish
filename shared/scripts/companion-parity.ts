@@ -119,7 +119,7 @@ import {
   TURNS_AFTER_DRAFT,
   draftLine,
 } from "../../web/src/lib/league/phase-words.ts";
-import { zoneLine } from "../../web/src/lib/format/clock.ts";
+import { zoneLine } from "../../web/src/lib/league/phase-words.ts";
 
 export const COMPANION_OUTPUT = "shared/fixtures/parity/companion.json";
 const FIXTURES = join(REPOSITORY, "shared/fixtures/companion");

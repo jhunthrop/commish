@@ -72,15 +72,6 @@ export function onListWords(word: string): string {
 	return ON_LIST_WORDS[word] ?? `On ${word}`;
 }
 
-/** "Questionable as of Thu 4:10 pm": the designation with when the report said so. */
-export function designationMark(
-	status: DesignationStatus,
-	asOf: string,
-	zone: string = memberZone()
-): string {
-	return `${DESIGNATION_WORDS[status]} as of ${weekdayTime(asOf, zone)}`;
-}
-
 /** Whether a designation keeps him out (out, injured reserve, suspended, PUP, NFI): drawn as a loss. */
 export function sitsHim(status: DesignationStatus): boolean {
 	return status !== 'questionable' && status !== 'doubtful';

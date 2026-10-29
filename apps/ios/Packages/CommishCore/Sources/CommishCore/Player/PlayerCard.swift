@@ -131,8 +131,9 @@ public enum PlayerCards {
             line.facts.designation?.value1, hostIR: line.player.injuredReserve, toCome: game.toPlay, zone: input.zone
         )
         let listed = status?.rank
-        let read = input.page?.weekRead.map {
-            StatusHeld.read($0.value1, capture: input.capture, player: input.page?.id ?? "", now: input.now)
+        // The newer of the run's read and the answer's live one (Lane 284), judged by the status rule.
+        let read = WeekReads.newest(run: input.page?.weekRead?.value1, live: input.week.weekRead?.value1).map {
+            StatusHeld.read($0, capture: input.capture, player: input.page?.id ?? "", now: input.now)
         }
         let tiles = CardTiles.live(input, read: read, game: game)
         return PlayerCard(

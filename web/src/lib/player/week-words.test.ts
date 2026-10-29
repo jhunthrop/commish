@@ -15,8 +15,10 @@ import {
 } from './card.ts';
 import { printTenth } from '#lib/league/box/box.ts';
 import { BASIS_WORDS, vsAvgCaption, vsAvgReason } from './basis-words.ts';
-import type { WeekRead } from '../run/schema.ts';
-import { noReadWords, shownWeekRead } from './week-read.ts';
+import type { Designations, WeekRead } from '../run/schema.ts';
+import { newestWeekRead, noReadWords, shownWeekRead } from './week-read.ts';
+import { readAtStatus } from './status-held.ts';
+import { STATUS_HELD_WORDS, isStatusCaption } from './status-words.ts';
 import {
 	compareSay,
 	liveCard,
@@ -1239,3 +1241,104 @@ void test('"Proj at the read" is never shown for a read the run withheld (fix ro
 		words: WEEK_READ.caption
 	});
 });
+
+// MARK: the live read (Lane 284, B277)
+
+/** The hourly pass's rewrite after his status changed, written Saturday 10:00 am Central. */
+const REWRITTEN_AT = '2026-10-17T15:00:00.000Z';
+const LIVE_READ: NonNullable<PlayerWeek['weekRead']> = {
+	week: 6,
+	body: 'Puka Nacua is questionable and gets the Cardinals at home. Start him if he is active.',
+	caption: 'Written Sat Oct 17, 10:00 am CT, for week 6',
+	status: 'questionable',
+	call: 'start',
+	writtenAt: REWRITTEN_AT,
+	factsAt: '2026-10-17T14:40:00.000Z',
+	projection: 19.4,
+	source: 'llm'
+};
+/** The capture the 9:45 am build read: questionable since 9:30, after the night's read. */
+const CAPTURE: Designations = {
+	readAt: '2026-10-17T14:30:00.000Z',
+	checkedAt: '2026-10-17T14:30:00.000Z',
+	source: 'tank01_injuries_by_date',
+	players: { [PLAYER.id]: { status: 'questionable', seasonLong: false, since: null } }
+};
+const BUILT_STATUS = { capture: CAPTURE, listed: CAPTURE.players[PLAYER.id] };
+const BUILD_AT = Date.parse('2026-10-17T14:45:00.000Z');
+
+void test('a status rewrite landed at 10:00 shows at 10:01 with the live read, the run caption replaced', () => {
+	// The 9:45 build served the night's read under the status caption, the rewrite due by 10:00.
+	const served = readAtStatus(WEEK_READ, CAPTURE, PLAYER.id, BUILD_AT);
+	assert.ok(isStatusCaption(served.caption), served.caption);
+	assert.ok(served.caption.endsWith('Sat Oct 17, 10:00 am CT.'), served.caption);
+	const at = Date.parse('2026-10-17T15:01:00.000Z');
+	const live = liveCard({
+		...liveInputOf(week({ weekRead: LIVE_READ })),
+		read: served,
+		built: BUILT_STATUS,
+		now: at
+	});
+	assert.deepEqual(shownWeekRead(nonNull(live.read), live.projection), {
+		withheld: false,
+		body: LIVE_READ.body,
+		caption: LIVE_READ.caption
+	});
+	// The answer before the field, or with no read stored: the run's read and caption stand.
+	const before = liveCard({ ...liveInputOf(week()), read: served, built: BUILT_STATUS, now: at });
+	assert.equal(before.read, served);
+});
+
+void test('the Proj change tile keeps the figure of the read that is shown (Lane 284 ruling 3)', () => {
+	const moved = week({ weekRead: LIVE_READ }, { week_projection: 21.8 });
+	const live = liveCard({ ...liveInputOf(moved), read: WEEK_READ, now: NOW });
+	const asRun = liveCard({
+		...liveInputOf(week({}, { week_projection: 21.8 })),
+		read: LIVE_READ,
+		now: NOW
+	});
+	assert.deepEqual(live.tiles, asRun.tiles);
+	assert.ok(tile(live.tiles, 'proj').caption.endsWith('Proj at the read 19.4'));
+	// A live read older than the run's leaves the run's figure on the tiles.
+	const older = { ...LIVE_READ, writtenAt: BEFORE };
+	const run = liveCard({ ...liveInputOf(week({ weekRead: older })), read: WEEK_READ, now: NOW });
+	assert.equal(run.read, WEEK_READ);
+	assert.ok(!tile(run.tiles, 'proj').caption.includes('at the read'));
+});
+
+void test('the newer read is shown: live newer, run newer, live absent, live failed', () => {
+	assert.equal(newestWeekRead(WEEK_READ, LIVE_READ, null), LIVE_READ, 'live newer');
+	const older = { ...LIVE_READ, writtenAt: BEFORE };
+	assert.equal(newestWeekRead(WEEK_READ, older, null), WEEK_READ, 'run newer');
+	const same = { ...LIVE_READ, writtenAt: WEEK_READ.writtenAt };
+	assert.equal(newestWeekRead(WEEK_READ, same, null), WEEK_READ, 'the same write: the run');
+	// A failed live read answers without the field, as an answer with none stored does.
+	assert.equal(newestWeekRead(WEEK_READ, undefined, null), WEEK_READ, 'live absent');
+	assert.equal(newestWeekRead(null, undefined, null), null);
+	assert.equal(newestWeekRead(null, LIVE_READ, null), LIVE_READ, 'no run read');
+});
+
+void test('a live read his status moved past on the build capture keeps its body under the status caption', () => {
+	// The capture read after the rewrite lists him out: the build's caption over the run's read, said
+	// over the live one.
+	const later: Designations = {
+		...CAPTURE,
+		readAt: '2026-10-17T16:30:00.000Z',
+		checkedAt: '2026-10-17T16:30:00.000Z',
+		players: { [PLAYER.id]: { status: 'out', seasonLong: false, since: null } }
+	};
+	const built = { capture: later, listed: later.players[PLAYER.id] };
+	const served = readAtStatus(WEEK_READ, later, PLAYER.id, Date.parse('2026-10-17T16:45:00.000Z'));
+	const shown = nonNull(newestWeekRead(served, LIVE_READ, built));
+	assert.equal(shown.body, LIVE_READ.body);
+	assert.equal(shown.caption, served.caption);
+	// With a run caption that is not the status one, the lead alone.
+	assert.equal(newestWeekRead(WEEK_READ, LIVE_READ, built)?.caption, STATUS_HELD_WORDS.changedLead);
+	// His status unchanged since the rewrite: the live caption.
+	assert.equal(newestWeekRead(served, LIVE_READ, BUILT_STATUS)?.caption, LIVE_READ.caption);
+});
+
+function nonNull<T>(value: T | null): T {
+	assert.ok(value !== null);
+	return value;
+}

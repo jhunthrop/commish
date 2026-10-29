@@ -62,7 +62,7 @@ import {
 	type RestParts
 } from './card.ts';
 import { vsAvgCaption } from './basis-words.ts';
-import type { CardProjection } from './week-read.ts';
+import { newestWeekRead, type BuiltStatus, type CardProjection } from './week-read.ts';
 import type { WeekRead } from '#lib/run/schema.ts';
 
 /** What of the week's read the change tile needs: its week and the projection it quotes. */
@@ -157,6 +157,8 @@ export interface LiveCard {
 	positionRank: number | null;
 	/** The clock the card was read at, which the read's place says its words on (Lane 265). */
 	at: number;
+	/** The week read shown beside the card: the answer's when newer than the run's (Lane 284). */
+	read: WeekRead | null;
 }
 
 /** His rest-of-season points at the read's clock and the week they start from, as words. */
@@ -683,8 +685,11 @@ export interface LiveInput {
 	/** The season-long list's word ("IR") his card's pill shows, null when he is on none: his week's
 	 * tiles then say the list in place of a Proj, an Opp rank or a change (Lane 128 fix round 1). */
 	held?: string | null;
-	/** The week's read, whose quoted projection the change tile measures from (Lane 162, D04). */
-	read?: ReadQuote | null;
+	/** The run's week read as the build served it, whose quoted projection the change tile measures
+	 * from (Lane 162, D04) unless the answer carries a newer one (Lane 284). */
+	read?: WeekRead | null;
+	/** The capture the build judged his status on, which a live read is judged against. */
+	built?: BuiltStatus | null;
 	screenHref: ScreenHref;
 	zone?: string;
 	/** The time the card is drawn at, in ms: a game kicked off by then says no facts read. */
@@ -732,11 +737,14 @@ export function liveCard({
 	basisTiles = [],
 	lastKickoffs = {},
 	held: listed = null,
-	read = null,
+	read: runRead = null,
+	built = null,
 	screenHref,
 	zone = memberZone(),
 	now
 }: LiveInput): LiveCard {
+	// The read shown, the run's or the answer's newer one: the change tile measures from its figure.
+	const read = newestWeekRead(runRead, week.weekRead, built);
 	const restAtClock = restNow(week, rest);
 	const fallback = (key: CardTile['key']): CardTile => {
 		const found = tiles.find((tile) => tile.key === key);
@@ -777,6 +785,7 @@ export function liveCard({
 		tier: tierOf(week, restAtClock, tier),
 		positionRank: rest === null ? null : week.line.position_rank,
 		at: now,
+		read,
 		projection: {
 			week: week.week,
 			scoring: week.projection_scoring.format,

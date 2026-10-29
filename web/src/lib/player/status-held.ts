@@ -15,11 +15,11 @@
  * (`capsules/week/rules.py _returning_violations`). Built on the server: the page's script carries none
  * of it. */
 import { stampAt } from '#lib/format/clock.ts';
-import type { Designations, PlayerStatus, WeekRead } from '#lib/run/schema.ts';
+import type { Designations, WeekRead } from '#lib/run/schema.ts';
 import { CAPTION_ZONE } from './read-byline.ts';
-import { STATUS_HELD_WORDS } from './status-words.ts';
+import { STATUS_HELD_WORDS, statusChangedSince } from './status-words.ts';
 
-export { STATUS_HELD_WORDS } from './status-words.ts';
+export { STATUS_HELD_WORDS, lastRead, statusChangedSince } from './status-words.ts';
 /** The writer's hourly passes, Eastern hours (`capsules/week/caption.py HOURLY_PASS_HOURS_ET`, the
  * capture's schedule in `infra/research-schedule.sh`): midnight, 2 am, then 6 am through 11 pm. */
 const HOURLY_PASS_HOURS_ET: ReadonlySet<number> = new Set([
@@ -43,32 +43,6 @@ export function nextHourlyPass(after: number): number {
 		if (HOURLY_PASS_HOURS_ET.has(Number(passHour.format(at)))) return at;
 	}
 	throw new Error('Every day holds an hourly pass.');
-}
-
-/** When the capture was last read: its check, else its stamp (the page's "read" instant). */
-export function lastRead(capture: Pick<Designations, 'readAt' | 'checkedAt'>): number {
-	return Date.parse(capture.checkedAt ?? capture.readAt);
-}
-
-/** Whether his designation changed since the read was written. Only a capture read after the write can
- * say so (one read before it is the list the writer read, or an older one); then another status than
- * the one the read was written against (a player due back this week reads questionable where the read
- * says IR), or the same status in a run that began after the read (`since`, the first capture of his
- * unbroken run), is a change. A `returning` day is only ever set on a questionable player (schema.ts), so a
- * read written against another status always differs by status. The one case this does not see, a read
- * written while he was questionable and given a `returning` day since with the status unchanged, stands:
- * the writer's rules refuse a read that keeps a returning player out at the next pass (rules.py
- * `_returning_violations`), and the hourly build is the only refresh of this judgement (it is decided at
- * the build's clock, as the run's own is). */
-export function statusChangedSince(
-	read: WeekRead,
-	capture: Pick<Designations, 'readAt' | 'checkedAt'>,
-	listed: PlayerStatus | undefined
-): boolean {
-	const written = Date.parse(read.writtenAt);
-	if (lastRead(capture) <= written) return false;
-	if (read.status !== (listed?.status ?? null)) return true;
-	return listed?.since != null && Date.parse(listed.since) > written;
 }
 
 /** The months a stamp names, in order (`format/clock.ts stampAt`, en-US short). */

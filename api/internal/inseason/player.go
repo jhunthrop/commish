@@ -166,6 +166,7 @@ func (s *Service) playerWeek(w http.ResponseWriter, r *http.Request) {
 	listed := publicListed(season)
 	fillRest(&out, lives, bp, tier, ranks, formatLists{others: listed, subject: listed(bp)})
 	out.AfterBye = s.publicAfterBye(ctx, out, data, board, rest, bp, now)
+	out.WeekRead = s.liveWeekRead(ctx, data.Games, bp, now)
 	httpx.WriteOK(w, r, http.StatusOK, out)
 }
 
@@ -228,6 +229,8 @@ func (s *Service) leaguePlayerWeek(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out.AfterBye = s.leagueAfterBye(r.Context(), a, out, bp)
+	// The read is the board week's, whatever week the league is in.
+	out.WeekRead = s.liveWeekRead(r.Context(), a.data.Games, bp, s.Now())
 	if out.Verb != nil && (out.Verb.Kind == apitypes.PlayerVerbKindWaivers || out.Verb.Kind == apitypes.PlayerVerbKindClaim) {
 		out.Verb = s.claimVerb(r, a, bp, *out.Verb)
 	}

@@ -79,10 +79,11 @@
 	}
 	/** The tiles as built: rest of season in the lead format, the week's tiles "--" until read. */
 	const built = $derived<CardTile[]>(builtTiles(page, lead));
-	/** The week-ahead read as the page shows it: withheld once the card prints another projection. */
-	const weekRead = $derived(
-		page.weekRead ? shownWeekRead(page.weekRead, live?.projection ?? null) : null
-	);
+	/** The week read the card holds: the run's until it answers, then the newer of it and the live one
+	 * (Lane 284). */
+	const readShown = $derived(live === null ? page.weekRead : live.read);
+	/** The week-ahead read as the page shows it beside the card's projection. */
+	const weekRead = $derived(readShown ? shownWeekRead(readShown, live?.projection ?? null) : null);
 	/** The week's figures over the tiles as built. */
 	const tiles = $derived<CardTile[]>(live === null ? built : live.tiles);
 
@@ -359,10 +360,7 @@
 			<article class="read">
 				<h3><Label>{CARD.ourRead}</Label></h3>
 				{#if weekRead}
-					<section
-						class="week-read"
-						aria-label={page.weekRead ? weekReadLabel(page.weekRead) : null}
-					>
+					<section class="week-read" aria-label={readShown ? weekReadLabel(readShown) : null}>
 						{#if weekRead.withheld}
 							<p class="unwritten">{weekRead.words}</p>
 						{:else}
