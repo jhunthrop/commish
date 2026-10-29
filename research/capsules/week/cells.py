@@ -99,7 +99,12 @@ def quotable_figures(sheet: WeekSheet) -> frozenset[float]:
 
 
 def _angle_figures(sheet: WeekSheet) -> set[float]:
-    return {page_tenth(figure) for angle in sheet.angles for figure in angle.figures}
+    return {page_tenth(figure.value) for angle in sheet.angles for figure in angle.figures}
+
+
+def card_figures(sheet: WeekSheet) -> frozenset[float]:
+    """Every figure a cell prints, without the angles' (the angles' own rule reads the rest, `angle_rules`)."""
+    return frozenset(_projection_cells(sheet) | _game_cells(sheet) | _season_cells(sheet))
 
 
 # A figure's name, right after it or right before it (Lane 100 review M1, Lane 117 B80): every cell the card

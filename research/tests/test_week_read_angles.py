@@ -7,7 +7,7 @@ from dataclasses import replace
 import pytest
 
 from research.capsules.week import angles as angles_module
-from research.capsules.week.angle_candidates import Basis
+from research.capsules.week.angle_candidates import AngleFigure, Basis, Measure
 from research.capsules.week.angles import (
     MAX_ANGLES,
     MIN_ANGLE_SCORE,
@@ -68,8 +68,6 @@ def _week(week: int, team: str = "LAR", *, snaps: float = 60, targets: float = 8
         air_yard_targets=targets,
         red_zone=1,
         team_red_zone=6,
-        inside_ten=0,
-        team_inside_ten=3,
         touchdowns=0,
     )
 
@@ -97,8 +95,11 @@ def test_a_receiver_far_above_his_peers_leads_on_his_target_share() -> None:
     got = board_angles([*_board(), star], {}, 8)[star.player_id]
     assert got and got[0].key in {"target_share", "air_yards_share", "snap_share"}
     lead = next(a for a in got if a.key == "target_share")
-    assert "39% of the Rams' targets this season, the highest among the wide receivers we rank" in lead.text
-    assert 39.0 in lead.figures  # noqa: PLR2004 - 14 of 36 targets
+    assert (
+        "39% of the Rams' targets in his games this season, the highest among the wide receivers we rank" in lead.text
+    )
+    assert AngleFigure(39.0, Measure.TARGETS) in lead.figures  # 14 of 36 targets
+    assert lead.places == (("the highest", "among the wide receivers we rank"),)
 
 
 def test_a_thin_basis_is_never_carried() -> None:
@@ -113,6 +114,7 @@ def test_a_teammate_ruled_out_names_him_and_his_share() -> None:
     vacated = next(a for a in got if a.key == "vacated")
     assert vacated.names == (gone.name,)
     assert vacated.text.startswith(f"Vacated work: {gone.name} is Out this week, and he drew 33% of the Rams' targets")
+    assert "targets in his games this season" in vacated.text
 
 
 def test_a_teammate_out_for_weeks_vacates_nothing_new() -> None:
@@ -134,7 +136,7 @@ def test_the_club_expected_score_is_an_angle_only_at_the_weeks_edges() -> None:
 
 
 def _angle(key: str, score: float) -> Angle:
-    return Angle(key, f"{key}.", (1.0,), (), score, Basis(5, 100, "snaps"))
+    return Angle(key, f"{key}.", (AngleFigure(1.0, Measure.SNAPS),), (), score, Basis(5, 100, "snaps"))
 
 
 def test_one_angle_a_family_and_two_at_most() -> None:
@@ -171,7 +173,7 @@ def test_weather_bites_on_wind_rain_or_snow_and_never_under_a_roof() -> None:
     assert not weather_bites(replace(sheet, weather=Weather("dome", None, 30.0, 90.0, "snow", None)))
 
 
-def test_the_rank_bites_at_the_six_either_end() -> None:
+def test_the_rank_bites_at_the_four_either_end() -> None:
     def at(rank: int) -> Allowed:
         return Allowed(rank, 32, 20.0, "WR", 7, starter().written_at)
 
@@ -191,19 +193,20 @@ def test_the_depth_chart_bites_on_a_split_or_a_fresh_move() -> None:
 
 _TARGETS = Angle(
     "target_share",
-    "Targets: 32% of the Rams' targets this season, the 3rd-highest among the wide receivers we rank.",
-    (32.0,),
+    "Targets: 32% of the Rams' targets in his games this season, the 3rd-highest among the wide receivers we rank.",
+    (AngleFigure(32.0, Measure.TARGETS),),
     (),
     2.2,
-    Basis(5, 192, "targets"),
+    Basis(5, 48, "targets"),
+    (("the 3rd-highest", "among the wide receivers we rank"),),
 )
 _VACATED = Angle(
     "vacated",
-    "Vacated work: Tutu Atwell is Out this week, and he drew 20% of the Rams' targets this season.",
-    (20.0,),
+    "Vacated work: Tutu Atwell is Out this week, and he drew 20% of the Rams' targets in his games this season.",
+    (AngleFigure(20.0, Measure.TARGETS),),
     ("Tutu Atwell",),
     2.0,
-    Basis(6, 242, "targets"),
+    Basis(6, 40, "targets"),
 )
 
 
@@ -314,7 +317,7 @@ def _long_angle(n: int) -> Angle:
         f"Vacated work: {mate} is on the physically unable to perform list this week, and he drew 33% of the "
         "Commanders' targets this season, the 2nd-highest among the wide receivers we rank."
     )
-    return Angle("vacated", text, (33.0,), (mate,), 3.0, Basis(7, 250, "targets"))
+    return Angle("vacated", text, (AngleFigure(33.0, Measure.TARGETS),), (mate,), 3.0, Basis(7, 80, "targets"))
 
 
 @pytest.mark.usefixtures("angles_on")
@@ -326,3 +329,113 @@ def test_the_heaviest_correction_with_three_angles_stays_inside_the_prompt_bound
     assert system == WEEK_RULES_ANGLES and ANGLES_REMINDER in user and _long_angle(2).text in user
     tokens = (len(system) + len(user)) / CHARS_PER_TOKEN
     assert tokens <= (1 - BOUND_MARGIN) * WORST_PROMPT_TOKENS, tokens
+
+
+# --- fix round 2: the review's H1, H2, M2, M3, M4 and L7 -----------------------------------------------------------
+
+_ACCEPTED = (
+    "Puka Nacua draws 32% of the Rams' targets, the 3rd-highest among the wide receivers we rank, in week 6 of "
+    "2026. Tutu Atwell is Out this week, and his 20% of the Rams' targets has to go somewhere. Nacua is the obvious "
+    "home for it against Arizona. Start him."
+)
+# The review's H1: each variant quotes an angle's figure as another measure, a share as a count, or a place among
+# his peers no angle states.
+_MISQUOTED = (
+    ("32% of the Rams' targets", "32% of the Rams' offensive snaps"),
+    ("32% of the Rams' targets", "32% of the Rams' red-zone work"),
+    ("his 20% of the Rams' targets", "his 20% of the Rams' carries"),
+    ("draws 32% of the Rams' targets", "has 32 targets"),
+    ("the 3rd-highest among the wide receivers we rank", "1st among the receivers we rank"),
+    ("the 3rd-highest among the wide receivers we rank", "the highest share among receivers we rank"),
+    ("the 3rd-highest among the wide receivers we rank", "the 2nd-highest among the wide receivers we rank"),
+)
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_an_angle_said_as_its_angle_says_it_is_accepted() -> None:
+    assert validate_week_read(_ACCEPTED, _angled(), call="start").ok
+
+
+@pytest.mark.usefixtures("angles_on")
+@pytest.mark.parametrize(("said", "misquoted"), _MISQUOTED)
+def test_an_angle_figure_or_place_misquoted_is_refused(said: str, misquoted: str) -> None:
+    read = _ACCEPTED.replace(said, misquoted)
+    assert read != _ACCEPTED
+    violations = validate_week_read(read, _angled(), call="start").violations
+    assert any("angle" in v for v in violations), violations
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_a_place_among_peers_on_a_sheet_with_no_angle_is_refused() -> None:
+    read = (
+        "Puka Nacua has the highest target share among the receivers we rank in week 6 of 2026, and Arizona comes "
+        "to town. He averages 25.9 PPR points a game. Start him."
+    )
+    assert any("among his peers" in v for v in validate_week_read(read, starter(), call="start").violations)
+
+
+def _thin_receiver(n: int) -> AnglePlayer:
+    """2 snaps and 1 target a game over 5 games: 10 snaps and 5 targets of his own."""
+    usage = tuple(replace(_week(w, snaps=2, targets=1)) for w in range(1, 6))
+    return AnglePlayer(f"00-{n:07d}", "Thin Receiver", "WR", "LAR", usage, tuple((w, 1.0) for w in range(1, 6)), ())
+
+
+def test_a_share_on_10_snaps_and_5_targets_of_his_own_is_never_carried() -> None:
+    thin = _thin_receiver(90)
+    got = board_angles([*_board(), thin], {}, 8)[thin.player_id]
+    assert all(a.key not in {"snap_share", "target_share", "air_yards_share"} for a in got), got
+
+
+def test_a_return_on_15_snaps_of_his_own_is_never_carried() -> None:
+    weeks = (1, 2, 5, 6, 7)
+    usage = tuple(_week(w, snaps=5 if w > 4 else 60) for w in weeks)  # noqa: PLR2004 - back from week 5
+    back = AnglePlayer("00-0000091", "Back Receiver", "WR", "LAR", usage, tuple((w, 8.0) for w in weeks), (3, 4))
+    assert all(a.key != "return" for a in board_angles([*_board(), back], {}, 8)[back.player_id])
+
+
+def test_a_trend_waits_for_usage_to_reach_his_last_game() -> None:
+    lagging = _receiver(89, 14)
+    lagging = replace(lagging, weeks=lagging.weeks[:-1])  # the log has week 7; the usage stops at week 6
+    built = angles_module.own_candidates(lagging)
+    assert all(not c.key.endswith("_trend") for c in built) and any(c.key == "target_share" for c in built)
+
+
+def test_a_screen_only_depth_is_left_out() -> None:
+    usage = tuple(replace(_week(w), air_yards=-4.0) for w in range(1, 8))
+    screens = replace(_receiver(88, 8), weeks=usage)
+    assert all(c.key != "target_depth" for c in angles_module.own_candidates(screens))
+
+
+def _back(n: int, carries: float, team: str = "LAR", out: str | None = None) -> AnglePlayer:
+    usage = tuple(_week(w, team, carries=carries) for w in range(1, 8))
+    player = _receiver(n, 2, team=team, out=out)
+    return replace(player, position="RB", weeks=usage)
+
+
+def test_a_receivers_targets_never_pass_to_a_back() -> None:
+    gone = _receiver(97, 12, team="LAR", out="Out")
+    back = _back(87, 10)
+    assert all(a.key != "vacated" for a in board_angles([*_board(), gone, back], {}, 8)[back.player_id])
+
+
+def test_vacated_work_leads_for_the_heir_and_is_scaled_down_for_the_rest() -> None:
+    gone = _receiver(97, 12, team="LAR", out="Out")
+    heir, other = _receiver(96, 8, team="LAR"), _receiver(95, 4, team="LAR")
+    lead, scaled = (angles_module.vacated(p, [gone, heir, other], 8) for p in (heir, other))
+    assert lead is not None and scaled is not None and lead.fixed is not None
+    assert lead.fixed == pytest.approx(12 / 36 / angles_module.VACATED_SHARE_PER_SCORE)
+    assert scaled.fixed == pytest.approx(lead.fixed / 2)
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_the_depth_line_says_the_move_and_the_fact_rule_takes_it() -> None:
+    sheet = replace(
+        starter(), depth=DepthPlace(1.0, (("Davante Adams", 2.0),), starter().written_at), depth_moved_from=2.0
+    )
+    sheet = replace(sheet, angles=(_TARGETS,))
+    assert "listed first among LAR WRs, up from second on the chart before." in render_week_sheet(sheet)
+    read = (
+        "Puka Nacua draws 32% of the Rams' targets in week 6 of 2026. He is listed first, up from second on the chart "
+        "before, and Arizona comes to town. Start him."
+    )
+    assert not any("depth chart" in v for v in validate_week_read(read, sheet, call="start").violations)

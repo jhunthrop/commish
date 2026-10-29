@@ -1,9 +1,12 @@
 """HIS DEPTH-CHART MOVE (Lane 300): his place on his club's newest weekly chart against the chart before it.
 
-The depth chart reaches the writer when it moved (`bites.depth_bites`), so the sheet needs the place he held on
-the chart his club released before the newest (`week.depth`, Lane 299's weekly charts): for each club and
-position, the newest chart week loaded by the write (as `week.depth` reads it, a club on its bye included), and
-the latest chart of an earlier week. A player on only one of them has no move.
+The depth chart reaches the writer when it moved (`bites.depth_bites`), and the line says the move
+(`render._depth_line`), so the sheet needs the place he held on the chart his club released before the newest
+(`week.depth`, Lane 299's weekly charts). One snapshot a room each, as `week.depth.weekly_charts` reads them (the
+Lane 299 review's L7, this lane's review M3): for each club and position the newest snapshot loaded by the write
+(a club on its bye files it under the next week), and the newest snapshot of an earlier week. Each player's
+place is his best on each, kept by (player, position) so a back listed at RB and FB is never compared across
+the two (review L6). A player on only one of them has no move.
 """
 
 from collections.abc import Mapping
@@ -11,43 +14,36 @@ from datetime import datetime
 
 from sqlalchemy import Connection, text
 
-from research.capsules.week.depth import WeeklyChart, charts_from_rows
-
 _ROWS = text(
-    "select team, position, week, player_id, player_id as name, depth_order, as_of "
-    "from research.nflverse_depth_chart_weeks where season = :s and as_of <= :at"
+    "with newest as (select distinct on (team, position) team, position, week, as_of "
+    "from research.nflverse_depth_chart_weeks where season = :s and as_of <= :at "
+    "order by team, position, as_of desc, week desc), "
+    "prior as (select distinct on (c.team, c.position) c.team, c.position, c.week, c.as_of "
+    "from research.nflverse_depth_chart_weeks c join newest n on n.team = c.team and n.position = c.position "
+    "where c.season = :s and c.as_of <= :at and c.week < n.week "
+    "order by c.team, c.position, c.as_of desc, c.week desc), "
+    "picked as (select team, position, week, as_of, true as newest from newest "
+    "union all select team, position, week, as_of, false from prior) "
+    "select c.position, c.player_id, p.newest, min(c.depth_order) as place "
+    "from research.nflverse_depth_chart_weeks c join picked p on p.team = c.team and p.position = c.position "
+    "and p.week = c.week and p.as_of = c.as_of where c.season = :s "
+    "group by c.position, c.player_id, p.newest"
 )
 
-
-def _places(chart: WeeklyChart) -> dict[str, int]:
-    return {pid: place for pid, _name, place in chart.listed}
+PlayerPosition = tuple[str, str]
 
 
-def depth_moves(conn: Connection, season: int, as_of: datetime) -> dict[str, float]:
-    """Each player's place on the chart before his club's newest, where it differs from his newest place."""
-    rows = [
-        (r.team, r.position, r.week, r.player_id, r.name, r.depth_order, r.as_of)
-        for r in conn.execute(_ROWS, {"s": season, "at": as_of})
-    ]
-    newest = charts_from_rows(rows)
-    newest_week: dict[tuple[str, str], int] = {}
-    for team, position, chart_week, *_ in rows:
-        key = (team, position)
-        newest_week[key] = max(newest_week.get(key, chart_week), chart_week)
-    before = charts_from_rows([row for row in rows if row[2] < newest_week[(row[0], row[1])]])
-    return _moved(newest, before)
+def depth_moves(conn: Connection, season: int, as_of: datetime) -> dict[PlayerPosition, float]:
+    """Each (player, position)'s place on the chart before his club's newest, where it differs from his newest."""
+    newest: dict[PlayerPosition, float] = {}
+    before: dict[PlayerPosition, float] = {}
+    for row in conn.execute(_ROWS, {"s": season, "at": as_of}):
+        (newest if row.newest else before)[(str(row.player_id), str(row.position))] = float(row.place)
+    return moved(newest, before)
 
 
-def _moved(
-    newest: Mapping[tuple[str, str], WeeklyChart], before: Mapping[tuple[str, str], WeeklyChart]
-) -> dict[str, float]:
-    out: dict[str, float] = {}
-    for key, chart in newest.items():
-        prior = before.get(key)
-        if prior is None:
-            continue
-        then = _places(prior)
-        for pid, place in _places(chart).items():
-            if pid in then and then[pid] != place:
-                out[pid] = float(then[pid])
-    return out
+def moved(
+    newest: Mapping[PlayerPosition, float], before: Mapping[PlayerPosition, float]
+) -> dict[PlayerPosition, float]:
+    """His place before, for each (player, position) on both charts whose place changed."""
+    return {key: before[key] for key, place in newest.items() if key in before and before[key] != place}

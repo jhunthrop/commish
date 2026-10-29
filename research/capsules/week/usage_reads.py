@@ -3,7 +3,7 @@
 One read of the stored facts at or before the instant, the newest statement of each (week, player, fact):
 - his offensive snaps and his club's, his targets and his club's, his carries and his club's (the snap
   counts and the weekly stat lines, nflverse);
-- his air yards, the targets they were taken over, and his red-zone and inside-the-ten carries and targets
+- his air yards, the targets they were taken over, and his red-zone carries and targets
   (the play-by-play), each against his club's own total that week, summed over every player the store
   places on the club that week (`player_week_teams`), as the season capsules sum them
   (`facts.season_usage_reads`);
@@ -39,10 +39,6 @@ _RED_ZONE: Final = (
     (PBP_PLAYER_SOURCE, PbpPlayerMetric.RED_ZONE_CARRIES),
     (PBP_PLAYER_SOURCE, PbpPlayerMetric.RED_ZONE_TARGETS),
 )
-_INSIDE_TEN: Final = (
-    (PBP_PLAYER_SOURCE, PbpPlayerMetric.INSIDE_TEN_CARRIES),
-    (PBP_PLAYER_SOURCE, PbpPlayerMetric.INSIDE_TEN_TARGETS),
-)
 _TOUCHDOWNS: Final = (
     (NflverseSource.PLAYER_WEEK, "rushing_touchdowns"),
     (NflverseSource.PLAYER_WEEK, "receiving_touchdowns"),
@@ -58,11 +54,10 @@ _ALL: Final = (
     _AIR_YARD_TARGETS,
     *_PBP_TOUCHES,
     *_RED_ZONE,
-    *_INSIDE_TEN,
     *_TOUCHDOWNS,
 )
 # The play-by-play counts a club's week is summed from, player by player.
-_SUMMED: Final = (_AIR_YARDS, *_RED_ZONE, *_INSIDE_TEN)
+_SUMMED: Final = (_AIR_YARDS, *_RED_ZONE)
 _READ: Final = text(
     "select distinct on (week, player_id, source, metric) week, player_id, source, metric, value "
     "from research.player_week_observations where season = :season and week >= 1 and week <= :last "
@@ -90,8 +85,6 @@ class UsageWeek:
     air_yard_targets: float | None
     red_zone: float | None
     team_red_zone: float | None
-    inside_ten: float | None
-    team_inside_ten: float | None
     touchdowns: float | None
 
 
@@ -159,8 +152,6 @@ def _week(week: int, team: str | None, own: Mapping[Fact, float], club: Mapping[
         air_yard_targets=own.get(_AIR_YARD_TARGETS),
         red_zone=mine(_RED_ZONE),
         team_red_zone=_sum(club, _RED_ZONE),
-        inside_ten=mine(_INSIDE_TEN),
-        team_inside_ten=_sum(club, _INSIDE_TEN),
         touchdowns=_sum(own, _TOUCHDOWNS),
     )
 

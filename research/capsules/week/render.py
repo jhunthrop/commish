@@ -171,8 +171,18 @@ def _depth_line(sheet: WeekSheet) -> str | None:
         else "Listed with him: " + ", ".join(f"{name} {slot_word(slot)}" for name, slot in d.around) + "."
     )
     return (
-        f"Depth chart{_as_of(d.released_at)}: listed {slot_word(d.slot)} among {sheet.team} {sheet.position}s. {around}"
+        f"Depth chart{_as_of(d.released_at)}: listed {slot_word(d.slot)} among {sheet.team} {sheet.position}s"
+        f"{_move_words(sheet)}. {around}"
     )
+
+
+def _move_words(sheet: WeekSheet) -> str:
+    """His move since the chart before (Lane 300, review M3), the reason the line bites: ", up from second on the
+    chart before". The depth fact rule takes that place after "from" (`fact_rules.place_violations`)."""
+    d, before = sheet.depth, sheet.depth_moved_from
+    if d is None or before is None or before == d.slot or not angles_on():
+        return ""
+    return f", {'up' if d.slot < before else 'down'} from {slot_word(before)} on the chart before"
 
 
 def _season_line(sheet: WeekSheet) -> str:

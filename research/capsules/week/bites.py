@@ -11,7 +11,8 @@ from research.capsules.week.sheet import Allowed, WeekSheet
 
 # Wind from 15 mph moves the passing and kicking game (the brief's own line); under it the forecast is noise.
 WIND_BITES_MPH: Final = 15.0
-# Rain or thunderstorms bite when likely: the forecast service's "likely" starts at a 60% chance.
+# Rain or thunderstorms bite when likely: the forecast service's "likely" starts at a 60% chance. The brief asks
+# for heavy rain likely; the forecast carries no intensity, so a likely chance of rain or storms stands in (review L4).
 RAIN_BITES_CHANCE: Final = 60.0
 # Snow or ice bites at a lower chance: any real chance of either changes footing and the ball.
 SNOW_BITES_CHANCE: Final = 30.0

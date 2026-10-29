@@ -250,7 +250,7 @@ class WeekSheet:
     lines_at: datetime | None = None
     basis: str = field(default=PROJECTION_BASIS)
     # What sets his week apart, most unusual first (Lane 300, `angles`), and his depth slot on the release
-    # before the newest when it moved (`usage_reads.depth_changes`): empty and None while `ANGLES_ON` is off.
+    # before the newest when it moved (`depth_moves`): empty and None while `ANGLES_ON` is off.
     angles: tuple[Angle, ...] = ()
     depth_moved_from: float | None = None
 

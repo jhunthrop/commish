@@ -94,13 +94,25 @@ def _depth_remedy(sheet: WeekSheet) -> str:
     return f"The facts list him {slot_word(d.slot)} on this week's depth chart{names}: say his place as they do."
 
 
+# A place said as where he came from ("up from second on the chart before", Lane 300's depth line).
+_FROM_BEFORE: Final = re.compile(r"\bfrom\s+$")
+
+
+def _said_as_the_move(sentence: str, m: re.Match[str], sheet: WeekSheet) -> bool:
+    """Whether a place is his place on the chart before, said after "from" as the sheet's move gives it."""
+    before = sheet.depth_moved_from
+    if before is None or not _FROM_BEFORE.search(sentence[: m.start(1)]):
+        return False
+    return float(_ORDINALS.index(m.group(1)) + 1) == before
+
+
 def place_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
     """His place on the chart as the sheet lists it, and only teammates it lists ahead of him behind (Lane 299)."""
     d = sheet.depth
     out = []
     for s in sentences:
         for pattern in _place_patterns(sheet):
-            m = pattern.search(s)
+            m = next((m for m in pattern.finditer(s) if not _said_as_the_move(s, m, sheet)), None)
             if m is None:
                 continue
             said = _ORDINALS.index(m.group(1)) + 1

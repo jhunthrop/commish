@@ -12,22 +12,28 @@ score, vacated work, his return), the strongest.
 
 The sheet carries at most `MAX_ANGLES`, most unusual first (`render`), and only angles that score
 `MIN_ANGLE_SCORE` or more: a sheet with none over it carries none, and the writer leans on his status and his game
-(the coordinator's fix round 1). An angle on a thin basis (`THIN_FLOORS`: under three games, a share on fewer than 20 snaps or
-10 targets or carries) is never carried, so it never leads. `ANGLES_ON` is the one switch: off, the sheet, the
+(the coordinator's fix round 1). An angle on a thin basis (`THIN_FLOORS`, on HIS OWN counts: under three games,
+a share on fewer than 20 of his snaps or 10 of his targets, carries or red-zone chances, each window of a trend and
+a return; the review's H2) is never carried, so it never leads. A trend or a return is built only while his usage
+reaches the newest game of his log (review M4), so "his last three games" are the log's.
+
+Every figure an angle prints is bound to what it measures (`AngleFigure`), and every place among his peers it
+states is kept (`Angle.places`): the read may quote a figure only as its measure and a place only as stated
+(`angle_rules`, the review's H1). `ANGLES_ON` is the one switch: off, the sheet, the
 prompt and the validator are main's before Lane 300.
 """
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Final
+from typing import Final, cast
 
 from research.capsules.page_figures import page_tenth, page_tenth_text
 from research.capsules.render_words import ordinal
 from research.capsules.week.angle_candidates import (
     CARRIES,
     GAMES,
-    PASS_CATCHERS,
     POSITION_WORDS,
+    RECEIVERS,
     RED_ZONE,
     RETURN_GAMES_BACK,
     RETURN_GAMES_BEFORE,
@@ -35,9 +41,13 @@ from research.capsules.week.angle_candidates import (
     SHARE_KINDS,
     SNAPS,
     TARGETS,
+    AngleFigure,
     Basis,
     Candidate,
+    Measure,
+    Pick,
     club_possessive,
+    held_weeks,
     percent,
     percent_text,
     red_zone,
@@ -65,7 +75,6 @@ THIN_FLOORS: Final = {SNAPS: 20.0, TARGETS: 10.0, CARRIES: 10.0, RED_ZONE: 10.0,
 THIN_GAMES: Final = 3
 # A peer z-score needs this many peers at his position, or the candidate has no score.
 MIN_PEERS: Final = 8
-# The sheet carries two angles, and a third only when it is about one standard deviation out (the top sixth).
 # Two angles at most (fix round 1): a third ran the reads past the figure cap and the word band, the two
 # largest of the angles arm's fall causes in Lane 300's first three pairs.
 MAX_ANGLES: Final = 2
@@ -74,7 +83,10 @@ MAX_ANGLES: Final = 2
 MIN_ANGLE_SCORE: Final = 0.75
 # Work vacated: a teammate ruled out this week who drew at least this share of his club's targets (or carries,
 # for a back) in his games, and played within this many weeks of this one (a player out for a month has had
-# his work taken already). Its score is the share over `VACATED_SHARE_PER_SCORE`: 15% scores 1.5.
+# his work taken already). Targets pass only to the mate's own position, or between receivers and tight ends;
+# carries only between backs (review M2). Its score is the share over `VACATED_SHARE_PER_SCORE` (15% scores
+# 1.5) for the likely heir, the eligible teammate with the largest share of that work, and scaled down by his
+# own share against the heir's for everyone else, so one club's lost work leads only one read.
 VACATED_MIN_SHARE: Final = 0.15
 VACATED_RECENT_WEEKS: Final = 3
 VACATED_SHARE_PER_SCORE: Final = 0.10
@@ -87,6 +99,8 @@ RETURN_SCORE_FLOOR: Final = 1.5
 # weight against his own usage's.
 CLUB_FACT_WEIGHT: Final = 0.75
 _ORDER_WORDS: Final = ("", "second-", "third-")
+# The group the expected score's place is among.
+WEEK_GROUP: Final = "of the week"
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,15 +110,13 @@ class Angle:
 
     key: str
     text: str
-    figures: tuple[float, ...]
+    figures: tuple[AngleFigure, ...]
     names: tuple[str, ...]
     score: float
-    basis: Basis
-
-    @property
-    def basis_words(self) -> str:
-        count = page_tenth_text(self.basis.count)
-        return f"{self.basis.games} games, {count} {self.basis.unit}"
+    basis: Basis | None
+    # Each place among his peers the sentence states: its words ("the 3rd-highest", "the second-highest") and
+    # the group it is among ("among the wide receivers we rank", "of the week").
+    places: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,8 +135,18 @@ class AnglePlayer:
     out_words: str | None = None
 
 
-def _thin(basis: Basis) -> bool:
+def _thin(basis: Basis | None) -> bool:
+    """Under the games floor or his own count's floor; the club's fact (no basis) is never thin."""
+    if basis is None:
+        return False
     return basis.games < THIN_GAMES or basis.count < THIN_FLOORS.get(basis.unit, 0.0)
+
+
+def fresh(player: AnglePlayer, weeks: Sequence[UsageWeek]) -> bool:
+    """Whether his usage reaches the newest game of his log: a trend's "last three games" are the log's
+    (review M4). The two feeds publish on different clocks, and a lagging week would set a trend's window apart
+    from the Last cell and the spread."""
+    return bool(weeks) and bool(player.points) and weeks[-1].week == max(week for week, _ in player.points)
 
 
 def _club_weeks(player: AnglePlayer) -> tuple[UsageWeek, ...]:
@@ -133,22 +155,20 @@ def _club_weeks(player: AnglePlayer) -> tuple[UsageWeek, ...]:
 
 
 def own_candidates(player: AnglePlayer) -> list[Candidate]:
-    """Every candidate read from his own weeks alone."""
+    """Every candidate read from his own weeks alone; a trend and a return only while his usage is fresh."""
     weeks = _club_weeks(player)
+    current = fresh(player, weeks)
     built: list[Candidate | None] = []
     for kind in SHARE_KINDS:
-        built.extend(
-            (
-                share_level(kind, player.position, player.team, weeks),
-                share_trend(kind, player.position, player.team, weeks),
-            )
-        )
+        built.append(share_level(kind, player.position, player.team, weeks))
+        if current:
+            built.append(share_trend(kind, player.position, player.team, weeks))
     built.extend(
         (
             target_depth(player.position, weeks),
             red_zone(player.position, player.team, weeks),
             spread([points for _, points in player.points]),
-            _returned(player, weeks),
+            _returned(player, weeks) if current else None,
         )
     )
     return [c for c in built if c is not None]
@@ -173,49 +193,62 @@ def _returned(player: AnglePlayer, weeks: Sequence[UsageWeek]) -> Candidate | No
         f"Back in the lineup: since the {games} he missed, he has played {percent_text(now[0] / now[1])} of "
         f"{club_possessive(player.team)} offensive snaps, against {percent_text(then[0] / then[1])} before"
     )
-    figures = (percent(now[0] / now[1]), percent(then[0] / then[1]))
-    return Candidate(
-        "return", "return", None, text, figures, Basis(len(back), now[1], SNAPS),
-        fixed=RETURN_SCORE_FLOOR,
-    )  # fmt: skip
+    figures = (
+        AngleFigure(percent(now[0] / now[1]), Measure.SNAPS),
+        AngleFigure(percent(then[0] / then[1]), Measure.SNAPS),
+    )
+    # Each window is a basis on his own snaps: the thinner one is the angle's.
+    basis = Basis(min(len(back), len(before)), min(now[0], then[0]), SNAPS)
+    return Candidate("return", "return", None, text, figures, basis, fixed=RETURN_SCORE_FLOOR)
 
 
-def vacated(player: AnglePlayer, teammates: Iterable[AnglePlayer], week: int) -> Candidate | None:
-    """The largest share of his club's targets (or a back's carries) a teammate ruled out this week drew."""
+def vacated(player: AnglePlayer, teammates: Sequence[AnglePlayer], week: int) -> Candidate | None:
+    """The largest share of his club's work a teammate ruled out this week drew that passes to his position
+    (`_vacated_kinds`), scored for the likely heir and scaled down for the rest (review M2)."""
     best: Candidate | None = None
     for mate in teammates:
-        if mate.out_words is None or mate.player_id == player.player_id or not mate.weeks:
+        if mate.out_words is None or mate.player_id == player.player_id:
             continue
         weeks = _club_weeks(mate)
         if not weeks or weeks[-1].week < week - VACATED_RECENT_WEEKS:
             continue
-        for unit, picks, noun in _vacated_kinds(player.position, mate.position):
-            held = share_of(weeks, picks)
+        for unit, pick, noun, measure in _vacated_kinds(player.position, mate.position):
+            held = share_of(weeks, pick)
             if held is None or held[0] / held[1] < VACATED_MIN_SHARE:
                 continue
             share = held[0] / held[1]
+            heirs = [t for t in teammates if t.out_words is None and _vacated_kinds(t.position, mate.position)]
+            weight = _heir_weight(player, heirs, pick)
             text = (
                 f"Vacated work: {mate.name} is {mate.out_words} this week, and he drew {percent_text(share)} of "
-                f"{club_possessive(player.team)} {noun} this season"
+                f"{club_possessive(player.team)} {noun} in his games this season"
             )
             found = Candidate(
-                "vacated", "vacated", None, text, (percent(share),), Basis(len(weeks), held[1], unit),
-                names=(mate.name,), fixed=share / VACATED_SHARE_PER_SCORE,
+                "vacated", "vacated", None, text, (AngleFigure(percent(share), measure),),
+                Basis(len(held_weeks(weeks, pick)), held[0], unit),
+                names=(mate.name,), fixed=weight * share / VACATED_SHARE_PER_SCORE,
             )  # fmt: skip
             if best is None or (found.fixed or 0.0) > (best.fixed or 0.0):
                 best = found
     return best
 
 
-Pick = Callable[[UsageWeek], tuple[float | None, float | None]]
+def _heir_weight(player: AnglePlayer, heirs: Sequence[AnglePlayer], pick: Pick) -> float:
+    """His share of the work against the heir's (the eligible teammate with the largest), 1 for the heir."""
+    shares = {h.player_id: (s[0] / s[1] if (s := share_of(_club_weeks(h), pick)) else 0.0) for h in heirs}
+    top = max(shares.values(), default=0.0)
+    mine = shares.get(player.player_id, 0.0)
+    return 0.0 if top <= 0 else mine / top
 
 
-def _vacated_kinds(position: str, mate_position: str) -> list[tuple[str, Pick, str]]:
-    kinds: list[tuple[str, Pick, str]] = []
-    if position in PASS_CATCHERS and mate_position in PASS_CATCHERS:
-        kinds.append((TARGETS, lambda w: (w.targets, w.team_targets), "targets"))
+def _vacated_kinds(position: str, mate_position: str) -> list[tuple[str, Pick, str, str]]:
+    """The work a mate at `mate_position` leaves that passes to a player at `position`: targets to his own position
+    or between receivers and tight ends, carries between backs."""
+    kinds: list[tuple[str, Pick, str, str]] = []
+    if position == mate_position or {position, mate_position} <= RECEIVERS:
+        kinds.append((TARGETS, lambda w: (w.targets, w.team_targets), "targets", Measure.TARGETS))
     if position in RUNNERS and mate_position in RUNNERS:
-        kinds.append((CARRIES, lambda w: (w.carries, w.team_carries), "carries"))
+        kinds.append((CARRIES, lambda w: (w.carries, w.team_carries), "carries", Measure.CARRIES))
     return kinds
 
 
@@ -228,16 +261,18 @@ def expected(team: str | None, clubs: Mapping[str, float]) -> Candidate | None:
     high, low = ordered.index(points), len(ordered) - 1 - ordered[::-1].index(points)
     from_low = len(ordered) - 1 - low
     if high < EXPECTED_EDGE:
-        place = f"the {_ORDER_WORDS[high]}highest of the week"
+        place = f"the {_ORDER_WORDS[high]}highest {WEEK_GROUP}"
     elif from_low < EXPECTED_EDGE:
-        place = f"the {_ORDER_WORDS[from_low]}lowest of the week"
+        place = f"the {_ORDER_WORDS[from_low]}lowest {WEEK_GROUP}"
     else:
         return None
     figure = page_tenth(points)
     text = f"Expected score: {club_possessive(team)} expected score is {page_tenth_text(figure)} points, {place}"
+    # The club's fact has no player basis (review L5): `_thin` reads None as never thin.
     return Candidate(
-        "expected", "expected", None, text, (figure,), Basis(THIN_GAMES, THIN_FLOORS[GAMES], GAMES),
+        "expected", "expected", None, text, (AngleFigure(figure, Measure.EXPECTED),), None,
         fixed=CLUB_FACT_WEIGHT * abs(_z(points, list(clubs.values())) or 0.0),
+        ends=None,
     )  # fmt: skip
 
 
@@ -260,7 +295,7 @@ def _red_zone_rates(players: Sequence[AnglePlayer], own: Mapping[str, Sequence[C
         for c in own[player.player_id]:
             if c.key == "red_zone" and c.measure is not None and not _thin(c.basis):
                 chances[player.position] = chances.get(player.position, 0.0) + c.measure
-                touchdowns[player.position] = touchdowns.get(player.position, 0.0) + c.figures[1]
+                touchdowns[player.position] = touchdowns.get(player.position, 0.0) + c.touchdowns
     return {position: touchdowns[position] / n for position, n in chances.items() if n > 0}
 
 
@@ -269,7 +304,7 @@ def _with_gap(c: Candidate, rates: Mapping[str, float], position: str) -> Candid
     if c.key != "red_zone" or c.measure is None:
         return c
     rate = rates.get(position)
-    return None if rate is None else replace(c, measure=c.figures[1] - c.measure * rate)
+    return None if rate is None else replace(c, measure=c.touchdowns - c.measure * rate)
 
 
 def _pools(
@@ -285,16 +320,25 @@ def _pools(
 
 def _scored(c: Candidate, pool: Sequence[float], position: str) -> Angle | None:
     if c.fixed is not None:
-        return Angle(c.key, f"{c.text}.", c.figures, c.names, round(c.fixed, 2), c.basis)
+        return Angle(c.key, f"{c.text}.", c.figures, c.names, round(c.fixed, 2), c.basis, _expected_places(c))
     z = None if c.measure is None else _z(c.measure, pool)
     if z is None:
         return None
-    text, figures = c.text, c.figures
+    text, places = c.text, cast("tuple[tuple[str, str], ...]", ())
     if c.ends is not None and c.measure is not None:
-        text = f"{text}, {place_words(c.measure, pool, c.ends)} among the {POSITION_WORDS[position]} we rank"
+        words, group = place_words(c.measure, pool, c.ends), f"among the {POSITION_WORDS[position]} we rank"
+        text, places = f"{text}, {words} {group}", ((words, group),)
     if c.key == "spread":
         text = f"{'Boom or bust' if z > 0 else 'Steady week to week'}: {text}"
-    return Angle(c.key, f"{text}.", figures, c.names, round(abs(z), 2), c.basis)
+    return Angle(c.key, f"{text}.", c.figures, c.names, round(abs(z), 2), c.basis, places)
+
+
+def _expected_places(c: Candidate) -> tuple[tuple[str, str], ...]:
+    """The expected score's place, "the second-highest" "of the week", as its sentence states it."""
+    if c.key != "expected":
+        return ()
+    words = c.text.rsplit(", ", 1)[1].removesuffix(f" {WEEK_GROUP}")
+    return ((words, WEEK_GROUP),)
 
 
 def place_words(value: float, pool: Sequence[float], ends: tuple[str, str]) -> str:
@@ -333,7 +377,7 @@ def board_angles(players: Sequence[AnglePlayer], clubs: Mapping[str, float], wee
         for p in players
     }
     pools = _pools(players, own)
-    by_club: dict[str | None, list[AnglePlayer]] = {}
+    by_club: dict[str | None, list[AnglePlayer]] = {}  # teammates by this week's club
     for player in players:
         by_club.setdefault(player.team, []).append(player)
     out: dict[str, tuple[Angle, ...]] = {}
