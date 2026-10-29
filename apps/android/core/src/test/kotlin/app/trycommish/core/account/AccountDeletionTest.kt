@@ -11,6 +11,7 @@ import app.trycommish.core.MemorySession
 import app.trycommish.core.SignInState
 import app.trycommish.core.SignOut
 import app.trycommish.core.leaguehome.Fixtures
+import app.trycommish.core.push.StaticPush
 import app.trycommish.design.Words
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -70,7 +71,7 @@ class AccountDeletionTest {
                 cache,
                 FixedClock(Fixtures.week),
                 Fixtures.zone,
-                MemoryPushStore(),
+                StaticPush(),
                 { AccountFixtures.PHONE },
                 AccountHooks({}, { sessionEnd() }, {}, { true }, deleted),
             )
@@ -91,7 +92,7 @@ class AccountDeletionTest {
                     MemoryCache(),
                     FixedClock(Fixtures.week),
                     Fixtures.zone,
-                    MemoryPushStore(),
+                    StaticPush(),
                     { null },
                     AccountHooks({}, {}, {}, { true }, {}),
                 )

@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.trycommish.api.ApiFailure
+import app.trycommish.api.models.NotificationKinds
+import app.trycommish.api.models.NotificationSettings
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
 import app.trycommish.core.account.AccountFixtures
@@ -19,11 +21,11 @@ import app.trycommish.core.account.AccountHooks
 import app.trycommish.core.account.AccountState
 import app.trycommish.core.account.AccountViewModel
 import app.trycommish.core.account.DeletionUi
-import app.trycommish.core.account.MemoryPushStore
 import app.trycommish.core.account.PushKind
-import app.trycommish.core.account.PushSettings
 import app.trycommish.core.account.StubAccountScreen
 import app.trycommish.core.leaguehome.Fixtures
+import app.trycommish.core.push.PushPermission
+import app.trycommish.core.push.StaticPush
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Words
 import com.android.ide.common.rendering.api.SessionParams.RenderingMode
@@ -210,7 +212,7 @@ private fun deletionAt(
             MemoryCache(),
             FixedClock(Fixtures.week),
             Fixtures.zone,
-            MemoryPushStore(),
+            StaticPush(),
             { AccountFixtures.PHONE },
             AccountHooks({}, {}, {}, { true }, {}),
         )
@@ -240,15 +242,25 @@ private fun twoX(
 
 /** The view model at the scene's state through the stub: read fresh (the free season ended by the API's
  * flag for NotFree), a league detached a moment ago, or saved and read again with no signal half an hour
- * on. A starter's status is switched off throughout, as on iOS. */
+ * on. The account holds a starter's status switched off throughout and the phone allows push, as on iOS. */
 @OptIn(ExperimentalCoroutinesApi::class)
 private fun viewModelAt(
     scene: AccountSnapshotTest.Scene,
     scheduler: TestCoroutineScheduler,
 ): AccountViewModel {
     val cache = MemoryCache()
-    val stub = StubAccountScreen(flag = if (scene == AccountSnapshotTest.Scene.NotFree) false else null)
-    val push = MemoryPushStore(PushSettings.standard.with(PushKind.Status, isOn = false))
+    val me =
+        AccountFixtures.me().copy(
+            notifications =
+                NotificationSettings(
+                    timeZone = Fixtures.zone.id,
+                    quietStart = "23:00",
+                    quietEnd = "08:00",
+                    kinds = NotificationKinds(starterStatus = false, weekReads = true, waiverClaims = true),
+                ),
+        )
+    val stub = StubAccountScreen(account = me, flag = if (scene == AccountSnapshotTest.Scene.NotFree) false else null)
+    val push = StaticPush(PushPermission.Allowed)
     val hooks = AccountHooks({}, {}, {}, { true }, {})
 
     fun at(seconds: Long) =

@@ -11,6 +11,8 @@ import app.trycommish.core.Cached
 import app.trycommish.core.Clock
 import app.trycommish.core.Format
 import app.trycommish.core.SessionEnd
+import app.trycommish.core.push.PushControl
+import app.trycommish.core.push.PushPermission
 import app.trycommish.design.Words
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -43,7 +45,7 @@ sealed interface AccountState {
 }
 
 /** Which part of the screen an action's failure is said beside. */
-enum class AccountSection { Leagues, Devices }
+enum class AccountSection { Leagues, Devices, Notifications }
 
 /** An action that did not go through: the API's own sentence, else the web's. */
 data class AccountProblem(
@@ -51,14 +53,18 @@ data class AccountProblem(
     val text: String,
 )
 
-/** The screen's state, the switches, the row an action is under way on (a league's or a device's id, or
- * Sign out's word) and the last action's failure. */
+/** The screen's state, the account's switches, whether this phone may show a push, the row an action is
+ * under way on (a league's or a device's id, or Sign out's word) and the last action's failure. */
 data class AccountUi(
     val state: AccountState = AccountState.Loading,
     val push: PushSettings = PushSettings.standard,
+    val permission: PushPermission = PushPermission.NotAsked,
     val busy: String? = null,
     val problem: AccountProblem? = null,
-)
+) {
+    /** The switches as drawn: the account's, every one off while this phone may not show a push. */
+    val shownPush: PushSettings get() = if (permission == PushPermission.Allowed) push else push.allOff
+}
 
 /** What the Account asks of the app: sign this phone out through the session (it revokes the device and
  * returns to sign-in), end a session the API refused, tell the league switch the leagues changed, whether
@@ -75,8 +81,9 @@ class AccountHooks(
 /**
  * The Account screen's view model, the iOS one's (Lane 198 after its fix round): the account, the leagues
  * followed with detach and its undo, the paired devices with this phone marked and unpair, the plan in
- * the free season, the push switches kept on this phone, and sign out. The reads, the cache, the clock,
- * the switches' store, this phone's id and the app's hooks are injected; `wait` is the undo's window.
+ * the free season, the push switches the account keeps (PATCH /me `notifications`) with this phone's
+ * registration behind them, and sign out. The reads, the cache, the clock, the phone's push, this phone's
+ * id and the app's hooks are injected; `wait` is the undo's window and quiet hours' rest.
  * The saved account shows at once, then the API's; a failed read keeps it, stale with its stamp; a 401
  * signs out.
  */
@@ -85,12 +92,13 @@ class AccountViewModel(
     private val cache: Cache,
     private val clock: Clock,
     private val zone: ZoneId,
-    private val store: PushStore,
+    private val control: PushControl,
     private val thisDevice: () -> String?,
     private val hooks: AccountHooks,
     private val wait: suspend (Duration) -> Unit = { delay(it.toMillis()) },
 ) : ViewModel() {
-    private val mutableUi = MutableStateFlow(AccountUi(push = store.load()))
+    private val mutableUi = MutableStateFlow(AccountUi())
+    private var quietWrite: Job? = null
     private val mutableRefreshing = MutableStateFlow(false)
     private var loadJob: Job? = null
     private var answer: AccountScreenAnswer? = null
@@ -128,6 +136,7 @@ class AccountViewModel(
         return viewModelScope
             .launch {
                 mutableRefreshing.value = true
+                mutableUi.update { it.copy(permission = control.permission()) }
                 try {
                     read()
                 } finally {
@@ -259,23 +268,71 @@ class AccountViewModel(
         detached = emptySet()
     }
 
+    /** A switch moved. On asks the phone first when it may not show a push yet (the prompt once, never at
+     * launch), and stays off when it says no. The switches as drawn are written whole, so what the member
+     * sees is what the account keeps; every one off takes this phone's token off. */
     fun set(
         kind: PushKind,
         isOn: Boolean,
-    ) = savePush(ui.value.push.with(kind, isOn))
+    ): Job =
+        viewModelScope.launch {
+            val drawn = ui.value.shownPush
+            if (isOn) {
+                val permission = control.enable()
+                mutableUi.update { it.copy(permission = permission) }
+                if (permission != PushPermission.Allowed) return@launch
+            }
+            val next = drawn.with(kind, isOn)
+            if (writePush(next) && !next.anyOn) control.disable()
+        }
 
+    /** Quiet hours moved: drawn at once, written once the picker has rested a moment (one PATCH). */
     fun setQuiet(
         end: QuietEnd,
         minutes: Int,
-    ) = savePush(ui.value.push.with(end, minutes))
+    ): Job {
+        val settings = ui.value.push.with(end, minutes)
+        mutableUi.update { it.copy(push = settings) }
+        quietWrite?.cancel()
+        return viewModelScope
+            .launch {
+                wait(QUIET_PAUSE)
+                writePush(settings)
+            }.also { quietWrite = it }
+    }
 
     override fun onCleared() {
         leave()
     }
 
-    private fun savePush(settings: PushSettings) {
-        store.save(settings)
-        mutableUi.update { it.copy(push = settings) }
+    /** Writes the settings to the account and shows what it holds after; a write that fails puts the
+     * account's back and says so beside the switches. */
+    private suspend fun writePush(settings: PushSettings): Boolean {
+        val before = ui.value.push
+        mutableUi.update { it.copy(push = settings, problem = null) }
+        val problem =
+            try {
+                val me = reads.updateNotifications(settings.change(zone))
+                mutableUi.update { it.copy(push = PushSettings.of(me.notifications)) }
+                answer = answer?.copy(me = me)
+                save()
+                null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Unauthorized) {
+                signedOut()
+                AppWords.signedOut
+            } catch (e: ApiFailure) {
+                e.message.ifEmpty { Words.Account.failed }
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Exception,
+            ) {
+                Words.Account.failed
+            }
+        if (problem != null) {
+            mutableUi.update { it.copy(push = before, problem = AccountProblem(AccountSection.Notifications, problem)) }
+        }
+        return problem == null
     }
 
     /** Runs a row's action; false, with its sentence beside the section, when it did not go through. */
@@ -331,6 +388,7 @@ class AccountViewModel(
         stale: Boolean,
     ) {
         answer = read
+        if (quietWrite?.isActive != true) mutableUi.update { it.copy(push = PushSettings.of(read.me.notifications)) }
         this.stamp = stamp
         this.stale = stale
         redraw()
@@ -357,6 +415,9 @@ class AccountViewModel(
 
         /** How long a detached league stays on the list with its undo (AccountLeagues.svelte UNDO_MS). */
         val UNDO_WINDOW: Duration = Duration.ofSeconds(10)
+
+        /** How long the quiet hours' picker rests before they are written. */
+        val QUIET_PAUSE: Duration = Duration.ofMillis(800)
     }
 }
 

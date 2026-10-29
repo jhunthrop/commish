@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.trycommish.core.AppWords
 import app.trycommish.core.account.AccountModel
+import app.trycommish.core.account.AccountSection
 import app.trycommish.core.account.AccountState
 import app.trycommish.core.account.AccountUi
 import app.trycommish.core.account.PushKind
@@ -106,7 +107,14 @@ fun AccountPage(
                     AccountLeagues(model, ui, actions)
                     model.plan?.let { PlanView(it, actions.openLink) }
                 }
-                AccountPart.Switches -> PushSwitches(ui.push, actions.toggle, actions.editQuiet)
+                AccountPart.Switches ->
+                    PushSwitches(
+                        ui.shownPush,
+                        ui.permission,
+                        ui.problem?.takeIf { it.section == AccountSection.Notifications }?.text,
+                        actions.toggle,
+                        actions.editQuiet,
+                    )
                 AccountPart.Devices -> {
                     AccountDevices(model, ui, actions.unpair)
                     AccountFoot(actions.deleteAccount, actions.openLink)

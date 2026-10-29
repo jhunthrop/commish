@@ -39,6 +39,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.trycommish.core.lobby.LobbyLandingViewModel
 import app.trycommish.core.phoneBar
+import app.trycommish.core.push.PushScreen
 import app.trycommish.core.shell.FollowedLeague
 import app.trycommish.core.shell.LEAGUE_PAGE
 import app.trycommish.core.shell.LINEUP_PAGE
@@ -220,6 +221,26 @@ fun Shell(
             is ShellDestination.Tab -> openTab(home.page)
             is ShellDestination.Push -> push(home.route)
         }
+    }
+
+    // A tapped push (Lane 288), once the account is read: its league chosen in the switch (one this account
+    // still follows), then the tab its screen is where the bar has it, else the league's home as the switch
+    // opens it.
+    val pushed by graph.pushed.collectAsStateWithLifecycle()
+    LaunchedEffect(pushed, signedIn, state) {
+        val route = pushed ?: return@LaunchedEffect
+        val ready = state as? ShellState.Ready ?: return@LaunchedEffect
+        graph.pushOpened()
+        if (!signedIn || ready.leagues.none { it.id == route.league }) return@LaunchedEffect
+        sheet.close()
+        choose(route.league)
+        val page =
+            when (route.screen) {
+                PushScreen.League -> LEAGUE_PAGE
+                PushScreen.Lineup -> LINEUP_PAGE
+                PushScreen.Waivers -> WAIVERS_PAGE
+            }
+        if (shell.bar().any { it.page == page }) openTab(page)
     }
 
     val openLineup: (String) -> Unit = { id ->

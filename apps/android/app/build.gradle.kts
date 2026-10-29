@@ -8,6 +8,24 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+/**
+ * Push (Lane 288): Firebase's client config for app.trycommish.android. Firebase documents the file as
+ * no secret (it names the project and the app), but it carries a browser API key GitHub's secret scanning
+ * flags, so it is not committed: CI writes it from the GOOGLE_SERVICES_JSON secret (android.yml), a
+ * developer copies it from .superpowers/firebase/. Without it the build still passes and push stays off
+ * (FirebaseApp never starts, so the app registers no token); the unit tests never touch Firebase.
+ */
+if (file("google-services.json").exists()) {
+    apply(
+        plugin =
+            libs.plugins.google.services
+                .get()
+                .pluginId,
+    )
+} else {
+    logger.lifecycle("app/google-services.json is absent: this build has no push (Lane 288).")
+}
+
 /** The site, and the app link the API's sign-in returns to (the web serves its assetlinks.json). */
 val siteUrl = "https://trycommish.app"
 val returnTo = "$siteUrl/app/signed-in"
@@ -158,6 +176,9 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.browser)
     implementation(libs.coroutines.android)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+    implementation(libs.fragment)
 
     testImplementation(libs.junit4)
     testImplementation(libs.serialization.json)

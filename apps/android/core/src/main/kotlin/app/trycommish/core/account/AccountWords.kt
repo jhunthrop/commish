@@ -6,6 +6,7 @@ import app.trycommish.core.Format
 import app.trycommish.core.instantOrNull
 import app.trycommish.core.leaguehome.ValueWords
 import app.trycommish.core.matchup.MatchupWords
+import app.trycommish.core.push.PushPermission
 import app.trycommish.core.shell.followedName
 import app.trycommish.core.shell.phaseWord
 import app.trycommish.design.Words
@@ -109,9 +110,14 @@ object AccountWords {
         return league.playoffStartWeek?.let { "${Words.Attached.inSeason}, playoffs from week $it" } ?: Words.Attached.inSeason
     }
 
-    /** Under the switches while the account does not carry them: where they are kept, and that nothing is
-     * sent yet. */
-    val pushFoot: String = "${Words.Push.savedHere}. ${Words.Push.notYet}"
+    /** Under the switches: where they are kept, then, while the phone may not show a push, what turning one
+     * on does (not asked yet) or where to allow it (refused). */
+    fun pushFoot(permission: PushPermission): String =
+        when (permission) {
+            PushPermission.Allowed -> Words.Push.kept
+            PushPermission.NotAsked -> "${Words.Push.kept} ${Words.Push.ask}"
+            PushPermission.Refused -> "${Words.Push.kept} ${Words.Push.blocked}"
+        }
 
     /** A time of day from minutes after midnight: "11:00 pm". */
     fun clockTime(minutes: Int): String = Format.timeOfDay(Instant.ofEpochSecond(minutes * SECONDS_IN_A_MINUTE), ZoneOffset.UTC)

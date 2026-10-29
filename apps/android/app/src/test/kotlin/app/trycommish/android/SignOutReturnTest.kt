@@ -17,9 +17,9 @@ import app.trycommish.core.SignOut
 import app.trycommish.core.account.AccountFixtures
 import app.trycommish.core.account.AccountHooks
 import app.trycommish.core.account.AccountViewModel
-import app.trycommish.core.account.MemoryPushStore
 import app.trycommish.core.account.StubAccountScreen
 import app.trycommish.core.leaguehome.Fixtures
+import app.trycommish.core.push.StaticPush
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -76,7 +76,7 @@ class SignOutReturnTest {
                                 cache,
                                 FixedClock(Fixtures.week),
                                 Fixtures.zone,
-                                MemoryPushStore(),
+                                StaticPush(),
                                 { session.deviceId },
                                 AccountHooks(
                                     signOut = { runBlocking { state.signOut() } },
