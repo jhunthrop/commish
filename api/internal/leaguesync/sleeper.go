@@ -175,7 +175,7 @@ func sleeperTeams(rosters []sleeper.Roster, users []sleeper.User, league sleeper
 			RosterID: r.RosterID, Owner: owner.DisplayName, Name: owner.TeamName, Players: r.Players,
 			Starters: starters(r.Starters), Reserve: r.Reserve, Taxi: r.Taxi, Wins: r.Wins, Losses: r.Losses, Ties: r.Ties,
 			PointsFor: round2(r.PointsFor), Streak: sleeperStreak(r.Streak), WaiverOrder: r.WaiverPosition,
-			Avatar: sleeperAvatar(owner.Avatar),
+			Avatar: sleeperAvatar(owner.Avatar), Division: r.Division,
 		}
 		against := round2(r.PointsAgainst)
 		t.PointsAgainst = &against

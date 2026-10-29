@@ -112,7 +112,8 @@ func (m *Member) ReadLeague(ctx context.Context, accountID uuid.UUID, season int
 }
 
 // Scoreboards is each week's scoreboard of a league, as the member, one
-// documented request a week inside the client's pace (Lane 298).
+// documented request a week inside the client's pace (Lane 298). A read
+// that fails partway answers the weeks read before it with the error.
 func (m *Member) Scoreboards(ctx context.Context, accountID uuid.UUID, season int, leagueID string, weeks []int) ([]Scoreboard, error) {
 	var out []Scoreboard
 	err := m.as(ctx, accountID, func(access string) error {

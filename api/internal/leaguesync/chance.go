@@ -1,21 +1,22 @@
 package leaguesync
 
 import (
-	"fmt"
 	"hash/fnv"
 	"math"
 	"math/rand/v2"
 	"sort"
-	"strings"
 	"sync"
 )
 
 // Playoff chance (Lane 298, ruling 3): the schedule left replayed
 // ChanceRuns times, each team's score in a week drawn around its season
-// rate (its points for over the weeks it has played) with the league's own
+// rate (its mean over the weeks the schedule scores) with the league's own
 // week-to-week spread of scores about those rates, then the playoff field
-// picked by the host's seeds. No projection of ours or the platform's is
-// used for a week to come, so no weekly number is called ours.
+// picked by the platform's seeds and, where read, its division winners. No
+// projection of ours or the platform's is used for a week to come, so no
+// weekly number is called ours. 100 and 0 are printed only when proven
+// (fix round 1: never where the league's divisions or tie rule leave the
+// proof open).
 const (
 	// ChanceRuns is how many times the schedule left is replayed.
 	ChanceRuns = 2000
@@ -39,7 +40,8 @@ type chanceGame struct {
 }
 
 // chanceLeague is what a replay reads: the standings now, each team's
-// rate, the spread, the weeks left and the seeds.
+// rate, the spread, the weeks left, the seeds, the divisions and the tie
+// rule.
 type chanceLeague struct {
 	ids    []int
 	wins   map[int]float64
@@ -48,11 +50,23 @@ type chanceLeague struct {
 	spread float64
 	weeks  [][]chanceGame
 	seeds  []string
+	// division is each team's division where the platform seats each
+	// division's winner (Terms.DivisionWinners), nil otherwise.
+	division map[int]int
+	// hold says no team may read 100 or 0: the league's divisions are not
+	// read, or it has several and whether their winners are seated is not.
+	hold bool
+	// tieRule is the platform's own tie rule as read, empty where unread.
+	tieRule string
+	// played is the season's final head-to-head games, for a tie the
+	// platform breaks head-to-head.
+	played []ScheduledGame
 }
 
 // PlayoffChances is the league's playoff chance for every team, false where
 // it has none: no playoff seats read, a regular season the schedule does
-// not cover, or fewer than chanceMinWeeks weeks played.
+// not cover, fewer than chanceMinWeeks weeks scored, or standings and
+// schedule that disagree on the games played (fix round 1, M3).
 func PlayoffChances(snap Snapshot) (Chances, bool) {
 	l, ok := chanceLeagueOf(snap)
 	if !ok {
@@ -101,22 +115,41 @@ func seedsOf(snap Snapshot) []string {
 	return seeds
 }
 
+// divisional reports a league of several divisions whose winners the
+// platform's rules seat, as read.
+func divisional(t Terms) bool { return t.Divisions > 1 && t.DivisionWinners }
+
+// holdsProof reports a league where no team may read 100 or 0: its
+// divisions unread, or several of them with no read of how they seat.
+func holdsProof(t Terms) bool {
+	return !t.DivisionsRead || (t.Divisions > 1 && !t.DivisionWinners)
+}
+
 // chanceLeagueOf reads the replay's inputs from the read.
 func chanceLeagueOf(snap Snapshot) (chanceLeague, bool) {
 	seeds, last := seedsOf(snap), RegularSeasonLast(snap)
-	if len(seeds) == 0 || last == 0 || len(snap.Teams) < 2 || !covers(snap.Schedule, last) {
+	first := max(snap.Terms.StartWeek, 1)
+	if len(seeds) == 0 || last < first || len(snap.Teams) < 2 || !covers(snap.Schedule, first, last) ||
+		Disagreement(snap, snap.Schedule) != 0 {
 		return chanceLeague{}, false
 	}
-	l := chanceLeague{wins: map[int]float64{}, points: map[int]float64{}, rate: map[int]float64{}, seeds: seeds}
-	played := playedWeeks(snap.Schedule, last)
+	l := chanceLeague{wins: map[int]float64{}, points: map[int]float64{}, seeds: seeds,
+		hold: holdsProof(snap.Terms), tieRule: snap.Terms.Tiebreak}
+	rate, scored := ratesOf(snap.Schedule, last)
 	for _, t := range snap.Teams {
-		if played[t.RosterID] < chanceMinWeeks {
+		if scored[t.RosterID] < chanceMinWeeks {
 			return chanceLeague{}, false
 		}
 		l.ids = append(l.ids, t.RosterID)
 		l.wins[t.RosterID] = float64(t.Wins) + float64(t.Ties)/2
 		l.points[t.RosterID] = t.PointsFor
-		l.rate[t.RosterID] = t.PointsFor / float64(played[t.RosterID])
+	}
+	l.rate = rate
+	if divisional(snap.Terms) {
+		l.division = map[int]int{}
+		for _, t := range snap.Teams {
+			l.division[t.RosterID] = t.Division
+		}
 	}
 	spread, ok := spreadOf(snap.Schedule, last, l.rate)
 	if !ok {
@@ -124,17 +157,22 @@ func chanceLeagueOf(snap Snapshot) (chanceLeague, bool) {
 	}
 	l.spread = spread
 	l.weeks = weeksLeft(snap.Schedule, last)
+	for _, g := range snap.Schedule {
+		if g.Final && g.Scored() && g.HeadToHead() && g.Week <= last {
+			l.played = append(l.played, g)
+		}
+	}
 	return l, true
 }
 
 // covers reports a schedule with games in every week of the regular
-// season.
-func covers(games []ScheduledGame, last int) bool {
+// season, from its first week to its last.
+func covers(games []ScheduledGame, first, last int) bool {
 	has := map[int]bool{}
 	for _, g := range games {
 		has[g.Week] = true
 	}
-	for week := 1; week <= last; week++ {
+	for week := first; week <= last; week++ {
 		if !has[week] {
 			return false
 		}
@@ -142,23 +180,82 @@ func covers(games []ScheduledGame, last int) bool {
 	return true
 }
 
-// playedWeeks is how many final regular-season weeks each team has a game
-// in.
-func playedWeeks(games []ScheduledGame, last int) map[int]int {
-	seen := map[[2]int]bool{}
-	out := map[int]int{}
-	for _, g := range games {
-		if !g.Final || g.Week > last {
+// ratesOf is each team's season rate, its mean score over the final
+// regular-season weeks the schedule scores (M3: the schedule's own scores,
+// never the standings' points for over a count of weeks it may not share),
+// and how many such weeks each team has.
+func ratesOf(games []ScheduledGame, last int) (map[int]float64, map[int]int) {
+	sum, n := map[int]float64{}, map[int]int{}
+	for _, week := range Weeks(games) {
+		if week > last {
 			continue
 		}
-		for _, id := range g.RosterIDs {
-			if !seen[[2]int{g.Week, id}] {
-				seen[[2]int{g.Week, id}] = true
-				out[id]++
+		for id, score := range WeekScores(games, week) {
+			sum[id] += score
+			n[id]++
+		}
+	}
+	rate := make(map[int]float64, len(sum))
+	for id, s := range sum {
+		rate[id] = s / float64(n[id])
+	}
+	return rate, n
+}
+
+// gamesCounted is whether a game counts in a team's record: a game against
+// another team, the median, the average or the field; a bye does not.
+func gamesCounted(g ScheduledGame) bool {
+	return g.Against != AgainstTeam || len(g.RosterIDs) == 2
+}
+
+// Disagreement is the first regular-season week at which the schedule and
+// the platform's standings stop agreeing on the games each team has played
+// (wins, losses and ties), 0 when they agree. The standings win: a final
+// week past a team's record is read again, and a played week the schedule
+// has not scored final, which the standings already count, is read again
+// (M3). Nothing is reckoned on a schedule that disagrees.
+func Disagreement(snap Snapshot, games []ScheduledGame) int {
+	last := RegularSeasonLast(snap)
+	if last == 0 {
+		last = snap.Week
+	}
+	record := map[int]int{}
+	for _, t := range snap.Teams {
+		record[t.RosterID] = t.Wins + t.Losses + t.Ties
+	}
+	count := map[int]int{}
+	pending := 0
+	for _, week := range Weeks(games) {
+		if week > last {
+			break
+		}
+		for _, g := range games {
+			if g.Week != week || !gamesCounted(g) {
+				continue
+			}
+			for _, id := range g.RosterIDs {
+				if !g.Final {
+					if pending == 0 && playedBefore(snap, week) {
+						pending = week
+					}
+					continue
+				}
+				count[id]++
+				if want, ok := record[id]; ok && count[id] > want {
+					return week
+				}
 			}
 		}
 	}
-	return out
+	for id, want := range record {
+		if count[id] < want {
+			if pending == 0 {
+				return last
+			}
+			return pending
+		}
+	}
+	return 0
 }
 
 // spreadOf is the league's week-to-week spread: the pooled deviation of
@@ -219,7 +316,7 @@ func (l chanceLeague) replay(rng *rand.Rand) map[int]int {
 		for _, week := range l.weeks {
 			l.playWeek(rng, week, wins, points)
 		}
-		for _, id := range field(l.ids, l.seeds, wins, points) {
+		for _, id := range l.field(wins, points) {
 			made[id]++
 		}
 	}
@@ -293,155 +390,6 @@ func markOf(against string, score map[int]float64) float64 {
 		return vals[n/2]
 	}
 	return (vals[n/2-1] + vals[n/2]) / 2
-}
-
-// field is the playoff teams by the seeds: each seed by record takes the
-// best record left, ties by points for; each by points the most points
-// left.
-func field(ids []int, seeds []string, wins, points map[int]float64) []int {
-	left := append([]int(nil), ids...)
-	out := make([]int, 0, len(seeds))
-	for _, seed := range seeds {
-		best := 0
-		for i := 1; i < len(left); i++ {
-			if ahead(left[i], left[best], seed, wins, points) {
-				best = i
-			}
-		}
-		out = append(out, left[best])
-		left = append(left[:best], left[best+1:]...)
-	}
-	return out
-}
-
-// ahead reports a ahead of b for the seed.
-func ahead(a, b int, seed string, wins, points map[int]float64) bool {
-	if seed == SeedPoints {
-		if points[a] != points[b] {
-			return points[a] > points[b]
-		}
-		return wins[a] > wins[b]
-	}
-	if wins[a] != wins[b] {
-		return wins[a] > wins[b]
-	}
-	return points[a] > points[b]
-}
-
-// proofs is the teams that have clinched a place and the teams that are
-// out, by record alone. A team clinches when fewer teams than the seeds
-// by record could reach its wins now; it is out, where every seed is by
-// record, when the seeds' count of teams already have more wins than it
-// could reach. With no game left the field is settled for every team.
-func (l chanceLeague) proofs() (map[int]bool, map[int]bool) {
-	left := map[int]float64{}
-	for _, week := range l.weeks {
-		for _, g := range week {
-			for _, id := range g.rosters {
-				left[id]++
-			}
-		}
-	}
-	clinched, out := map[int]bool{}, map[int]bool{}
-	if len(l.weeks) == 0 {
-		made := map[int]bool{}
-		for _, id := range field(l.ids, l.seeds, l.wins, l.points) {
-			made[id] = true
-		}
-		for _, id := range l.ids {
-			clinched[id], out[id] = made[id], !made[id]
-		}
-		return clinched, out
-	}
-	byRecord := 0
-	for _, s := range l.seeds {
-		if s == SeedRecord {
-			byRecord++
-		}
-	}
-	for _, id := range l.ids {
-		reach, above := 0, 0
-		for _, o := range l.ids {
-			if o == id {
-				continue
-			}
-			if l.wins[o]+left[o] >= l.wins[id] {
-				reach++
-			}
-			if l.wins[o] > l.wins[id]+left[id] {
-				above++
-			}
-		}
-		clinched[id] = byRecord > 0 && reach < byRecord
-		out[id] = byRecord == len(l.seeds) && above >= len(l.seeds)
-	}
-	return clinched, out
-}
-
-// tiebreakWords is a host tie rule the replays do not follow, in the
-// member's words.
-var tiebreakWords = map[string]string{
-	TiebreakHeadToHead:     "head-to-head",
-	TiebreakPointsAgainst:  "points against",
-	TiebreakDivisionRecord: "division record",
-}
-
-// chanceBasis is the figure's sentence: the replays, the model, the rules
-// read.
-func chanceBasis(snap Snapshot) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "Playoff chance from %s replays of the schedule left, each team at its season rate, scores varying week to week as this league's have. ",
-		thousands(ChanceRuns))
-	b.WriteString(capital(seedWords(seedsOf(snap))))
-	b.WriteString(", ties by points for")
-	if words, ok := tiebreakWords[snap.Terms.Tiebreak]; ok {
-		fmt.Fprintf(&b, " in place of the platform's %s rule", words)
-	}
-	b.WriteString(". Only a clinched place reads 100 and only a team that is out reads 0.")
-	if snap.Ref.Host != HostFFPC {
-		b.WriteString(" Divisions are not counted.")
-	}
-	return b.String()
-}
-
-// capital is s with its first letter a capital.
-func capital(s string) string {
-	if s == "" {
-		return s
-	}
-	return strings.ToUpper(s[:1]) + s[1:]
-}
-
-// seedWords says how the field is picked.
-func seedWords(seeds []string) string {
-	var record, points []string
-	for i, s := range seeds {
-		if s == SeedPoints {
-			points = append(points, fmt.Sprint(i+1))
-		} else {
-			record = append(record, fmt.Sprint(i+1))
-		}
-	}
-	if len(points) == 0 {
-		return fmt.Sprintf("the top %d by record make it", len(seeds))
-	}
-	return fmt.Sprintf("seeds %s by record and %s by points for make it", and(record), and(points))
-}
-
-// and lists items as "1, 3 and 5".
-func and(items []string) string {
-	if len(items) < 2 {
-		return strings.Join(items, "")
-	}
-	return strings.Join(items[:len(items)-1], ", ") + " and " + items[len(items)-1]
-}
-
-// thousands is n with a comma at the thousands.
-func thousands(n int) string {
-	if n < 1000 {
-		return fmt.Sprint(n)
-	}
-	return fmt.Sprintf("%d,%03d", n/1000, n%1000)
 }
 
 // chanceCache keeps each read's figures, so a read is replayed once

@@ -28,7 +28,7 @@ func (s *Sleeper) ReadWeeks(ctx context.Context, snap Snapshot, weeks []int) ([]
 	for _, week := range weeks {
 		matchups, err := s.API.Matchups(ctx, snap.Ref.LeagueID, week)
 		if err != nil {
-			return nil, sleeperErr("schedule matchups", err)
+			return out, sleeperErr("schedule matchups", err)
 		}
 		out = append(out, sleeperWeek(matchups, week, playedBefore(snap, week), snap.Terms.MedianGame)...)
 	}
@@ -76,16 +76,17 @@ func scheduled(week int, final bool, against string, sides ...sleeper.Matchup) S
 }
 
 // ReadWeeks is each week's scoreboard (league/{key}/scoreboard;week=N),
-// one request a week, as the account the league is read for. A game Yahoo
+// one request a week, as the account the league is read for; a read that
+// fails partway answers the weeks read before it with the error (M4). A game Yahoo
 // has scored final (postevent) is final.
 func (y *Yahoo) ReadWeeks(ctx context.Context, snap Snapshot, weeks []int) ([]ScheduledGame, error) {
 	boards, err := y.Member.Scoreboards(ctx, snap.Ref.As, snap.Ref.Season, snap.Ref.LeagueID, weeks)
-	if err != nil {
-		return nil, yahooErr(err)
-	}
 	var out []ScheduledGame
 	for _, b := range boards {
 		out = append(out, yahooWeek(b)...)
+	}
+	if err != nil {
+		return out, yahooErr(err)
 	}
 	return out, nil
 }

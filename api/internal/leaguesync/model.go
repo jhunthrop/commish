@@ -154,6 +154,9 @@ type Team struct {
 	// Avatar is the host's image for the team or its owner, empty where
 	// the host gives none we show.
 	Avatar string `json:"avatar,omitempty"`
+	// Division is the team's division as the platform numbers it, 0 for
+	// none or unread (Lane 298 fix round 1).
+	Division int `json:"division,omitempty"`
 }
 
 // Side is one team's side of the week's matchup.

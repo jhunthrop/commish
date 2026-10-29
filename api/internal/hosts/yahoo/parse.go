@@ -50,6 +50,9 @@ type League struct {
 	// PlayoffStartWeek is the league's first playoff week (settings
 	// playoff_start_week), 0 for a league with no playoffs.
 	PlayoffStartWeek int
+	// StartWeek is the league's first week (start_week), 0 when unstated
+	// (Lane 298 fix round 1).
+	StartWeek int
 	// PlayoffTeams is settings num_playoff_teams, 0 for a league with no
 	// playoffs or one that does not say (Lane 298).
 	PlayoffTeams int
@@ -76,6 +79,8 @@ type Team struct {
 	Ties      int
 	PointsFor float64
 	Players   []Player
+	// Division is the team's division_id, 0 for none (Lane 298 fix round 1).
+	Division int
 }
 
 // Player is one player as Yahoo lists him, and the slot he fills this
@@ -180,6 +185,7 @@ type xmlPlayer struct {
 type xmlTeam struct {
 	TeamKey  string `xml:"team_key"`
 	TeamID   string `xml:"team_id"`
+	Division int    `xml:"division_id"`
 	Name     string `xml:"name"`
 	Owned    string `xml:"is_owned_by_current_login"`
 	Managers []struct {
@@ -208,6 +214,7 @@ type xmlLeague struct {
 	ScoringType string    `xml:"scoring_type"`
 	DraftStatus string    `xml:"draft_status"`
 	CurrentWeek int       `xml:"current_week"`
+	StartWeek   int       `xml:"start_week"`
 	IsFinished  string    `xml:"is_finished"`
 	Season      int       `xml:"season"`
 	Teams       []xmlTeam `xml:"teams>team"`
@@ -378,6 +385,7 @@ func ParseLeague(headBody, rostersBody []byte) (League, error) {
 	}
 	l := League{
 		LeagueID: h.LeagueID, Name: clean(h.Name), Season: h.Season, CurrentWeek: bounded(h.CurrentWeek, 0, maxWeek),
+		StartWeek:   bounded(h.StartWeek, 0, maxWeek),
 		ScoringType: h.ScoringType, DraftStatus: h.DraftStatus, Finished: h.IsFinished == "1",
 		Settings: settings(h), Scoreboard: scoreboard(h), Moves: moves(h), DraftAt: draftTime(h.Settings.DraftTime),
 	}
@@ -474,7 +482,7 @@ func leagueTeams(standings, rosters []xmlTeam) ([]Team, error) {
 		if !ok {
 			return nil, fmt.Errorf("%w: a team with no id", ErrMalformed)
 		}
-		team := Team{ID: id, Name: clean(t.Name), Mine: t.Owned == "1"}
+		team := Team{ID: id, Name: clean(t.Name), Mine: t.Owned == "1", Division: bounded(t.Division, 0, MaxTeams)}
 		for _, m := range t.Managers {
 			if team.Owner == "" {
 				team.Owner = clean(m.Nickname)

@@ -41,7 +41,7 @@ func syntheticLeague() Snapshot {
 	}
 	return Snapshot{
 		Ref: Ref{Host: HostSleeper, LeagueID: "1"}, Week: 4, Status: StatusInSeason, Teams: teams, Schedule: schedule,
-		Terms: Terms{PlayoffTeams: 2, PlayoffFirst: 5},
+		Terms: Terms{PlayoffTeams: 2, PlayoffFirst: 5, DivisionsRead: true},
 	}
 }
 
@@ -63,8 +63,9 @@ func TestPlayoffChanceOnASyntheticLeagueWithAKnownAnswer(t *testing.T) {
 		t.Fatal("the replays are seeded: the same read gives the same figure")
 	}
 	want := "Playoff chance from 2,000 replays of the schedule left, each team at its season rate, " +
-		"scores varying week to week as this league's have. The top 2 by record make it, ties by points for. " +
-		"Only a clinched place reads 100 and only a team that is out reads 0. Divisions are not counted."
+		"scores varying week to week as this league's have. The top 2 by record make it. " +
+		"Ties go by points for in the replays, as the platform's tie rule is not read, so a team tied at the cut when the season is over waits on the platform. " +
+		"Only a clinched place reads 100 and only a team that is out reads 0."
 	if c.Basis != want {
 		t.Fatalf("basis %q", c.Basis)
 	}
@@ -88,24 +89,70 @@ func TestAnUnprovenCertaintyIsHeldTo99(t *testing.T) {
 	}
 }
 
-// With no game left the field is settled: every team reads 100 or 0; an
-// FFPC league seeds by its rules, seed 1 the best record, seed 2 the most
-// points of the rest.
-func TestTheFieldSettledAndFFPCsSeeds(t *testing.T) {
+// settledLeague is the synthetic league with week 4 played: A 4-0, D 0-4,
+// and B and C level at 2-2 for the last seat. C beat B in week 4 and has
+// more points for; B beat C in week 1, so their head-to-head is even.
+func settledLeague() Snapshot {
 	snap := syntheticLeague()
 	snap.Schedule[6], snap.Schedule[7] = h2h(4, 1, 4, 100, 99), h2h(4, 2, 3, 90, 140)
 	snap.Teams[0].Wins, snap.Teams[0].PointsFor = 4, 460
 	snap.Teams[3].Losses, snap.Teams[3].PointsFor = 4, 354
 	snap.Teams[1].Losses, snap.Teams[1].PointsFor = 2, 390
 	snap.Teams[2].Wins, snap.Teams[2].Losses, snap.Teams[2].PointsFor = 2, 2, 440
+	return snap
+}
+
+// With no game left the field is settled, but a tie at the cut is broken
+// only by the platform's rule as read (fix round 1, H2): under points for C
+// takes the seat and every team is proven; under a rule not read, and under
+// a head-to-head rule the season's games leave even, B and C hold 1 to 99
+// while A and D stay proven; a head-to-head rule the games settle proves.
+func TestTheSettledFieldBreaksATieOnlyByARuleRead(t *testing.T) {
+	snap := settledLeague()
+	snap.Terms.Tiebreak = TiebreakPointsFor
 	c, _ := PlayoffChances(snap)
 	if c.ByRoster[1] != 100 || c.ByRoster[3] != 100 || c.ByRoster[2] != 0 || c.ByRoster[4] != 0 {
-		t.Fatalf("settled by record, ties by points: %v", c.ByRoster)
+		t.Fatalf("points for, read: %v", c.ByRoster)
 	}
-	snap.Ref.Host = HostFFPC
-	snap.Terms = Terms{PlayoffFirst: 5, Seeds: []string{SeedRecord, SeedPoints}}
-	snap.Teams[3].PointsFor = 445
+	for _, rule := range []string{"", TiebreakHeadToHead, TiebreakPointsAgainst, TiebreakDivisionRecord} {
+		snap.Terms.Tiebreak = rule
+		c, _ = PlayoffChances(snap)
+		if c.ByRoster[1] != 100 || c.ByRoster[4] != 0 || c.ByRoster[2] != 1 || c.ByRoster[3] != 99 {
+			t.Fatalf("rule %q leaves the tie open: %v", rule, c.ByRoster)
+		}
+	}
+	// Head-to-head settles it when B beat C twice: B is seated, though C
+	// has more points for.
+	snap.Schedule[7] = h2h(4, 2, 3, 141, 140)
+	snap.Teams[1].Wins, snap.Teams[1].Losses, snap.Teams[1].PointsFor = 3, 1, 470
+	snap.Teams[2].Wins, snap.Teams[2].Losses, snap.Teams[2].PointsFor = 1, 3, 440
+	snap.Teams[0].Wins, snap.Teams[0].Losses = 3, 1
+	snap.Teams[3].Wins, snap.Teams[3].Losses = 1, 3
+	snap.Schedule[6] = h2h(4, 1, 4, 99, 100)
+	snap.Teams[0].PointsFor, snap.Teams[3].PointsFor = 459, 355
+	snap.Terms.Tiebreak = TiebreakHeadToHead
+	// A 3-1 and B 3-1 lead, C and D 1-3: a tie inside the field proves.
 	c, _ = PlayoffChances(snap)
+	if c.ByRoster[1] != 100 || c.ByRoster[2] != 100 || c.ByRoster[3] != 0 || c.ByRoster[4] != 0 {
+		t.Fatalf("a head-to-head rule over a tie inside the field: %v", c.ByRoster)
+	}
+	snap.Terms.PlayoffTeams = 1
+	c, _ = PlayoffChances(snap)
+	// One seat: A and B level at 3-1, B with more points for, but A beat B
+	// in week 3, so head-to-head seats A.
+	if c.ByRoster[1] != 100 || c.ByRoster[2] != 0 {
+		t.Fatalf("head-to-head over points for: %v", c.ByRoster)
+	}
+}
+
+// An FFPC league seeds by its rules, seed 1 the best record, seed 2 the
+// most points of the rest; its pages state no divisions.
+func TestFFPCsSeeds(t *testing.T) {
+	snap := settledLeague()
+	snap.Ref.Host = HostFFPC
+	snap.Terms = Terms{PlayoffFirst: 5, Seeds: []string{SeedRecord, SeedPoints}, DivisionsRead: true}
+	snap.Teams[3].PointsFor = 445
+	c, _ := PlayoffChances(snap)
 	if c.ByRoster[1] != 100 || c.ByRoster[4] != 100 || c.ByRoster[3] != 0 {
 		t.Fatalf("FFPC's seeds: %v", c.ByRoster)
 	}
@@ -206,7 +253,7 @@ func TestTheWebFixtureCopiesTheChanceSentence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	snap := Snapshot{Ref: Ref{Host: HostSleeper}, Terms: Terms{PlayoffTeams: 6}, Teams: make([]Team, 12)}
+	snap := Snapshot{Ref: Ref{Host: HostSleeper}, Terms: Terms{PlayoffTeams: 6, DivisionsRead: true}, Teams: make([]Team, 12)}
 	if !strings.Contains(string(raw), `"`+chanceBasis(snap)+`"`) {
 		t.Fatalf("the fixture's CHANCE_BASIS is not %q", chanceBasis(snap))
 	}

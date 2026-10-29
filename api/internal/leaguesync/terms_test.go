@@ -58,7 +58,8 @@ func TestRecordedSleeperStandingsAndTerms(t *testing.T) {
 	if bids == 0 {
 		t.Error("no claim kept its bid")
 	}
-	want := Terms{Waivers: WaiversBudget, Budget: 1000, PlayoffTeams: 6, PlayoffFirst: 15, PlayoffLast: 17, FinalWeeks: 1}
+	want := Terms{Waivers: WaiversBudget, Budget: 1000, PlayoffTeams: 6, PlayoffFirst: 15, PlayoffLast: 17, FinalWeeks: 1,
+		DivisionsRead: true, StartWeek: 1}
 	if !reflect.DeepEqual(snap.Terms, want) {
 		t.Errorf("terms %+v, want %+v", snap.Terms, want)
 	}

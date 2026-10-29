@@ -154,6 +154,11 @@ type FullLeague struct {
 	// TOTAL_POINTS_SCORED and the like; espn-api's playoff_seed_tie_rule),
 	// empty when the read carries none.
 	SeedingTiebreak string
+	// Divisions is the number of divisions scheduleSettings.divisions
+	// lists, and DivisionsRead whether the read carries the list at all
+	// (Lane 298 fix round 1). Each team's division is Team.Division.
+	Divisions     int
+	DivisionsRead bool
 	// Schedule is every regular-season matchup of the season, past and to
 	// come, from the same read's schedule (Lane 298): the matchup periods up
 	// to scheduleSettings.matchupPeriodCount, each placed at its first
@@ -224,6 +229,8 @@ type Team struct {
 	Streak string
 	// WaiverRank is the team's place in the waiver order, 0 when unset.
 	WaiverRank int
+	// Division is the team's divisionId (Lane 298 fix round 1).
+	Division int
 }
 
 // Player is one rostered player and the slot he fills.
@@ -390,6 +397,9 @@ type wireFull struct {
 			MatchupPeriods      map[string][]int `json:"matchupPeriods"`
 			PlayoffTeamCount    int              `json:"playoffTeamCount"`
 			PlayoffSeedingRule  string           `json:"playoffSeedingRule"`
+			Divisions           *[]struct {
+				ID int `json:"id"`
+			} `json:"divisions"`
 		} `json:"scheduleSettings"`
 		RosterSettings struct {
 			LineupSlotCounts map[string]int `json:"lineupSlotCounts"`
@@ -410,6 +420,7 @@ type wireFull struct {
 		Nickname   string   `json:"nickname"`
 		Owners     []string `json:"owners"`
 		WaiverRank int      `json:"waiverRank"`
+		DivisionID int      `json:"divisionId"`
 		Counter    *struct {
 			BudgetSpent *int `json:"acquisitionBudgetSpent"`
 		} `json:"transactionCounter"`
@@ -590,6 +601,7 @@ func checkFull(w wireFull) (FullLeague, error) {
 		if t.WaiverRank > 0 && t.WaiverRank <= maxTeams {
 			tm.WaiverRank = t.WaiverRank
 		}
+		tm.Division = t.DivisionID
 		l.Teams = append(l.Teams, tm)
 	}
 	kicked := kickedOff(l.Teams)
@@ -598,6 +610,9 @@ func checkFull(w wireFull) (FullLeague, error) {
 		byID[t.ID] = t
 	}
 	l.Schedule = regularSeason(w)
+	if d := w.Settings.ScheduleSettings.Divisions; d != nil && len(*d) <= maxTeams {
+		l.Divisions, l.DivisionsRead = len(*d), true
+	}
 	for _, g := range w.Schedule {
 		if g.MatchupPeriodID != l.MatchupPeriod || g.Away == nil {
 			continue

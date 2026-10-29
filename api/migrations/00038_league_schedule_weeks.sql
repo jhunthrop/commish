@@ -16,6 +16,9 @@ create table app.league_schedule_weeks (
   week           smallint not null check (week between 1 and 25),
   games          jsonb not null check (jsonb_typeof(games) = 'array'),
   final          boolean not null,
+  -- A final week read once more a day after it first turned final (stat
+  -- corrections land), then never again.
+  confirmed      boolean not null default false,
   read_at        timestamptz not null,
   primary key (host, host_league_id, host_season, read_as, week)
 );

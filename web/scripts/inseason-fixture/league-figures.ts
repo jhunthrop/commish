@@ -4,13 +4,14 @@
 // fixed figure by its place in the standings (the leader clinched at 100, the last out at 0, the rest
 // between, so the column draws every shape a cell takes), and the member's weeks against the median
 // are five made-up weeks. The sentences are the API's words, copied (api/internal/leaguesync
-// chance.go chanceBasis for a Sleeper league of six seats by record, median.go VsMedianBasis); a Go
+// chancewords.go chanceBasis for a Sleeper league of six seats by record, median.go VsMedianBasis); a Go
 // test holds these copies to the API word for word.
 import type { LeagueSync } from '../../src/lib/league/api.ts';
 
-/** chance.go chanceBasis, a Sleeper league with six seats by record, word for word. */
+/** chancewords.go chanceBasis, a Sleeper league of one division with six seats by record, word for
+ * word. */
 export const CHANCE_BASIS =
-	"Playoff chance from 2,000 replays of the schedule left, each team at its season rate, scores varying week to week as this league's have. The top 6 by record make it, ties by points for. Only a clinched place reads 100 and only a team that is out reads 0. Divisions are not counted.";
+	"Playoff chance from 2,000 replays of the schedule left, each team at its season rate, scores varying week to week as this league's have. The top 6 by record make it. Ties go by points for in the replays, as the platform's tie rule is not read, so a team tied at the cut when the season is over waits on the platform. Only a clinched place reads 100 and only a team that is out reads 0.";
 
 /** median.go VsMedianBasis, word for word. */
 export const VS_MEDIAN_BASIS =

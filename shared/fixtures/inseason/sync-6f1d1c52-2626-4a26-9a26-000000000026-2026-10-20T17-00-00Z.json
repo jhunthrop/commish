@@ -1800,7 +1800,7 @@
 			]
 		},
 		"moves_read": true,
-		"playoff_chance_basis": "Playoff chance from 2,000 replays of the schedule left, each team at its season rate, scores varying week to week as this league's have. The top 6 by record make it, ties by points for. Only a clinched place reads 100 and only a team that is out reads 0. Divisions are not counted.",
+		"playoff_chance_basis": "Playoff chance from 2,000 replays of the schedule left, each team at its season rate, scores varying week to week as this league's have. The top 6 by record make it. Ties go by points for in the replays, as the platform's tie rule is not read, so a team tied at the cut when the season is over waits on the platform. Only a clinched place reads 100 and only a team that is out reads 0.",
 		"points_vs_median": {
 			"weeks": [
 				{
