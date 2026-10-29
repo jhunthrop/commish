@@ -265,7 +265,7 @@ const boards = new Map<string, unknown>(
 /** The position panel's stand-in inputs (positions.ts): the board's points by id, the week's Proj. */
 const panelInputs = await (async (): Promise<Omit<PanelInputs, 'weeks'>> => {
 	const recorded = boards.get('ppr') as {
-		players: { id: string; position: string; points: number | null }[];
+		players: { id: string; position: string; points: number | null; vor: number | null }[];
 	};
 	const projection = await load<Projection>('projection');
 	return {

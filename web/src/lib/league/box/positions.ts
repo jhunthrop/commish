@@ -147,9 +147,9 @@ function entriesOf(
 			beats: null
 		})
 	);
-	const free = byFigure(card.available, (f) =>
-		sortFigure(f.row.add, f.rest_of_season_points, mode)
-	);
+	// This week lists the week's own best five by Proj (review M1); an older answer re-sorts its five.
+	const listed = mode === 'week' ? (card.available_week ?? card.available) : card.available;
+	const free = byFigure(listed, (f) => sortFigure(f.row.add, f.rest_of_season_points, mode));
 	const pools = poolRows(
 		{ rows: free.map((f) => f.row), pickups: advice.pickups, roster: advice.roster },
 		zone,

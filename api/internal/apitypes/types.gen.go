@@ -6314,10 +6314,13 @@ type WaiverPositionCard struct {
 	// Available the best free agents at the position the table lists, at most five, by rest-of-season points, highest first: each one's row is the table's, the pickup rule's verdict (Beats, Gain) and the Add verb's input
 	Available []WaiverPositionFree `json:"available"`
 
+	// AvailableWeek the This week list (review M1): the best free agents at the position the table lists with a Proj this week, at most five, by this week's Proj, highest first, each one's row the table's as in available; set with week alone, absent otherwise and from an older answer
+	AvailableWeek *[]WaiverPositionFree `json:"available_week,omitempty"`
+
 	// Mine the member's active players at the position, by rest-of-season points, highest first (none last)
 	Mine []WaiverPositionPlayer `json:"mine"`
 
-	// Need the trade finder's team profile (Lane 287) names a need of the member's here: a starting spot that takes the position falls below the league's median team there by the close call a week or more, a shared spot marking each of its positions where the member ranks below the middle; never at K or DEF
+	// Need the member's rest-of-season figure at the position (rest_of_season, the rank's own measure) falls below the median team's by the close call a week or more over the weeks the figures cover, so a card at or above the median never marks one; never at K or DEF, never without rest_of_season
 	Need     bool                       `json:"need"`
 	Position WaiverPositionCardPosition `json:"position"`
 
@@ -6327,7 +6330,7 @@ type WaiverPositionCard struct {
 	// Teams the league's teams, the rank's out of
 	Teams int `json:"teams"`
 
-	// Week this week's Proj of the starters at the position in the lineup the advice sets for each team (the Lineup screen's rule, each team's own starters kept where their games have kicked off); null before the week's projection is read
+	// Week this week's Proj of the starters at the position in the lineup the advice sets for each team (the Lineup screen's rule, each team's own starters kept where their games have kicked off); null before the week's projection is read and where no player at the position carries a Proj (a figure every team would share at 0.0)
 	Week *WaiverStanding `json:"week"`
 }
 

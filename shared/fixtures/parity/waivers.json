@@ -52,26 +52,27 @@
 				}
 			],
 			"panel": {
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
 				"season": {
 					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
 					"cards": [
 						{
 							"key": "QB",
 							"rank": "QB rank 8 of 12",
-							"figure": "252.2",
+							"figure": "248.2",
 							"median": "264.0 median",
 							"need": "Need",
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "252.2"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "248.2"
 								},
 								{
@@ -136,10 +137,10 @@
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 9 of 12",
-							"figure": "367.3",
-							"median": "429.8 median",
-							"need": "Need",
+							"rank": "RB rank 6 of 12",
+							"figure": "507.1",
+							"median": "501.1 median",
+							"need": null,
 							"mine": [
 								{
 									"name": "Love",
@@ -156,7 +157,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "139.8"
 								},
 								{
@@ -177,8 +178,8 @@
 						{
 							"key": "WR",
 							"rank": "WR rank 2 of 12",
-							"figure": "1084.8",
-							"median": "920.3 median",
+							"figure": "923.4",
+							"median": "734.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -208,7 +209,7 @@
 								{
 									"name": "Meyers",
 									"team": "JAX",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "161.4"
 								},
 								{
@@ -279,10 +280,10 @@
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 8 of 12",
+							"rank": "TE rank 9 of 12",
 							"figure": "141.0",
-							"median": "142.6 median",
-							"need": null,
+							"median": "155.6 median",
+							"need": "Need",
 							"mine": [
 								{
 									"name": "LaPorta",
@@ -370,18 +371,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "Texans, Starter, +0.3 Gain",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				},
@@ -390,21 +380,21 @@
 					"cards": [
 						{
 							"key": "QB",
-							"rank": "QB rank 8 of 12",
-							"figure": "20.6",
+							"rank": "QB rank 11 of 12",
+							"figure": "17.9",
 							"median": "21.4 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "20.6"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "17.9"
 								},
 								{
@@ -444,34 +434,14 @@
 									"beats": "0.0",
 									"verb": "Add",
 									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4360423",
-									"name": "Penix",
-									"team": "ATL",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:2576980",
-									"name": "Mariota",
-									"team": "WSH",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
 								}
 							]
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 10 of 12",
-							"figure": "26.5",
-							"median": "38.8 median",
+							"rank": "RB rank 6 of 12",
+							"figure": "40.4",
+							"median": "40.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -489,7 +459,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "9.5"
 								},
 								{
@@ -509,8 +479,8 @@
 						},
 						{
 							"key": "WR",
-							"rank": "WR rank 8 of 12",
-							"figure": "66.1",
+							"rank": "WR rank 12 of 12",
+							"figure": "33.9",
 							"median": "68.0 median",
 							"need": null,
 							"mine": [
@@ -541,13 +511,13 @@
 								{
 									"name": "Chase",
 									"team": "CIN",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								},
 								{
 									"name": "Addison",
 									"team": "MIN",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								},
 								{
@@ -569,6 +539,16 @@
 									"move": "Open FFPC waivers"
 								},
 								{
+									"key": "free:board:4427095",
+									"name": "Douglas",
+									"team": "NE",
+									"mark": "Free",
+									"figure": "5.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
 									"key": "free:board:4686422",
 									"name": "Hutchinson",
 									"team": "HOU",
@@ -577,56 +557,26 @@
 									"beats": "McConkey, Starter, +1.8 Gain",
 									"verb": "Add",
 									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4382466",
-									"name": "Nailor",
-									"team": "LV",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:3916945",
-									"name": "Slayton",
-									"team": "NYG",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4241372",
-									"name": "Brown",
-									"team": "PHI",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
 								}
 							]
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 5 of 12",
-							"figure": "12.2",
-							"median": "11.7 median",
+							"rank": "TE rank 12 of 12",
+							"figure": "7.8",
+							"median": "11.4 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Okonkwo",
 									"team": "WAS",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "7.8"
 								},
 								{
 									"name": "LaPorta",
 									"team": "DET",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								}
 							],
@@ -685,9 +635,9 @@
 						},
 						{
 							"key": "DEF",
-							"rank": "D/ST rank 1 of 12",
-							"figure": "0.0",
-							"median": "0.0 median",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
 							"need": null,
 							"mine": [
 								{
@@ -703,18 +653,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "9.6",
-									"beats": "Texans, Starter, +0.3 Gain",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				}
@@ -3820,26 +3759,27 @@
 				}
 			],
 			"panel": {
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
 				"season": {
 					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
 					"cards": [
 						{
 							"key": "QB",
 							"rank": "QB rank 8 of 12",
-							"figure": "252.2",
+							"figure": "248.2",
 							"median": "264.0 median",
 							"need": "Need",
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "252.2"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "248.2"
 								},
 								{
@@ -3904,10 +3844,10 @@
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 9 of 12",
-							"figure": "367.3",
-							"median": "429.8 median",
-							"need": "Need",
+							"rank": "RB rank 6 of 12",
+							"figure": "507.1",
+							"median": "501.1 median",
+							"need": null,
 							"mine": [
 								{
 									"name": "Love",
@@ -3924,7 +3864,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "139.8"
 								},
 								{
@@ -3945,8 +3885,8 @@
 						{
 							"key": "WR",
 							"rank": "WR rank 2 of 12",
-							"figure": "1084.8",
-							"median": "920.3 median",
+							"figure": "923.4",
+							"median": "734.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -3976,7 +3916,7 @@
 								{
 									"name": "Meyers",
 									"team": "JAX",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "161.4"
 								},
 								{
@@ -4047,10 +3987,10 @@
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 8 of 12",
+							"rank": "TE rank 9 of 12",
 							"figure": "141.0",
-							"median": "142.6 median",
-							"need": null,
+							"median": "155.6 median",
+							"need": "Need",
 							"mine": [
 								{
 									"name": "LaPorta",
@@ -4138,18 +4078,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "Texans, Starter, +0.3 Gain",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				},
@@ -4158,21 +4087,21 @@
 					"cards": [
 						{
 							"key": "QB",
-							"rank": "QB rank 8 of 12",
-							"figure": "20.6",
+							"rank": "QB rank 11 of 12",
+							"figure": "17.9",
 							"median": "21.4 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "20.6"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "17.9"
 								},
 								{
@@ -4212,34 +4141,14 @@
 									"beats": "0.0",
 									"verb": "Add",
 									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4360423",
-									"name": "Penix",
-									"team": "ATL",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:2576980",
-									"name": "Mariota",
-									"team": "WSH",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
 								}
 							]
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 10 of 12",
-							"figure": "26.5",
-							"median": "38.8 median",
+							"rank": "RB rank 6 of 12",
+							"figure": "40.4",
+							"median": "40.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -4257,7 +4166,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "9.5"
 								},
 								{
@@ -4277,8 +4186,8 @@
 						},
 						{
 							"key": "WR",
-							"rank": "WR rank 8 of 12",
-							"figure": "66.1",
+							"rank": "WR rank 12 of 12",
+							"figure": "33.9",
 							"median": "68.0 median",
 							"need": null,
 							"mine": [
@@ -4309,13 +4218,13 @@
 								{
 									"name": "Chase",
 									"team": "CIN",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								},
 								{
 									"name": "Addison",
 									"team": "MIN",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								},
 								{
@@ -4337,6 +4246,16 @@
 									"move": "Open FFPC waivers"
 								},
 								{
+									"key": "free:board:4427095",
+									"name": "Douglas",
+									"team": "NE",
+									"mark": "Free",
+									"figure": "5.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
 									"key": "free:board:4686422",
 									"name": "Hutchinson",
 									"team": "HOU",
@@ -4345,56 +4264,26 @@
 									"beats": "McConkey, Starter, +1.8 Gain",
 									"verb": "Add",
 									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4382466",
-									"name": "Nailor",
-									"team": "LV",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:3916945",
-									"name": "Slayton",
-									"team": "NYG",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4241372",
-									"name": "Brown",
-									"team": "PHI",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
 								}
 							]
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 5 of 12",
-							"figure": "12.2",
-							"median": "11.7 median",
+							"rank": "TE rank 12 of 12",
+							"figure": "7.8",
+							"median": "11.4 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Okonkwo",
 									"team": "WAS",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "7.8"
 								},
 								{
 									"name": "LaPorta",
 									"team": "DET",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								}
 							],
@@ -4453,9 +4342,9 @@
 						},
 						{
 							"key": "DEF",
-							"rank": "D/ST rank 1 of 12",
-							"figure": "0.0",
-							"median": "0.0 median",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
 							"need": null,
 							"mine": [
 								{
@@ -4471,18 +4360,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "9.6",
-									"beats": "Texans, Starter, +0.3 Gain",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				}
@@ -7575,26 +7453,27 @@
 				}
 			],
 			"panel": {
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
 				"season": {
 					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
 					"cards": [
 						{
 							"key": "QB",
 							"rank": "QB rank 8 of 12",
-							"figure": "252.2",
+							"figure": "248.2",
 							"median": "264.0 median",
 							"need": "Need",
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "252.2"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "248.2"
 								},
 								{
@@ -7659,10 +7538,10 @@
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 9 of 12",
-							"figure": "367.3",
-							"median": "429.8 median",
-							"need": "Need",
+							"rank": "RB rank 6 of 12",
+							"figure": "507.1",
+							"median": "501.1 median",
+							"need": null,
 							"mine": [
 								{
 									"name": "Love",
@@ -7679,7 +7558,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "139.8"
 								},
 								{
@@ -7700,8 +7579,8 @@
 						{
 							"key": "WR",
 							"rank": "WR rank 2 of 12",
-							"figure": "1084.8",
-							"median": "920.3 median",
+							"figure": "923.4",
+							"median": "734.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -7731,7 +7610,7 @@
 								{
 									"name": "Meyers",
 									"team": "JAX",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "161.4"
 								},
 								{
@@ -7802,10 +7681,10 @@
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 8 of 12",
+							"rank": "TE rank 9 of 12",
 							"figure": "141.0",
-							"median": "142.6 median",
-							"need": null,
+							"median": "155.6 median",
+							"need": "Need",
 							"mine": [
 								{
 									"name": "LaPorta",
@@ -7893,18 +7772,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "--",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				},
@@ -7913,21 +7781,21 @@
 					"cards": [
 						{
 							"key": "QB",
-							"rank": "QB rank 8 of 12",
-							"figure": "20.6",
+							"rank": "QB rank 11 of 12",
+							"figure": "17.9",
 							"median": "21.4 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "20.6"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "17.9"
 								},
 								{
@@ -7967,34 +7835,14 @@
 									"beats": "0.0",
 									"verb": "Add",
 									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4360423",
-									"name": "Penix",
-									"team": "ATL",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:2576980",
-									"name": "Mariota",
-									"team": "WSH",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
 								}
 							]
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 10 of 12",
-							"figure": "26.5",
-							"median": "38.8 median",
+							"rank": "RB rank 6 of 12",
+							"figure": "40.4",
+							"median": "40.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -8012,7 +7860,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "9.5"
 								},
 								{
@@ -8032,8 +7880,8 @@
 						},
 						{
 							"key": "WR",
-							"rank": "WR rank 8 of 12",
-							"figure": "66.1",
+							"rank": "WR rank 12 of 12",
+							"figure": "33.9",
 							"median": "68.0 median",
 							"need": null,
 							"mine": [
@@ -8064,13 +7912,13 @@
 								{
 									"name": "Chase",
 									"team": "CIN",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								},
 								{
 									"name": "Addison",
 									"team": "MIN",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								},
 								{
@@ -8092,6 +7940,16 @@
 									"move": "Open FFPC waivers"
 								},
 								{
+									"key": "free:board:4427095",
+									"name": "Douglas",
+									"team": "NE",
+									"mark": "Free",
+									"figure": "5.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
 									"key": "free:board:4686422",
 									"name": "Hutchinson",
 									"team": "HOU",
@@ -8100,56 +7958,26 @@
 									"beats": "Dart, Bench, +1.8 Gain",
 									"verb": "Add",
 									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4382466",
-									"name": "Nailor",
-									"team": "LV",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:3916945",
-									"name": "Slayton",
-									"team": "NYG",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4241372",
-									"name": "Brown",
-									"team": "PHI",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
 								}
 							]
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 5 of 12",
-							"figure": "12.2",
-							"median": "11.7 median",
+							"rank": "TE rank 12 of 12",
+							"figure": "7.8",
+							"median": "11.4 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Okonkwo",
 									"team": "WAS",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "7.8"
 								},
 								{
 									"name": "LaPorta",
 									"team": "DET",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								}
 							],
@@ -8208,9 +8036,9 @@
 						},
 						{
 							"key": "DEF",
-							"rank": "D/ST rank 1 of 12",
-							"figure": "0.0",
-							"median": "0.0 median",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
 							"need": null,
 							"mine": [
 								{
@@ -8226,18 +8054,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "9.6",
-									"beats": "--",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				}
@@ -11207,26 +11024,27 @@
 				}
 			],
 			"panel": {
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
 				"season": {
 					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
 					"cards": [
 						{
 							"key": "QB",
 							"rank": "QB rank 8 of 12",
-							"figure": "252.2",
+							"figure": "248.2",
 							"median": "264.0 median",
 							"need": "Need",
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "252.2"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "248.2"
 								},
 								{
@@ -11291,10 +11109,10 @@
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 9 of 12",
-							"figure": "367.3",
-							"median": "429.8 median",
-							"need": "Need",
+							"rank": "RB rank 6 of 12",
+							"figure": "507.1",
+							"median": "501.1 median",
+							"need": null,
 							"mine": [
 								{
 									"name": "Love",
@@ -11311,7 +11129,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "139.8"
 								},
 								{
@@ -11332,8 +11150,8 @@
 						{
 							"key": "WR",
 							"rank": "WR rank 2 of 12",
-							"figure": "1084.8",
-							"median": "920.3 median",
+							"figure": "923.4",
+							"median": "734.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -11363,7 +11181,7 @@
 								{
 									"name": "Meyers",
 									"team": "JAX",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "161.4"
 								},
 								{
@@ -11434,10 +11252,10 @@
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 8 of 12",
+							"rank": "TE rank 9 of 12",
 							"figure": "141.0",
-							"median": "142.6 median",
-							"need": null,
+							"median": "155.6 median",
+							"need": "Need",
 							"mine": [
 								{
 									"name": "LaPorta",
@@ -11525,18 +11343,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "--",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				},
@@ -11545,21 +11352,21 @@
 					"cards": [
 						{
 							"key": "QB",
-							"rank": "QB rank 8 of 12",
-							"figure": "20.6",
+							"rank": "QB rank 11 of 12",
+							"figure": "17.9",
 							"median": "21.4 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "20.6"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "17.9"
 								},
 								{
@@ -11599,34 +11406,14 @@
 									"beats": "0.0",
 									"verb": "Add",
 									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4360423",
-									"name": "Penix",
-									"team": "ATL",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:2576980",
-									"name": "Mariota",
-									"team": "WSH",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
 								}
 							]
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 10 of 12",
-							"figure": "26.5",
-							"median": "38.8 median",
+							"rank": "RB rank 6 of 12",
+							"figure": "40.4",
+							"median": "40.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -11644,7 +11431,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "9.5"
 								},
 								{
@@ -11664,8 +11451,8 @@
 						},
 						{
 							"key": "WR",
-							"rank": "WR rank 8 of 12",
-							"figure": "66.1",
+							"rank": "WR rank 12 of 12",
+							"figure": "33.9",
 							"median": "68.0 median",
 							"need": null,
 							"mine": [
@@ -11696,13 +11483,13 @@
 								{
 									"name": "Chase",
 									"team": "CIN",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								},
 								{
 									"name": "Addison",
 									"team": "MIN",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								},
 								{
@@ -11724,6 +11511,16 @@
 									"move": "Open FFPC waivers"
 								},
 								{
+									"key": "free:board:4427095",
+									"name": "Douglas",
+									"team": "NE",
+									"mark": "Free",
+									"figure": "5.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
 									"key": "free:board:4686422",
 									"name": "Hutchinson",
 									"team": "HOU",
@@ -11732,56 +11529,26 @@
 									"beats": "Dart, Bench, +1.8 Gain",
 									"verb": "Add",
 									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4382466",
-									"name": "Nailor",
-									"team": "LV",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:3916945",
-									"name": "Slayton",
-									"team": "NYG",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4241372",
-									"name": "Brown",
-									"team": "PHI",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
 								}
 							]
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 5 of 12",
-							"figure": "12.2",
-							"median": "11.7 median",
+							"rank": "TE rank 12 of 12",
+							"figure": "7.8",
+							"median": "11.4 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Okonkwo",
 									"team": "WAS",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "7.8"
 								},
 								{
 									"name": "LaPorta",
 									"team": "DET",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								}
 							],
@@ -11840,9 +11607,9 @@
 						},
 						{
 							"key": "DEF",
-							"rank": "D/ST rank 1 of 12",
-							"figure": "0.0",
-							"median": "0.0 median",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
 							"need": null,
 							"mine": [
 								{
@@ -11858,18 +11625,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "9.6",
-									"beats": "--",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				}
@@ -14797,26 +14553,27 @@
 				}
 			],
 			"panel": {
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
 				"season": {
 					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
 					"cards": [
 						{
 							"key": "QB",
 							"rank": "QB rank 8 of 12",
-							"figure": "252.2",
+							"figure": "248.2",
 							"median": "264.0 median",
 							"need": "Need",
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "252.2"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "248.2"
 								},
 								{
@@ -14881,10 +14638,10 @@
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 9 of 12",
-							"figure": "367.3",
-							"median": "429.8 median",
-							"need": "Need",
+							"rank": "RB rank 6 of 12",
+							"figure": "507.1",
+							"median": "501.1 median",
+							"need": null,
 							"mine": [
 								{
 									"name": "Love",
@@ -14901,7 +14658,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "139.8"
 								},
 								{
@@ -14922,8 +14679,8 @@
 						{
 							"key": "WR",
 							"rank": "WR rank 2 of 12",
-							"figure": "1084.8",
-							"median": "920.3 median",
+							"figure": "923.4",
+							"median": "734.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -14953,7 +14710,7 @@
 								{
 									"name": "Meyers",
 									"team": "JAX",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "161.4"
 								},
 								{
@@ -15024,10 +14781,10 @@
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 8 of 12",
+							"rank": "TE rank 9 of 12",
 							"figure": "141.0",
-							"median": "142.6 median",
-							"need": null,
+							"median": "155.6 median",
+							"need": "Need",
 							"mine": [
 								{
 									"name": "LaPorta",
@@ -15115,18 +14872,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "--",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				}
@@ -18069,26 +17815,27 @@
 				}
 			],
 			"panel": {
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
 				"season": {
 					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
 					"cards": [
 						{
 							"key": "QB",
 							"rank": "QB rank 8 of 12",
-							"figure": "252.2",
+							"figure": "248.2",
 							"median": "264.0 median",
 							"need": "Need",
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "252.2"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "248.2"
 								},
 								{
@@ -18153,10 +17900,10 @@
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 9 of 12",
-							"figure": "367.3",
-							"median": "429.8 median",
-							"need": "Need",
+							"rank": "RB rank 6 of 12",
+							"figure": "507.1",
+							"median": "501.1 median",
+							"need": null,
 							"mine": [
 								{
 									"name": "Love",
@@ -18173,7 +17920,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "139.8"
 								},
 								{
@@ -18194,8 +17941,8 @@
 						{
 							"key": "WR",
 							"rank": "WR rank 2 of 12",
-							"figure": "1084.8",
-							"median": "920.3 median",
+							"figure": "923.4",
+							"median": "734.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -18225,7 +17972,7 @@
 								{
 									"name": "Meyers",
 									"team": "JAX",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "161.4"
 								},
 								{
@@ -18296,10 +18043,10 @@
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 8 of 12",
+							"rank": "TE rank 9 of 12",
 							"figure": "141.0",
-							"median": "142.6 median",
-							"need": null,
+							"median": "155.6 median",
+							"need": "Need",
 							"mine": [
 								{
 									"name": "LaPorta",
@@ -18387,18 +18134,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "--",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				}
@@ -21359,26 +21095,27 @@
 					}
 				],
 				"panel": {
+					"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
 					"season": {
 						"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
 						"cards": [
 							{
 								"key": "QB",
 								"rank": "QB rank 8 of 12",
-								"figure": "252.2",
+								"figure": "248.2",
 								"median": "264.0 median",
 								"need": "Need",
 								"mine": [
 									{
 										"name": "Dart",
 										"team": "NYG",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "252.2"
 									},
 									{
 										"name": "Mahomes",
 										"team": "KC",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "248.2"
 									},
 									{
@@ -21443,10 +21180,10 @@
 							},
 							{
 								"key": "RB",
-								"rank": "RB rank 9 of 12",
-								"figure": "367.3",
-								"median": "429.8 median",
-								"need": "Need",
+								"rank": "RB rank 6 of 12",
+								"figure": "507.1",
+								"median": "501.1 median",
+								"need": null,
 								"mine": [
 									{
 										"name": "Love",
@@ -21463,7 +21200,7 @@
 									{
 										"name": "Gainwell",
 										"team": "TB",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "139.8"
 									},
 									{
@@ -21484,8 +21221,8 @@
 							{
 								"key": "WR",
 								"rank": "WR rank 2 of 12",
-								"figure": "1084.8",
-								"median": "920.3 median",
+								"figure": "923.4",
+								"median": "734.3 median",
 								"need": null,
 								"mine": [
 									{
@@ -21515,7 +21252,7 @@
 									{
 										"name": "Meyers",
 										"team": "JAX",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "161.4"
 									},
 									{
@@ -21586,10 +21323,10 @@
 							},
 							{
 								"key": "TE",
-								"rank": "TE rank 8 of 12",
+								"rank": "TE rank 9 of 12",
 								"figure": "141.0",
-								"median": "142.6 median",
-								"need": null,
+								"median": "155.6 median",
+								"need": "Need",
 								"mine": [
 									{
 										"name": "LaPorta",
@@ -21677,18 +21414,7 @@
 										"figure": "--"
 									}
 								],
-								"free": [
-									{
-										"key": "free:board:Kansas City Chiefs",
-										"name": "Chiefs",
-										"team": "KC",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "Texans, Starter, +0.3 Gain",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									}
-								]
+								"free": []
 							}
 						]
 					},
@@ -21697,21 +21423,21 @@
 						"cards": [
 							{
 								"key": "QB",
-								"rank": "QB rank 8 of 12",
-								"figure": "20.6",
+								"rank": "QB rank 11 of 12",
+								"figure": "17.9",
 								"median": "21.4 median",
 								"need": null,
 								"mine": [
 									{
 										"name": "Dart",
 										"team": "NYG",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "20.6"
 									},
 									{
 										"name": "Mahomes",
 										"team": "KC",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "17.9"
 									},
 									{
@@ -21751,34 +21477,14 @@
 										"beats": "0.0",
 										"verb": "Add",
 										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:4360423",
-										"name": "Penix",
-										"team": "ATL",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:2576980",
-										"name": "Mariota",
-										"team": "WSH",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
 									}
 								]
 							},
 							{
 								"key": "RB",
-								"rank": "RB rank 10 of 12",
-								"figure": "26.5",
-								"median": "38.8 median",
+								"rank": "RB rank 6 of 12",
+								"figure": "40.4",
+								"median": "40.3 median",
 								"need": null,
 								"mine": [
 									{
@@ -21796,7 +21502,7 @@
 									{
 										"name": "Gainwell",
 										"team": "TB",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "9.5"
 									},
 									{
@@ -21816,8 +21522,8 @@
 							},
 							{
 								"key": "WR",
-								"rank": "WR rank 8 of 12",
-								"figure": "66.1",
+								"rank": "WR rank 12 of 12",
+								"figure": "33.9",
 								"median": "68.0 median",
 								"need": null,
 								"mine": [
@@ -21848,13 +21554,13 @@
 									{
 										"name": "Chase",
 										"team": "CIN",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "--"
 									},
 									{
 										"name": "Addison",
 										"team": "MIN",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "--"
 									},
 									{
@@ -21876,6 +21582,16 @@
 										"move": "Open ESPN waivers"
 									},
 									{
+										"key": "free:board:4427095",
+										"name": "Douglas",
+										"team": "NE",
+										"mark": "Free",
+										"figure": "5.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
 										"key": "free:board:4686422",
 										"name": "Hutchinson",
 										"team": "HOU",
@@ -21884,56 +21600,26 @@
 										"beats": "McConkey, Starter, +1.8 Gain",
 										"verb": "Add",
 										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:4382466",
-										"name": "Nailor",
-										"team": "LV",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:3916945",
-										"name": "Slayton",
-										"team": "NYG",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:4241372",
-										"name": "Brown",
-										"team": "PHI",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
 									}
 								]
 							},
 							{
 								"key": "TE",
-								"rank": "TE rank 5 of 12",
-								"figure": "12.2",
-								"median": "11.7 median",
+								"rank": "TE rank 12 of 12",
+								"figure": "7.8",
+								"median": "11.4 median",
 								"need": null,
 								"mine": [
 									{
 										"name": "Okonkwo",
 										"team": "WAS",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "7.8"
 									},
 									{
 										"name": "LaPorta",
 										"team": "DET",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "--"
 									}
 								],
@@ -21992,9 +21678,9 @@
 							},
 							{
 								"key": "DEF",
-								"rank": "D/ST rank 1 of 12",
-								"figure": "0.0",
-								"median": "0.0 median",
+								"rank": "D/ST --",
+								"figure": "--",
+								"median": null,
 								"need": null,
 								"mine": [
 									{
@@ -22010,18 +21696,7 @@
 										"figure": "--"
 									}
 								],
-								"free": [
-									{
-										"key": "free:board:Kansas City Chiefs",
-										"name": "Chiefs",
-										"team": "KC",
-										"mark": "Free",
-										"figure": "9.6",
-										"beats": "Texans, Starter, +0.3 Gain",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									}
-								]
+								"free": []
 							}
 						]
 					}
@@ -25130,26 +24805,27 @@
 					}
 				],
 				"panel": {
+					"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
 					"season": {
 						"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
 						"cards": [
 							{
 								"key": "QB",
 								"rank": "QB rank 8 of 12",
-								"figure": "252.2",
+								"figure": "248.2",
 								"median": "264.0 median",
 								"need": "Need",
 								"mine": [
 									{
 										"name": "Dart",
 										"team": "NYG",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "252.2"
 									},
 									{
 										"name": "Mahomes",
 										"team": "KC",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "248.2"
 									},
 									{
@@ -25214,10 +24890,10 @@
 							},
 							{
 								"key": "RB",
-								"rank": "RB rank 9 of 12",
-								"figure": "367.3",
-								"median": "429.8 median",
-								"need": "Need",
+								"rank": "RB rank 6 of 12",
+								"figure": "507.1",
+								"median": "501.1 median",
+								"need": null,
 								"mine": [
 									{
 										"name": "Love",
@@ -25234,7 +24910,7 @@
 									{
 										"name": "Gainwell",
 										"team": "TB",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "139.8"
 									},
 									{
@@ -25255,8 +24931,8 @@
 							{
 								"key": "WR",
 								"rank": "WR rank 2 of 12",
-								"figure": "1084.8",
-								"median": "920.3 median",
+								"figure": "923.4",
+								"median": "734.3 median",
 								"need": null,
 								"mine": [
 									{
@@ -25286,7 +24962,7 @@
 									{
 										"name": "Meyers",
 										"team": "JAX",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "161.4"
 									},
 									{
@@ -25357,10 +25033,10 @@
 							},
 							{
 								"key": "TE",
-								"rank": "TE rank 8 of 12",
+								"rank": "TE rank 9 of 12",
 								"figure": "141.0",
-								"median": "142.6 median",
-								"need": null,
+								"median": "155.6 median",
+								"need": "Need",
 								"mine": [
 									{
 										"name": "LaPorta",
@@ -25448,18 +25124,7 @@
 										"figure": "--"
 									}
 								],
-								"free": [
-									{
-										"key": "free:board:Kansas City Chiefs",
-										"name": "Chiefs",
-										"team": "KC",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "Texans, Starter, +0.3 Gain",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									}
-								]
+								"free": []
 							}
 						]
 					},
@@ -25468,21 +25133,21 @@
 						"cards": [
 							{
 								"key": "QB",
-								"rank": "QB rank 8 of 12",
-								"figure": "20.6",
+								"rank": "QB rank 11 of 12",
+								"figure": "17.9",
 								"median": "21.4 median",
 								"need": null,
 								"mine": [
 									{
 										"name": "Dart",
 										"team": "NYG",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "20.6"
 									},
 									{
 										"name": "Mahomes",
 										"team": "KC",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "17.9"
 									},
 									{
@@ -25522,34 +25187,14 @@
 										"beats": "0.0",
 										"verb": "Add",
 										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:4360423",
-										"name": "Penix",
-										"team": "ATL",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:2576980",
-										"name": "Mariota",
-										"team": "WSH",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
 									}
 								]
 							},
 							{
 								"key": "RB",
-								"rank": "RB rank 10 of 12",
-								"figure": "26.5",
-								"median": "38.8 median",
+								"rank": "RB rank 6 of 12",
+								"figure": "40.4",
+								"median": "40.3 median",
 								"need": null,
 								"mine": [
 									{
@@ -25567,7 +25212,7 @@
 									{
 										"name": "Gainwell",
 										"team": "TB",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "9.5"
 									},
 									{
@@ -25587,8 +25232,8 @@
 							},
 							{
 								"key": "WR",
-								"rank": "WR rank 8 of 12",
-								"figure": "66.1",
+								"rank": "WR rank 12 of 12",
+								"figure": "33.9",
 								"median": "68.0 median",
 								"need": null,
 								"mine": [
@@ -25619,13 +25264,13 @@
 									{
 										"name": "Chase",
 										"team": "CIN",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "--"
 									},
 									{
 										"name": "Addison",
 										"team": "MIN",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "--"
 									},
 									{
@@ -25647,6 +25292,16 @@
 										"move": "Open ESPN waivers"
 									},
 									{
+										"key": "free:board:4427095",
+										"name": "Douglas",
+										"team": "NE",
+										"mark": "Free",
+										"figure": "5.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
 										"key": "free:board:4686422",
 										"name": "Hutchinson",
 										"team": "HOU",
@@ -25655,56 +25310,26 @@
 										"beats": "McConkey, Starter, +1.8 Gain",
 										"verb": "Add",
 										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:4382466",
-										"name": "Nailor",
-										"team": "LV",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:3916945",
-										"name": "Slayton",
-										"team": "NYG",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:4241372",
-										"name": "Brown",
-										"team": "PHI",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
 									}
 								]
 							},
 							{
 								"key": "TE",
-								"rank": "TE rank 5 of 12",
-								"figure": "12.2",
-								"median": "11.7 median",
+								"rank": "TE rank 12 of 12",
+								"figure": "7.8",
+								"median": "11.4 median",
 								"need": null,
 								"mine": [
 									{
 										"name": "Okonkwo",
 										"team": "WAS",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "7.8"
 									},
 									{
 										"name": "LaPorta",
 										"team": "DET",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "--"
 									}
 								],
@@ -25763,9 +25388,9 @@
 							},
 							{
 								"key": "DEF",
-								"rank": "D/ST rank 1 of 12",
-								"figure": "0.0",
-								"median": "0.0 median",
+								"rank": "D/ST --",
+								"figure": "--",
+								"median": null,
 								"need": null,
 								"mine": [
 									{
@@ -25781,18 +25406,7 @@
 										"figure": "--"
 									}
 								],
-								"free": [
-									{
-										"key": "free:board:Kansas City Chiefs",
-										"name": "Chiefs",
-										"team": "KC",
-										"mark": "Free",
-										"figure": "9.6",
-										"beats": "Texans, Starter, +0.3 Gain",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									}
-								]
+								"free": []
 							}
 						]
 					}
@@ -28901,26 +28515,27 @@
 					}
 				],
 				"panel": {
+					"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
 					"season": {
 						"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
 						"cards": [
 							{
 								"key": "QB",
 								"rank": "QB rank 8 of 12",
-								"figure": "252.2",
+								"figure": "248.2",
 								"median": "264.0 median",
 								"need": "Need",
 								"mine": [
 									{
 										"name": "Dart",
 										"team": "NYG",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "252.2"
 									},
 									{
 										"name": "Mahomes",
 										"team": "KC",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "248.2"
 									},
 									{
@@ -28985,10 +28600,10 @@
 							},
 							{
 								"key": "RB",
-								"rank": "RB rank 9 of 12",
-								"figure": "367.3",
-								"median": "429.8 median",
-								"need": "Need",
+								"rank": "RB rank 6 of 12",
+								"figure": "507.1",
+								"median": "501.1 median",
+								"need": null,
 								"mine": [
 									{
 										"name": "Love",
@@ -29005,7 +28620,7 @@
 									{
 										"name": "Gainwell",
 										"team": "TB",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "139.8"
 									},
 									{
@@ -29026,8 +28641,8 @@
 							{
 								"key": "WR",
 								"rank": "WR rank 2 of 12",
-								"figure": "1084.8",
-								"median": "920.3 median",
+								"figure": "923.4",
+								"median": "734.3 median",
 								"need": null,
 								"mine": [
 									{
@@ -29057,7 +28672,7 @@
 									{
 										"name": "Meyers",
 										"team": "JAX",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "161.4"
 									},
 									{
@@ -29128,10 +28743,10 @@
 							},
 							{
 								"key": "TE",
-								"rank": "TE rank 8 of 12",
+								"rank": "TE rank 9 of 12",
 								"figure": "141.0",
-								"median": "142.6 median",
-								"need": null,
+								"median": "155.6 median",
+								"need": "Need",
 								"mine": [
 									{
 										"name": "LaPorta",
@@ -29219,18 +28834,7 @@
 										"figure": "--"
 									}
 								],
-								"free": [
-									{
-										"key": "free:board:Kansas City Chiefs",
-										"name": "Chiefs",
-										"team": "KC",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "Texans, Starter, +0.3 Gain",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									}
-								]
+								"free": []
 							}
 						]
 					},
@@ -29239,21 +28843,21 @@
 						"cards": [
 							{
 								"key": "QB",
-								"rank": "QB rank 8 of 12",
-								"figure": "20.6",
+								"rank": "QB rank 11 of 12",
+								"figure": "17.9",
 								"median": "21.4 median",
 								"need": null,
 								"mine": [
 									{
 										"name": "Dart",
 										"team": "NYG",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "20.6"
 									},
 									{
 										"name": "Mahomes",
 										"team": "KC",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "17.9"
 									},
 									{
@@ -29293,34 +28897,14 @@
 										"beats": "0.0",
 										"verb": "Add",
 										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:4360423",
-										"name": "Penix",
-										"team": "ATL",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:2576980",
-										"name": "Mariota",
-										"team": "WSH",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
 									}
 								]
 							},
 							{
 								"key": "RB",
-								"rank": "RB rank 10 of 12",
-								"figure": "26.5",
-								"median": "38.8 median",
+								"rank": "RB rank 6 of 12",
+								"figure": "40.4",
+								"median": "40.3 median",
 								"need": null,
 								"mine": [
 									{
@@ -29338,7 +28922,7 @@
 									{
 										"name": "Gainwell",
 										"team": "TB",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "9.5"
 									},
 									{
@@ -29358,8 +28942,8 @@
 							},
 							{
 								"key": "WR",
-								"rank": "WR rank 8 of 12",
-								"figure": "66.1",
+								"rank": "WR rank 12 of 12",
+								"figure": "33.9",
 								"median": "68.0 median",
 								"need": null,
 								"mine": [
@@ -29390,13 +28974,13 @@
 									{
 										"name": "Chase",
 										"team": "CIN",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "--"
 									},
 									{
 										"name": "Addison",
 										"team": "MIN",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "--"
 									},
 									{
@@ -29418,6 +29002,16 @@
 										"move": "Open ESPN waivers"
 									},
 									{
+										"key": "free:board:4427095",
+										"name": "Douglas",
+										"team": "NE",
+										"mark": "Free",
+										"figure": "5.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
 										"key": "free:board:4686422",
 										"name": "Hutchinson",
 										"team": "HOU",
@@ -29426,56 +29020,26 @@
 										"beats": "McConkey, Starter, +1.8 Gain",
 										"verb": "Add",
 										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:4382466",
-										"name": "Nailor",
-										"team": "LV",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:3916945",
-										"name": "Slayton",
-										"team": "NYG",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									},
-									{
-										"key": "free:board:4241372",
-										"name": "Brown",
-										"team": "PHI",
-										"mark": "Free",
-										"figure": "--",
-										"beats": "0.0",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
 									}
 								]
 							},
 							{
 								"key": "TE",
-								"rank": "TE rank 5 of 12",
-								"figure": "12.2",
-								"median": "11.7 median",
+								"rank": "TE rank 12 of 12",
+								"figure": "7.8",
+								"median": "11.4 median",
 								"need": null,
 								"mine": [
 									{
 										"name": "Okonkwo",
 										"team": "WAS",
-										"mark": "Yours, Bench",
+										"mark": "Yours, Starter",
 										"figure": "7.8"
 									},
 									{
 										"name": "LaPorta",
 										"team": "DET",
-										"mark": "Yours, Starter",
+										"mark": "Yours, Bench",
 										"figure": "--"
 									}
 								],
@@ -29534,9 +29098,9 @@
 							},
 							{
 								"key": "DEF",
-								"rank": "D/ST rank 1 of 12",
-								"figure": "0.0",
-								"median": "0.0 median",
+								"rank": "D/ST --",
+								"figure": "--",
+								"median": null,
 								"need": null,
 								"mine": [
 									{
@@ -29552,18 +29116,7 @@
 										"figure": "--"
 									}
 								],
-								"free": [
-									{
-										"key": "free:board:Kansas City Chiefs",
-										"name": "Chiefs",
-										"team": "KC",
-										"mark": "Free",
-										"figure": "9.6",
-										"beats": "Texans, Starter, +0.3 Gain",
-										"verb": "Add",
-										"move": "Open ESPN waivers"
-									}
-								]
+								"free": []
 							}
 						]
 					}
@@ -32672,26 +32225,27 @@
 				}
 			],
 			"panel": {
+				"figures": "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.",
 				"season": {
 					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
 					"cards": [
 						{
 							"key": "QB",
 							"rank": "QB rank 8 of 12",
-							"figure": "252.2",
+							"figure": "248.2",
 							"median": "264.0 median",
 							"need": "Need",
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "252.2"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "248.2"
 								},
 								{
@@ -32756,10 +32310,10 @@
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 9 of 12",
-							"figure": "367.3",
-							"median": "429.8 median",
-							"need": "Need",
+							"rank": "RB rank 6 of 12",
+							"figure": "507.1",
+							"median": "501.1 median",
+							"need": null,
 							"mine": [
 								{
 									"name": "Love",
@@ -32776,7 +32330,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "139.8"
 								},
 								{
@@ -32797,8 +32351,8 @@
 						{
 							"key": "WR",
 							"rank": "WR rank 2 of 12",
-							"figure": "1084.8",
-							"median": "920.3 median",
+							"figure": "923.4",
+							"median": "734.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -32828,7 +32382,7 @@
 								{
 									"name": "Meyers",
 									"team": "JAX",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "161.4"
 								},
 								{
@@ -32899,10 +32453,10 @@
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 8 of 12",
+							"rank": "TE rank 9 of 12",
 							"figure": "141.0",
-							"median": "142.6 median",
-							"need": null,
+							"median": "155.6 median",
+							"need": "Need",
 							"mine": [
 								{
 									"name": "LaPorta",
@@ -32990,18 +32544,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "Texans, Starter, +0.3 Gain",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				},
@@ -33010,21 +32553,21 @@
 					"cards": [
 						{
 							"key": "QB",
-							"rank": "QB rank 8 of 12",
-							"figure": "20.6",
+							"rank": "QB rank 11 of 12",
+							"figure": "17.9",
 							"median": "21.4 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Dart",
 									"team": "NYG",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "20.6"
 								},
 								{
 									"name": "Mahomes",
 									"team": "KC",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "17.9"
 								},
 								{
@@ -33064,34 +32607,14 @@
 									"beats": "0.0",
 									"verb": "Add",
 									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4360423",
-									"name": "Penix",
-									"team": "ATL",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:2576980",
-									"name": "Mariota",
-									"team": "WSH",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
 								}
 							]
 						},
 						{
 							"key": "RB",
-							"rank": "RB rank 10 of 12",
-							"figure": "26.5",
-							"median": "38.8 median",
+							"rank": "RB rank 6 of 12",
+							"figure": "40.4",
+							"median": "40.3 median",
 							"need": null,
 							"mine": [
 								{
@@ -33109,7 +32632,7 @@
 								{
 									"name": "Gainwell",
 									"team": "TB",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "9.5"
 								},
 								{
@@ -33129,8 +32652,8 @@
 						},
 						{
 							"key": "WR",
-							"rank": "WR rank 8 of 12",
-							"figure": "66.1",
+							"rank": "WR rank 12 of 12",
+							"figure": "33.9",
 							"median": "68.0 median",
 							"need": null,
 							"mine": [
@@ -33161,13 +32684,13 @@
 								{
 									"name": "Chase",
 									"team": "CIN",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								},
 								{
 									"name": "Addison",
 									"team": "MIN",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								},
 								{
@@ -33189,6 +32712,16 @@
 									"move": "Open FFPC waivers"
 								},
 								{
+									"key": "free:board:4427095",
+									"name": "Douglas",
+									"team": "NE",
+									"mark": "Free",
+									"figure": "5.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
 									"key": "free:board:4686422",
 									"name": "Hutchinson",
 									"team": "HOU",
@@ -33197,56 +32730,26 @@
 									"beats": "McConkey, Starter, +1.8 Gain",
 									"verb": "Add",
 									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4382466",
-									"name": "Nailor",
-									"team": "LV",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:3916945",
-									"name": "Slayton",
-									"team": "NYG",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								},
-								{
-									"key": "free:board:4241372",
-									"name": "Brown",
-									"team": "PHI",
-									"mark": "Free",
-									"figure": "--",
-									"beats": "0.0",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
 								}
 							]
 						},
 						{
 							"key": "TE",
-							"rank": "TE rank 5 of 12",
-							"figure": "12.2",
-							"median": "11.7 median",
+							"rank": "TE rank 12 of 12",
+							"figure": "7.8",
+							"median": "11.4 median",
 							"need": null,
 							"mine": [
 								{
 									"name": "Okonkwo",
 									"team": "WAS",
-									"mark": "Yours, Bench",
+									"mark": "Yours, Starter",
 									"figure": "7.8"
 								},
 								{
 									"name": "LaPorta",
 									"team": "DET",
-									"mark": "Yours, Starter",
+									"mark": "Yours, Bench",
 									"figure": "--"
 								}
 							],
@@ -33305,9 +32808,9 @@
 						},
 						{
 							"key": "DEF",
-							"rank": "D/ST rank 1 of 12",
-							"figure": "0.0",
-							"median": "0.0 median",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
 							"need": null,
 							"mine": [
 								{
@@ -33323,18 +32826,7 @@
 									"figure": "--"
 								}
 							],
-							"free": [
-								{
-									"key": "free:board:Kansas City Chiefs",
-									"name": "Chiefs",
-									"team": "KC",
-									"mark": "Free",
-									"figure": "9.6",
-									"beats": "Texans, Starter, +0.3 Gain",
-									"verb": "Add",
-									"move": "Open FFPC waivers"
-								}
-							]
+							"free": []
 						}
 					]
 				}

@@ -6723,9 +6723,9 @@ components:
         need:
           type: boolean
           description: >-
-            the trade finder's team profile (Lane 287) names a need of the member's here: a starting spot that takes
-            the position falls below the league's median team there by the close call a week or more, a shared spot
-            marking each of its positions where the member ranks below the middle; never at K or DEF
+            the member's rest-of-season figure at the position (rest_of_season, the rank's own measure) falls below
+            the median team's by the close call a week or more over the weeks the figures cover, so a card at or
+            above the median never marks one; never at K or DEF, never without rest_of_season
         rest_of_season:
           allOf: [{ $ref: "#/components/schemas/WaiverStanding" }]
           nullable: true
@@ -6739,7 +6739,8 @@ components:
           description: >-
             this week's Proj of the starters at the position in the lineup the advice sets for each team (the Lineup
             screen's rule, each team's own starters kept where their games have kicked off); null before the week's
-            projection is read
+            projection is read and where no player at the position carries a Proj (a figure every team would share at
+            0.0)
         mine:
           type: array
           description: the member's active players at the position, by rest-of-season points, highest first (none last)
@@ -6749,6 +6750,13 @@ components:
           description: >-
             the best free agents at the position the table lists, at most five, by rest-of-season points, highest
             first: each one's row is the table's, the pickup rule's verdict (Beats, Gain) and the Add verb's input
+          items: { $ref: "#/components/schemas/WaiverPositionFree" }
+        available_week:
+          type: array
+          description: >-
+            the This week list (review M1): the best free agents at the position the table lists with a Proj this
+            week, at most five, by this week's Proj, highest first, each one's row the table's as in available; set
+            with week alone, absent otherwise and from an older answer
           items: { $ref: "#/components/schemas/WaiverPositionFree" }
     WaiverStanding:
       type: object

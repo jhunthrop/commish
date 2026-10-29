@@ -229,6 +229,15 @@
 		overflow: hidden;
 	}
 
+	/* Three cards to a row: the rank at the small size, so "rank 12 of 12" fits whole. */
+	.band .top {
+		gap: 4px;
+	}
+
+	.band .rank {
+		font-size: var(--t-xs);
+	}
+
 	.row {
 		display: grid;
 		grid-template-columns: auto minmax(0, 1fr);

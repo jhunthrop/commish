@@ -182,6 +182,40 @@ void test("a free agent carries the table's own row: its Beats words and the ver
 	assert.ok(table[1] && beatsWords(table[1]) === second.beats);
 });
 
+void test("This week lists the week's own best free agents, not the rest-of-season five (review M1)", () => {
+	const streamer = row(line('Jake Ferguson', 'TE', 11.3), 0.2, null);
+	const withWeek: Card = {
+		...te,
+		available_week: [
+			{ row: streamer, rest_of_season_points: 60 },
+			{ row: higbee, rest_of_season_points: 88 }
+		]
+	};
+	const [card] = panelCards({ ...advice, positions: [withWeek] }, 'week', ZONE, NOW);
+	assert.deepEqual(
+		card?.free.map((e) => [e.name, e.figure]),
+		[
+			['Ferguson', '11.3'],
+			['Higbee', '6.2']
+		]
+	);
+	// Rest of season keeps its own five.
+	const [season] = panelCards({ ...advice, positions: [withWeek] }, 'season', ZONE, NOW);
+	assert.deepEqual(
+		season?.free.map((e) => e.name),
+		['Taylor', 'Higbee']
+	);
+});
+
+void test('a position with no week figure draws no rank and no median this week (review M4)', () => {
+	const [, kicker] = panelCards(advice, 'week', ZONE, NOW);
+	assert.ok(kicker);
+	assert.equal(kicker.rank, 'K --');
+	assert.equal(kicker.figure, '--');
+	assert.equal(kicker.standing, null);
+	assert.doesNotMatch(kicker.rank, /rank 1 of/);
+});
+
 void test('an answer without the panel draws none', () => {
 	assert.deepEqual(panelCards({ pickups: [], roster: [] }, 'season', ZONE, NOW), []);
 });

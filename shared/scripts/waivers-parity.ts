@@ -207,8 +207,11 @@ function tableKeys(
   };
 }
 
-/** The Waivers at one clock, as the web's phone draws it: `advice` the page's answer, `shown` the
- * answer for the chosen position (WaiverScreen's `narrowed ?? advice`), its rows drawn at `now`. */
+/** What the panel's figures are, said once in each clock's panel: an app holds the words and the
+ * rules, never the stand-in's numbers (Lane 291 review M6). */
+const PANEL_FIGURES =
+  "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers.";
+
 /** The position panel as the web draws it (PositionPanel.svelte over positions.ts, Lane 291): for each
  * figure the toggle reads, each card's words and its ranked list, each free agent's Beats words and
  * verb; null on an answer without the panel. */
@@ -222,7 +225,7 @@ function panelOf(
   const modes: readonly PanelMode[] = panelHasWeek(advice)
     ? ["season", "week"]
     : ["season"];
-  return Object.fromEntries(
+  const byMode = Object.fromEntries(
     modes.map((mode) => {
       const cards = panelCards(advice, mode, zone, at);
       return [
@@ -262,8 +265,11 @@ function panelOf(
       ];
     }),
   );
+  return { figures: PANEL_FIGURES, ...byMode };
 }
 
+/** The Waivers at one clock, as the web's phone draws it: `advice` the page's answer, `shown` the
+ * answer for the chosen position (WaiverScreen's `narrowed ?? advice`), its rows drawn at `now`. */
 export function waiversAt(
   advice: WaiverAdvice,
   host: LeagueHost,

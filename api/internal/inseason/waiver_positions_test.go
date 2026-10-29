@@ -23,8 +23,8 @@ func pointed(roster []Candidate) []Candidate {
 	return out
 }
 
-// panelLeague is the synthetic 12 teams with points, team 0 given first.
-func panelLeague(config []draft.SlotConfig, first []Candidate) TradeLeague {
+// syntheticPanel is the synthetic 12 teams with points, team 0 given first.
+func syntheticPanel(config []draft.SlotConfig, first []Candidate) TradeLeague {
 	squads := []Squad{{Players: pointed(first)}}
 	for i := 1; i < 12; i++ {
 		squads = append(squads, Squad{Players: pointed(leagueTeam(i, 20))})
@@ -42,7 +42,7 @@ func panelFigures(l TradeLeague, p draft.Position) []float64 {
 
 func TestPanelWeakAtTERanksLast(t *testing.T) {
 	weak := set(leagueTeam(0, 20), "t0-te1", func(c Candidate) Candidate { c.Value = -60; return c })
-	l := panelLeague(standardConfig, weak)
+	l := syntheticPanel(standardConfig, weak)
 	got := StandingOf(panelFigures(l, draft.TE), 0)
 	if got.Rank != 12 {
 		t.Fatalf("TE rank %d of 12, want 12: %+v", got.Rank, got)
@@ -54,19 +54,18 @@ func TestPanelWeakAtTERanksLast(t *testing.T) {
 	if rb := StandingOf(panelFigures(l, draft.RB), 0); rb.Rank != 1 {
 		t.Fatalf("RB rank %d, want 1", rb.Rank)
 	}
-	need := l.NeedPositions(l.Needs(l.Profile(pointed(weak))), map[draft.Position]int{draft.TE: 12}, 12)
-	if !need[draft.TE] {
-		t.Fatalf("no TE need marked: %v", need)
+	if !PositionNeed(draft.TE, &got, l.Weeks()) {
+		t.Fatalf("no TE need at %+v", got)
 	}
-	if need[draft.QB] || need[draft.RB] {
-		t.Fatalf("a need marked where team 0 leads: %v", need)
+	if rb := StandingOf(panelFigures(l, draft.RB), 0); PositionNeed(draft.RB, &rb, l.Weeks()) {
+		t.Fatalf("a need marked where team 0 leads: %+v", rb)
 	}
 }
 
 func TestPanelFoldsTheFlexIntoItsPlayersPosition(t *testing.T) {
 	// A third receiver worth more than every back on the bench takes the flex.
 	deep := set(leagueTeam(0, 20), "t0-wr3", func(c Candidate) Candidate { c.Value = 70; return c })
-	l := panelLeague(standardConfig, deep)
+	l := syntheticPanel(standardConfig, deep)
 	by := l.Positions[0]
 	// Every club plays every week (no schedule read), so each starter's
 	// figure is his rest-of-season points whole.
@@ -86,7 +85,7 @@ func TestPanelFoldsTheFlexIntoItsPlayersPosition(t *testing.T) {
 		}
 	}
 	// Superflex: a second quarterback worth starting counts at QB.
-	sf := panelLeague(superflexConfig, set(leagueTeam(0, 45), "t0-qb2", func(c Candidate) Candidate { c.Value = 45; return c }))
+	sf := syntheticPanel(superflexConfig, set(leagueTeam(0, 45), "t0-qb2", func(c Candidate) Candidate { c.Value = 45; return c }))
 	if want := (60.0 + 100) + (45 + 100); roundTenth(sf.Positions[0][draft.QB]) != want {
 		t.Fatalf("QB %v, want both quarterbacks' %v", sf.Positions[0][draft.QB], want)
 	}
@@ -129,17 +128,32 @@ func TestStandingOfSharesAPlaceAtTheTenth(t *testing.T) {
 	}
 }
 
-func TestNeedAtASharedSpotMarksOnlyWhereTheMemberTrails(t *testing.T) {
-	l := panelLeague(standardConfig, leagueTeam(0, 20))
-	flex := -1
-	for i, s := range l.slots {
-		if s.Type == draft.SlotFlex {
-			flex = i
-		}
+// Review M2: the need mark and the rank are one measure, so a card never
+// shows a strong rank with a Need, and a position well under the median
+// marks one even when no single slot misses by the close call.
+func TestPositionNeedIsTheRanksOwnMeasure(t *testing.T) {
+	const weeks = 11
+	cases := []struct {
+		name string
+		p    draft.Position
+		s    *apitypes.WaiverStanding
+		want bool
+	}{
+		{"rank 2, above the median: never a need", draft.WR, &apitypes.WaiverStanding{Rank: 2, Points: 1084.8, Median: 920.3}, false},
+		{"at the median: no need", draft.RB, &apitypes.WaiverStanding{Rank: 6, Points: 400, Median: 400}, false},
+		{"under by less than the close call over the weeks", draft.RB, &apitypes.WaiverStanding{Rank: 7, Points: 395, Median: 400}, false},
+		{"three receivers each a little under: one need at the position", draft.WR, &apitypes.WaiverStanding{Rank: 10, Points: 880, Median: 900}, true},
+		{"exactly the close call over the weeks", draft.TE, &apitypes.WaiverStanding{Rank: 9, Points: 94.5, Median: 100}, true},
+		{"never at K", draft.K, &apitypes.WaiverStanding{Rank: 12, Points: 0, Median: 90}, false},
+		{"never without a figure", draft.QB, nil, false},
 	}
-	need := l.NeedPositions([]Need{{Slot: flex, Short: 30}}, map[draft.Position]int{draft.RB: 3, draft.WR: 9, draft.TE: 7}, 12)
-	if need[draft.RB] || !need[draft.WR] || !need[draft.TE] {
-		t.Fatalf("%v", need)
+	for _, c := range cases {
+		if got := PositionNeed(c.p, c.s, weeks); got != c.want {
+			t.Errorf("%s: need %v, want %v", c.name, got, c.want)
+		}
+		if c.want && c.s.Points >= c.s.Median {
+			t.Errorf("%s: a need at or above the median", c.name)
+		}
 	}
 }
 

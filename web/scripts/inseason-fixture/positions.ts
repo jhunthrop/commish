@@ -1,21 +1,29 @@
 // The Waivers answer's position panel on the fixture (Lane 291), as the API builds it (inseason
 // waiver_positions.go): a card a position the league starts, the member's place among the twelve
-// teams by the points of the starters each team's best lineup fields there (a flex or superflex spot
-// counted for the position of the player who fills it), the median team's figure, the same for this
-// week's Proj, the member's players there and the five best free agents the table lists, each with
-// the table's own row. STAND-INS, named in the lane's report: a player's rest-of-season points are
-// the recorded board's points (boards-ppr.json, the fixture's one board), each lineup is filled
-// greedily by them (the API's week-by-week fill with byes is not ported), this week's by the one
-// projection snapshot (projection.json), a player it has no row for at his board points over the
-// weeks left, and the need mark is the API's rule on those figures (the member's figure under the
-// median by half a point a week over the weeks the order covers). Only the panel's shape and its
-// rules are meant to hold.
+// teams by the rest-of-season points of the starters each team's best lineup fields there (a flex or
+// superflex spot counted for the position of the player who fills it), the median team's figure, the
+// need on that same measure (the member under the median by the close call a week over the weeks
+// covered), the same standing for this week's Proj where any player at the position has one, the
+// member's players there, and the best free agents the table lists: five by rest-of-season points,
+// and five by this week's Proj for the This week list, each with the table's own row.
+//
+// STAND-INS, named in the lane's report; only the panel's shape and its rules are meant to hold, and
+// the apps' parity should assert its words, not these figures:
+// - a player's rest-of-season points are the recorded board's points (boards-ppr.json), and the fill
+//   picks starters by the board's points over replacement (vor) as the engine picks by points over
+//   replacement a game, summing their points; the API's week-by-week fill with byes is not ported;
+// - the member's players on injured reserve or a season-long list never start (the engine's
+//   InjuredReserve); other teams' designations are not in the fixture, so theirs all may start;
+// - this week's figures are the member's lines' own Proj (a player without one sits) and, for every
+//   other team, the one projection snapshot (projection.json), a player it has no row for
+//   at his board points over the weeks left; a position with no figure at all has no week standing.
 import type { LeagueSync } from '../../src/lib/league/api.ts';
 import type { PlayerLine, WaiverAdvice, WaiverRow } from '../../src/lib/league/inseason/api.ts';
 import type { components } from '../../src/lib/api/types.ts';
 import { roundTenth } from './tenths.ts';
 
 type Card = components['schemas']['WaiverPositionCard'];
+type Free = components['schemas']['WaiverPositionFree'];
 type Standing = components['schemas']['WaiverStanding'];
 type Position = Card['position'];
 
@@ -23,6 +31,7 @@ type Position = Card['position'];
 const POSITIONS: readonly Position[] = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
 const FLEX: readonly Position[] = ['RB', 'WR', 'TE'];
 const SUPER_FLEX: readonly Position[] = ['QB', 'RB', 'WR', 'TE'];
+const SKILL: readonly Position[] = ['QB', 'RB', 'WR', 'TE'];
 /** The free agents a card lists at most (waiver_positions.go PanelFree). */
 const PANEL_FREE = 5;
 /** The need's least shortfall a week (trades.go CloseCall). */
@@ -33,13 +42,16 @@ export interface PanelPlayer {
 	id: string;
 	position: Position;
 	points: number | null;
+	/** His points over replacement, the fill's order for the rest of the season. */
+	por: number | null;
 	proj: number | null;
 }
 
-/** The fixture's inputs: the league read, each board id's position and points, the week's Proj. */
+/** The fixture's inputs: the league read, each board id's position, points and points over
+ * replacement, the week's Proj. */
 export interface PanelInputs {
 	sync: Pick<LeagueSync, 'teams' | 'me' | 'held_by' | 'terms'>;
-	board: ReadonlyMap<string, { position: string; points: number | null }>;
+	board: ReadonlyMap<string, { position: string; points: number | null; vor: number | null }>;
 	proj: (boardId: string) => number | null;
 	weeks: number;
 }
@@ -63,23 +75,33 @@ function spotsOf(roster: Spots): Position[][] {
 	return out;
 }
 
-/** The best lineup by a figure: each spot takes the best player left it accepts. Returns the
- * figure by position and who starts. */
+const desc =
+	<T>(key: (item: T) => number | null) =>
+	(a: T, b: T): number =>
+		(key(b) ?? -Infinity) - (key(a) ?? -Infinity);
+
+/** The best lineup: each spot takes the best player left it accepts by order, players out kept out.
+ * Returns the figure the starters sum to by position, and who starts. */
 export function fill(
 	players: readonly PanelPlayer[],
 	spots: readonly Position[][],
-	figure: (p: PanelPlayer) => number | null
-): { by: Map<Position, number>; starts: Set<string> } {
-	const order = [...players].sort((a, b) => (figure(b) ?? -Infinity) - (figure(a) ?? -Infinity));
+	order: (p: PanelPlayer) => number | null,
+	figure: (p: PanelPlayer) => number | null,
+	out: ReadonlySet<string> = new Set()
+): { by: Map<Position, number>; starts: Set<string>; figured: Set<Position> } {
+	const ranked = [...players].filter((p) => !out.has(p.id)).sort(desc(order));
 	const by = new Map<Position, number>();
 	const starts = new Set<string>();
+	const figured = new Set<Position>();
 	for (const spot of spots) {
-		const p = order.find((c) => !starts.has(c.id) && spot.includes(c.position));
+		const p = ranked.find((c) => !starts.has(c.id) && spot.includes(c.position));
 		if (p === undefined) continue;
 		starts.add(p.id);
-		by.set(p.position, (by.get(p.position) ?? 0) + (figure(p) ?? 0));
+		const v = figure(p);
+		if (v !== null) figured.add(p.position);
+		by.set(p.position, (by.get(p.position) ?? 0) + (v ?? 0));
 	}
-	return { by, starts };
+	return { by, starts, figured };
 }
 
 function median(values: readonly number[]): number {
@@ -99,14 +121,34 @@ export function standingOf(figures: readonly number[], me: number): Standing {
 	};
 }
 
+/** The need on the rank's own measure (waiver_positions.go PositionNeed). */
+export function positionNeed(p: Position, s: Standing | null, weeks: number): boolean {
+	if (s === null || !SKILL.includes(p)) return false;
+	return roundTenth(s.median - s.points) >= roundTenth(CLOSE_CALL * Math.max(1, weeks));
+}
+
 function playersOf(inputs: PanelInputs): Map<number, PanelPlayer[]> {
 	const out = new Map<number, PanelPlayer[]>();
 	for (const [id, roster] of Object.entries(inputs.sync.held_by)) {
 		const b = inputs.board.get(id);
 		if (b === undefined || !POSITIONS.includes(b.position as Position)) continue;
 		const list = out.get(roster) ?? [];
-		list.push({ id, position: b.position as Position, points: b.points, proj: inputs.proj(id) });
+		const position = b.position as Position;
+		list.push({ id, position, points: b.points, por: b.vor, proj: inputs.proj(id) });
 		out.set(roster, list);
+	}
+	return out;
+}
+
+/** The member's players the engine keeps out of every lineup: on injured reserve or a season-long
+ * list (InjuredReserve). */
+function keptOut(roster: readonly PlayerLine[]): Set<string> {
+	const out = new Set<string>();
+	for (const line of roster) {
+		const d = line.facts.designation;
+		const away =
+			line.player.injured_reserve || d?.status === 'injured_reserve' || d?.season_long === true;
+		if (away && line.player.board_id !== null) out.add(line.player.board_id);
 	}
 	return out;
 }
@@ -117,27 +159,75 @@ const pointsOf = (inputs: PanelInputs, line: PlayerLine): number | null =>
 const rowKey = (row: WaiverRow): string =>
 	`${row.add.player.host_id}|${row.add.player.board_id ?? ''}`;
 
+/** The table's free agents at p, the best five by key, each with his row. */
+function freeAt(
+	rows: readonly WaiverRow[],
+	p: Position,
+	inputs: PanelInputs,
+	key: (f: Free) => number | null
+): Free[] {
+	return [...new Map(rows.map((r) => [rowKey(r), r])).values()]
+		.filter((r) => r.add.player.position === p)
+		.map((row) => ({ row, rest_of_season_points: pointsOf(inputs, row.add) }))
+		.filter((f) => key(f) !== null)
+		.sort(desc(key))
+		.slice(0, PANEL_FREE);
+}
+
 /** The answer with its panel (the full page's alone). */
 export function withPositions(answer: WaiverAdvice, inputs: PanelInputs): WaiverAdvice {
 	const spots = spotsOf(inputs.sync.terms.roster);
 	const teams = inputs.sync.teams.map((t) => t.roster_id);
 	const me = teams.indexOf(inputs.sync.me);
 	const players = playersOf(inputs);
-	const season = teams.map((t) => fill(players.get(t) ?? [], spots, (p) => p.points));
+	const out = keptOut(answer.roster);
+	const outFor = (t: number): Set<string> => (t === inputs.sync.me ? out : new Set());
+	const season = teams.map((t) =>
+		fill(
+			players.get(t) ?? [],
+			spots,
+			(p) => p.por,
+			(p) => p.points,
+			outFor(t)
+		)
+	);
+	// The member's week is his lines' own Proj, a player without one (a bye) never starting, as the
+	// Lineup rule has it; every other team's is the stand-in's.
+	const myProj = new Map(
+		answer.roster.flatMap((l) =>
+			l.player.board_id === null ? [] : [[l.player.board_id, l.week_projection] as const]
+		)
+	);
+	const weekFigure = (p: PanelPlayer): number | null =>
+		myProj.has(p.id)
+			? (myProj.get(p.id) ?? null)
+			: (p.proj ?? (p.points === null ? null : p.points / inputs.weeks));
+	const myWeekOut = new Set([
+		...out,
+		...[...myProj].filter(([, v]) => v === null).map(([id]) => id)
+	]);
 	const week = teams.map((t) =>
 		fill(
 			players.get(t) ?? [],
 			spots,
-			(p) => p.proj ?? (p.points === null ? null : p.points / inputs.weeks)
+			weekFigure,
+			weekFigure,
+			t === inputs.sync.me ? myWeekOut : new Set()
 		)
 	);
 	const weekRead = answer.projection_read_at !== null;
 	const positions = POSITIONS.filter((p) => spots.some((s) => s.includes(p))).map((p): Card => {
-		const seasonFigures = season.map((f) => f.by.get(p) ?? 0);
-		const rest = standingOf(seasonFigures, me);
 		const pointed = [...players.values()].some((list) =>
 			list.some((c) => c.position === p && c.points !== null)
 		);
+		const rest = pointed
+			? standingOf(
+					season.map((f) => f.by.get(p) ?? 0),
+					me
+				)
+			: null;
+		// A position no starter has a week figure at ranks nobody this week (review M4).
+		const projected = weekRead && week.some((f) => f.figured.has(p));
 		const mine = answer.roster
 			.filter((l) => l.player.position === p)
 			.map((line) => ({
@@ -146,30 +236,23 @@ export function withPositions(answer: WaiverAdvice, inputs: PanelInputs): Waiver
 				starts_this_week: (week[me]?.starts ?? new Set()).has(line.player.board_id ?? ''),
 				rest_of_season_points: pointsOf(inputs, line)
 			}))
-			.sort(
-				(a, b) => (b.rest_of_season_points ?? -Infinity) - (a.rest_of_season_points ?? -Infinity)
-			);
-		const available = [...new Map(answer.rows.map((r) => [rowKey(r), r])).values()]
-			.filter((r) => r.add.player.position === p)
-			.map((row) => ({ row, rest_of_season_points: pointsOf(inputs, row.add) }))
-			.sort(
-				(a, b) => (b.rest_of_season_points ?? -Infinity) - (a.rest_of_season_points ?? -Infinity)
-			)
-			.slice(0, PANEL_FREE);
-		const short = rest.median - rest.points;
+			.sort(desc((m) => m.rest_of_season_points));
 		return {
 			position: p,
 			teams: teams.length,
-			need: pointed && p !== 'K' && p !== 'DEF' && roundTenth(short) >= CLOSE_CALL * inputs.weeks,
-			rest_of_season: pointed ? rest : null,
-			week: weekRead
+			need: positionNeed(p, rest, inputs.weeks),
+			rest_of_season: rest,
+			week: projected
 				? standingOf(
 						week.map((f) => f.by.get(p) ?? 0),
 						me
 					)
 				: null,
 			mine,
-			available
+			available: freeAt(answer.rows, p, inputs, (f) => f.rest_of_season_points),
+			...(projected
+				? { available_week: freeAt(answer.rows, p, inputs, (f) => f.row.add.week_projection) }
+				: {})
 		};
 	});
 	return { ...answer, positions };
