@@ -82,6 +82,16 @@ func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.Leag
 		out.Roster = p.roster(team)
 	}
 	out.Matchup = p.matchup(snap, link.RosterID)
+	out.PointsVsMedian = pointsVsMedian(snap, link.RosterID)
+	if chances, ok := s.chances.of(snap); ok {
+		for i := range out.Teams {
+			pct, has := chances.ByRoster[out.Teams[i].RosterId]
+			if has {
+				out.Teams[i].PlayoffChance = &pct
+			}
+		}
+		out.PlayoffChanceBasis = &chances.Basis
+	}
 	return out, nil
 }
 

@@ -3506,6 +3506,12 @@ type LeagueSync struct {
 	// Placement how the league's rostered players were placed on our board, by rule
 	Placement Placement `json:"placement"`
 
+	// PlayoffChanceBasis Lane 298: how each team's playoff_chance is reckoned, the replays, the model and the playoff rules read; absent where no team has one
+	PlayoffChanceBasis *string `json:"playoff_chance_basis,omitempty"`
+
+	// PointsVsMedian Lane 298, absent where the league's played weeks are not read
+	PointsVsMedian *LeagueVsMedian `json:"points_vs_median,omitempty"`
+
 	// ReadAt when the host was last read for this league
 	ReadAt time.Time    `json:"read_at"`
 	Roster []RosterSpot `json:"roster"`
@@ -3557,6 +3563,9 @@ type LeagueTeam struct {
 
 	// Owner the owner's display name
 	Owner string `json:"owner"`
+
+	// PlayoffChance Lane 298: the team's chance of making the playoffs, a percent from the league answer's replays of the schedule left (playoff_chance_basis says how). 100 only for a team that has clinched a place and 0 only for one that is out; a replayed figure is held to 1 to 99. Absent or null where the league has no figure (its playoffs, its schedule or too few played weeks are not read)
+	PlayoffChance *int `json:"playoff_chance,omitempty"`
 
 	// PointsAgainst null where the host does not say
 	PointsAgainst *float64 `json:"points_against"`
@@ -3619,6 +3628,34 @@ type LeagueTermsPlayoffSeeds string
 
 // LeagueTermsWaivers claims carry a bid from a season budget, or run in a waiver order; null where the host does not say
 type LeagueTermsWaivers string
+
+// LeagueVsMedian Lane 298, the member's points against the league's median score on each played week
+type LeagueVsMedian struct {
+	// Above the weeks the member scored above the median
+	Above int `json:"above"`
+
+	// Basis the figure's sentence, in the member's words
+	Basis string `json:"basis"`
+
+	// Total the weeks' diffs summed from their printed tenths
+	Total float64 `json:"total"`
+
+	// Weeks every played week whose scores the platform gave for each team, in order
+	Weeks []LeagueVsMedianWeek `json:"weeks"`
+}
+
+// LeagueVsMedianWeek defines model for LeagueVsMedianWeek.
+type LeagueVsMedianWeek struct {
+	// Diff points less median
+	Diff float64 `json:"diff"`
+
+	// Median the league's median score that week, to the tenth
+	Median float64 `json:"median"`
+
+	// Points the member's points that week
+	Points float64 `json:"points"`
+	Week   int     `json:"week"`
+}
 
 // Lineup defines model for Lineup.
 type Lineup string

@@ -111,6 +111,28 @@ func (m *Member) ReadLeague(ctx context.Context, accountID uuid.UUID, season int
 	return out, err
 }
 
+// Scoreboards is each week's scoreboard of a league, as the member, one
+// documented request a week inside the client's pace (Lane 298).
+func (m *Member) Scoreboards(ctx context.Context, accountID uuid.UUID, season int, leagueID string, weeks []int) ([]Scoreboard, error) {
+	var out []Scoreboard
+	err := m.as(ctx, accountID, func(access string) error {
+		key, err := m.leagueKey(ctx, access, season, leagueID)
+		if err != nil {
+			return err
+		}
+		out = out[:0]
+		for _, week := range weeks {
+			sb, err := m.Client.Scoreboard(ctx, access, key, week)
+			if err != nil {
+				return err
+			}
+			out = append(out, sb)
+		}
+		return nil
+	})
+	return out, err
+}
+
 // leagueKey is the league's key in the season's game; season 0 is the
 // current season's game.
 func (m *Member) leagueKey(ctx context.Context, access string, season int, leagueID string) (string, error) {

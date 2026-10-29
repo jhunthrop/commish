@@ -179,6 +179,20 @@ func (c *Client) League(ctx context.Context, access, leagueKey string) (League, 
 	return l, nil
 }
 
+// Scoreboard is one week's scoreboard of a league (the documented
+// league/{key}/scoreboard;week=N, Lane 298): each matchup's two teams,
+// their points and whether Yahoo has scored it final.
+func (c *Client) Scoreboard(ctx context.Context, access, leagueKey string, week int) (Scoreboard, error) {
+	if week < 1 || week > maxWeek {
+		return Scoreboard{}, fmt.Errorf("%w: week %d", ErrNoSuchLeague, week)
+	}
+	body, err := c.get(ctx, access, "league/"+leagueKey+"/scoreboard;week="+strconv.Itoa(week))
+	if err != nil {
+		return Scoreboard{}, err
+	}
+	return ParseScoreboard(body)
+}
+
 // Bounds on the waiver read: Yahoo answers at most a page of 25 players,
 // and a league's waiver wire is a few dozen at most.
 const (

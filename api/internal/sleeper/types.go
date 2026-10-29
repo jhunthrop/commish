@@ -114,6 +114,9 @@ type League struct {
 	// player ruled out may take one (Lane 118, B79).
 	ReserveSlots    int
 	ReserveAllowOut bool
+	// MedianMatch is settings.league_average_match: each week every team
+	// also plays the week's median score (Lane 298).
+	MedianMatch bool
 }
 
 type wireDraft struct {
@@ -354,6 +357,9 @@ func (w wireLeague) validate(id string) (League, error) {
 	}
 	if n, ok := intSetting(w.Settings["reserve_allow_out"]); ok {
 		l.ReserveAllowOut = n == 1
+	}
+	if n, ok := intSetting(w.Settings["league_average_match"]); ok {
+		l.MedianMatch = n == 1
 	}
 	return l, nil
 }

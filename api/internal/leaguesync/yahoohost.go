@@ -28,6 +28,7 @@ const yahooIDsTTL = 6 * time.Hour
 // YahooMember reads Yahoo as a member. *yahoo.Member implements it.
 type YahooMember interface {
 	ReadLeague(ctx context.Context, accountID uuid.UUID, season int, leagueID string) (yahoo.League, error)
+	Scoreboards(ctx context.Context, accountID uuid.UUID, season int, leagueID string, weeks []int) ([]yahoo.Scoreboard, error)
 }
 
 // HostIDs is a host's player id to our board's, from the research

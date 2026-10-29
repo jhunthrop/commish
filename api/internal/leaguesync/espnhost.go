@@ -194,6 +194,7 @@ func espnSnapshot(l espn.FullLeague, now time.Time) Snapshot {
 	snap.Scoring = Scoring{Rules: im.Rules, Dropped: scoring.DroppedWords(im.Dropped), DroppedRules: im.Dropped, Defaulted: im.Defaulted}
 	snap.Shape = espnShape(l.LineupSlotCount, len(snap.Teams))
 	snap.Terms = espnTerms(l)
+	snap.Schedule = espnSchedule(l.Schedule)
 	return snap
 }
 

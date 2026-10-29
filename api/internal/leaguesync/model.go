@@ -101,6 +101,12 @@ type Snapshot struct {
 	// Terms is the host's word on the league's waivers and playoffs, for
 	// the league page's settings (terms.go).
 	Terms Terms `json:"terms"`
+	// Schedule is the season's games, every week's pairings and each
+	// played week's scores (Lane 298, schedule.go): ESPN's and FFPC's from
+	// the read itself, Sleeper's, Yahoo's and MyFantasyLeague's from the
+	// weeks the schedule keeper has kept (schedulekeep.go). Empty where
+	// none is read yet; Matchups stays the live week's sides.
+	Schedule []ScheduledGame `json:"schedule,omitempty"`
 }
 
 // Pool statuses, as the waiver tool reads them.

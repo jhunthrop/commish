@@ -17,6 +17,9 @@ nesting are Yahoo's; the values are ours.
 - `yahoo-league-rosters.xml`: `league/{key}/teams;out=roster`
 - `yahoo-league-waivers.xml`: `league/{key}/players;status=W;out=ownership;start=0;count=25`
 - `yahoo-token.json`: the token endpoint's answer, with fixture tokens
+- `yahoo-scoreboard-week5.xml`: `league/{key}/scoreboard;week=5` (Lane 298, constructed):
+  two matchups the league scored final (status postevent). The league head
+  gains the documented settings `num_playoff_teams` (4) the same lane reads
 - `yahoo-pending-trades.xml`: `league/{key}/transactions;team_key={team};type=pending_trade`
   (Lane 279, constructed): the guide's pending-trade sample (Transaction
   resource, `257.l.193.pt.1`) inside the league transactions collection, four

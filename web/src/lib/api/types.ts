@@ -3114,6 +3114,40 @@ export interface components {
 			waiver_budget_left: number | null;
 			/** @description the host's image for the team or its owner, null where the host gives none we show */
 			avatar: string | null;
+			/** @description Lane 298: the team's chance of making the playoffs, a percent from the league answer's replays of the schedule left (playoff_chance_basis says how). 100 only for a team that has clinched a place and 0 only for one that is out; a replayed figure is held to 1 to 99. Absent or null where the league has no figure (its playoffs, its schedule or too few played weeks are not read) */
+			playoff_chance?: number | null;
+		};
+		LeagueVsMedianWeek: {
+			week: number;
+			/**
+			 * Format: double
+			 * @description the member's points that week
+			 */
+			points: number;
+			/**
+			 * Format: double
+			 * @description the league's median score that week, to the tenth
+			 */
+			median: number;
+			/**
+			 * Format: double
+			 * @description points less median
+			 */
+			diff: number;
+		};
+		/** @description Lane 298, the member's points against the league's median score on each played week */
+		LeagueVsMedian: {
+			/** @description every played week whose scores the platform gave for each team, in order */
+			weeks: components['schemas']['LeagueVsMedianWeek'][];
+			/** @description the weeks the member scored above the median */
+			above: number;
+			/**
+			 * Format: double
+			 * @description the weeks' diffs summed from their printed tenths
+			 */
+			total: number;
+			/** @description the figure's sentence, in the member's words */
+			basis: string;
 		};
 		LeaguePlayer: {
 			host_id: string;
@@ -5428,6 +5462,10 @@ export interface components {
 			host_failed: boolean;
 			/** @description the stale answer's last read failed because no member of the league is signed in to the host (FFPC), so a sign-in mends it. False when fresh */
 			host_signed_out: boolean;
+			/** @description Lane 298: how each team's playoff_chance is reckoned, the replays, the model and the playoff rules read; absent where no team has one */
+			playoff_chance_basis?: string;
+			/** @description Lane 298, absent where the league's played weeks are not read */
+			points_vs_median?: components['schemas']['LeagueVsMedian'];
 		};
 		/**
 		 * @description what a paired device may do; session (an app's alone) opens every signed-in route

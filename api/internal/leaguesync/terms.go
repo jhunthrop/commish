@@ -57,6 +57,9 @@ type Terms struct {
 	// Seeds is how the host's rules seed the playoffs, seed by seed
 	// (SeedRecord or SeedPoints); none where the host states no seeding.
 	Seeds []string `json:"seeds,omitempty"`
+	// MedianGame says every team also plays the week's median score each
+	// week (Sleeper's league_average_match, Lane 298).
+	MedianGame bool `json:"median_game,omitempty"`
 }
 
 // How a playoff seed is earned, as the contract (LeagueTerms.playoff_seeds)
@@ -86,7 +89,7 @@ func sleeperStreak(s string) string {
 }
 
 func sleeperTerms(l sleeper.League) Terms {
-	t := Terms{PlayoffTeams: l.PlayoffTeams, PlayoffFirst: l.PlayoffWeekStart}
+	t := Terms{PlayoffTeams: l.PlayoffTeams, PlayoffFirst: l.PlayoffWeekStart, MedianGame: l.MedianMatch}
 	switch l.WaiverType {
 	case sleeper.WaiverBudget:
 		t.Waivers, t.Budget = WaiversBudget, l.WaiverBudget

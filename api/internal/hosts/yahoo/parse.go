@@ -50,10 +50,13 @@ type League struct {
 	// PlayoffStartWeek is the league's first playoff week (settings
 	// playoff_start_week), 0 for a league with no playoffs.
 	PlayoffStartWeek int
-	Teams            []Team
-	Settings         Settings
-	Scoreboard       Scoreboard
-	Moves            []Move
+	// PlayoffTeams is settings num_playoff_teams, 0 for a league with no
+	// playoffs or one that does not say (Lane 298).
+	PlayoffTeams int
+	Teams        []Team
+	Settings     Settings
+	Scoreboard   Scoreboard
+	Moves        []Move
 	// Waivers is every unrostered player on waivers; every other
 	// unrostered player is a free agent.
 	Waivers []Waiver
@@ -129,10 +132,12 @@ type Scoreboard struct {
 	Games []Game
 }
 
-// Game is one matchup: two teams and their points.
+// Game is one matchup: two teams and their points, and whether Yahoo
+// has scored it final (its status postevent, Lane 298).
 type Game struct {
 	TeamIDs [2]int
 	Points  [2]float64
+	Final   bool
 }
 
 // Move is one completed transaction.
@@ -211,6 +216,7 @@ type xmlLeague struct {
 		DraftTime        int64  `xml:"draft_time"`
 		UsesPlayoff      string `xml:"uses_playoff"`
 		PlayoffStartWeek int    `xml:"playoff_start_week"`
+		PlayoffTeams     int    `xml:"num_playoff_teams"`
 		Slots            []struct {
 			Position string `xml:"position"`
 			Count    int    `xml:"count"`
@@ -234,7 +240,9 @@ type xmlLeague struct {
 	Scoreboard struct {
 		Week     int `xml:"week"`
 		Matchups []struct {
-			Teams []xmlTeam `xml:"teams>team"`
+			Week   int       `xml:"week"`
+			Status string    `xml:"status"`
+			Teams  []xmlTeam `xml:"teams>team"`
 		} `xml:"matchups>matchup"`
 	} `xml:"scoreboard"`
 	Transactions []struct {
@@ -375,6 +383,7 @@ func ParseLeague(headBody, rostersBody []byte) (League, error) {
 	}
 	if h.Settings.UsesPlayoff == "1" {
 		l.PlayoffStartWeek = bounded(h.Settings.PlayoffStartWeek, 0, maxWeek)
+		l.PlayoffTeams = bounded(h.Settings.PlayoffTeams, 0, MaxTeams)
 	}
 	teams, err := leagueTeams(h.Standings, rosters.League.Teams)
 	if err != nil {
@@ -537,13 +546,30 @@ func settings(h xmlLeague) Settings {
 	return s
 }
 
+// statusFinal is a matchup Yahoo has scored final.
+const statusFinal = "postevent"
+
+// ParseScoreboard reads one week's scoreboard
+// (league/{key}/scoreboard;week=N): its week and its games.
+func ParseScoreboard(body []byte) (Scoreboard, error) {
+	root, err := decode(body)
+	if err != nil {
+		return Scoreboard{}, err
+	}
+	sb := scoreboard(root.League)
+	if sb.Week == 0 {
+		return Scoreboard{}, fmt.Errorf("%w: scoreboard names no week", ErrMalformed)
+	}
+	return sb, nil
+}
+
 func scoreboard(h xmlLeague) Scoreboard {
 	sb := Scoreboard{Week: bounded(h.Scoreboard.Week, 0, 25)}
 	for _, m := range h.Scoreboard.Matchups {
 		if len(m.Teams) != 2 {
 			continue
 		}
-		var g Game
+		g := Game{Final: m.Status == statusFinal}
 		ok := true
 		for i, t := range m.Teams {
 			id, valid := teamID(t)

@@ -281,8 +281,9 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 	players := &leaguesync.Directory{Hosts: hostList, Store: store, Now: now, Log: log}
 	go players.Warm(context.Background(), cfg.Board.Season)
 	return &leaguesync.Service{
-		Hosts:     hostList,
-		Poller:    &leaguesync.Poller{Hosts: hostList, Store: store, Now: now, Log: log},
+		Hosts: hostList,
+		Poller: &leaguesync.Poller{Hosts: hostList, Store: store, Now: now, Log: log,
+			Schedule: &leaguesync.ScheduleKeeper{Store: store, Now: now, Log: log}},
 		Admission: &leaguesync.Admission{Now: now},
 		Players:   players,
 		Links:     store, Saved: saved, Boards: board, FFPC: ffpcHost, Entitlements: ents, ESPN: espn.New(), Now: now, Log: log,

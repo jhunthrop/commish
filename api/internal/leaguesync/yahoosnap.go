@@ -64,6 +64,7 @@ func yahooSnapshot(l yahoo.League, ids map[string]string, now time.Time) Snapsho
 	im := l.Settings.Scoring()
 	snap.Scoring = Scoring{Rules: im.Rules, Dropped: scoring.DroppedWords(im.Dropped), DroppedRules: im.Dropped, Defaulted: im.Defaulted}
 	snap.Shape = yahooShape(l.Settings, len(snap.Teams))
+	snap.Terms = Terms{PlayoffTeams: l.PlayoffTeams, PlayoffFirst: l.PlayoffStartWeek}
 	return snap
 }
 
