@@ -58,9 +58,10 @@ import app.trycommish.core.player.PlayerPageViewModel
 import app.trycommish.core.player.PlayerReadsGraph
 import app.trycommish.core.player.PlayerSheetViewModel
 import app.trycommish.core.push.ApiPushApi
+import app.trycommish.core.push.PendingRemoval
 import app.trycommish.core.push.PrefsPushOffFlag
 import app.trycommish.core.push.PushRegistrar
-import app.trycommish.core.push.PushRoute
+import app.trycommish.core.push.PushTap
 import app.trycommish.core.rankings.ApiRankingsReads
 import app.trycommish.core.rankings.RankingsReads
 import app.trycommish.core.rankings.RankingsViewModel
@@ -186,18 +187,25 @@ class AppGraph(
     private val pushPlatform = FirebasePush(appContext, pushPrefs)
 
     /** This phone's push (Lane 288): its FCM token on its own device, the Account's switches behind it. */
-    private val push =
-        PushRegistrar(ApiPushApi(transport), pushPlatform, { session.deviceId }, PrefsPushOffFlag(pushPrefs)) { what, e ->
-            Log.w(TAG, what, e)
-        }
+    private val push: PushRegistrar by lazy {
+        // A removal a sign out without signal could not finish, with the signed-out device's own token.
+        val pending = EncryptedSession(appContext, EncryptedSession.PUSH_PENDING)
+        PushRegistrar(
+            ApiPushApi(transport),
+            pushPlatform,
+            session,
+            PendingRemoval(pending, ApiPushApi(Transport(apiBaseUrl, token = { pending.token }))),
+            PrefsPushOffFlag(pushPrefs),
+        ) { what, e -> Log.w(TAG, what, e) }
+    }
 
-    private val mutablePushed = MutableStateFlow<PushRoute?>(null)
+    private val mutablePushed = MutableStateFlow<PushTap?>(null)
 
-    /** A tapped push's screen, opened by the shell once it is signed in. */
-    val pushed: StateFlow<PushRoute?> = mutablePushed.asStateFlow()
+    /** A tapped push, opened by the shell once it is signed in. */
+    val pushed: StateFlow<PushTap?> = mutablePushed.asStateFlow()
 
-    fun openPush(route: PushRoute) {
-        mutablePushed.value = route
+    fun openPush(tap: PushTap) {
+        mutablePushed.value = tap
     }
 
     /** The shell opened the push's screen (or let it go). */
@@ -210,9 +218,10 @@ class AppGraph(
         pushPlatform.asker = ask
     }
 
-    /** Signed in (the app's start, a finished sign-in): a phone that allows push registers its token. */
+    /** The app's start: a removal left from a sign out without signal is tried again; signed in, a phone that
+     * allows push registers its token. */
     fun startPush() {
-        if (session.token != null) appScope.launch { push.start() }
+        appScope.launch { if (session.token != null) push.start() else push.launched() }
     }
 
     /** Firebase handed over a new token (CommishMessaging.onNewToken). */

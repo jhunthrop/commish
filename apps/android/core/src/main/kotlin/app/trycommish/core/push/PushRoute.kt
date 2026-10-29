@@ -4,6 +4,21 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.net.URLDecoder
 
+/** What a tapped push opens: a followed league's screen, or the league list. */
+sealed interface PushDestination {
+    data class League(
+        val route: PushRoute,
+    ) : PushDestination
+
+    data object LeagueList : PushDestination
+}
+
+/** One tap on a push: the route its payload names (null for none this build reads). Not a data class, so the
+ * same push tapped twice opens twice. */
+class PushTap(
+    val route: PushRoute?,
+)
+
 /** The screens a push opens, the tabs of the league it names. */
 enum class PushScreen { League, Lineup, Waivers }
 
@@ -28,6 +43,14 @@ data class PushRoute(
         private const val HOME_SEGMENTS = 2
         private const val SCREEN_SEGMENTS = 3
         private const val UTF_8 = "UTF-8"
+
+        /** Where a tapped push opens the shell (review M1): its route when it names a league the member
+         * follows, else the league list (the switch), so a push for a league since detached, or a path this
+         * build does not draw, still lands somewhere that says what is followed. */
+        fun destination(
+            route: PushRoute?,
+            following: List<String>,
+        ): PushDestination = if (route != null && route.league in following) PushDestination.League(route) else PushDestination.LeagueList
 
         /** The route a push's data names (FCM's data map, or a tapped notification's extras). */
         fun of(data: Map<String, String?>): PushRoute? = data[PATH_KEY]?.let(::ofPath)

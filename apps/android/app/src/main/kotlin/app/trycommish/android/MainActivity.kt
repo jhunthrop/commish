@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
         graph.askReplay(intent?.getBooleanExtra(REPLAY_EXTRA, false) == true)
         graph.signInFlow.returnLink(intent)?.let(graph::completeSignIn)
         intent?.dataString?.let { SiteLinks.companion(it) ?: SiteLinks.mock(it) }?.let(graph::openLink)
-        intent?.pushRoute()?.let(graph::openPush)
+        intent?.pushTap()?.let(graph::openPush)
     }
 
     private companion object {

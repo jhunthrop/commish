@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import app.trycommish.core.push.PushPermission
 import app.trycommish.core.push.PushPlatform
 import app.trycommish.core.push.PushRoute
+import app.trycommish.core.push.PushTap
 import app.trycommish.design.Words
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
@@ -97,12 +98,16 @@ class FirebasePush(
     }
 }
 
-/** A push's data as the intent that opens the app carries it: FCM puts a background push's data in the
- * launcher intent's extras, and a push shown here puts the same keys there. */
-fun Intent.pushRoute(): PushRoute? {
-    val path = getStringExtra(PushRoute.PATH_KEY) ?: return null
-    return PushRoute.ofPath(path)
+/** A tapped push as the intent that opens the app carries it: FCM puts a background push's data in the
+ * launcher intent's extras, and a push shown here puts the same keys there. Every push carries its `kind`;
+ * an intent without one is no push. Its path may name no screen this build draws (a null route). */
+fun Intent.pushTap(): PushTap? {
+    if (getStringExtra(KIND_KEY) == null) return null
+    return PushTap(getStringExtra(PushRoute.PATH_KEY)?.let(PushRoute::ofPath))
 }
+
+/** The payload's key every push carries (the API's notify payload). */
+private const val KIND_KEY = "kind"
 
 /**
  * Firebase Messaging's service: a new token goes to the registrar (onNewToken); a push that arrives while
@@ -142,6 +147,8 @@ class CommishMessaging : FirebaseMessagingService() {
                 .setContentText(shown.body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(shown.body))
                 .setAutoCancel(true)
+                // A player's and a league's names: the lock screen says a push arrived, not what it says.
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                 .setContentIntent(tap)
                 .build()
         NotificationManagerCompat.from(this).notify(message.messageId.hashCode(), notification)

@@ -1,8 +1,11 @@
 package app.trycommish.core.push
 
 import android.content.SharedPreferences
+import app.trycommish.api.ApiFailure
 import app.trycommish.api.Transport
+import app.trycommish.api.Unauthorized
 import app.trycommish.api.models.PushRegistration
+import app.trycommish.core.Session
 import app.trycommish.core.account.done
 import kotlinx.coroutines.CancellationException
 import java.util.UUID
@@ -91,36 +94,66 @@ class MemoryPushOffFlag(
     override var off: Boolean = false,
 ) : PushOffFlag
 
+/** A removal the phone could not finish at sign out (no signal): the signed-out device's id and token kept in
+ * their own encrypted store, and the client that takes the token off with that token (Lane 288 security
+ * M1). Until it is done, the previous member's pushes would keep arriving here. */
+class PendingRemoval(
+    val store: Session,
+    val api: PushApi,
+)
+
 /**
  * This phone's push registration (spec §5.3, Lane 288; the iOS PushRegistrar's): the FCM token on its own
  * device on the first run signed in and at each launch signed in, again when Firebase hands over a new
  * one (onNewToken), taken off when every switch goes off and at sign out. Whether push is wanted is kept
- * on the phone, so a launch after every switch went off registers nothing; it starts wanted. The
- * permission is never asked here: only the Account's switch asks. `log` hears a failed write.
+ * on the phone, so a launch after every switch went off registers nothing; it starts wanted. A token
+ * registers only while the phone allows push, and the permission is never asked here: only the
+ * Account's switch asks. A removal that failed at sign out is kept and tried again at the next launch
+ * before any registration, and a registration the API refuses because another account's device holds
+ * the token tries that removal, then once more. `log` hears a failed write.
  */
 class PushRegistrar(
     private val api: PushApi,
     private val platform: PushPlatform,
-    private val deviceId: () -> String?,
+    private val session: Session,
+    private val pending: PendingRemoval,
     private val flag: PushOffFlag,
     private val log: (String, Throwable) -> Unit,
 ) : PushControl {
     /** Whether this phone wants pushes: true until every switch goes off here. */
     val wanted: Boolean get() = !flag.off
 
+    /** At launch, signed in or not: a removal left from a sign out without signal is tried again. */
+    suspend fun launched() = finishPendingRemoval()
+
     /** Signed in (at launch, or a sign-in just finished): a phone that allows push and wants it registers its
      * token. Never shows the prompt. */
     suspend fun start() {
+        finishPendingRemoval()
         if (!wanted || platform.permission() != PushPermission.Allowed) return
         platform.token()?.let { tokenArrived(it) }
     }
 
-    /** Firebase handed over a token (onNewToken): registered on this phone's device while push is wanted
-     * and the phone is signed in. */
+    /** Firebase handed over a token (onNewToken): registered on this phone's device while push is wanted and
+     * allowed and the phone is signed in, after any removal left from a sign out. A token another account's
+     * device holds (409) tries that removal and registers once more. */
     suspend fun tokenArrived(token: String) {
-        if (!wanted) return
-        val device = deviceId() ?: return
-        attempt("push registration") { api.register(device, token) }
+        finishPendingRemoval()
+        if (!wanted || platform.permission() != PushPermission.Allowed) return
+        val device = session.deviceId ?: return
+        try {
+            api.register(device, token)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: ApiFailure) {
+            if (e.status != HTTP_CONFLICT) return log("push registration", e)
+            finishPendingRemoval()
+            attempt("push registration again") { api.register(device, token) }
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            log("push registration", e)
+        }
     }
 
     override fun permission(): PushPermission = platform.permission()
@@ -138,21 +171,47 @@ class PushRegistrar(
 
     override suspend fun disable() {
         flag.off = true
-        remove()
+        session.deviceId?.let { remove(it, api) }
     }
 
-    /** The phone signs out: its token comes off the account before the device is revoked, Firebase forgets
-     * it, and the next account on this phone starts wanting push again. */
+    /** The phone signs out: its token comes off the account before the device is revoked, Firebase forgets it,
+     * and the next account on this phone starts wanting push again. Without signal the removal is kept, with
+     * this device's token, for the next launch. */
     suspend fun signingOut() {
-        remove()
-        attempt("push token delete") { platform.deleteToken() }
         flag.off = false
+        val device = session.deviceId ?: return
+        if (!remove(device, api)) session.token?.let { pending.store.signIn(it, device) }
+        attempt("push token delete") { platform.deleteToken() }
     }
 
-    private suspend fun remove() {
-        val device = deviceId() ?: return
-        attempt("push removal") { api.remove(device) }
+    /** The removal a sign out could not finish, with the signed-out device's own token; done once the API takes
+     * it or says the device is gone (its token refused, or no such device). */
+    private suspend fun finishPendingRemoval() {
+        val device = pending.store.deviceId ?: return
+        if (remove(device, pending.api)) pending.store.signOut()
     }
+
+    /** Whether the device's token is off the account: taken off, or the device is gone already. */
+    private suspend fun remove(
+        device: String,
+        client: PushApi,
+    ): Boolean =
+        try {
+            client.remove(device)
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Unauthorized) {
+            true
+        } catch (e: ApiFailure) {
+            log("push removal", e)
+            e.status == HTTP_NOT_FOUND
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            log("push removal", e)
+            false
+        }
 
     private suspend fun attempt(
         what: String,
@@ -167,6 +226,11 @@ class PushRegistrar(
         ) {
             log(what, e)
         }
+    }
+
+    private companion object {
+        const val HTTP_CONFLICT = 409
+        const val HTTP_NOT_FOUND = 404
     }
 }
 

@@ -39,6 +39,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.trycommish.core.lobby.LobbyLandingViewModel
 import app.trycommish.core.phoneBar
+import app.trycommish.core.push.PushDestination
+import app.trycommish.core.push.PushRoute
 import app.trycommish.core.push.PushScreen
 import app.trycommish.core.shell.FollowedLeague
 import app.trycommish.core.shell.LEAGUE_PAGE
@@ -96,6 +98,14 @@ private val LIVE_PAGES =
  * record. */
 private const val PLAYERS_PAGE = "players"
 private const val RECORD_PAGE = "record"
+
+/** The tab a push's screen opens. */
+internal fun pushPage(screen: PushScreen): String =
+    when (screen) {
+        PushScreen.League -> LEAGUE_PAGE
+        PushScreen.Lineup -> LINEUP_PAGE
+        PushScreen.Waivers -> WAIVERS_PAGE
+    }
 
 /** The pushed screens' routes, one per ShellRoute. */
 private object Routes {
@@ -223,24 +233,25 @@ fun Shell(
         }
     }
 
-    // A tapped push (Lane 288), once the account is read: its league chosen in the switch (one this account
-    // still follows), then the tab its screen is where the bar has it, else the league's home as the switch
-    // opens it.
+    // A tapped push (Lane 288, review M1), once the account is read: a followed league's screen, its league
+    // chosen in the switch, then the tab its screen is where the bar has it, else the league's home as the
+    // switch opens it; a league no longer followed, or a path this build does not draw, opens the league
+    // list. Signed out, the tap is let go, so the next account never opens it (security L2).
     val pushed by graph.pushed.collectAsStateWithLifecycle()
     LaunchedEffect(pushed, signedIn, state) {
-        val route = pushed ?: return@LaunchedEffect
+        val tap = pushed ?: return@LaunchedEffect
+        if (!signedIn) return@LaunchedEffect graph.pushOpened()
         val ready = state as? ShellState.Ready ?: return@LaunchedEffect
         graph.pushOpened()
-        if (!signedIn || ready.leagues.none { it.id == route.league }) return@LaunchedEffect
         sheet.close()
-        choose(route.league)
-        val page =
-            when (route.screen) {
-                PushScreen.League -> LEAGUE_PAGE
-                PushScreen.Lineup -> LINEUP_PAGE
-                PushScreen.Waivers -> WAIVERS_PAGE
+        when (val to = PushRoute.destination(tap.route, ready.leagues.map { it.id })) {
+            PushDestination.LeagueList -> switchOpen = true
+            is PushDestination.League -> {
+                choose(to.route.league)
+                val page = pushPage(to.route.screen)
+                if (shell.bar().any { it.page == page }) openTab(page)
             }
-        if (shell.bar().any { it.page == page }) openTab(page)
+        }
     }
 
     val openLineup: (String) -> Unit = { id ->

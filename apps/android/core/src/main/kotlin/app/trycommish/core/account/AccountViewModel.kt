@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.trycommish.api.ApiFailure
 import app.trycommish.api.CommishJson
 import app.trycommish.api.Unauthorized
+import app.trycommish.api.models.NotificationSettingsUpdate
 import app.trycommish.core.AppWords
 import app.trycommish.core.Cache
 import app.trycommish.core.Cached
@@ -99,6 +100,12 @@ class AccountViewModel(
 ) : ViewModel() {
     private val mutableUi = MutableStateFlow(AccountUi())
     private var quietWrite: Job? = null
+
+    /** The settings the account last confirmed (read or written), put back when a write fails (review M4). */
+    private var confirmed = PushSettings.standard
+
+    /** Whether this view model has written the phone's zone to the account (once, on load; review M2). */
+    private var zoneWritten = false
     private val mutableRefreshing = MutableStateFlow(false)
     private var loadJob: Job? = null
     private var answer: AccountScreenAnswer? = null
@@ -154,6 +161,7 @@ class AccountViewModel(
             val now = clock.now()
             cache.write(ROUTE, Cached(CommishJson.encodeToString(AccountScreenAnswer.serializer(), fresh), now))
             show(fresh, now, stale = false)
+            writeZone(fresh.me)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Unauthorized) {
@@ -269,20 +277,20 @@ class AccountViewModel(
     }
 
     /** A switch moved. On asks the phone first when it may not show a push yet (the prompt once, never at
-     * launch), and stays off when it says no. The switches as drawn are written whole, so what the member
-     * sees is what the account keeps; every one off takes this phone's token off. */
+     * launch), and stays off when it says no. The write is the account's stored switches with only this kind
+     * changed, so a phone that had not allowed push (every switch drawn off) never turns off the kinds the
+     * account keeps on (review M3); every one off takes this phone's token off. */
     fun set(
         kind: PushKind,
         isOn: Boolean,
     ): Job =
         viewModelScope.launch {
-            val drawn = ui.value.shownPush
             if (isOn) {
                 val permission = control.enable()
                 mutableUi.update { it.copy(permission = permission) }
                 if (permission != PushPermission.Allowed) return@launch
             }
-            val next = drawn.with(kind, isOn)
+            val next = ui.value.push.with(kind, isOn)
             if (writePush(next) && !next.anyOn) control.disable()
         }
 
@@ -306,16 +314,12 @@ class AccountViewModel(
     }
 
     /** Writes the settings to the account and shows what it holds after; a write that fails puts the
-     * account's back and says so beside the switches. */
+     * account's last confirmed settings back (review M4) and says so beside the switches. */
     private suspend fun writePush(settings: PushSettings): Boolean {
-        val before = ui.value.push
         mutableUi.update { it.copy(push = settings, problem = null) }
         val problem =
             try {
-                val me = reads.updateNotifications(settings.change(zone))
-                mutableUi.update { it.copy(push = PushSettings.of(me.notifications)) }
-                answer = answer?.copy(me = me)
-                save()
+                held(reads.updateNotifications(settings.change(zone)))
                 null
             } catch (e: CancellationException) {
                 throw e
@@ -330,9 +334,37 @@ class AccountViewModel(
                 Words.Account.failed
             }
         if (problem != null) {
-            mutableUi.update { it.copy(push = before, problem = AccountProblem(AccountSection.Notifications, problem)) }
+            mutableUi.update { it.copy(push = confirmed, problem = AccountProblem(AccountSection.Notifications, problem)) }
         }
         return problem == null
+    }
+
+    /** The account as PATCH /me answered it: its settings confirmed and shown, the saved answer updated. */
+    private fun held(me: AccountRead) {
+        confirmed = PushSettings.of(me.notifications)
+        mutableUi.update { it.copy(push = confirmed) }
+        answer = answer?.copy(me = me)
+        save()
+    }
+
+    /** The account keeps quiet hours in a zone; when it is not this phone's (the API's New York default, or a
+     * trip), the phone's is written once, so quiet hours hold on the phone's clock (review M2). A failed
+     * write is tried again the next time the Account opens. */
+    private suspend fun writeZone(me: AccountRead) {
+        val heldZone = me.notifications?.timeZone ?: return
+        if (zoneWritten || heldZone == zone.id) return
+        zoneWritten = true
+        try {
+            held(reads.updateNotifications(NotificationSettingsUpdate(timeZone = zone.id)))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Unauthorized) {
+            signedOut()
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            zoneWritten = false
+        }
     }
 
     /** Runs a row's action; false, with its sentence beside the section, when it did not go through. */
@@ -388,7 +420,10 @@ class AccountViewModel(
         stale: Boolean,
     ) {
         answer = read
-        if (quietWrite?.isActive != true) mutableUi.update { it.copy(push = PushSettings.of(read.me.notifications)) }
+        if (quietWrite?.isActive != true) {
+            confirmed = PushSettings.of(read.me.notifications)
+            mutableUi.update { it.copy(push = confirmed) }
+        }
         this.stamp = stamp
         this.stale = stale
         redraw()
