@@ -10,6 +10,7 @@
 	import type { LeagueHost } from '../api.ts';
 	import { positionWord } from '../box/box.ts';
 	import PickupStrip from '../box/PickupStrip.svelte';
+	import PositionPanel from '../box/PositionPanel.svelte';
 	import { addressedWeek, arrivesPart, weekProjected } from '../box/next-week.ts';
 	import WaiverTable from '../box/WaiverTable.svelte';
 	import {
@@ -338,6 +339,17 @@
 		markAsked(document, asked);
 	});
 
+	/** The advice's drop for an add: the first the drop panel lists. */
+	function advisedDrop(source: WaiverRow): DropRow | null {
+		return dropRows(source, shown.roster, memberZone(), now)[0] ?? null;
+	}
+
+	/** The position panel's Add (Lane 291): the add with the advice's drop, by the verb rule the
+	 * shelf and the table's go verb use. */
+	function addFromPanel(source: WaiverRow): void {
+		act(withDrop(source, advisedDrop(source)));
+	}
+
 	/** The player shelf's verb on an add's row (Lane 113): the screen's own, for the add with the
 	 * advice's drop, its pair said under it; none on a player of the member's. */
 	function shelfOffer(tapped: BoxRow): ScreenOffer | null {
@@ -354,7 +366,7 @@
 				focus: null
 			};
 		}
-		const advised = dropRows(entry.source, shown.roster, memberZone(), now)[0] ?? null;
+		const advised = advisedDrop(entry.source);
 		const paired = withDrop(entry.source, advised);
 		const names = namesOnScreen(shown);
 		const move = moveWords({
@@ -474,6 +486,7 @@
 			/>
 		{/if}
 	{/snippet}
+	<PositionPanel {advice} zone={memberZone()} now={pageNow} onadd={addFromPanel} />
 	<div class="filters">
 		<ChipGroup label={LINES.position}>
 			<Chip size="sm" pressed={position === null} onclick={() => void choose(null)}

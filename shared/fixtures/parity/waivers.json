@@ -51,6 +51,674 @@
 					"word": "D/ST"
 				}
 			],
+			"panel": {
+				"season": {
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "252.2",
+							"median": "264.0 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "252.2"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "248.2"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "173.5"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "188.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "186.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "179.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "47.0",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "44.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 9 of 12",
+							"figure": "367.3",
+							"median": "429.8 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "184.4"
+								},
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "182.9"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "139.8"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "77.7"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "16.3"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 2 of 12",
+							"figure": "1084.8",
+							"median": "920.3 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "333.2"
+								},
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "222.8"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "199.2"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "168.2"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "161.4"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "77.1"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "12.1"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "125.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "102.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "102.1",
+									"beats": "McConkey, Starter, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "85.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "65.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 8 of 12",
+							"figure": "141.0",
+							"median": "142.6 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "141.0"
+								},
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "94.4"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "McConkey, Starter, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "Dart, Bench, 0.0 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "83.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "60.4",
+									"beats": "McConkey, Starter, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "Texans, Starter, +0.3 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				},
+				"week": {
+					"explain": "Rank is your starters' Proj this week at the position against the league's.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "20.6",
+							"median": "21.4 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "20.6"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "17.9"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "15.8"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "17.9",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "15.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "14.9",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 10 of 12",
+							"figure": "26.5",
+							"median": "38.8 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "14.2"
+								},
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "12.3"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "9.5"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "0.6"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 8 of 12",
+							"figure": "66.1",
+							"median": "68.0 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "13.2"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "11.0"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "9.7"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "3.2"
+								},
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "5.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "4.3",
+									"beats": "McConkey, Starter, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 5 of 12",
+							"figure": "12.2",
+							"median": "11.7 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "7.8"
+								},
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "4.8",
+									"beats": "Dart, Bench, 0.0 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "4.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "4.1",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "2.9",
+									"beats": "McConkey, Starter, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "2.4",
+									"beats": "McConkey, Starter, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST rank 1 of 12",
+							"figure": "0.0",
+							"median": "0.0 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "7.9"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "9.6",
+									"beats": "Texans, Starter, +0.3 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				}
+			},
 			"projected": true,
 			"arrives": null,
 			"heads": "A game is our rest-of-season points a game, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace in your rest-of-season lineup.",
@@ -3151,6 +3819,674 @@
 					"word": "D/ST"
 				}
 			],
+			"panel": {
+				"season": {
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "252.2",
+							"median": "264.0 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "252.2"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "248.2"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "173.5"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "188.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "186.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "179.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "47.0",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "44.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 9 of 12",
+							"figure": "367.3",
+							"median": "429.8 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "184.4"
+								},
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "182.9"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "139.8"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "77.7"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "16.3"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 2 of 12",
+							"figure": "1084.8",
+							"median": "920.3 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "333.2"
+								},
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "222.8"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "199.2"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "168.2"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "161.4"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "77.1"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "12.1"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "125.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "102.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "102.1",
+									"beats": "McConkey, Starter, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "85.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "65.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 8 of 12",
+							"figure": "141.0",
+							"median": "142.6 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "141.0"
+								},
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "94.4"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "McConkey, Starter, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "Dart, Bench, 0.0 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "83.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "60.4",
+									"beats": "McConkey, Starter, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "Texans, Starter, +0.3 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				},
+				"week": {
+					"explain": "Rank is your starters' Proj this week at the position against the league's.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "20.6",
+							"median": "21.4 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "20.6"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "17.9"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "15.8"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "17.9",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "15.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "14.9",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 10 of 12",
+							"figure": "26.5",
+							"median": "38.8 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "14.2"
+								},
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "12.3"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "9.5"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "0.6"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 8 of 12",
+							"figure": "66.1",
+							"median": "68.0 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "13.2"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "11.0"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "9.7"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "3.2"
+								},
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "5.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "4.3",
+									"beats": "McConkey, Starter, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 5 of 12",
+							"figure": "12.2",
+							"median": "11.7 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "7.8"
+								},
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "4.8",
+									"beats": "Dart, Bench, 0.0 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "4.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "4.1",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "2.9",
+									"beats": "McConkey, Starter, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "2.4",
+									"beats": "McConkey, Starter, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST rank 1 of 12",
+							"figure": "0.0",
+							"median": "0.0 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "7.9"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "9.6",
+									"beats": "Texans, Starter, +0.3 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				}
+			},
 			"projected": true,
 			"arrives": null,
 			"heads": "A game is our rest-of-season points a game, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace in your rest-of-season lineup.",
@@ -6238,6 +7574,674 @@
 					"word": "D/ST"
 				}
 			],
+			"panel": {
+				"season": {
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "252.2",
+							"median": "264.0 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "252.2"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "248.2"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "173.5"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "188.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "186.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "179.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "47.0",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "44.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 9 of 12",
+							"figure": "367.3",
+							"median": "429.8 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "184.4"
+								},
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "182.9"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "139.8"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "77.7"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "16.3"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 2 of 12",
+							"figure": "1084.8",
+							"median": "920.3 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "333.2"
+								},
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "222.8"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "199.2"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "168.2"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "161.4"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "77.1"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "12.1"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "125.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "102.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "102.1",
+									"beats": "Dart, Bench, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "85.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "65.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 8 of 12",
+							"figure": "141.0",
+							"median": "142.6 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "141.0"
+								},
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "94.4"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "McConkey, Starter, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "83.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "60.4",
+									"beats": "McConkey, Starter, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "--",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				},
+				"week": {
+					"explain": "Rank is your starters' Proj this week at the position against the league's.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "20.6",
+							"median": "21.4 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "20.6"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "17.9"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "15.8"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "17.9",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "15.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "14.9",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 10 of 12",
+							"figure": "26.5",
+							"median": "38.8 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "14.2"
+								},
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "12.3"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "9.5"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "0.6"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 8 of 12",
+							"figure": "66.1",
+							"median": "68.0 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "13.2"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "11.0"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "9.7"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "3.2"
+								},
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "5.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "4.3",
+									"beats": "Dart, Bench, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 5 of 12",
+							"figure": "12.2",
+							"median": "11.7 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "7.8"
+								},
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "4.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "4.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "4.1",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "2.9",
+									"beats": "McConkey, Starter, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "2.4",
+									"beats": "McConkey, Starter, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST rank 1 of 12",
+							"figure": "0.0",
+							"median": "0.0 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "7.9"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "9.6",
+									"beats": "--",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				}
+			},
 			"projected": true,
 			"arrives": null,
 			"heads": "A game is our rest-of-season points a game, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace in your rest-of-season lineup.",
@@ -9202,6 +11206,674 @@
 					"word": "D/ST"
 				}
 			],
+			"panel": {
+				"season": {
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "252.2",
+							"median": "264.0 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "252.2"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "248.2"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "173.5"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "188.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "186.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "179.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "47.0",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "44.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 9 of 12",
+							"figure": "367.3",
+							"median": "429.8 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "184.4"
+								},
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "182.9"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "139.8"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "77.7"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "16.3"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 2 of 12",
+							"figure": "1084.8",
+							"median": "920.3 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "333.2"
+								},
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "222.8"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "199.2"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "168.2"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "161.4"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "77.1"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "12.1"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "125.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "102.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "102.1",
+									"beats": "Dart, Bench, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "85.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "65.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 8 of 12",
+							"figure": "141.0",
+							"median": "142.6 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "141.0"
+								},
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "94.4"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "Kirk, Starter, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "83.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "60.4",
+									"beats": "Kirk, Starter, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "--",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				},
+				"week": {
+					"explain": "Rank is your starters' Proj this week at the position against the league's.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "20.6",
+							"median": "21.4 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "20.6"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "17.9"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "15.8"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "17.9",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "15.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "14.9",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 10 of 12",
+							"figure": "26.5",
+							"median": "38.8 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "14.2"
+								},
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "12.3"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "9.5"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "0.6"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 8 of 12",
+							"figure": "66.1",
+							"median": "68.0 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "13.2"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "11.0"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "9.7"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "3.2"
+								},
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "5.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "4.3",
+									"beats": "Dart, Bench, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 5 of 12",
+							"figure": "12.2",
+							"median": "11.7 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "7.8"
+								},
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "4.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "4.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "4.1",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "2.9",
+									"beats": "Kirk, Starter, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "2.4",
+									"beats": "Kirk, Starter, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST rank 1 of 12",
+							"figure": "0.0",
+							"median": "0.0 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "7.9"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "9.6",
+									"beats": "--",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				}
+			},
 			"projected": true,
 			"arrives": null,
 			"heads": "A game is our rest-of-season points a game, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace in your rest-of-season lineup.",
@@ -12124,6 +14796,341 @@
 					"word": "D/ST"
 				}
 			],
+			"panel": {
+				"season": {
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "252.2",
+							"median": "264.0 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "252.2"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "248.2"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "173.5"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "188.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "186.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "179.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "47.0",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "44.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 9 of 12",
+							"figure": "367.3",
+							"median": "429.8 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "184.4"
+								},
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "182.9"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "139.8"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "77.7"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "16.3"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 2 of 12",
+							"figure": "1084.8",
+							"median": "920.3 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "333.2"
+								},
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "222.8"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "199.2"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "168.2"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "161.4"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "77.1"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "12.1"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "125.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "102.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "102.1",
+									"beats": "Dart, Bench, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "85.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "65.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 8 of 12",
+							"figure": "141.0",
+							"median": "142.6 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "141.0"
+								},
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "94.4"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "McConkey, Starter, bye, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "83.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "60.4",
+									"beats": "McConkey, Starter, bye, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "--",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				}
+			},
 			"projected": false,
 			"arrives": "Week 7 projections expected Thursday.",
 			"heads": "A game is our rest-of-season points a game, Avg his season average, Beats the player he would replace in your rest-of-season lineup.",
@@ -15061,6 +18068,341 @@
 					"word": "D/ST"
 				}
 			],
+			"panel": {
+				"season": {
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "252.2",
+							"median": "264.0 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "252.2"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "248.2"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "173.5"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "188.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "186.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "179.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "47.0",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "44.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 9 of 12",
+							"figure": "367.3",
+							"median": "429.8 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "184.4"
+								},
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "182.9"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "139.8"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "77.7"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "16.3"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 2 of 12",
+							"figure": "1084.8",
+							"median": "920.3 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "333.2"
+								},
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "222.8"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "199.2"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "168.2"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "161.4"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "77.1"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "12.1"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "125.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "102.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "102.1",
+									"beats": "Dart, Bench, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "85.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "65.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 8 of 12",
+							"figure": "141.0",
+							"median": "142.6 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "141.0"
+								},
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "94.4"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "McConkey, Starter, bye, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "83.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "60.4",
+									"beats": "McConkey, Starter, bye, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "--",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				}
+			},
 			"projected": false,
 			"arrives": "Week 7 projections expected Thursday.",
 			"heads": "A game is our rest-of-season points a game, Avg his season average, Beats the player he would replace in your rest-of-season lineup.",
@@ -18016,6 +21358,674 @@
 						"word": "D/ST"
 					}
 				],
+				"panel": {
+					"season": {
+						"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+						"cards": [
+							{
+								"key": "QB",
+								"rank": "QB rank 8 of 12",
+								"figure": "252.2",
+								"median": "264.0 median",
+								"need": "Need",
+								"mine": [
+									{
+										"name": "Dart",
+										"team": "NYG",
+										"mark": "Yours, Starter",
+										"figure": "252.2"
+									},
+									{
+										"name": "Mahomes",
+										"team": "KC",
+										"mark": "Yours, Bench",
+										"figure": "248.2"
+									},
+									{
+										"name": "Rodgers",
+										"team": "PIT",
+										"mark": "Yours, Bench",
+										"figure": "173.5"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:3917792",
+										"name": "Jones",
+										"team": "IND",
+										"mark": "Free",
+										"figure": "188.7",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4688380",
+										"name": "Ward",
+										"team": "TEN",
+										"mark": "Free",
+										"figure": "186.7",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:15864",
+										"name": "Smith",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "179.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4360423",
+										"name": "Penix",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "47.0",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2576980",
+										"name": "Mariota",
+										"team": "WSH",
+										"mark": "Free",
+										"figure": "44.4",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "RB",
+								"rank": "RB rank 9 of 12",
+								"figure": "367.3",
+								"median": "429.8 median",
+								"need": "Need",
+								"mine": [
+									{
+										"name": "Love",
+										"team": "ARI",
+										"mark": "Yours, Starter",
+										"figure": "184.4"
+									},
+									{
+										"name": "Etienne",
+										"team": "NO",
+										"mark": "Yours, Starter",
+										"figure": "182.9"
+									},
+									{
+										"name": "Gainwell",
+										"team": "TB",
+										"mark": "Yours, Bench",
+										"figure": "139.8"
+									},
+									{
+										"name": "Charbonnet",
+										"team": "SEA",
+										"mark": "Yours, Bench",
+										"figure": "77.7"
+									},
+									{
+										"name": "Johnson",
+										"team": "CHI",
+										"mark": "Yours, Bench",
+										"figure": "16.3"
+									}
+								],
+								"free": []
+							},
+							{
+								"key": "WR",
+								"rank": "WR rank 2 of 12",
+								"figure": "1084.8",
+								"median": "920.3 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Chase",
+										"team": "CIN",
+										"mark": "Yours, Starter",
+										"figure": "333.2"
+									},
+									{
+										"name": "McConkey",
+										"team": "LAC",
+										"mark": "Yours, Starter",
+										"figure": "222.8"
+									},
+									{
+										"name": "Odunze",
+										"team": "CHI",
+										"mark": "Yours, Starter",
+										"figure": "199.2"
+									},
+									{
+										"name": "Addison",
+										"team": "MIN",
+										"mark": "Yours, Starter",
+										"figure": "168.2"
+									},
+									{
+										"name": "Meyers",
+										"team": "JAX",
+										"mark": "Yours, Starter",
+										"figure": "161.4"
+									},
+									{
+										"name": "Williams",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "77.1"
+									},
+									{
+										"name": "Kirk",
+										"team": "SF",
+										"mark": "Yours, Bench",
+										"figure": "12.1"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4382466",
+										"name": "Nailor",
+										"team": "LV",
+										"mark": "Free",
+										"figure": "125.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:3916945",
+										"name": "Slayton",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "102.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4686422",
+										"name": "Hutchinson",
+										"team": "HOU",
+										"mark": "Free",
+										"figure": "102.1",
+										"beats": "McConkey, Starter, +1.8 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4361409",
+										"name": "Dotson",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "85.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4241372",
+										"name": "Brown",
+										"team": "PHI",
+										"mark": "Free",
+										"figure": "65.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "TE",
+								"rank": "TE rank 8 of 12",
+								"figure": "141.0",
+								"median": "142.6 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "LaPorta",
+										"team": "DET",
+										"mark": "Yours, Starter",
+										"figure": "141.0"
+									},
+									{
+										"name": "Okonkwo",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "94.4"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4372780",
+										"name": "Tremble",
+										"team": "CAR",
+										"mark": "Free",
+										"figure": "85.6",
+										"beats": "McConkey, Starter, +0.6 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4808766",
+										"name": "Taylor",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "85.6",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4429148",
+										"name": "Johnson",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "85.6",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4430802",
+										"name": "Washington",
+										"team": "PIT",
+										"mark": "Free",
+										"figure": "83.7",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2573401",
+										"name": "Higbee",
+										"team": "LAR",
+										"mark": "Free",
+										"figure": "60.4",
+										"beats": "McConkey, Starter, +0.2 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "DEF",
+								"rank": "D/ST --",
+								"figure": "--",
+								"median": null,
+								"need": null,
+								"mine": [
+									{
+										"name": "Texans",
+										"team": "HOU",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									},
+									{
+										"name": "Vikings",
+										"team": "MIN",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:Kansas City Chiefs",
+										"name": "Chiefs",
+										"team": "KC",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "Texans, Starter, +0.3 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							}
+						]
+					},
+					"week": {
+						"explain": "Rank is your starters' Proj this week at the position against the league's.",
+						"cards": [
+							{
+								"key": "QB",
+								"rank": "QB rank 8 of 12",
+								"figure": "20.6",
+								"median": "21.4 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Dart",
+										"team": "NYG",
+										"mark": "Yours, Starter",
+										"figure": "20.6"
+									},
+									{
+										"name": "Mahomes",
+										"team": "KC",
+										"mark": "Yours, Bench",
+										"figure": "17.9"
+									},
+									{
+										"name": "Rodgers",
+										"team": "PIT",
+										"mark": "Yours, Bench",
+										"figure": "15.8"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:3917792",
+										"name": "Jones",
+										"team": "IND",
+										"mark": "Free",
+										"figure": "17.9",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4688380",
+										"name": "Ward",
+										"team": "TEN",
+										"mark": "Free",
+										"figure": "15.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:15864",
+										"name": "Smith",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "14.9",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4360423",
+										"name": "Penix",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2576980",
+										"name": "Mariota",
+										"team": "WSH",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "RB",
+								"rank": "RB rank 10 of 12",
+								"figure": "26.5",
+								"median": "38.8 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Etienne",
+										"team": "NO",
+										"mark": "Yours, Starter",
+										"figure": "14.2"
+									},
+									{
+										"name": "Love",
+										"team": "ARI",
+										"mark": "Yours, Starter",
+										"figure": "12.3"
+									},
+									{
+										"name": "Gainwell",
+										"team": "TB",
+										"mark": "Yours, Bench",
+										"figure": "9.5"
+									},
+									{
+										"name": "Johnson",
+										"team": "CHI",
+										"mark": "Yours, Bench",
+										"figure": "0.6"
+									},
+									{
+										"name": "Charbonnet",
+										"team": "SEA",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": []
+							},
+							{
+								"key": "WR",
+								"rank": "WR rank 8 of 12",
+								"figure": "66.1",
+								"median": "68.0 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "McConkey",
+										"team": "LAC",
+										"mark": "Yours, Starter",
+										"figure": "13.2"
+									},
+									{
+										"name": "Odunze",
+										"team": "CHI",
+										"mark": "Yours, Starter",
+										"figure": "11.0"
+									},
+									{
+										"name": "Meyers",
+										"team": "JAX",
+										"mark": "Yours, Starter",
+										"figure": "9.7"
+									},
+									{
+										"name": "Williams",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "3.2"
+									},
+									{
+										"name": "Chase",
+										"team": "CIN",
+										"mark": "Yours, Starter",
+										"figure": "--"
+									},
+									{
+										"name": "Addison",
+										"team": "MIN",
+										"mark": "Yours, Starter",
+										"figure": "--"
+									},
+									{
+										"name": "Kirk",
+										"team": "SF",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4361409",
+										"name": "Dotson",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "5.6",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4686422",
+										"name": "Hutchinson",
+										"team": "HOU",
+										"mark": "Free",
+										"figure": "4.3",
+										"beats": "McConkey, Starter, +1.8 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4382466",
+										"name": "Nailor",
+										"team": "LV",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:3916945",
+										"name": "Slayton",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4241372",
+										"name": "Brown",
+										"team": "PHI",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "TE",
+								"rank": "TE rank 5 of 12",
+								"figure": "12.2",
+								"median": "11.7 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Okonkwo",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "7.8"
+									},
+									{
+										"name": "LaPorta",
+										"team": "DET",
+										"mark": "Yours, Starter",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4808766",
+										"name": "Taylor",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "4.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4430802",
+										"name": "Washington",
+										"team": "PIT",
+										"mark": "Free",
+										"figure": "4.4",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4429148",
+										"name": "Johnson",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "4.1",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2573401",
+										"name": "Higbee",
+										"team": "LAR",
+										"mark": "Free",
+										"figure": "2.9",
+										"beats": "McConkey, Starter, +0.2 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4372780",
+										"name": "Tremble",
+										"team": "CAR",
+										"mark": "Free",
+										"figure": "2.4",
+										"beats": "McConkey, Starter, +0.6 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "DEF",
+								"rank": "D/ST rank 1 of 12",
+								"figure": "0.0",
+								"median": "0.0 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Texans",
+										"team": "HOU",
+										"mark": "Yours, Bench",
+										"figure": "7.9"
+									},
+									{
+										"name": "Vikings",
+										"team": "MIN",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:Kansas City Chiefs",
+										"name": "Chiefs",
+										"team": "KC",
+										"mark": "Free",
+										"figure": "9.6",
+										"beats": "Texans, Starter, +0.3 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							}
+						]
+					}
+				},
 				"projected": true,
 				"arrives": null,
 				"heads": "A game is our rest-of-season points a game, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace in your rest-of-season lineup.",
@@ -21119,6 +25129,674 @@
 						"word": "D/ST"
 					}
 				],
+				"panel": {
+					"season": {
+						"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+						"cards": [
+							{
+								"key": "QB",
+								"rank": "QB rank 8 of 12",
+								"figure": "252.2",
+								"median": "264.0 median",
+								"need": "Need",
+								"mine": [
+									{
+										"name": "Dart",
+										"team": "NYG",
+										"mark": "Yours, Starter",
+										"figure": "252.2"
+									},
+									{
+										"name": "Mahomes",
+										"team": "KC",
+										"mark": "Yours, Bench",
+										"figure": "248.2"
+									},
+									{
+										"name": "Rodgers",
+										"team": "PIT",
+										"mark": "Yours, Bench",
+										"figure": "173.5"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:3917792",
+										"name": "Jones",
+										"team": "IND",
+										"mark": "Free",
+										"figure": "188.7",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4688380",
+										"name": "Ward",
+										"team": "TEN",
+										"mark": "Free",
+										"figure": "186.7",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:15864",
+										"name": "Smith",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "179.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4360423",
+										"name": "Penix",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "47.0",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2576980",
+										"name": "Mariota",
+										"team": "WSH",
+										"mark": "Free",
+										"figure": "44.4",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "RB",
+								"rank": "RB rank 9 of 12",
+								"figure": "367.3",
+								"median": "429.8 median",
+								"need": "Need",
+								"mine": [
+									{
+										"name": "Love",
+										"team": "ARI",
+										"mark": "Yours, Starter",
+										"figure": "184.4"
+									},
+									{
+										"name": "Etienne",
+										"team": "NO",
+										"mark": "Yours, Starter",
+										"figure": "182.9"
+									},
+									{
+										"name": "Gainwell",
+										"team": "TB",
+										"mark": "Yours, Bench",
+										"figure": "139.8"
+									},
+									{
+										"name": "Charbonnet",
+										"team": "SEA",
+										"mark": "Yours, Bench",
+										"figure": "77.7"
+									},
+									{
+										"name": "Johnson",
+										"team": "CHI",
+										"mark": "Yours, Bench",
+										"figure": "16.3"
+									}
+								],
+								"free": []
+							},
+							{
+								"key": "WR",
+								"rank": "WR rank 2 of 12",
+								"figure": "1084.8",
+								"median": "920.3 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Chase",
+										"team": "CIN",
+										"mark": "Yours, Starter",
+										"figure": "333.2"
+									},
+									{
+										"name": "McConkey",
+										"team": "LAC",
+										"mark": "Yours, Starter",
+										"figure": "222.8"
+									},
+									{
+										"name": "Odunze",
+										"team": "CHI",
+										"mark": "Yours, Starter",
+										"figure": "199.2"
+									},
+									{
+										"name": "Addison",
+										"team": "MIN",
+										"mark": "Yours, Starter",
+										"figure": "168.2"
+									},
+									{
+										"name": "Meyers",
+										"team": "JAX",
+										"mark": "Yours, Starter",
+										"figure": "161.4"
+									},
+									{
+										"name": "Williams",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "77.1"
+									},
+									{
+										"name": "Kirk",
+										"team": "SF",
+										"mark": "Yours, Bench",
+										"figure": "12.1"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4382466",
+										"name": "Nailor",
+										"team": "LV",
+										"mark": "Free",
+										"figure": "125.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:3916945",
+										"name": "Slayton",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "102.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4686422",
+										"name": "Hutchinson",
+										"team": "HOU",
+										"mark": "Free",
+										"figure": "102.1",
+										"beats": "McConkey, Starter, +1.8 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4361409",
+										"name": "Dotson",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "85.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4241372",
+										"name": "Brown",
+										"team": "PHI",
+										"mark": "Free",
+										"figure": "65.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "TE",
+								"rank": "TE rank 8 of 12",
+								"figure": "141.0",
+								"median": "142.6 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "LaPorta",
+										"team": "DET",
+										"mark": "Yours, Starter",
+										"figure": "141.0"
+									},
+									{
+										"name": "Okonkwo",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "94.4"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4372780",
+										"name": "Tremble",
+										"team": "CAR",
+										"mark": "Free",
+										"figure": "85.6",
+										"beats": "McConkey, Starter, +0.6 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4808766",
+										"name": "Taylor",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "85.6",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4429148",
+										"name": "Johnson",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "85.6",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4430802",
+										"name": "Washington",
+										"team": "PIT",
+										"mark": "Free",
+										"figure": "83.7",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2573401",
+										"name": "Higbee",
+										"team": "LAR",
+										"mark": "Free",
+										"figure": "60.4",
+										"beats": "McConkey, Starter, +0.2 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "DEF",
+								"rank": "D/ST --",
+								"figure": "--",
+								"median": null,
+								"need": null,
+								"mine": [
+									{
+										"name": "Texans",
+										"team": "HOU",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									},
+									{
+										"name": "Vikings",
+										"team": "MIN",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:Kansas City Chiefs",
+										"name": "Chiefs",
+										"team": "KC",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "Texans, Starter, +0.3 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							}
+						]
+					},
+					"week": {
+						"explain": "Rank is your starters' Proj this week at the position against the league's.",
+						"cards": [
+							{
+								"key": "QB",
+								"rank": "QB rank 8 of 12",
+								"figure": "20.6",
+								"median": "21.4 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Dart",
+										"team": "NYG",
+										"mark": "Yours, Starter",
+										"figure": "20.6"
+									},
+									{
+										"name": "Mahomes",
+										"team": "KC",
+										"mark": "Yours, Bench",
+										"figure": "17.9"
+									},
+									{
+										"name": "Rodgers",
+										"team": "PIT",
+										"mark": "Yours, Bench",
+										"figure": "15.8"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:3917792",
+										"name": "Jones",
+										"team": "IND",
+										"mark": "Free",
+										"figure": "17.9",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4688380",
+										"name": "Ward",
+										"team": "TEN",
+										"mark": "Free",
+										"figure": "15.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:15864",
+										"name": "Smith",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "14.9",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4360423",
+										"name": "Penix",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2576980",
+										"name": "Mariota",
+										"team": "WSH",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "RB",
+								"rank": "RB rank 10 of 12",
+								"figure": "26.5",
+								"median": "38.8 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Etienne",
+										"team": "NO",
+										"mark": "Yours, Starter",
+										"figure": "14.2"
+									},
+									{
+										"name": "Love",
+										"team": "ARI",
+										"mark": "Yours, Starter",
+										"figure": "12.3"
+									},
+									{
+										"name": "Gainwell",
+										"team": "TB",
+										"mark": "Yours, Bench",
+										"figure": "9.5"
+									},
+									{
+										"name": "Johnson",
+										"team": "CHI",
+										"mark": "Yours, Bench",
+										"figure": "0.6"
+									},
+									{
+										"name": "Charbonnet",
+										"team": "SEA",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": []
+							},
+							{
+								"key": "WR",
+								"rank": "WR rank 8 of 12",
+								"figure": "66.1",
+								"median": "68.0 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "McConkey",
+										"team": "LAC",
+										"mark": "Yours, Starter",
+										"figure": "13.2"
+									},
+									{
+										"name": "Odunze",
+										"team": "CHI",
+										"mark": "Yours, Starter",
+										"figure": "11.0"
+									},
+									{
+										"name": "Meyers",
+										"team": "JAX",
+										"mark": "Yours, Starter",
+										"figure": "9.7"
+									},
+									{
+										"name": "Williams",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "3.2"
+									},
+									{
+										"name": "Chase",
+										"team": "CIN",
+										"mark": "Yours, Starter",
+										"figure": "--"
+									},
+									{
+										"name": "Addison",
+										"team": "MIN",
+										"mark": "Yours, Starter",
+										"figure": "--"
+									},
+									{
+										"name": "Kirk",
+										"team": "SF",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4361409",
+										"name": "Dotson",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "5.6",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4686422",
+										"name": "Hutchinson",
+										"team": "HOU",
+										"mark": "Free",
+										"figure": "4.3",
+										"beats": "McConkey, Starter, +1.8 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4382466",
+										"name": "Nailor",
+										"team": "LV",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:3916945",
+										"name": "Slayton",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4241372",
+										"name": "Brown",
+										"team": "PHI",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "TE",
+								"rank": "TE rank 5 of 12",
+								"figure": "12.2",
+								"median": "11.7 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Okonkwo",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "7.8"
+									},
+									{
+										"name": "LaPorta",
+										"team": "DET",
+										"mark": "Yours, Starter",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4808766",
+										"name": "Taylor",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "4.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4430802",
+										"name": "Washington",
+										"team": "PIT",
+										"mark": "Free",
+										"figure": "4.4",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4429148",
+										"name": "Johnson",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "4.1",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2573401",
+										"name": "Higbee",
+										"team": "LAR",
+										"mark": "Free",
+										"figure": "2.9",
+										"beats": "McConkey, Starter, +0.2 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4372780",
+										"name": "Tremble",
+										"team": "CAR",
+										"mark": "Free",
+										"figure": "2.4",
+										"beats": "McConkey, Starter, +0.6 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "DEF",
+								"rank": "D/ST rank 1 of 12",
+								"figure": "0.0",
+								"median": "0.0 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Texans",
+										"team": "HOU",
+										"mark": "Yours, Bench",
+										"figure": "7.9"
+									},
+									{
+										"name": "Vikings",
+										"team": "MIN",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:Kansas City Chiefs",
+										"name": "Chiefs",
+										"team": "KC",
+										"mark": "Free",
+										"figure": "9.6",
+										"beats": "Texans, Starter, +0.3 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							}
+						]
+					}
+				},
 				"projected": true,
 				"arrives": null,
 				"heads": "A game is our rest-of-season points a game, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace in your rest-of-season lineup.",
@@ -24222,6 +28900,674 @@
 						"word": "D/ST"
 					}
 				],
+				"panel": {
+					"season": {
+						"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+						"cards": [
+							{
+								"key": "QB",
+								"rank": "QB rank 8 of 12",
+								"figure": "252.2",
+								"median": "264.0 median",
+								"need": "Need",
+								"mine": [
+									{
+										"name": "Dart",
+										"team": "NYG",
+										"mark": "Yours, Starter",
+										"figure": "252.2"
+									},
+									{
+										"name": "Mahomes",
+										"team": "KC",
+										"mark": "Yours, Bench",
+										"figure": "248.2"
+									},
+									{
+										"name": "Rodgers",
+										"team": "PIT",
+										"mark": "Yours, Bench",
+										"figure": "173.5"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:3917792",
+										"name": "Jones",
+										"team": "IND",
+										"mark": "Free",
+										"figure": "188.7",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4688380",
+										"name": "Ward",
+										"team": "TEN",
+										"mark": "Free",
+										"figure": "186.7",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:15864",
+										"name": "Smith",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "179.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4360423",
+										"name": "Penix",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "47.0",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2576980",
+										"name": "Mariota",
+										"team": "WSH",
+										"mark": "Free",
+										"figure": "44.4",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "RB",
+								"rank": "RB rank 9 of 12",
+								"figure": "367.3",
+								"median": "429.8 median",
+								"need": "Need",
+								"mine": [
+									{
+										"name": "Love",
+										"team": "ARI",
+										"mark": "Yours, Starter",
+										"figure": "184.4"
+									},
+									{
+										"name": "Etienne",
+										"team": "NO",
+										"mark": "Yours, Starter",
+										"figure": "182.9"
+									},
+									{
+										"name": "Gainwell",
+										"team": "TB",
+										"mark": "Yours, Bench",
+										"figure": "139.8"
+									},
+									{
+										"name": "Charbonnet",
+										"team": "SEA",
+										"mark": "Yours, Bench",
+										"figure": "77.7"
+									},
+									{
+										"name": "Johnson",
+										"team": "CHI",
+										"mark": "Yours, Bench",
+										"figure": "16.3"
+									}
+								],
+								"free": []
+							},
+							{
+								"key": "WR",
+								"rank": "WR rank 2 of 12",
+								"figure": "1084.8",
+								"median": "920.3 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Chase",
+										"team": "CIN",
+										"mark": "Yours, Starter",
+										"figure": "333.2"
+									},
+									{
+										"name": "McConkey",
+										"team": "LAC",
+										"mark": "Yours, Starter",
+										"figure": "222.8"
+									},
+									{
+										"name": "Odunze",
+										"team": "CHI",
+										"mark": "Yours, Starter",
+										"figure": "199.2"
+									},
+									{
+										"name": "Addison",
+										"team": "MIN",
+										"mark": "Yours, Starter",
+										"figure": "168.2"
+									},
+									{
+										"name": "Meyers",
+										"team": "JAX",
+										"mark": "Yours, Starter",
+										"figure": "161.4"
+									},
+									{
+										"name": "Williams",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "77.1"
+									},
+									{
+										"name": "Kirk",
+										"team": "SF",
+										"mark": "Yours, Bench",
+										"figure": "12.1"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4382466",
+										"name": "Nailor",
+										"team": "LV",
+										"mark": "Free",
+										"figure": "125.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:3916945",
+										"name": "Slayton",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "102.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4686422",
+										"name": "Hutchinson",
+										"team": "HOU",
+										"mark": "Free",
+										"figure": "102.1",
+										"beats": "McConkey, Starter, +1.8 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4361409",
+										"name": "Dotson",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "85.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4241372",
+										"name": "Brown",
+										"team": "PHI",
+										"mark": "Free",
+										"figure": "65.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "TE",
+								"rank": "TE rank 8 of 12",
+								"figure": "141.0",
+								"median": "142.6 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "LaPorta",
+										"team": "DET",
+										"mark": "Yours, Starter",
+										"figure": "141.0"
+									},
+									{
+										"name": "Okonkwo",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "94.4"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4372780",
+										"name": "Tremble",
+										"team": "CAR",
+										"mark": "Free",
+										"figure": "85.6",
+										"beats": "McConkey, Starter, +0.6 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4808766",
+										"name": "Taylor",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "85.6",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4429148",
+										"name": "Johnson",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "85.6",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4430802",
+										"name": "Washington",
+										"team": "PIT",
+										"mark": "Free",
+										"figure": "83.7",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2573401",
+										"name": "Higbee",
+										"team": "LAR",
+										"mark": "Free",
+										"figure": "60.4",
+										"beats": "McConkey, Starter, +0.2 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "DEF",
+								"rank": "D/ST --",
+								"figure": "--",
+								"median": null,
+								"need": null,
+								"mine": [
+									{
+										"name": "Texans",
+										"team": "HOU",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									},
+									{
+										"name": "Vikings",
+										"team": "MIN",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:Kansas City Chiefs",
+										"name": "Chiefs",
+										"team": "KC",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "Texans, Starter, +0.3 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							}
+						]
+					},
+					"week": {
+						"explain": "Rank is your starters' Proj this week at the position against the league's.",
+						"cards": [
+							{
+								"key": "QB",
+								"rank": "QB rank 8 of 12",
+								"figure": "20.6",
+								"median": "21.4 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Dart",
+										"team": "NYG",
+										"mark": "Yours, Starter",
+										"figure": "20.6"
+									},
+									{
+										"name": "Mahomes",
+										"team": "KC",
+										"mark": "Yours, Bench",
+										"figure": "17.9"
+									},
+									{
+										"name": "Rodgers",
+										"team": "PIT",
+										"mark": "Yours, Bench",
+										"figure": "15.8"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:3917792",
+										"name": "Jones",
+										"team": "IND",
+										"mark": "Free",
+										"figure": "17.9",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4688380",
+										"name": "Ward",
+										"team": "TEN",
+										"mark": "Free",
+										"figure": "15.3",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:15864",
+										"name": "Smith",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "14.9",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4360423",
+										"name": "Penix",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2576980",
+										"name": "Mariota",
+										"team": "WSH",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "RB",
+								"rank": "RB rank 10 of 12",
+								"figure": "26.5",
+								"median": "38.8 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Etienne",
+										"team": "NO",
+										"mark": "Yours, Starter",
+										"figure": "14.2"
+									},
+									{
+										"name": "Love",
+										"team": "ARI",
+										"mark": "Yours, Starter",
+										"figure": "12.3"
+									},
+									{
+										"name": "Gainwell",
+										"team": "TB",
+										"mark": "Yours, Bench",
+										"figure": "9.5"
+									},
+									{
+										"name": "Johnson",
+										"team": "CHI",
+										"mark": "Yours, Bench",
+										"figure": "0.6"
+									},
+									{
+										"name": "Charbonnet",
+										"team": "SEA",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": []
+							},
+							{
+								"key": "WR",
+								"rank": "WR rank 8 of 12",
+								"figure": "66.1",
+								"median": "68.0 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "McConkey",
+										"team": "LAC",
+										"mark": "Yours, Starter",
+										"figure": "13.2"
+									},
+									{
+										"name": "Odunze",
+										"team": "CHI",
+										"mark": "Yours, Starter",
+										"figure": "11.0"
+									},
+									{
+										"name": "Meyers",
+										"team": "JAX",
+										"mark": "Yours, Starter",
+										"figure": "9.7"
+									},
+									{
+										"name": "Williams",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "3.2"
+									},
+									{
+										"name": "Chase",
+										"team": "CIN",
+										"mark": "Yours, Starter",
+										"figure": "--"
+									},
+									{
+										"name": "Addison",
+										"team": "MIN",
+										"mark": "Yours, Starter",
+										"figure": "--"
+									},
+									{
+										"name": "Kirk",
+										"team": "SF",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4361409",
+										"name": "Dotson",
+										"team": "ATL",
+										"mark": "Free",
+										"figure": "5.6",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4686422",
+										"name": "Hutchinson",
+										"team": "HOU",
+										"mark": "Free",
+										"figure": "4.3",
+										"beats": "McConkey, Starter, +1.8 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4382466",
+										"name": "Nailor",
+										"team": "LV",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:3916945",
+										"name": "Slayton",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4241372",
+										"name": "Brown",
+										"team": "PHI",
+										"mark": "Free",
+										"figure": "--",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "TE",
+								"rank": "TE rank 5 of 12",
+								"figure": "12.2",
+								"median": "11.7 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Okonkwo",
+										"team": "WAS",
+										"mark": "Yours, Bench",
+										"figure": "7.8"
+									},
+									{
+										"name": "LaPorta",
+										"team": "DET",
+										"mark": "Yours, Starter",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:4808766",
+										"name": "Taylor",
+										"team": "NYJ",
+										"mark": "Free",
+										"figure": "4.8",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4430802",
+										"name": "Washington",
+										"team": "PIT",
+										"mark": "Free",
+										"figure": "4.4",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4429148",
+										"name": "Johnson",
+										"team": "NYG",
+										"mark": "Free",
+										"figure": "4.1",
+										"beats": "0.0",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:2573401",
+										"name": "Higbee",
+										"team": "LAR",
+										"mark": "Free",
+										"figure": "2.9",
+										"beats": "McConkey, Starter, +0.2 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									},
+									{
+										"key": "free:board:4372780",
+										"name": "Tremble",
+										"team": "CAR",
+										"mark": "Free",
+										"figure": "2.4",
+										"beats": "McConkey, Starter, +0.6 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							},
+							{
+								"key": "DEF",
+								"rank": "D/ST rank 1 of 12",
+								"figure": "0.0",
+								"median": "0.0 median",
+								"need": null,
+								"mine": [
+									{
+										"name": "Texans",
+										"team": "HOU",
+										"mark": "Yours, Bench",
+										"figure": "7.9"
+									},
+									{
+										"name": "Vikings",
+										"team": "MIN",
+										"mark": "Yours, Bench",
+										"figure": "--"
+									}
+								],
+								"free": [
+									{
+										"key": "free:board:Kansas City Chiefs",
+										"name": "Chiefs",
+										"team": "KC",
+										"mark": "Free",
+										"figure": "9.6",
+										"beats": "Texans, Starter, +0.3 Gain",
+										"verb": "Add",
+										"move": "Open ESPN waivers"
+									}
+								]
+							}
+						]
+					}
+				},
 				"projected": true,
 				"arrives": null,
 				"heads": "A game is our rest-of-season points a game, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace in your rest-of-season lineup.",
@@ -27325,6 +32671,674 @@
 					"word": "D/ST"
 				}
 			],
+			"panel": {
+				"season": {
+					"explain": "Rank is your starters' rest of season at the position against the league's. Need marks a starting spot below the league median.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "252.2",
+							"median": "264.0 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "252.2"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "248.2"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "173.5"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "188.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "186.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "179.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "47.0",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "44.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 9 of 12",
+							"figure": "367.3",
+							"median": "429.8 median",
+							"need": "Need",
+							"mine": [
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "184.4"
+								},
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "182.9"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "139.8"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "77.7"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "16.3"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 2 of 12",
+							"figure": "1084.8",
+							"median": "920.3 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "333.2"
+								},
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "222.8"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "199.2"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "168.2"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "161.4"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "77.1"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "12.1"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "125.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "102.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "102.1",
+									"beats": "McConkey, Starter, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "85.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "65.8",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 8 of 12",
+							"figure": "141.0",
+							"median": "142.6 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "141.0"
+								},
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "94.4"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "McConkey, Starter, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "Dart, Bench, 0.0 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "85.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "83.7",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "60.4",
+									"beats": "McConkey, Starter, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST --",
+							"figure": "--",
+							"median": null,
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "Texans, Starter, +0.3 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				},
+				"week": {
+					"explain": "Rank is your starters' Proj this week at the position against the league's.",
+					"cards": [
+						{
+							"key": "QB",
+							"rank": "QB rank 8 of 12",
+							"figure": "20.6",
+							"median": "21.4 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Dart",
+									"team": "NYG",
+									"mark": "Yours, Starter",
+									"figure": "20.6"
+								},
+								{
+									"name": "Mahomes",
+									"team": "KC",
+									"mark": "Yours, Bench",
+									"figure": "17.9"
+								},
+								{
+									"name": "Rodgers",
+									"team": "PIT",
+									"mark": "Yours, Bench",
+									"figure": "15.8"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:3917792",
+									"name": "Jones",
+									"team": "IND",
+									"mark": "Free",
+									"figure": "17.9",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4688380",
+									"name": "Ward",
+									"team": "TEN",
+									"mark": "Free",
+									"figure": "15.3",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:15864",
+									"name": "Smith",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "14.9",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4360423",
+									"name": "Penix",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2576980",
+									"name": "Mariota",
+									"team": "WSH",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "RB",
+							"rank": "RB rank 10 of 12",
+							"figure": "26.5",
+							"median": "38.8 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Etienne",
+									"team": "NO",
+									"mark": "Yours, Starter",
+									"figure": "14.2"
+								},
+								{
+									"name": "Love",
+									"team": "ARI",
+									"mark": "Yours, Starter",
+									"figure": "12.3"
+								},
+								{
+									"name": "Gainwell",
+									"team": "TB",
+									"mark": "Yours, Bench",
+									"figure": "9.5"
+								},
+								{
+									"name": "Johnson",
+									"team": "CHI",
+									"mark": "Yours, Bench",
+									"figure": "0.6"
+								},
+								{
+									"name": "Charbonnet",
+									"team": "SEA",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": []
+						},
+						{
+							"key": "WR",
+							"rank": "WR rank 8 of 12",
+							"figure": "66.1",
+							"median": "68.0 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "McConkey",
+									"team": "LAC",
+									"mark": "Yours, Starter",
+									"figure": "13.2"
+								},
+								{
+									"name": "Odunze",
+									"team": "CHI",
+									"mark": "Yours, Starter",
+									"figure": "11.0"
+								},
+								{
+									"name": "Meyers",
+									"team": "JAX",
+									"mark": "Yours, Starter",
+									"figure": "9.7"
+								},
+								{
+									"name": "Williams",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "3.2"
+								},
+								{
+									"name": "Chase",
+									"team": "CIN",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								},
+								{
+									"name": "Addison",
+									"team": "MIN",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								},
+								{
+									"name": "Kirk",
+									"team": "SF",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4361409",
+									"name": "Dotson",
+									"team": "ATL",
+									"mark": "Free",
+									"figure": "5.6",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4686422",
+									"name": "Hutchinson",
+									"team": "HOU",
+									"mark": "Free",
+									"figure": "4.3",
+									"beats": "McConkey, Starter, +1.8 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4382466",
+									"name": "Nailor",
+									"team": "LV",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:3916945",
+									"name": "Slayton",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4241372",
+									"name": "Brown",
+									"team": "PHI",
+									"mark": "Free",
+									"figure": "--",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "TE",
+							"rank": "TE rank 5 of 12",
+							"figure": "12.2",
+							"median": "11.7 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Okonkwo",
+									"team": "WAS",
+									"mark": "Yours, Bench",
+									"figure": "7.8"
+								},
+								{
+									"name": "LaPorta",
+									"team": "DET",
+									"mark": "Yours, Starter",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:4808766",
+									"name": "Taylor",
+									"team": "NYJ",
+									"mark": "Free",
+									"figure": "4.8",
+									"beats": "Dart, Bench, 0.0 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4430802",
+									"name": "Washington",
+									"team": "PIT",
+									"mark": "Free",
+									"figure": "4.4",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4429148",
+									"name": "Johnson",
+									"team": "NYG",
+									"mark": "Free",
+									"figure": "4.1",
+									"beats": "0.0",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:2573401",
+									"name": "Higbee",
+									"team": "LAR",
+									"mark": "Free",
+									"figure": "2.9",
+									"beats": "McConkey, Starter, +0.2 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								},
+								{
+									"key": "free:board:4372780",
+									"name": "Tremble",
+									"team": "CAR",
+									"mark": "Free",
+									"figure": "2.4",
+									"beats": "McConkey, Starter, +0.6 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						},
+						{
+							"key": "DEF",
+							"rank": "D/ST rank 1 of 12",
+							"figure": "0.0",
+							"median": "0.0 median",
+							"need": null,
+							"mine": [
+								{
+									"name": "Texans",
+									"team": "HOU",
+									"mark": "Yours, Bench",
+									"figure": "7.9"
+								},
+								{
+									"name": "Vikings",
+									"team": "MIN",
+									"mark": "Yours, Bench",
+									"figure": "--"
+								}
+							],
+							"free": [
+								{
+									"key": "free:board:Kansas City Chiefs",
+									"name": "Chiefs",
+									"team": "KC",
+									"mark": "Free",
+									"figure": "9.6",
+									"beats": "Texans, Starter, +0.3 Gain",
+									"verb": "Add",
+									"move": "Open FFPC waivers"
+								}
+							]
+						}
+					]
+				}
+			},
 			"projected": true,
 			"arrives": null,
 			"heads": "A game is our rest-of-season points a game, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace in your rest-of-season lineup.",
@@ -36243,6 +42257,7 @@
 						"word": "D/ST"
 					}
 				],
+				"panel": null,
 				"projected": true,
 				"arrives": null,
 				"heads": "A game is our rest-of-season points a game, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace in your rest-of-season lineup.",
@@ -49638,6 +55653,7 @@
 						"word": "D/ST"
 					}
 				],
+				"panel": null,
 				"projected": true,
 				"arrives": null,
 				"heads": "A game is our rest-of-season points a game, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace in your rest-of-season lineup.",
@@ -62661,6 +68677,7 @@
 						"word": "D/ST"
 					}
 				],
+				"panel": null,
 				"projected": true,
 				"arrives": null,
 				"heads": "A game is our rest-of-season points a game, Avg his season average, Δ Proj his Proj's change since Thu 9:00 pm, Beats the player he would replace in your rest-of-season lineup.",
