@@ -59,8 +59,8 @@ export const SHEET = {
 	checkingAccount: 'Checking your account'
 } as const;
 
-/** The import panel's words, and the reasons a file or a row of it does not read that need no slot
- * and say no line. */
+/** The import panel's words, and the reasons a file or a row of it does not read that need no slot;
+ * each says "row", the API's word for them too (Lane 283, the coordinator's C1 ruling). */
 export const SHEET_IMPORT = {
 	head: 'Import',
 	fileLabel: 'A CSV file',
@@ -81,6 +81,9 @@ export const SHEET_IMPORT = {
 	boardNotLoaded: 'Our board did not load, so a list of names cannot be read yet',
 	boardLoading: 'Our board is still loading',
 	emptyFile: 'The file is empty',
+	badHeader: 'The first row must name rank, player_id, name and position',
+	notCsv: 'This row is not valid CSV',
+	earlier: 'This player is already on an earlier row',
 	bothTargetAndAvoid: 'Target and Avoid are both set, pick one',
 	badRank: 'The rank is not a whole number from 1',
 	badPosition: 'The position is not QB, RB, WR, TE, K or DST'

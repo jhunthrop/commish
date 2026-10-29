@@ -146,7 +146,7 @@ function headerIndex(header: readonly string[]): ColumnIndex {
 	});
 	const missing = REQUIRED.filter((column) => index[column] === undefined);
 	if (missing.length > 0) {
-		throw new CsvHeaderError('The first line must name rank, player_id, name and position');
+		throw new CsvHeaderError(SHEET_IMPORT.badHeader);
 	}
 	return index;
 }
@@ -228,13 +228,12 @@ export function decodeCsv(text: string): CsvRead {
 		const line = k + 2;
 		const isLast = k === body.length - 1;
 		if (unterminated && isLast) {
-			skipped.push({ line, reason: 'This line is not valid CSV' });
+			skipped.push({ line, reason: SHEET_IMPORT.notCsv });
 			return;
 		}
 		const read = readRecord(record, index);
 		if ('reason' in read) skipped.push({ line, reason: read.reason });
-		else if (seen.has(read.row.id))
-			skipped.push({ line, reason: 'This player is already on an earlier line' });
+		else if (seen.has(read.row.id)) skipped.push({ line, reason: SHEET_IMPORT.earlier });
 		else if (kept.length >= SHEET_LIMITS.rows)
 			skipped.push({ line, reason: `A sheet holds at most ${SHEET_LIMITS.rows} players` });
 		else {

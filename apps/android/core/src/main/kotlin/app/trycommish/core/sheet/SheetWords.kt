@@ -14,8 +14,8 @@ import java.util.Locale
  * (Words.Sheet, Words.SheetImport, Words.SheetStatus, from web/src/lib/sheet/words.ts, Lane 283), the
  * words with a slot spelled here until B256, and the phone's own, listed with their reason in
  * apps/android/scripts/sheet-words.test.ts, which fails on a copy of a table's word; the status line and
- * the tags are held to shared/fixtures/parity/sheet.json. The web says "line" for a row of a file, a word the copy rules keep for the
- * field (shared/words/banned-words.json), so the phone says "row".
+ * the tags are held to shared/fixtures/parity/sheet.json. The web's slot words still say "line" for a row of
+ * a file, a word the copy rules keep for the field (shared/words/banned-words.json), so the phone says "row".
  */
 @Suppress("ktlint:standard:property-naming") // A word table reads like Words.LeagueHome.
 object SheetWords {
@@ -183,11 +183,11 @@ object SheetWords {
             (if (first.first().isUpperCase()) "Row" else "row") + plural
         }
 
-    // A file's rows refused (csv.ts decodeCsv), "row" where the web says "line".
+    // A file's rows refused (csv.ts decodeCsv), the generated words where they need no slot.
     const val emptyFile = Words.SheetImport.emptyFile
-    const val badHeader = "The first row must name rank, player_id, name and position"
-    const val notCsv = "This row is not valid CSV"
-    const val earlier = "This player is already on an earlier row"
+    const val badHeader = Words.SheetImport.badHeader
+    const val notCsv = Words.SheetImport.notCsv
+    const val earlier = Words.SheetImport.earlier
     const val tooMany = "A sheet holds at most ${SheetLimits.ROWS} players"
     const val badRank = Words.SheetImport.badRank
     const val badPosition = Words.SheetImport.badPosition

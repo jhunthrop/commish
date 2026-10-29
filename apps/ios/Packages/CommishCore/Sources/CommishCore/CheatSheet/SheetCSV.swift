@@ -6,10 +6,8 @@ import Foundation
 /// any order and case, a bad line is skipped with its reason, and the players kept are counted. The
 /// import sends no CSV the web's panel would not let replace a sheet: a file whose header cannot be used
 /// is refused with its sentence, and one that reads no player is refused with what it skipped. A list of
-/// names is not read here: the API reads it (Lane 278). The web's
-/// reasons say "line" for a row of the file, a word the copy rules keep for the field
-/// (shared/words/banned-words.json), so the phone says "row" where the web says "line" and is held to the
-/// web's reasons with that one word swapped.
+/// names is not read here: the API reads it (Lane 278). The reasons with no slot are the generated
+/// Words.SheetImport's, which say "row" on the web, the API and the phone (Lane 283).
 public enum SheetCSV {
     /// The header could not be used: the web's (and the API's) sentence.
     public struct HeaderError: Error, Equatable, Sendable {
@@ -38,7 +36,7 @@ public enum SheetCSV {
     static let byteOrderMark = "\u{FEFF}"
 
     static let emptyFile = Words.SheetImport.emptyFile
-    static let badHeader = "The first row must name rank, player_id, name and position"
+    static let badHeader = Words.SheetImport.badHeader
 
     /// True when the text is the sheet's CSV, not a list of names: its first line names player_id (paste.ts
     /// looksLikeCsv, held to sheet.json `lists`). Read as the API reads it (paste.go looksLikeCSV), which
@@ -65,7 +63,7 @@ public enum SheetCSV {
         for (offset, record) in body.enumerated() {
             let line = offset + 2
             if unterminated, offset == body.count - 1 {
-                skipped.append(Skip(line: line, reason: "This row is not valid CSV"))
+                skipped.append(Skip(line: line, reason: Words.SheetImport.notCsv))
                 continue
             }
             let read: Row
@@ -77,7 +75,7 @@ public enum SheetCSV {
                 read = row
             }
             if seen.contains(read.id) {
-                skipped.append(Skip(line: line, reason: "This player is already on an earlier row"))
+                skipped.append(Skip(line: line, reason: Words.SheetImport.earlier))
             } else if kept.count >= SheetLimits.rows {
                 skipped.append(Skip(line: line, reason: "A sheet holds at most \(SheetLimits.rows) players"))
             } else {
