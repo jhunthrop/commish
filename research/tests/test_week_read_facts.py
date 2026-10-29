@@ -258,3 +258,23 @@ def test_an_undated_rank_or_average_is_tonights() -> None:
     assert standing_violations(["He averages 24.1 PPR points a game this season."], puka)
     assert standing_violations(["He averages 25.9 PPR points a game this season."], puka) == []
     assert standing_violations(["The Chargers allow 27.6 PPR points a game to receivers."], puka) == []
+
+
+def test_true_weather_shapes_are_never_refused() -> None:
+    """The review's L1: thunderstorms carry rain, a denied kind is no claim, and ice has its own words."""
+    storms = _downs(68.0, "thunderstorms")
+    assert weather_violations(["A 68% chance of thunderstorms and heavy rain hangs over kickoff."], storms) == []
+    clear = _downs(None, "none")
+    assert weather_violations(["Clear skies, no rain in the forecast."], clear) == []
+    assert weather_violations(["He plays without snow or storms to worry about."], clear) == []
+    assert weather_violations(["Rain is coming at kickoff."], clear)
+    ice = _downs(45.0, "ice")
+    assert weather_violations(["Freezing rain is in the forecast."], ice) == []
+    assert weather_violations(["Sleet and an icy field await."], ice) == []
+    assert weather_violations(["Freezing rain is in the forecast."], storms)
+
+
+def test_a_first_look_at_a_club_is_no_place() -> None:
+    """The review's L2: "his first look at the Jaguars" is a game, not a place on the chart."""
+    second = replace(_white(2.0, (("Brian Thomas Jr.", 1.0),)), name="Parker Washington", position="WR", team="JAX")
+    assert _place("Sunday is his first look at the Colts this season.", second) == []

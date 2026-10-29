@@ -410,7 +410,7 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         stamp,
         the_board_week,
         rollover(the_board_week, context.games, states, published_from, held, as_of),
-        weekly_charts(conn, season, the_board_week, as_of),
+        weekly_charts(conn, season, as_of),
     )
 
 

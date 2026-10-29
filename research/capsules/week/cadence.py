@@ -26,12 +26,14 @@ behind a withhold until the nightly.
 
 - The written read states a fact tonight's sheet does not bear out (`FACT_STALE`, Lane 299,
   `fact_rules.fact_violations`): his place on this week's depth chart (a read written from the week-one chart, or
-  whose place has moved since), or a game's figure tied to the wrong week. Nightly only, at most once a Central
-  day, ahead of the rule-stale ones; a rewrite that falls keeps the old read shown. Week 8's charts moved 4 to 13
-  board players' places a night after the roll-over, so about $0.01 to $0.03 a night once the backlog is written.
+  whose place has moved since), a game's figure tied to the wrong week, a kickoff forecast that has moved, an
+  undated Opp rank or his points a game the cells no longer print. Nightly only, at most once a Central day, ahead
+  of the rule-stale ones; a rewrite that falls keeps the old read shown. Week 8's charts moved 4 to 13 board
+  players' places a night after the roll-over, and a few dozen reads quote a forecast figure before a game day,
+  so about $0.10 to $0.15 a night with the rounds once the backlog is written.
 
-Anything else (a new projection, a new forecast, a chart that moves no place a read states) waits for one of
-those, so a quiet week costs nothing.
+Anything else (a new projection, a forecast no read quotes, a chart that moves no place a read states) waits for
+one of those, so a quiet week costs nothing.
 """
 
 from dataclasses import replace
