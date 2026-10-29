@@ -359,7 +359,16 @@ def _result(text: str) -> Any:
     read = SimpleNamespace(text=text, fallback=None)
     narrative = SimpleNamespace(slots={}, rejected=())
     return SimpleNamespace(
-        compact=read, full=read, narrative=narrative, source="llm", usage=None, calls=1, asks=1, model="m/x"
+        compact=read,
+        full=read,
+        narrative=narrative,
+        source="llm",
+        usage=None,
+        calls=1,
+        asks=1,
+        retry_asks=0,
+        rescued=False,
+        model="m/x",
     )
 
 
@@ -380,7 +389,7 @@ def test_each_page_is_told_what_the_pages_landed_before_it_started_repeat_and_ca
 
     def write_one(engine: Any, subject: Subject, stored: Any, view: GatewayClient, worn: WornPhrases, **_: Any) -> Any:
         told[subject.universe_id] = worn.sentences
-        return _result(texts[subject.universe_id]), False, False
+        return _result(texts[subject.universe_id]), False
 
     monkeypatch.setattr(sweep, "write_one", write_one)
     engine = _stub_store(monkeypatch)
@@ -416,12 +425,12 @@ class _FlakyEngine:
 def test_a_commit_that_loses_its_connection_is_tried_once_more_on_a_fresh_one(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, gateway, worn: _result(_SHARED))
+    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, gateway, worn, **_: _result(_SHARED))
     monkeypatch.setattr(sweep, "upsert_capsule", lambda conn, row, at: None)
     monkeypatch.setattr(sweep, "CapsuleWrite", lambda *args: args)
     engine = _FlakyEngine(1)
     gateway = _client(lambda r: _ok(), FakeClock())
-    result, _, _ = sweep.write_one(cast("Engine", engine), _subject("a"), None, gateway, WornPhrases((), ()))
+    result, _ = sweep.write_one(cast("Engine", engine), _subject("a"), None, gateway, WornPhrases((), ()))
     assert result.source == "llm"
     assert engine.begun == 1 + 1
 
@@ -478,10 +487,9 @@ def _stored(pid: str, full: str) -> Any:
     [
         (SweepPlan(10, span_rules=SpanRules(frozenset())), True),
         (SweepPlan(10, span_rules=SpanRules(frozenset()), only=("a",)), False),
-        (SweepPlan(10, span_rules=SpanRules(frozenset()), only=("a",), keep_written=True), False),
         (SweepPlan(10, span_rules=SpanRules(frozenset()), only=("a",), grace=True), False),
     ],
-    ids=["the sweep", "the shared-sentence repair", "the span repair", "the graced rewrite"],
+    ids=["the sweep", "the repair", "the graced rewrite"],
 )
 def test_a_rewrite_that_would_land_another_pages_sentence_is_refused_and_keeps_the_written_read(
     monkeypatch: pytest.MonkeyPatch, plan: SweepPlan, lands: bool
@@ -492,7 +500,7 @@ def test_a_rewrite_that_would_land_another_pages_sentence_is_refused_and_keeps_t
     monkeypatch.setattr(sweep, "stored_capsules_for", lambda conn, ids: {k: v for k, v in stored.items() if k in ids})
     monkeypatch.setattr(sweep, "queue_regeneration", lambda conn, ids: 0)
     monkeypatch.setattr(sweep, "worn_phrases", lambda subjects, stored: WornPhrases((), ()))
-    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, gateway, worn: _result(f"Fresh words. {_CLOSER}"))
+    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, gateway, worn, **_: _result(f"Fresh words. {_CLOSER}"))
     monkeypatch.setattr(sweep, "upsert_capsule", lambda conn, row, at: committed.append(row.player_id))
     monkeypatch.setattr(sweep, "_needs_generation", lambda subject, row: subject.universe_id == "a")
     engine = cast("Engine", SimpleNamespace(connect=lambda: nullcontext(None), begin=lambda: nullcontext(None)))
@@ -520,7 +528,7 @@ def test_a_rewrite_landing_a_sentence_the_facts_print_is_not_refused(monkeypatch
     monkeypatch.setattr(sweep, "stored_capsules_for", lambda conn, ids: {k: v for k, v in stored.items() if k in ids})
     monkeypatch.setattr(sweep, "queue_regeneration", lambda conn, ids: 0)
     monkeypatch.setattr(sweep, "worn_phrases", lambda subjects, stored: WornPhrases((), ()))
-    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, gateway, worn: _result(f"Fresh words. {_CLOSER}"))
+    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, gateway, worn, **_: _result(f"Fresh words. {_CLOSER}"))
     monkeypatch.setattr(sweep, "upsert_capsule", lambda conn, row, at: committed.append(row.player_id))
     engine = cast("Engine", SimpleNamespace(connect=lambda: nullcontext(None), begin=lambda: nullcontext(None)))
     gateway = _client(lambda r: _ok(), FakeClock(), WriterSettings("m/x", 1, 60))
@@ -537,7 +545,7 @@ def test_two_pages_in_flight_with_the_same_new_sentence_land_it_once(monkeypatch
     both_started = threading.Barrier(2)
     committed: list[str] = []
 
-    def generate(facts: Any, gateway: Any, worn: Any) -> Any:
+    def generate(facts: Any, gateway: Any, worn: Any, **_: Any) -> Any:
         both_started.wait(5)
         return _result(f"Fresh words. {_CLOSER}")
 
@@ -548,7 +556,7 @@ def test_two_pages_in_flight_with_the_same_new_sentence_land_it_once(monkeypatch
     monkeypatch.setattr(sweep, "upsert_capsule", lambda conn, row, at: committed.append(row.player_id))
     engine = cast("Engine", SimpleNamespace(connect=lambda: nullcontext(None), begin=lambda: nullcontext(None)))
     gateway = _client(lambda r: _ok(), FakeClock(), WriterSettings("m/x", 2, 60))
-    plan = SweepPlan(10, span_rules=SpanRules(frozenset()), only=("a", "b"), keep_written=True)
+    plan = SweepPlan(10, span_rules=SpanRules(frozenset()), only=("a", "b"))
     report = sweep_capsules(engine, gateway, NOW, plan, lambda c, a: subjects)
     assert len(committed) == 1
     assert (report.llm, report.refused) == (1, 1)

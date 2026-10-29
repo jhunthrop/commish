@@ -9,7 +9,11 @@ fresh draft after a second length miss, the soft points, or a rewrite), each a c
 version it may run 10% over its cap. Every correction carries each rule the read has broken on any
 attempt so far, with the sentence it broke it in and the rule in one line (`rule_notes`, Lane 52),
 and a read out of its band is still read for every other rule, so its length correction asks for
-all of it at once. A read that still fails is the facts block (`facts_block`): his
+all of it at once. A read the writer's asks could not write (a validation fall) is asked once more of the retry
+writer when the run names one (Lane 294, the week read's Lane 276 retry writer on the same gateway
+path, `retry_model`): the correction of its last draft with every rule broken so far, or the first ask
+for a read the bundle never carried, held to the same validator. That ask is outside the six and the
+night's ceiling. A read that still fails is the facts block (`facts_block`): his
 numbers as labelled facts, no prose.
 Narrative slots refused only for their voice get one rewrite each from what calls are left. Nothing
 here raises for a gateway failure: the facts block is the answer, and the usage billed is kept.
@@ -97,6 +101,13 @@ class ReadResult:
     usage: Usage | None
     fallback: Fallback | None
     attempts: tuple[ReadAttempt, ...]
+    # The drafts asked of the retry writer for this read (0 or 1, Lane 294).
+    retry_asks: int = 0
+
+    @property
+    def rescued(self) -> bool:
+        """Whether the retry writer wrote the read the writer's asks could not."""
+        return self.retry_asks > 0 and self.source == "llm"
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +124,13 @@ class CapsuleResult:
     # The writer's own asks (the bundle, each correction, each slot rewrite), which the six bound and
     # the night's ceiling counts (Lane 73 ruling 1); a re-ask inside one ask is not another.
     asks: int
+    # The drafts asked of the retry writer (Lane 294), outside the six and the night's ceiling.
+    retry_asks: int = 0
+
+    @property
+    def rescued(self) -> bool:
+        """A written page one of whose reads the retry writer wrote."""
+        return self.source == "llm" and any(read.rescued for read in (self.compact, self.full))
 
 
 def _msgs(facts: "PlayerFacts", user: str) -> list[dict[str, str]]:
@@ -260,17 +278,52 @@ def _facts_block(facts: "PlayerFacts", read: _Read, fallback: Fallback) -> ReadR
     return ReadResult(render_facts_block(facts), FACTS_SOURCE, read.usage, fallback, read.attempts)
 
 
-def _settle(
-    facts: "PlayerFacts", size: str, read: _Read, budget: int, gateway: GatewayClient
+def _validation_fall(read: _Read) -> Fallback:
+    failed = None if read.result is None else read.result.violations
+    return Fallback("failed_validation", _NOT_WRITTEN if not failed else fallback_violation(failed))
+
+
+def _retry_correction(read: _Read) -> PriorAttempt:
+    """The retry writer's ask: the correction of the read's last draft with every rule it broke on any
+    attempt (its length named when the band was missed), or the first ask when no draft was carried."""
+    if read.text is None or read.result is None:
+        return PriorAttempt("", missing=True)
+    ledger = notes_of([(attempt.body, attempt.violations) for attempt in read.attempts])
+    return PriorAttempt(read.text, read.result.violations, length_correction=read.result.band_failure, ledger=ledger)
+
+
+def _retry_writer_read(facts: "PlayerFacts", size: str, read: _Read, retrier: GatewayClient) -> ReadResult:
+    """One draft of the read the writer's asks could not write, asked of the retry writer (`retrier`, the
+    same line, bucket and ledger) and validated as the writer's are: written as the retry writer's, else
+    the facts block named for this last draft, or for the writer's own fall when the gateway refused it."""
+    prior = _retry_correction(read)
+    try:
+        answer = ask(
+            retrier, _msgs(facts, correction_prompt_for(facts, size, prior)), CAPSULE_CONFIG.size(size).max_tokens
+        )
+    except GenerationError as error:
+        spent = replace(read, usage=add_usage(read.usage, error.billed))
+        return replace(_facts_block(facts, spent, _validation_fall(read)), retry_asks=1)
+    text = answer.content.strip()
+    graded = read.graded(
+        "retry", text, validate_capsule(text, facts, size, asked_shorter=_asked_shorter(read, size)), answer.usage, 0
+    )
+    if graded.ok:
+        return ReadResult(text, "llm", graded.usage, None, graded.attempts, retry_asks=1)
+    return replace(_facts_block(facts, graded, _validation_fall(graded)), retry_asks=1)
+
+
+def _settle(  # noqa: PLR0913 - one read's parts
+    facts: "PlayerFacts", size: str, read: _Read, budget: int, gateway: GatewayClient, *, retrier: GatewayClient | None
 ) -> tuple[ReadResult, int]:
     while True:
         if read.ok and read.text is not None:
             return ReadResult(read.text, "llm", read.usage, None, read.attempts), read.calls
         prior = _next_correction(read)
         if prior is None or read.calls >= budget:
-            failed = None if read.result is None else read.result.violations
-            first = _NOT_WRITTEN if not failed else fallback_violation(failed)
-            return _facts_block(facts, read, Fallback("failed_validation", first)), read.calls
+            if retrier is not None:
+                return _retry_writer_read(facts, size, read, retrier), read.calls
+            return _facts_block(facts, read, _validation_fall(read)), read.calls
         try:
             answer = ask(
                 gateway, _msgs(facts, correction_prompt_for(facts, size, prior)), CAPSULE_CONFIG.size(size).max_tokens
@@ -344,19 +397,23 @@ def _assemble(  # noqa: PLR0913, PLR0917 - one page's parts
     model: str,
     calls: int,
     asks: int,
+    retry_model: str | None = None,
 ) -> CapsuleResult:
+    """The page: written when both reads are, its model the retry writer's when it wrote either one."""
     compact, full = reads
     both = compact.source == "llm" and full.source == "llm"
     total = add_usage(add_usage(usage, compact.usage), full.usage)
+    rescued = retry_model is not None and any(read.rescued for read in reads)
     return CapsuleResult(
         compact,
         full,
         narrative,
         "llm" if both else FACTS_SOURCE,
-        model if both else None,
+        (retry_model if rescued else model) if both else None,
         total,
         calls,
         charged_asks(asks, reads),
+        compact.retry_asks + full.retry_asks,
     )
 
 
@@ -392,10 +449,16 @@ def describe_fallback(compact: ReadResult, full: ReadResult) -> str:
 
 
 def generate_capsule(
-    facts: "PlayerFacts", gateway: GatewayClient, worn: WornPhrases = NO_WORN_PHRASES
+    facts: "PlayerFacts", gateway: GatewayClient, worn: WornPhrases = NO_WORN_PHRASES, *, retry_model: str | None = None
 ) -> CapsuleResult:
-    """`generateCapsule`. `calls` is every HTTP call the gateway client made for him, retries included."""
+    """`generateCapsule`. `calls` is every HTTP call made for him, the retry writer's and retries included.
+    A read the writer's asks could not write is asked once more of `retry_model` when one is named."""
     before = gateway.calls
+    retrier = None if retry_model is None else gateway.with_model(retry_model)
+
+    def made() -> int:
+        return gateway.calls - before + (0 if retrier is None else retrier.calls)
+
     requests = narrative_requests_for(facts)
     outcome = _bundle(facts, requests, gateway, worn)
     if outcome.bundle is None:
@@ -410,7 +473,7 @@ def generate_capsule(
             failed_narrative(reason),
             outcome.usage,
             gateway.model,
-            gateway.calls - before,
+            made(),
             outcome.calls,
         )
     remaining = CAPSULE_CONFIG.max_gateway_calls_per_player - outcome.calls
@@ -421,8 +484,9 @@ def generate_capsule(
         _start(facts, "compact", outcome.bundle.compact),
         remaining - (0 if full_start.ok else 1),
         gateway,
+        retrier=retrier,
     )
-    full, full_calls = _settle(facts, "full", full_start, remaining - compact_calls, gateway)
+    full, full_calls = _settle(facts, "full", full_start, remaining - compact_calls, gateway, retrier=retrier)
     settled = settle_narrative(outcome.bundle.narrative, facts, requests, gateway.model)
     left = CAPSULE_CONFIG.max_gateway_calls_per_player - outcome.calls - compact_calls - full_calls
     narrative, voice_usage, voice_calls = _rewrite_voice_slots(settled, facts, requests, gateway, left)
@@ -432,6 +496,7 @@ def generate_capsule(
         narrative,
         add_usage(outcome.usage, voice_usage),
         gateway.model,
-        gateway.calls - before,
+        made(),
         outcome.calls + compact_calls + full_calls + voice_calls,
+        retry_model,
     )

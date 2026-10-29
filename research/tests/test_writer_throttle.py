@@ -229,7 +229,7 @@ def test_a_page_counts_its_writers_asks_apart_from_the_gateways_http_calls(monke
 
 def test_the_nights_calls_per_player_are_the_writers_asks() -> None:
     report = sweep_module.SweepReport(datetime(2026, 10, 17, 5, tzinfo=UTC), 1, 1)
-    result = cast("CapsuleResult", SimpleNamespace(calls=9, asks=6, usage=None))
+    result = cast("CapsuleResult", SimpleNamespace(calls=9, asks=6, retry_asks=0, usage=None))
     sweep_module._count_spend(report, cast("Any", SimpleNamespace(universe_id="u1")), result)
     assert report.calls == 9  # noqa: PLR2004 - the bill counts every HTTP call
     assert report.asks_by_player == {"u1": 6}

@@ -6912,6 +6912,4870 @@
 		"stash_late": 0,
 		"for_week": 7,
 		"projection_arrives_at": "2026-10-22T22:15:00.000Z",
+		"positions": [
+			{
+				"position": "QB",
+				"teams": 12,
+				"need": true,
+				"rest_of_season": {
+					"rank": 8,
+					"points": 248.2,
+					"median": 264
+				},
+				"week": null,
+				"mine": [
+					{
+						"line": {
+							"player": {
+								"host_id": "12508",
+								"board_id": "4689114",
+								"name": "Jaxson Dart",
+								"position": "QB",
+								"team": "NYG",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+							"slug": "jaxson-dart",
+							"position_rank": null,
+							"points_over_replacement": -8.3,
+							"rest_of_season_per_game": 15.8,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "HOU",
+								"home": false,
+								"kickoff": "2026-10-25T17:00:00.000Z",
+								"bye": false,
+								"designation": {
+									"status": "injured_reserve",
+									"as_of": "2026-10-14T02:03:35.613Z",
+									"since": "2026-09-24T22:00:00.000Z",
+									"season_long": true
+								},
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 17.5,
+										"source": "platform"
+									},
+									{
+										"week": 2,
+										"points": 0.8
+									},
+									{
+										"week": 1,
+										"points": 29.6
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 3,
+							"season_avg": 16,
+							"last_points": 17.5,
+							"games_played": 3,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": false,
+						"starts_this_week": false,
+						"rest_of_season_points": 252.2
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "4046",
+								"board_id": "3139477",
+								"name": "Patrick Mahomes",
+								"position": "QB",
+								"team": "KC",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3139477.png",
+							"slug": "patrick-mahomes",
+							"position_rank": 12,
+							"points_over_replacement": 2.7,
+							"rest_of_season_per_game": 15.5,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "SEA",
+								"home": false,
+								"kickoff": "2026-10-26T00:20:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 15.2,
+										"source": "platform"
+									},
+									{
+										"week": 4,
+										"points": 19
+									},
+									{
+										"week": 3,
+										"points": 18.9
+									},
+									{
+										"week": 2,
+										"points": 32
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 2,
+							"season_avg": 21.3,
+							"last_points": 15.2,
+							"games_played": 4,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": true,
+						"starts_this_week": false,
+						"rest_of_season_points": 248.2
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "96",
+								"board_id": "8439",
+								"name": "Aaron Rodgers",
+								"position": "QB",
+								"team": "PIT",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/8439.png",
+							"slug": "aaron-rodgers",
+							"position_rank": 26,
+							"points_over_replacement": 0,
+							"rest_of_season_per_game": 10.8,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "NO",
+								"home": false,
+								"kickoff": "2026-10-25T13:30:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 13.4,
+										"source": "platform"
+									},
+									{
+										"week": 5,
+										"points": 25
+									},
+									{
+										"week": 4,
+										"points": 25
+									},
+									{
+										"week": 3,
+										"points": 26.7
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 11,
+							"season_avg": 22.6,
+							"last_points": 13.4,
+							"games_played": 4,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": false,
+						"starts_this_week": false,
+						"rest_of_season_points": 173.5
+					}
+				],
+				"available": [
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "3917792",
+									"name": "Daniel Jones",
+									"position": "QB",
+									"team": "IND",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3917792.png",
+								"slug": "daniel-jones",
+								"position_rank": 21,
+								"points_over_replacement": -2.1,
+								"rest_of_season_per_game": 11.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "MIN",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 5,
+											"points": 11.1
+										},
+										{
+											"week": 4,
+											"points": 8.9
+										},
+										{
+											"week": 3,
+											"points": 9.9
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 23,
+								"season_avg": 10,
+								"last_points": 11.1,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": false,
+							"sentence": "Daniel Jones is QB24 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"pickup": false,
+							"clears": null
+						},
+						"rest_of_season_points": 188.7
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "4688380",
+									"name": "Cam Ward",
+									"position": "QB",
+									"team": "TEN",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4688380.png",
+								"slug": "cam-ward",
+								"position_rank": 22,
+								"points_over_replacement": -0.9,
+								"rest_of_season_per_game": 11.7,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "CLE",
+									"home": true,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 5,
+											"points": 6
+										},
+										{
+											"week": 4,
+											"points": 15.6
+										},
+										{
+											"week": 3,
+											"points": 11.4
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 14,
+								"season_avg": 11,
+								"last_points": 6,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": false,
+							"sentence": "Cam Ward is QB19 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"pickup": false,
+							"clears": null
+						},
+						"rest_of_season_points": 186.7
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "15864",
+									"name": "Geno Smith",
+									"position": "QB",
+									"team": "NYJ",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/15864.png",
+								"slug": "geno-smith",
+								"position_rank": 25,
+								"points_over_replacement": -0.9,
+								"rest_of_season_per_game": 11.2,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "MIA",
+									"home": true,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 5,
+											"points": 11
+										},
+										{
+											"week": 4,
+											"points": 9.8
+										},
+										{
+											"week": 3,
+											"points": 27
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 14,
+								"season_avg": 15.9,
+								"last_points": 11,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": false,
+							"sentence": "Geno Smith is QB18 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"pickup": false,
+							"clears": null
+						},
+						"rest_of_season_points": 179.3
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "4360423",
+									"name": "Michael Penix Jr.",
+									"position": "QB",
+									"team": "ATL",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4360423.png",
+								"slug": "michael-penix-jr",
+								"position_rank": 42,
+								"points_over_replacement": -12.1,
+								"rest_of_season_per_game": 2.9,
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 20,
+								"season_avg": 14.4,
+								"last_points": 15.4,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "SF",
+									"home": true,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "questionable",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"listed": null,
+										"carried_over": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 5,
+											"points": 15.4
+										},
+										{
+											"week": 4,
+											"points": 13.7
+										},
+										{
+											"week": 3,
+											"points": 14
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": false,
+							"sentence": "Michael Penix Jr. is QB42 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"pickup": false,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"clears": null
+						},
+						"rest_of_season_points": 47
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "2576980",
+									"name": "Marcus Mariota",
+									"position": "QB",
+									"team": "WSH",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/2576980.png",
+								"slug": "marcus-mariota",
+								"position_rank": 44,
+								"points_over_replacement": -12.2,
+								"rest_of_season_per_game": 2.8,
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 15,
+								"season_avg": 12.8,
+								"last_points": 5.3,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": null,
+									"home": null,
+									"kickoff": null,
+									"bye": true,
+									"designation": {
+										"status": "doubtful",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"listed": null,
+										"carried_over": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 4,
+											"points": 5.3
+										},
+										{
+											"week": 3,
+											"points": 23.4
+										},
+										{
+											"week": 2,
+											"points": 9.7
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": null
+								},
+								"game_state": {
+									"state": "bye",
+									"word": "Bye"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": false,
+							"sentence": "Marcus Mariota is QB44 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"pickup": false,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"clears": null
+						},
+						"rest_of_season_points": 44.4
+					}
+				]
+			},
+			{
+				"position": "RB",
+				"teams": 12,
+				"need": false,
+				"rest_of_season": {
+					"rank": 6,
+					"points": 507.1,
+					"median": 501.1
+				},
+				"week": null,
+				"mine": [
+					{
+						"line": {
+							"player": {
+								"host_id": "13287",
+								"board_id": "4870808",
+								"name": "Jeremiyah Love",
+								"position": "RB",
+								"team": "ARI",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4870808.png",
+							"slug": "jeremiyah-love",
+							"position_rank": 13,
+							"points_over_replacement": 0.6,
+							"rest_of_season_per_game": 11.5,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "DEN",
+								"home": true,
+								"kickoff": "2026-10-25T20:05:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 10.5,
+										"source": "platform"
+									},
+									{
+										"week": 5,
+										"points": 2.2
+									},
+									{
+										"week": 4,
+										"points": 6.5
+									},
+									{
+										"week": 3,
+										"points": 21.9
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 6,
+							"season_avg": 10.3,
+							"last_points": 10.5,
+							"games_played": 4,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": true,
+						"starts_this_week": false,
+						"rest_of_season_points": 184.4
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "7543",
+								"board_id": "4239996",
+								"name": "Travis Etienne",
+								"position": "RB",
+								"team": "NO",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4239996.png",
+							"slug": "travis-etienne-jr",
+							"position_rank": 14,
+							"points_over_replacement": -2.6,
+							"rest_of_season_per_game": 11.4,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "PIT",
+								"home": true,
+								"kickoff": "2026-10-25T13:30:00.000Z",
+								"bye": false,
+								"designation": {
+									"status": "questionable",
+									"as_of": "2026-10-14T02:03:35.613Z",
+									"returning": "2026-10-18",
+									"listed": null,
+									"carried_over": true
+								},
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 12.1,
+										"source": "platform"
+									},
+									{
+										"week": 3,
+										"points": 9
+									},
+									{
+										"week": 2,
+										"points": 5.1
+									},
+									{
+										"week": 1,
+										"points": 14.8
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 26,
+							"season_avg": 10.2,
+							"last_points": 12.1,
+							"games_played": 4,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": true,
+						"starts_this_week": false,
+						"rest_of_season_points": 182.9
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "7567",
+								"board_id": "4371733",
+								"name": "Kenny Gainwell",
+								"position": "RB",
+								"team": "TB",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4371733.png",
+							"slug": "kenny-gainwell",
+							"position_rank": 26,
+							"points_over_replacement": -1.6,
+							"rest_of_season_per_game": 8.7,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "CAR",
+								"home": false,
+								"kickoff": "2026-10-25T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 8.1,
+										"source": "platform"
+									},
+									{
+										"week": 5,
+										"points": 5.8
+									},
+									{
+										"week": 4,
+										"points": 10.7
+									},
+									{
+										"week": 3,
+										"points": 3
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 18,
+							"season_avg": 6.9,
+							"last_points": 8.1,
+							"games_played": 4,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": true,
+						"starts_this_week": false,
+						"rest_of_season_points": 139.8
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "9753",
+								"board_id": "4426385",
+								"name": "Zach Charbonnet",
+								"position": "RB",
+								"team": "SEA",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4426385.png",
+							"slug": "zach-charbonnet",
+							"position_rank": 47,
+							"points_over_replacement": -5.7,
+							"rest_of_season_per_game": 4.9,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "KC",
+								"home": true,
+								"kickoff": "2026-10-26T00:20:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 24,
+							"season_avg": null,
+							"last_points": null,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": false,
+						"starts_this_week": false,
+						"rest_of_season_points": 77.7
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "10235",
+								"board_id": "4426386",
+								"name": "Roschon Johnson",
+								"position": "RB",
+								"team": "CHI",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4426386.png",
+							"slug": "roschon-johnson",
+							"position_rank": 74,
+							"points_over_replacement": -6.2,
+							"rest_of_season_per_game": null,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "NE",
+								"home": true,
+								"kickoff": "2026-10-23T00:15:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 0.5,
+										"source": "platform"
+									},
+									{
+										"week": 5,
+										"points": 9
+									},
+									{
+										"week": 4,
+										"points": 3.3
+									},
+									{
+										"week": 2,
+										"points": 0
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 1,
+							"season_avg": 3.2,
+							"last_points": 0.5,
+							"games_played": 4,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": false,
+						"starts_this_week": false,
+						"rest_of_season_points": 16.3
+					}
+				],
+				"available": []
+			},
+			{
+				"position": "WR",
+				"teams": 12,
+				"need": false,
+				"rest_of_season": {
+					"rank": 2,
+					"points": 923.4,
+					"median": 734.3
+				},
+				"week": null,
+				"mine": [
+					{
+						"line": {
+							"player": {
+								"host_id": "7564",
+								"board_id": "4362628",
+								"name": "Ja'Marr Chase",
+								"position": "WR",
+								"team": "CIN",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4362628.png",
+							"slug": "ja-marr-chase",
+							"position_rank": 2,
+							"points_over_replacement": 4.4,
+							"rest_of_season_per_game": 20.8,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "BAL",
+								"home": false,
+								"kickoff": "2026-10-25T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 19.7
+									},
+									{
+										"week": 4,
+										"points": 5.7
+									},
+									{
+										"week": 3,
+										"points": 24.8
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.7,
+							"last_points": 19.7,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": true,
+						"starts_this_week": false,
+						"rest_of_season_points": 333.2
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "11635",
+								"board_id": "4612826",
+								"name": "Ladd McConkey",
+								"position": "WR",
+								"team": "LAC",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4612826.png",
+							"slug": "ladd-mcconkey",
+							"position_rank": 18,
+							"points_over_replacement": -3.3,
+							"rest_of_season_per_game": 13.9,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": null,
+								"home": null,
+								"kickoff": null,
+								"bye": true,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 11.2,
+										"source": "platform"
+									},
+									{
+										"week": 4,
+										"points": 0
+									},
+									{
+										"week": 3,
+										"points": 10.6
+									},
+									{
+										"week": 2,
+										"points": 6.5
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": null
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 22,
+							"season_avg": 7.1,
+							"last_points": 11.2,
+							"games_played": 4,
+							"game_state": {
+								"state": "bye",
+								"word": "Bye"
+							}
+						},
+						"starter": true,
+						"starts_this_week": false,
+						"rest_of_season_points": 222.8
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "11620",
+								"board_id": "4431299",
+								"name": "Rome Odunze",
+								"position": "WR",
+								"team": "CHI",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4431299.png",
+							"slug": "rome-odunze",
+							"position_rank": 25,
+							"points_over_replacement": 0,
+							"rest_of_season_per_game": 12.4,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "NE",
+								"home": true,
+								"kickoff": "2026-10-23T00:15:00.000Z",
+								"bye": false,
+								"designation": {
+									"status": "questionable",
+									"as_of": "2026-10-16T21:00:00.000Z",
+									"listed": null,
+									"carried_over": true
+								},
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 9.4,
+										"source": "platform"
+									},
+									{
+										"week": 5,
+										"points": 5
+									},
+									{
+										"week": 4,
+										"points": 15.4
+									},
+									{
+										"week": 3,
+										"points": 7.4
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 12,
+							"season_avg": 9.3,
+							"last_points": 9.4,
+							"games_played": 4,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": true,
+						"starts_this_week": false,
+						"rest_of_season_points": 199.2
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "9756",
+								"board_id": "4429205",
+								"name": "Jordan Addison",
+								"position": "WR",
+								"team": "MIN",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429205.png",
+							"slug": "jordan-addison",
+							"position_rank": 37,
+							"points_over_replacement": -3.3,
+							"rest_of_season_per_game": 10.5,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "IND",
+								"home": true,
+								"kickoff": "2026-10-25T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 4,
+										"points": 9.1
+									},
+									{
+										"week": 3,
+										"points": 20
+									},
+									{
+										"week": 2,
+										"points": 4.1
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 11.1,
+							"last_points": 9.1,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": true,
+						"starts_this_week": false,
+						"rest_of_season_points": 168.2
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "5947",
+								"board_id": "3916433",
+								"name": "Jakobi Meyers",
+								"position": "WR",
+								"team": "JAX",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3916433.png",
+							"slug": "jakobi-meyers",
+							"position_rank": 41,
+							"points_over_replacement": -1.7,
+							"rest_of_season_per_game": 10.1,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": null,
+								"home": null,
+								"kickoff": null,
+								"bye": true,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 8.2,
+										"source": "platform"
+									},
+									{
+										"week": 5,
+										"points": 5.7
+									},
+									{
+										"week": 4,
+										"points": 6.3
+									},
+									{
+										"week": 3,
+										"points": 19.4
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": null
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 31,
+							"season_avg": 9.9,
+							"last_points": 8.2,
+							"games_played": 4,
+							"game_state": {
+								"state": "bye",
+								"word": "Bye"
+							}
+						},
+						"starter": false,
+						"starts_this_week": false,
+						"rest_of_season_points": 161.4
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "13301",
+								"board_id": "5081432",
+								"name": "Antonio Williams",
+								"position": "WR",
+								"team": "WAS",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5081432.png",
+							"slug": "antonio-williams",
+							"position_rank": 83,
+							"points_over_replacement": -2.5,
+							"rest_of_season_per_game": 4.8,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": null,
+								"home": null,
+								"kickoff": null,
+								"bye": true,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 2.7,
+										"source": "platform"
+									},
+									{
+										"week": 5,
+										"points": 6.1
+									},
+									{
+										"week": 4,
+										"points": 5.1
+									},
+									{
+										"week": 3,
+										"points": 3.5
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": null
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 25,
+							"season_avg": 4.4,
+							"last_points": 2.7,
+							"games_played": 4,
+							"game_state": {
+								"state": "bye",
+								"word": "Bye"
+							}
+						},
+						"starter": false,
+						"starts_this_week": false,
+						"rest_of_season_points": 77.1
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "4950",
+								"board_id": "3895856",
+								"name": "Christian Kirk",
+								"position": "WR",
+								"team": "SF",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3895856.png",
+							"slug": "christian-kirk",
+							"position_rank": 149,
+							"points_over_replacement": -6.7,
+							"rest_of_season_per_game": null,
+							"held": true,
+							"facts": {
+								"week": 7,
+								"opponent": "ATL",
+								"home": false,
+								"kickoff": "2026-10-25T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 5,
+							"season_avg": null,
+							"last_points": null,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": false,
+						"starts_this_week": false,
+						"rest_of_season_points": 12.1
+					}
+				],
+				"available": [
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "4382466",
+									"name": "Jalen Nailor",
+									"position": "WR",
+									"team": "LV",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4382466.png",
+								"slug": "jalen-nailor",
+								"position_rank": 56,
+								"points_over_replacement": -3.2,
+								"rest_of_season_per_game": 7.9,
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 27,
+								"season_avg": 1.5,
+								"last_points": 0,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "LAR",
+									"home": true,
+									"kickoff": "2026-10-25T20:25:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "questionable",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"listed": null,
+										"carried_over": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 4,
+											"points": 0
+										},
+										{
+											"week": 3,
+											"points": 2.6
+										},
+										{
+											"week": 2,
+											"points": 1.9
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": false,
+							"sentence": "Jalen Nailor is WR56 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"pickup": false,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"clears": null
+						},
+						"rest_of_season_points": 125.8
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "3916945",
+									"name": "Darius Slayton",
+									"position": "WR",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3916945.png",
+								"slug": "darius-slayton",
+								"position_rank": 68,
+								"points_over_replacement": -4.6,
+								"rest_of_season_per_game": 6.4,
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 13,
+								"season_avg": null,
+								"last_points": null,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "questionable",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"listed": null,
+										"carried_over": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": false,
+							"sentence": "Darius Slayton is WR68 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"pickup": false,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"clears": null
+						},
+						"rest_of_season_points": 102.3
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "4686422",
+									"name": "Xavier Hutchinson",
+									"position": "WR",
+									"team": "HOU",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4686422.png",
+								"slug": "xavier-hutchinson",
+								"position_rank": 69,
+								"points_over_replacement": -0.7,
+								"rest_of_season_per_game": 6.4,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "NYG",
+									"home": true,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 5,
+											"points": 10.5
+										},
+										{
+											"week": 4,
+											"points": 7.6
+										},
+										{
+											"week": 3,
+											"points": 8.5
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 2,
+								"season_avg": 8.9,
+								"last_points": 10.5,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 1.8,
+							"starts": true,
+							"sentence": "Xavier Hutchinson starts for you, and your lineup gains 1.8 points over replacement a week on our rest-of-season order. Jaxson Dart is the player it costs you least to lose.",
+							"week_gain": null,
+							"beats": {
+								"host_id": "12508",
+								"name": "Jaxson Dart",
+								"starter": false,
+								"gain": null,
+								"open_spot": false
+							},
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 1.8,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 1.8,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 1.8,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 1.8,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 1.8,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 1.8,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 1.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 1.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -4,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -4.5,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -4.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -4.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -6.5,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -6.5,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -7.1,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -8.6,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -9.2,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -10.9,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"pickup": true,
+							"clears": null
+						},
+						"rest_of_season_points": 102.1
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "4361409",
+									"name": "Jahan Dotson",
+									"position": "WR",
+									"team": "ATL",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4361409.png",
+								"slug": "jahan-dotson",
+								"position_rank": 81,
+								"points_over_replacement": -3,
+								"rest_of_season_per_game": 5.4,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "SF",
+									"home": true,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 5,
+											"points": 7.4
+										},
+										{
+											"week": 4,
+											"points": 13.4
+										},
+										{
+											"week": 3,
+											"points": 2.1
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 30,
+								"season_avg": 7.6,
+								"last_points": 7.4,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": true,
+							"sentence": "Jahan Dotson is WR67 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"pickup": false,
+							"clears": null
+						},
+						"rest_of_season_points": 85.8
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "4241372",
+									"name": "Hollywood Brown",
+									"position": "WR",
+									"team": "PHI",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4241372.png",
+								"slug": "hollywood-brown",
+								"position_rank": 92,
+								"points_over_replacement": -6.7,
+								"rest_of_season_per_game": 4.1,
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 18,
+								"season_avg": 1.2,
+								"last_points": 1.2,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "DAL",
+									"home": true,
+									"kickoff": "2026-10-27T00:15:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "questionable",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"listed": null,
+										"carried_over": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 2,
+											"points": 1.2
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": false,
+							"sentence": "Hollywood Brown is WR92 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"pickup": false,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"clears": null
+						},
+						"rest_of_season_points": 65.8
+					}
+				]
+			},
+			{
+				"position": "TE",
+				"teams": 12,
+				"need": true,
+				"rest_of_season": {
+					"rank": 9,
+					"points": 141,
+					"median": 155.6
+				},
+				"week": null,
+				"mine": [
+					{
+						"line": {
+							"player": {
+								"host_id": "10859",
+								"board_id": "4430027",
+								"name": "Sam LaPorta",
+								"position": "TE",
+								"team": "DET",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430027.png",
+							"slug": "sam-laporta",
+							"position_rank": 11,
+							"points_over_replacement": 2.1,
+							"rest_of_season_per_game": 8.8,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "GB",
+								"home": true,
+								"kickoff": "2026-10-25T20:25:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 5,
+										"points": 19.8
+									},
+									{
+										"week": 4,
+										"points": 22.4
+									},
+									{
+										"week": 3,
+										"points": 7.4
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.5,
+							"last_points": 19.8,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": true,
+						"starts_this_week": false,
+						"rest_of_season_points": 141
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "8210",
+								"board_id": "4360635",
+								"name": "Chig Okonkwo",
+								"position": "TE",
+								"team": "WAS",
+								"injured_reserve": false
+							},
+							"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4360635.png",
+							"slug": "chig-okonkwo",
+							"position_rank": 21,
+							"points_over_replacement": -2,
+							"rest_of_season_per_game": 5.9,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": null,
+								"home": null,
+								"kickoff": null,
+								"bye": true,
+								"designation": {
+									"status": "out",
+									"as_of": "2026-10-16T21:00:00.000Z",
+									"listed": null,
+									"carried_over": true
+								},
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 6.6,
+										"source": "platform"
+									},
+									{
+										"week": 5,
+										"points": 10
+									},
+									{
+										"week": 4,
+										"points": 2.5
+									},
+									{
+										"week": 1,
+										"points": 3.6
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": null
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 15,
+							"season_avg": 5.7,
+							"last_points": 6.6,
+							"games_played": 4,
+							"game_state": {
+								"state": "bye",
+								"word": "Bye"
+							}
+						},
+						"starter": false,
+						"starts_this_week": false,
+						"rest_of_season_points": 94.4
+					}
+				],
+				"available": [
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "4372780",
+									"name": "Tommy Tremble",
+									"position": "TE",
+									"team": "CAR",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4372780.png",
+								"slug": "tommy-tremble",
+								"position_rank": 26,
+								"points_over_replacement": -1.9,
+								"rest_of_season_per_game": 5.3,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "TB",
+									"home": true,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 4,
+											"points": 5.2
+										},
+										{
+											"week": 3,
+											"points": 7.1
+										},
+										{
+											"week": 2,
+											"points": 1.4
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 29,
+								"season_avg": 4.6,
+								"last_points": 5.2,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0.6,
+							"starts": true,
+							"sentence": "Tommy Tremble starts for you, and your lineup gains 0.6 points over replacement a week on our rest-of-season order. Jaxson Dart is the player it costs you least to lose.",
+							"week_gain": null,
+							"beats": {
+								"host_id": "11635",
+								"name": "Ladd McConkey",
+								"starter": true,
+								"bye": true,
+								"gain": null,
+								"open_spot": false
+							},
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0.6,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0.6,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0.6,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0.6,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0.6,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0.6,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.2,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -5.7,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.1,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -7.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -7.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -9.8,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.1,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"pickup": false,
+							"clears": null
+						},
+						"rest_of_season_points": 85.6
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "4808766",
+									"name": "Mason Taylor",
+									"position": "TE",
+									"team": "NYJ",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4808766.png",
+								"slug": "mason-taylor",
+								"position_rank": 30,
+								"points_over_replacement": -3.1,
+								"rest_of_season_per_game": 5.3,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "MIA",
+									"home": true,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 5,
+											"points": 5.4
+										},
+										{
+											"week": 2,
+											"points": 0
+										},
+										{
+											"week": 1,
+											"points": 1.8
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 14,
+								"season_avg": 2.4,
+								"last_points": 5.4,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": true,
+							"sentence": "Mason Taylor is TE32 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"pickup": false,
+							"clears": null
+						},
+						"rest_of_season_points": 85.6
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "4429148",
+									"name": "Theo Johnson",
+									"position": "TE",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429148.png",
+								"slug": "theo-johnson",
+								"position_rank": 28,
+								"points_over_replacement": -3.4,
+								"rest_of_season_per_game": 5.3,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 5,
+											"points": 5.5
+										},
+										{
+											"week": 4,
+											"points": 8.1
+										},
+										{
+											"week": 3,
+											"points": 0
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 4.5,
+								"last_points": 5.5,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": true,
+							"sentence": "Theo Johnson is TE34 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"pickup": false,
+							"clears": null
+						},
+						"rest_of_season_points": 85.6
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "4430802",
+									"name": "Darnell Washington",
+									"position": "TE",
+									"team": "PIT",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430802.png",
+								"slug": "darnell-washington",
+								"position_rank": 32,
+								"points_over_replacement": -2.8,
+								"rest_of_season_per_game": 5.2,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "NO",
+									"home": false,
+									"kickoff": "2026-10-25T13:30:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 5,
+											"points": 3.2
+										},
+										{
+											"week": 4,
+											"points": 11.7
+										},
+										{
+											"week": 3,
+											"points": 9.7
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 11,
+								"season_avg": 8.2,
+								"last_points": 3.2,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0,
+							"starts": true,
+							"sentence": "Darnell Washington is TE31 in our rest-of-season order and would not start for you.",
+							"week_gain": null,
+							"beats": null,
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.3,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.3,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.9,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.4,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -11,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.7,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"pickup": false,
+							"clears": null
+						},
+						"rest_of_season_points": 83.7
+					},
+					{
+						"row": {
+							"add": {
+								"player": {
+									"host_id": "",
+									"board_id": "2573401",
+									"name": "Tyler Higbee",
+									"position": "TE",
+									"team": "LAR",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/2573401.png",
+								"slug": "tyler-higbee",
+								"position_rank": 52,
+								"points_over_replacement": -2.3,
+								"rest_of_season_per_game": 3.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "LV",
+									"home": false,
+									"kickoff": "2026-10-25T20:25:00.000Z",
+									"bye": false,
+									"designation": null,
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 5,
+											"points": 13.3
+										},
+										{
+											"week": 4,
+											"points": 11.7
+										},
+										{
+											"week": 3,
+											"points": 20.2
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 31,
+								"season_avg": 15.1,
+								"last_points": 13.3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"drop": {
+								"player": {
+									"host_id": "12508",
+									"board_id": "4689114",
+									"name": "Jaxson Dart",
+									"position": "QB",
+									"team": "NYG",
+									"injured_reserve": false
+								},
+								"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+								"slug": "jaxson-dart",
+								"position_rank": null,
+								"points_over_replacement": -8.3,
+								"rest_of_season_per_game": 15.8,
+								"held": false,
+								"facts": {
+									"week": 7,
+									"opponent": "HOU",
+									"home": false,
+									"kickoff": "2026-10-25T17:00:00.000Z",
+									"bye": false,
+									"designation": {
+										"status": "injured_reserve",
+										"as_of": "2026-10-14T02:03:35.613Z",
+										"since": "2026-09-24T22:00:00.000Z",
+										"season_long": true
+									},
+									"played": false,
+									"points_this_week": null,
+									"last_games": [
+										{
+											"week": 6,
+											"points": 17.5,
+											"source": "platform"
+										},
+										{
+											"week": 2,
+											"points": 0.8
+										},
+										{
+											"week": 1,
+											"points": 29.6
+										}
+									],
+									"allowed_to_position": null,
+									"game_total": null,
+									"spread": null,
+									"roof": null,
+									"weather": null,
+									"game_state": "upcoming"
+								},
+								"week_projection": null,
+								"projection_delta": null,
+								"opp_rank": 3,
+								"season_avg": 16,
+								"last_points": 17.5,
+								"games_played": 3,
+								"game_state": {
+									"state": "not_started",
+									"word": "Next kickoff"
+								}
+							},
+							"gain": 0.2,
+							"starts": true,
+							"sentence": "Tyler Higbee starts for you, and your lineup gains 0.2 points over replacement a week on our rest-of-season order. Jaxson Dart is the player it costs you least to lose.",
+							"week_gain": null,
+							"beats": {
+								"host_id": "11635",
+								"name": "Ladd McConkey",
+								"starter": true,
+								"bye": true,
+								"gain": null,
+								"open_spot": false
+							},
+							"drops": [
+								{
+									"host_id": "12508",
+									"gain": 0.2,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "96",
+									"gain": 0.2,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "10235",
+									"gain": 0.2,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9753",
+									"gain": 0.2,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "9756",
+									"gain": 0.2,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "MIN",
+									"gain": 0.2,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "11635",
+									"gain": 0.2,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7543",
+									"gain": 0.2,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13301",
+									"gain": -5.6,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "8210",
+									"gain": -6.1,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "5947",
+									"gain": -6.4,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7567",
+									"gain": -6.5,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "11620",
+									"gain": -8.1,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "HOU",
+									"gain": -8.1,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "13287",
+									"gain": -8.7,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "10859",
+									"gain": -10.2,
+									"week_gain": null,
+									"starts_this_week": false
+								},
+								{
+									"host_id": "4046",
+									"gain": -10.8,
+									"week_gain": null,
+									"starts_this_week": true
+								},
+								{
+									"host_id": "7564",
+									"gain": -12.5,
+									"week_gain": null,
+									"starts_this_week": false
+								}
+							],
+							"pickup": false,
+							"clears": null
+						},
+						"rest_of_season_points": 60.4
+					}
+				]
+			},
+			{
+				"position": "DEF",
+				"teams": 12,
+				"need": false,
+				"rest_of_season": null,
+				"week": null,
+				"mine": [
+					{
+						"line": {
+							"player": {
+								"host_id": "HOU",
+								"board_id": null,
+								"name": "Houston Texans",
+								"position": "DEF",
+								"team": "HOU",
+								"injured_reserve": false
+							},
+							"headshot": null,
+							"slug": null,
+							"position_rank": null,
+							"points_over_replacement": null,
+							"rest_of_season_per_game": null,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "NYG",
+								"home": true,
+								"kickoff": "2026-10-25T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [
+									{
+										"week": 6,
+										"points": 6.7,
+										"source": "platform"
+									}
+								],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 6.7,
+							"last_points": 6.7,
+							"games_played": 1,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": true,
+						"starts_this_week": false,
+						"rest_of_season_points": null
+					},
+					{
+						"line": {
+							"player": {
+								"host_id": "MIN",
+								"board_id": null,
+								"name": "Minnesota Vikings",
+								"position": "DEF",
+								"team": "MIN",
+								"injured_reserve": false
+							},
+							"headshot": null,
+							"slug": null,
+							"position_rank": null,
+							"points_over_replacement": null,
+							"rest_of_season_per_game": null,
+							"held": false,
+							"facts": {
+								"week": 7,
+								"opponent": "IND",
+								"home": true,
+								"kickoff": "2026-10-25T17:00:00.000Z",
+								"bye": false,
+								"designation": null,
+								"played": false,
+								"points_this_week": null,
+								"last_games": [],
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null,
+								"game_state": "upcoming"
+							},
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null,
+							"game_state": {
+								"state": "not_started",
+								"word": "Next kickoff"
+							}
+						},
+						"starter": false,
+						"starts_this_week": false,
+						"rest_of_season_points": null
+					}
+				],
+				"available": []
+			}
+		],
 		"basis_note_list": "two-point, missed kick, fumble recovery and safety"
 	},
 	"error": null

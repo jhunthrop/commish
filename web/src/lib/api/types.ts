@@ -4862,6 +4862,61 @@ export interface components {
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
 			moves: components['schemas']['WaiverMoves'];
+			/** @description the position panel (Lane 291): one card per position the league starts, in the order QB, RB, WR, TE, K, DEF, a flex or superflex spot folded into the position of the player who fills it. Set on the full page alone (no position asked); absent on a narrowed page, where the board carries no rest-of-season points, and from an older answer */
+			positions?: components['schemas']['WaiverPositionCard'][];
+		};
+		/** @description one position of the member's against the league's (Lane 291): where the member stands there, his players there and the best free agents there */
+		WaiverPositionCard: {
+			/** @enum {string} */
+			position: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+			/** @description the league's teams, the rank's out of */
+			teams: number;
+			/** @description the member's rest-of-season figure at the position (rest_of_season, the rank's own measure) falls below the median team's by the close call a week or more over the weeks the figures cover, so a card at or above the median never marks one; never at K or DEF, never without rest_of_season */
+			need: boolean;
+			/** @description the rest-of-season points of the starters each team's best lineup fields at the position, week by week with each club's bye over the weeks the order covers (the team profile's fill); null where no rostered player there carries rest-of-season points */
+			rest_of_season: components['schemas']['WaiverStanding'] | null;
+			/** @description this week's Proj of the starters at the position in the lineup the advice sets for each team (the Lineup screen's rule, each team's own starters kept where their games have kicked off); null before the week's projection is read and where no player at the position carries a Proj (a figure every team would share at 0.0) */
+			week: components['schemas']['WaiverStanding'] | null;
+			/** @description the member's active players at the position, by rest-of-season points, highest first (none last) */
+			mine: components['schemas']['WaiverPositionPlayer'][];
+			/** @description the best free agents at the position the table lists, at most five, by rest-of-season points, highest first: each one's row is the table's, the pickup rule's verdict (Beats, Gain) and the Add verb's input */
+			available: components['schemas']['WaiverPositionFree'][];
+			/** @description the This week list (review M1): the best free agents at the position the table lists with a Proj this week, at most five, by this week's Proj, highest first, each one's row the table's as in available; set with week alone, absent otherwise and from an older answer */
+			available_week?: components['schemas']['WaiverPositionFree'][];
+		};
+		WaiverStanding: {
+			/** @description the member's place among the league's teams by points, 1 the most; teams level at the printed tenth share a place */
+			rank: number;
+			/**
+			 * Format: double
+			 * @description the member's figure, one decimal
+			 */
+			points: number;
+			/**
+			 * Format: double
+			 * @description the league's median team's figure, one decimal
+			 */
+			median: number;
+		};
+		WaiverPositionPlayer: {
+			line: components['schemas']['PlayerLine'];
+			/** @description the member's best lineup with everyone playing starts him (the team profile's lineup) */
+			starter: boolean;
+			/** @description the lineup the advice sets this week starts him (the Lineup screen's rule) */
+			starts_this_week: boolean;
+			/**
+			 * Format: double
+			 * @description his rest-of-season points over his club's games left, one decimal (the order's key); null without one
+			 */
+			rest_of_season_points: number | null;
+		};
+		WaiverPositionFree: {
+			row: components['schemas']['WaiverRow'];
+			/**
+			 * Format: double
+			 * @description his rest-of-season points over his club's games left, one decimal (the order's key); null without one
+			 */
+			rest_of_season_points: number | null;
 		};
 		WaiverMoves: {
 			/**

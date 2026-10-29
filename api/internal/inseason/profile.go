@@ -1,6 +1,7 @@
 package inseason
 
 import (
+	"maps"
 	"math/bits"
 	"slices"
 	"sort"
@@ -73,6 +74,16 @@ func (s Span) perGame(c *Candidate) float64 {
 	return c.Value / float64(n)
 }
 
+// pointsPerGame is c's rest-of-season points a game (Lane 291), none
+// without a figure or a game.
+func (s Span) pointsPerGame(c *Candidate) float64 {
+	n := s.games(c)
+	if !c.HasPoints || n == 0 {
+		return 0
+	}
+	return c.Points / float64(n)
+}
+
 // weekFill is the best lineup week by week over a span, filled as the
 // Lineup screen fills it (each position's own slots first, then the
 // shared slots narrowest first) from the players whose clubs play that
@@ -94,6 +105,11 @@ type weekFill struct {
 	sets   []uint64
 	times  []int
 	firsts []int
+	// byPosition is, when set, the rest-of-season points the fill's
+	// starters score over the span by their position (Lane 291): a shared
+	// slot counts for the position of the player who fills it, an empty
+	// slot for none.
+	byPosition map[draft.Position]float64
 }
 
 func newWeekFill(slots []Slot, span Span, free map[draft.Position]float64) *weekFill {
@@ -106,6 +122,9 @@ func (w *weekFill) slotPoints(pool []*Candidate) []float64 {
 	w.prepare(pool)
 	for i := range w.points {
 		w.points[i] = 0
+	}
+	if w.byPosition != nil {
+		clear(w.byPosition)
 	}
 	// Weeks whose players who play are the same fill the same: each such
 	// set is filled once and counted for each of its weeks.
@@ -183,24 +202,36 @@ func (w *weekFill) fillWeek(pool []*Candidate, week int, times float64) {
 	}
 	for i, s := range w.slots {
 		if !s.shared() {
-			w.points[i] += times * w.take(pool, s)
+			w.count(pool, i, times)
 		}
 	}
 	for _, i := range w.shared {
-		w.points[i] += times * w.take(pool, w.slots[i])
+		w.count(pool, i, times)
+	}
+}
+
+// count adds slot i's take to its points, times over, and to its
+// starter's position when the fill keeps them.
+func (w *weekFill) count(pool []*Candidate, i int, times float64) {
+	rate, at := w.take(pool, w.slots[i])
+	w.points[i] += times * rate
+	if at >= 0 && w.byPosition != nil {
+		c := pool[at]
+		w.byPosition[c.Position] += times * w.span.pointsPerGame(c)
 	}
 }
 
 // take is the points a game of the best player left for s, marked
-// taken, or the slot's waiver level a week when none is left.
-func (w *weekFill) take(pool []*Candidate, s Slot) float64 {
+// taken, with his index into pool, or the slot's waiver level a week
+// and -1 when none is left.
+func (w *weekFill) take(pool []*Candidate, s Slot) (float64, int) {
 	for _, p := range w.order {
 		if !w.taken[p] && s.accepts(pool[p].Position) {
 			w.taken[p] = true
-			return w.rate[p]
+			return w.rate[p], p
 		}
 	}
-	return w.waiverLevel(s)
+	return w.waiverLevel(s), -1
 }
 
 // waiverLevel is the best waiver level a week among s's positions, 0 (the
@@ -240,7 +271,11 @@ type TradeLeague struct {
 	Span   Span
 	Free   map[draft.Position]float64
 	Median []float64
-	slots  []Slot
+	// Positions is each roster's rest-of-season points by position from
+	// the same fill, in the order the rosters were given (Lane 291): the
+	// starters its best lineup fields there, week by week.
+	Positions []map[draft.Position]float64
+	slots     []Slot
 }
 
 // Weeks is how many weeks the league's figures cover.
@@ -252,11 +287,13 @@ func (l TradeLeague) Weeks() int { return l.Span.Weeks() }
 func NewTradeLeague(config []draft.SlotConfig, span Span, squads []Squad) TradeLeague {
 	l := TradeLeague{Config: config, Span: span, Free: freeOf(squads), slots: Slots(config)}
 	fill := l.fill()
+	fill.byPosition = map[draft.Position]float64{}
 	columns := make([][]float64, len(l.slots))
 	for _, s := range squads {
 		for i, p := range fill.slotPoints(pointers(s.Players)) {
 			columns[i] = append(columns[i], p)
 		}
+		l.Positions = append(l.Positions, maps.Clone(fill.byPosition))
 	}
 	l.Median = make([]float64, len(l.slots))
 	for i, c := range columns {
@@ -301,6 +338,10 @@ func (l TradeLeague) Profile(players []Candidate) TeamProfile {
 	}
 	return out
 }
+
+// Starting marks the players of a roster the lineup with everyone
+// playing starts (the profile's bench is the rest).
+func (l TradeLeague) Starting(players []Candidate) []bool { return l.starting(pointers(players)) }
 
 // starting marks the players the lineup with everyone playing starts:
 // the fill of a week every club plays.
