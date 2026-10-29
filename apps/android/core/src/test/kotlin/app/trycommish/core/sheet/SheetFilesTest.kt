@@ -226,7 +226,7 @@ class SheetFilesTest {
     @Test
     fun `a list is told from a CSV by its first line`() {
         SheetParity.load().lists.forEach { assertEquals(it.csv, SheetCsv.looksLikeCsv(it.text), it.text) }
-        assertTrue(SheetCsv.looksLikeCsv("\n  Rank,Player_ID,Name,Position\n1,a,B,QB"))
+        assertTrue(SheetCsv.looksLikeCsv("\uFEFF\n  Rank,Player_ID,Name,Position\n1,a,B,QB"))
         // As the API reads it: a no-break space is not set aside, and "\r" alone does not end the line.
         assertFalse(SheetCsv.looksLikeCsv(" \nrank,player_id,name,position"))
         assertTrue(SheetCsv.looksLikeCsv("Gibbs\rrank,player_id,name,position"))
