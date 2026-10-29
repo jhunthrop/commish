@@ -2037,6 +2037,30 @@ func (e TradeRowTheirFills) Valid() bool {
 	}
 }
 
+// Defines values for TradeTeamEmptyReason.
+const (
+	TradeTeamEmptyReasonDropped  TradeTeamEmptyReason = "dropped"
+	TradeTeamEmptyReasonNoNeed   TradeTeamEmptyReason = "no_need"
+	TradeTeamEmptyReasonNothing  TradeTeamEmptyReason = "nothing"
+	TradeTeamEmptyReasonSameNeed TradeTeamEmptyReason = "same_need"
+)
+
+// Valid indicates whether the value is a known member of the TradeTeamEmptyReason enum.
+func (e TradeTeamEmptyReason) Valid() bool {
+	switch e {
+	case TradeTeamEmptyReasonDropped:
+		return true
+	case TradeTeamEmptyReasonNoNeed:
+		return true
+	case TradeTeamEmptyReasonNothing:
+		return true
+	case TradeTeamEmptyReasonSameNeed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WaiverAdvicePickupOrder.
 const (
 	WaiverAdvicePickupOrderSeasonGain WaiverAdvicePickupOrder = "season_gain"
@@ -6117,7 +6141,9 @@ type TradeSideTotals struct {
 
 // TradeTeam defines model for TradeTeam.
 type TradeTeam struct {
-	Name string `json:"name"`
+	// EmptyReason why trades is empty (Lane 290, B283), absent when it lists a trade; the first that holds, in this order: no_need when they have no slot short of the median team; dropped when the search found trades the drafter's lineup gains from but none they would take or that fills a need without opening one (the search's own record of the cause); same_need when every position their needs take is one the drafter's needs take too and nothing gained him; nothing when the search found none (or, with a player asked for, none holding him)
+	EmptyReason *TradeTeamEmptyReason `json:"empty_reason,omitempty"`
+	Name        string                `json:"name"`
 
 	// Note one sentence when every trade found with this team is a close call for them, else null
 	Note   *string     `json:"note"`
@@ -6131,6 +6157,9 @@ type TradeTeam struct {
 	// Trades at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group with the trades that fill one of the drafter's slots first (fills), then best for the drafter over the weeks left, then by this week's Proj change; a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills a need (Lane 103). One or two players a side (Lane 287); a trade is listed only when the drafter's lineup gains, theirs gains or loses nothing for a slot it fills, it fills a slot on at least one side and opens or deepens none of the drafter's (a slot short of the median team by 0.5 a week or more), it sends out no player this week's lineup needs to fill a spot, neither side gives up more rest of season than the rule allows, and it is not a listed trade with a player added who changes nothing. The array's order is the finder's and is the contract: a client keeps it for the team's list (Lane 287; sorting by my_gain alone undoes the fills-first order)
 	Trades []TradeRow `json:"trades"`
 }
+
+// TradeTeamEmptyReason why trades is empty (Lane 290, B283), absent when it lists a trade; the first that holds, in this order: no_need when they have no slot short of the median team; dropped when the search found trades the drafter's lineup gains from but none they would take or that fills a need without opening one (the search's own record of the cause); same_need when every position their needs take is one the drafter's needs take too and nothing gained him; nothing when the search found none (or, with a player asked for, none holding him)
+type TradeTeamEmptyReason string
 
 // TradeTotals defines model for TradeTotals.
 type TradeTotals struct {

@@ -10,6 +10,7 @@ import {
 	clockPart,
 	fixturePlan,
 	HOLDING_PLAYER,
+	NEEDS_COOKIE,
 	OTHER_GAME_ROSTER,
 	SHEET_CLOCKS
 } from './export-fixtures.ts';
@@ -256,7 +257,7 @@ void test("a claim's body: the first pickup with no bid planned, the plan's bid 
 void test("the strip's trades are checked at the week's and the Sunday's clocks, each posted", () => {
 	const checks = fixturePlan({ leagueId: LEAGUE, clocks: CLOCKS })
 		.flatMap((step) => step.files)
-		.filter((f) => f.check !== undefined);
+		.filter((f) => f.check !== undefined && f.cookie !== NEEDS_COOKIE);
 	assert.deepEqual(
 		checks.map((f) => [f.file, f.check]),
 		[CLOCKS.week, CLOCKS.sunday].flatMap((clock) =>
@@ -274,4 +275,27 @@ void test("the strip's trades are checked at the week's and the Sunday's clocks,
 		),
 		'the picker narrowed to one player is read'
 	);
+});
+
+void test("the finder's newer fields are read at the week's clock, its check posted with them (Lane 290)", () => {
+	const needs = fixturePlan({ leagueId: LEAGUE, clocks: CLOCKS })
+		.flatMap((step) => step.files)
+		.filter((f) => f.cookie === NEEDS_COOKIE);
+	const finder = `trades-${LEAGUE}-needs-${clockPart(CLOCKS.week)}.json`;
+	assert.deepEqual(
+		needs.map((f) => [f.file, f.route, f.clock, f.check ?? null]),
+		[
+			[finder, `GET /leagues/attached/${LEAGUE}/trades`, CLOCKS.week, null],
+			[
+				`trade-check-${LEAGUE}-needs-${clockPart(CLOCKS.week)}-1.json`,
+				`POST /leagues/attached/${LEAGUE}/trades/check`,
+				CLOCKS.week,
+				{ trades: finder, index: 0 }
+			]
+		]
+	);
+	assert.match(NEEDS_COOKIE, /fixture_platform=ffpc; fixture_trades=needs/);
+	const read = answer(finder).data as { offers?: unknown[]; teams: { empty_reason?: string }[] };
+	assert.ok((read.offers ?? []).length > 0);
+	assert.ok(read.teams.some((t) => t.empty_reason === 'same_need'));
 });

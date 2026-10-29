@@ -3,13 +3,14 @@
 // lists no trade with, its line in its place (B271); every trade the finder lists is one both sides
 // take on the rest-of-season rule its line states; every check's rest-of-season cells are the check's
 // figures; and the word cases where a side would not take it lead with that side's sentence and tag
-// its cell. Run with `npm test`.
+// its cell; and with the finder's newer fields (Lane 290) the host's offers head the row, each idea
+// says what it fills, each empty team says why, and the verdict answers as before. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { restFigure, TRADES } from '../box/trades.ts';
 import type { TradeAdvice, TradeCheck } from './api.ts';
-import { ANALYZER_LINES, ideaPlaces, noIdeasFrom, presetsFrom } from './builder.ts';
+import { ANALYZER_LINES, emptyNote, ideaPlaces, noIdeasFrom, presetsFrom } from './builder.ts';
 
 const ROOT = new URL('../../../../../', import.meta.url);
 const LEAGUE = '6f1d1c52-2626-4a26-9a26-000000000026';
@@ -24,6 +25,7 @@ interface Place {
 	rosterId: number;
 	team: string;
 	note: string | null;
+	fills: string | null;
 }
 
 interface Cell {
@@ -55,6 +57,14 @@ interface Parity {
 	clocks: Record<string, { ideas: { head: string; places: Place[] }; restBasis: string | null }>;
 	checks: Record<string, ParityCheck[]>;
 	words: { checks: WordCase[] };
+	needs: {
+		clock: string;
+		offers: { rosterId: number; picks: unknown; note: string | null; label: string }[];
+		ideas: { places: Place[] };
+		empty: { rosterId: number; reason: string | null; note: string }[];
+		check: ParityCheck;
+		builderBasis: string;
+	};
 }
 
 const parity = read('shared/fixtures/parity/trades.json') as Parity;
@@ -78,7 +88,11 @@ void test('the ideas row is our ideas, then each team with none, said (B271)', (
 		assert.deepEqual(
 			ideas.places.map((p) => [p.kind, p.rosterId]),
 			ours.map((p) =>
-				p.kind === 'idea' ? ['idea', p.preset.team.roster_id] : ['none', p.none.team.roster_id]
+				p.kind === 'idea'
+					? ['idea', p.preset.team.roster_id]
+					: p.kind === 'none'
+						? ['none', p.none.team.roster_id]
+						: ['offer', p.offer.team.roster_id]
 			),
 			clock
 		);
@@ -137,4 +151,46 @@ void test('a side that would not take it leads the line and is tagged', () => {
 	assert.ok(older);
 	assert.equal(older.cells.yours.text, '');
 	assert.equal(older.refusal, null);
+});
+
+void test("with the finder's newer fields the row and the verdict draw them (Lane 290)", () => {
+	const { needs } = parity;
+	const clock = '2026-10-17T17-00-00Z';
+	const answer = advice(`shared/fixtures/inseason/trades-${LEAGUE}-needs-${clock}.json`);
+	const check = dataOf(
+		`shared/fixtures/inseason/trade-check-${LEAGUE}-needs-${clock}-1.json`
+	) as TradeCheck;
+	// Offers head the row: one the builder holds loads picks, one it cannot says where to answer it.
+	assert.equal(needs.offers.length, answer.offers?.length);
+	assert.ok(needs.offers.every((o) => o.label === 'Offered to you'));
+	assert.ok(needs.offers.some((o) => o.picks !== null && o.note === null));
+	assert.ok(needs.offers.some((o) => o.picks === null && o.note !== null));
+	// Every idea says what it fills; the ideas keep presetsFrom's order.
+	const ideas = needs.ideas.places.filter((p) => p.kind === 'idea');
+	assert.ok(ideas.length > 0 && ideas.every((p) => p.fills?.startsWith('Fills your ')));
+	assert.deepEqual(
+		ideas.map((p) => p.rosterId),
+		presetsFrom(answer.teams).map((p) => p.team.roster_id)
+	);
+	// Every empty team's line is its reason's, and all four reasons are drawn.
+	const reasons = new Set(needs.empty.map((e) => e.reason));
+	assert.equal(reasons.size, 4);
+	for (const e of needs.empty) {
+		const team = answer.teams.find((t) => t.roster_id === e.rosterId);
+		assert.ok(team);
+		assert.equal(team.trades.length, 0);
+		assert.equal(e.note, emptyNote(team));
+	}
+	// The verdict's cells stay the players' figure a side takes a trade on, beside the lineup's the
+	// answer now sends (Lane 290's choice), and the basis says what they are.
+	assert.ok(check.trade.my_lineup_rest_of_season !== undefined);
+	assert.deepEqual(needs.check.yours.rest, restFigure(check, 'yours'));
+	assert.equal(
+		needs.check.yours.rest.text,
+		restFigure(
+			{ ...check, trade: { ...check.trade, my_lineup_rest_of_season: undefined } },
+			'yours'
+		).text
+	);
+	assert.ok(needs.builderBasis.includes(TRADES.restBasis));
 });

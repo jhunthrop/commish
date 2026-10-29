@@ -42,5 +42,15 @@
 	"bothGiveUp": "Both sides give up more rest of season than they get.",
 	"restBasis": "Rest of season: points over the waiver level, weeks left.",
 	"noIdea": "No idea they would take.",
+	"sameNeed": "They need what you need.",
+	"noNeed": "Nothing they need from you.",
+	"nothingFound": "No idea between you.",
+	"fillsYour": "Fills your",
+	"flexSlot": "flex",
+	"superflexSlot": "superflex",
+	"expires": "Ends",
+	"noPlayer": "Nothing",
+	"offRoster": "With an IR or taxi player",
+	"answerOn": "Answer it on",
 	"functions": []
 }

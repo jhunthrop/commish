@@ -196,7 +196,7 @@ func (a *advisor) tradeTargets() map[string]bool {
 			continue
 		}
 		theirs := a.active(t)
-		for _, tr := range Narrow(a.found()[t.RosterID], squad, a.squad(t, theirs, false), "", targetsPerTeam) {
+		for _, tr := range Narrow(a.found()[t.RosterID].Trades, squad, a.squad(t, theirs, false), "", targetsPerTeam) {
 			for _, i := range tr.Get {
 				if id := theirs[i].line.Player.BoardId; id != nil {
 					out[*id] = true

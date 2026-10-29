@@ -176,16 +176,16 @@ func (s *Service) timeout() time.Duration {
 // requests share the run, so never one request's), for a warm the warm
 // run's. A search that stops answers its error, said once by whoever
 // asked.
-func (s *Service) findsFor(a *advisor, account string, search context.Context) func() (map[int][]Trade, error) {
+func (s *Service) findsFor(a *advisor, account string, search context.Context) func() (map[int]Found, error) {
 	var once sync.Once
-	var got map[int][]Trade
+	var got map[int]Found
 	var failed error
-	return func() (map[int][]Trade, error) {
+	return func() (map[int]Found, error) {
 		once.Do(func() {
 			ctx, cancel := context.WithTimeout(search, s.timeout())
 			defer cancel()
 			pair, content := pairKey(a, account), contentKey(a)
-			find := func() (map[int][]Trade, error) {
+			find := func() (map[int]Found, error) {
 				s.searches.Add(1)
 				if s.beforeSearch != nil {
 					s.beforeSearch()

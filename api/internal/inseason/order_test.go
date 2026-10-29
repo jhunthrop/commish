@@ -272,7 +272,7 @@ func TestTheFinderRunsOncePerLeagueRead(t *testing.T) {
 	s := fixtureService(t, f.league, f.data, &fakeHolds{})
 	a := newFixtureAdvisor(t, f, nil)
 	runs := 0
-	find := func() (map[int][]Trade, error) { runs++; return a.findAll(context.Background()) }
+	find := func() (map[int]Found, error) { runs++; return a.findAll(context.Background()) }
 	get := func(b *advisor, account string) {
 		t.Helper()
 		if _, err := s.finds.get(pairKey(b, account), contentKey(b), find); err != nil {

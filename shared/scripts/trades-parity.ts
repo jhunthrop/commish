@@ -54,8 +54,11 @@ import {
 	MAX_A_SIDE,
 	builtFrom,
 	checkWords,
+	emptyNote,
+	fillsWords,
 	ideaPlaces,
 	noIdeasFrom,
+	offerPresets,
 	pickable,
 	pickPrompt,
 	presetsFrom,
@@ -202,13 +205,16 @@ export function tradesAt(
 }
 
 /** The builder-first screen's ideas row (Lane 260, Lane 268, Lane 277) as TradeBuilder draws it: our
- * ideas, best first, each card's team, gains and deal, then each team the finder lists no trade with,
- * its line in its place (B271), in the row's order. */
+ * ideas, best first, each card's team, gains, deal and what it fills (Lane 290, null on an answer
+ * without fills), then each team the finder lists no trade with, its line in its place (B271), in the
+ * row's order. The host's offers, which head the row, are needsAt's (`offers`). */
 function ideasOf(advice: TradeAdvice): unknown {
 	return {
 		head: ANALYZER_LINES.ideas,
-		places: ideaPlaces(presetsFrom(advice.teams), noIdeasFrom(advice.teams)).map((place) =>
-			place.kind === 'idea'
+		places: ideaPlaces(presetsFrom(advice.teams), noIdeasFrom(advice.teams)).flatMap((place) =>
+			place.kind === 'offer'
+				? []
+				: place.kind === 'idea'
 				? {
 						kind: 'idea',
 						key: place.preset.key,
@@ -217,7 +223,8 @@ function ideasOf(advice: TradeAdvice): unknown {
 						mark: place.preset.mark,
 						gains: place.preset.gains,
 						deal: place.preset.deal,
-						note: null
+						note: null,
+						fills: place.preset.fills
 					}
 				: {
 						kind: 'none',
@@ -227,8 +234,62 @@ function ideasOf(advice: TradeAdvice): unknown {
 						mark: null,
 						gains: null,
 						deal: null,
-						note: place.none.note
+						note: place.none.note,
+						fills: null
 					}
+		)
+	};
+}
+
+/** The finder's newer fields as the screen draws them (Lane 290), from the answer and the check the
+ * fixture serves with them (trade-fills.ts) at one clock: the host's offers at the head of the ideas
+ * row (each card's label, team, deal, expiry, the ticks it loads or where to answer it), the row's
+ * places as ideasOf draws them with each idea's fills line, each empty team's reason and its line, the
+ * line for every reason the API sends, the verdict's rest-of-season cells on each lineup's figure,
+ * and the builder's basis saying so. */
+export function needsAt(
+	answer: TradeAdvice,
+	check: TradeCheck,
+	host: LeagueHost,
+	me: string,
+	team: string,
+	clock: string,
+	zone: string
+): unknown {
+	const now = Date.parse(clock);
+	const advice = heldTrades(answer, now);
+	const lines = [
+		...advice.roster,
+		...advice.teams.flatMap((t) => [...t.roster, ...t.trades.flatMap((r) => [...r.give, ...r.get])])
+	];
+	const reasons = ['dropped', 'same_need', 'no_need', 'nothing'] as const;
+	return {
+		clock,
+		offers: offerPresets(advice.offers ?? [], advice, host, now, zone).map((offer) => ({
+			key: offer.key,
+			label: offer.label,
+			rosterId: offer.team.roster_id,
+			team: offer.team.name,
+			deal: offer.deal,
+			expires: offer.expires,
+			picks: offer.picks,
+			note: offer.note
+		})),
+		ideas: ideasOf(advice),
+		empty: advice.teams
+			.filter((t) => t.trades.length === 0)
+			.map((t) => ({ rosterId: t.roster_id, reason: t.empty_reason ?? null, note: emptyNote(t) })),
+		reasons: Object.fromEntries([
+			...reasons.map((reason) => [reason, emptyNote({ empty_reason: reason })]),
+			['absent', emptyNote({})]
+		]),
+		fills: Object.fromEntries(
+			(['QB', 'RB', 'WR', 'TE', 'FLEX', 'SUPERFLEX'] as const).map((slot) => [slot, fillsWords(slot)])
+		),
+		check: checkAt(check, me, team, clock),
+		builderBasis: drawnText(
+			tradeBasis(advice, host, lines, 'builder', { record: RECORD }, { zone, zoned: false }, now),
+			'phone'
 		)
 	};
 }

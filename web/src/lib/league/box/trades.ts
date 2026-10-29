@@ -102,7 +102,28 @@ export const TRADES = {
 	restBasis: 'Rest of season: points over the waiver level, weeks left.',
 	/** The ideas row's line for a team the finder lists no trade with (B271): every idea it found with
 	 * them, they would not take. */
-	noIdea: 'No idea they would take.'
+	noIdea: 'No idea they would take.',
+	/** The line in its place by the API's empty_reason (Lane 290, B283): they need what the member
+	 * needs, they need nothing, or the search found nothing with them; "dropped" keeps noIdea. */
+	sameNeed: 'They need what you need.',
+	noNeed: 'Nothing they need from you.',
+	nothingFound: 'No idea between you.',
+	/** An idea card's second line, from the row's fills (Lane 287, Lane 290): "Fills your WR",
+	 * "Fills your flex". */
+	fillsYour: 'Fills your',
+	flexSlot: 'flex',
+	superflexSlot: 'superflex',
+	/** A host offer's card (Lane 279, Lane 290): when the platform lets it lapse, "Ends Fri 3:00 pm",
+	 * and the line on one the builder cannot hold (more than two a side, or a kicker): "Answer it on
+	 * Sleeper." */
+	expires: 'Ends',
+	/** An offer's side that names no player (a one-sided offer, Lane 279): "Nothing for Tucker". */
+	noPlayer: 'Nothing',
+	/** An offer naming a player the answer's rosters do not draw (the API keeps injured reserve and
+	 * taxi players on an offer, the rosters here leave them out): said in place of give for get, the
+	 * card saying where to answer it (Lane 290 review H1). */
+	offRoster: 'With an IR or taxi player',
+	answerOn: 'Answer it on'
 } as const;
 
 /** A trade as the table lists it: its team and its row, keyed as the screen marks it. */
@@ -122,9 +143,27 @@ const SORT_FIGURE: Readonly<Record<SortKey, (row: TradeRow) => number | null>> =
 	weekTheirs: (row) => row.their_proj_change
 };
 
-/** The API's order across teams: the trades the other team gains from first, then the close calls
- * for them, each by your gain, then theirs. */
-function apiOrder(a: FinderRow, b: FinderRow): number {
+/** The one order of trades across teams (Lane 290, B289, review M3), by the API's own keys (inseason
+ * trades.go orderTrades): one the other team gains from before a close call for them, then one that
+ * fills a slot of the member's (fills, when the answer sends it), then the member's gain as a page
+ * prints it. Sorted stably, so ties keep the answer's order: inside a team the API's (its order is the
+ * contract, Lane 287), across teams the standings' (the API ranks no team over another). Never the
+ * member's gain alone, which undoes fills first. */
+export function tradeRank(a: TradeRow, b: TradeRow): number {
+	const fills = (row: TradeRow): number => Number(row.fills !== null && row.fills !== undefined);
+	const printed = (gain: number): number => Number(fixed(gain, 1));
+	return (
+		Number(a.close_for_them) - Number(b.close_for_them) ||
+		fills(b) - fills(a) ||
+		printed(b.my_gain) - printed(a.my_gain)
+	);
+}
+
+/** The apps' older every-trade table (Lane 66g, Lane 189), which no web screen draws: every trade of
+ * every team by the member's gain, then theirs. Kept for that table's parity alone until the apps move
+ * to the builder-first screen (B289's app half); the best with each team, the strip and the Best card
+ * read tradeRank. */
+function everyTradeOrder(a: FinderRow, b: FinderRow): number {
 	return (
 		Number(a.row.close_for_them) - Number(b.row.close_for_them) ||
 		b.row.my_gain - a.row.my_gain ||
@@ -132,17 +171,18 @@ function apiOrder(a: FinderRow, b: FinderRow): number {
 	);
 }
 
-/** The finder's rows: each team's first trade (the API's best with it), or every trade. */
+/** The finder's rows: each team's first trade (the API's best with it) in tradeRank's order, the one
+ * order the strip, the Best card and the checks the fixtures post read (Lane 290 review M3); or every
+ * trade, in the older table's order. */
 export function finderRows(teams: readonly TradeTeam[], every: boolean): FinderRow[] {
-	return teams
-		.flatMap((team) =>
-			(every ? team.trades : team.trades.slice(0, 1)).map((row) => ({
-				key: tradeKey(team.roster_id, row),
-				team,
-				row
-			}))
-		)
-		.sort(apiOrder);
+	const rows = teams.flatMap((team) =>
+		(every ? team.trades : team.trades.slice(0, 1)).map((row) => ({
+			key: tradeKey(team.roster_id, row),
+			team,
+			row
+		}))
+	);
+	return every ? rows.sort(everyTradeOrder) : rows.sort((a, b) => tradeRank(a.row, b.row));
 }
 
 /** The rows by a column, best first, a row without the figure last; ties keep the API's order. */
@@ -151,7 +191,7 @@ export function sortRows(rows: readonly FinderRow[], by: SortKey): FinderRow[] {
 	return [...rows].sort((a, b) => {
 		const fa = figure(a.row);
 		const fb = figure(b.row);
-		if (fa === fb) return apiOrder(a, b);
+		if (fa === fb) return everyTradeOrder(a, b);
 		if (fa === null) return 1;
 		if (fb === null) return -1;
 		return fb - fa;
@@ -422,7 +462,10 @@ export function bugFigures(
 /** A side's rest-of-season cell on the verdict (Lane 277): its change over the weeks the check covers,
  * toned as a gain or a loss, and whether that side would not take the trade. Before an answer it is the
  * none mark every verdict cell draws; on an answer without the figure (an older API) it is empty, never
- * a figure we did not read. */
+ * a figure we did not read. The figure is the players' (Lane 269), the one a side takes a trade on, so
+ * the cell, its tag and the answer's lead agree; each lineup's change over the weeks left (Lane 287's
+ * my_lineup_rest_of_season) is the Gain a week cell times the weeks, which that cell already draws
+ * (Lane 290's choice, the box-score rule: one figure a fact, a page never argues with itself). */
 export interface RestFigure {
 	text: string;
 	tone: 'gain' | 'loss' | 'even';

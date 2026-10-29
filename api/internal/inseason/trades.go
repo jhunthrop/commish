@@ -492,10 +492,42 @@ func Trades(l TradeLeague, mine, theirs Squad, focus string, limit int) []Trade 
 }
 
 // AllTrades is every trade Trades keeps between the two squads, in
-// orderTrades' order: the search a league read runs once (Service.finds).
-func AllTrades(l TradeLeague, mine, theirs Squad) []Trade {
+// orderTrades' order.
+func AllTrades(l TradeLeague, mine, theirs Squad) []Trade { return Find(l, mine, theirs).Trades }
+
+// EmptyReason is why the finder lists no trade with a team (Lane 290,
+// B283): the API's empty_reason, "" while it lists one.
+type EmptyReason string
+
+const (
+	// EmptySameNeed is a team whose needs take only positions the
+	// member's needs take too: they need what he needs.
+	EmptySameNeed EmptyReason = "same_need"
+	// EmptyNoNeed is a team with no slot short of the median team.
+	EmptyNoNeed EmptyReason = "no_need"
+	// EmptyDropped is a search that found trades the member's lineup
+	// gains from, none of them one they take or that fills a need
+	// without opening one.
+	EmptyDropped EmptyReason = "dropped"
+	// EmptyNothing is a search that found no trade the member's lineup
+	// gains from.
+	EmptyNothing EmptyReason = "nothing"
+)
+
+// Found is one team's search: every trade Trades keeps, in orderTrades'
+// order, and why there is none when there is none.
+type Found struct {
+	Trades []Trade
+	Empty  EmptyReason
+}
+
+// Find is the search a league read runs once a team (Service.finds):
+// AllTrades' trades, and when none is kept, the reason from the search's
+// own reading of both sides' needs and of what it found.
+func Find(l TradeLeague, mine, theirs Squad) Found {
 	t := newSearch(l, mine, theirs)
 	var out []Trade
+	gained := false
 	try := func(give, get []int) {
 		if !t.couldFill(give, get) || !t.restPossible(give, get) {
 			return
@@ -504,6 +536,7 @@ func AllTrades(l TradeLeague, mine, theirs Squad) []Trade {
 		if !my.stands() || printedSign(my.Gain) <= 0 {
 			return
 		}
+		gained = true
 		// Their drop is looked for only where they could take the trade: a
 		// drop never raises a lineup, so one that falls already is refused,
 		// and one that holds even is reckoned again with its drop.
@@ -538,7 +571,39 @@ func AllTrades(l TradeLeague, mine, theirs Squad) []Trade {
 	}
 	out = withoutPadding(out)
 	orderTrades(out)
-	return out
+	if len(out) > 0 {
+		return Found{Trades: out}
+	}
+	return Found{Trades: out, Empty: t.emptyReason(gained)}
+}
+
+// emptyReason is why a search kept no trade: no need of theirs first,
+// since a side with none takes nothing it does not gain from; then
+// whether any trade gained the member's lineup and was refused, which is
+// the search's own record of the cause (Lane 290 review M4: it wins over
+// a shared need, which is only a likely cause); then a need they share
+// with the member, where nothing gained him; else nothing found.
+func (t *tradeSearch) emptyReason(gained bool) EmptyReason {
+	switch {
+	case len(t.them.needs) == 0:
+		return EmptyNoNeed
+	case gained:
+		return EmptyDropped
+	case t.sameNeeds():
+		return EmptySameNeed
+	}
+	return EmptyNothing
+}
+
+// sameNeeds is whether every position the other side's needs take is one
+// the member's needs take too.
+func (t *tradeSearch) sameNeeds() bool {
+	for p := range t.them.needPositions {
+		if !t.me.needPositions[p] {
+			return false
+		}
+	}
+	return true
 }
 
 // withoutPadding is trades less each one that holds another of them with

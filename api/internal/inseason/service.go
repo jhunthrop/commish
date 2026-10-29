@@ -95,7 +95,7 @@ type Service struct {
 	Context context.Context
 	// finds keeps each pair's latest trade search (targets.go), for
 	// /trades, the order's targets and a landed read's warm run alike.
-	finds readCache[map[int][]Trade]
+	finds readCache[map[int]Found]
 	// SearchTimeout bounds one trade search, searchTimeout when zero.
 	SearchTimeout time.Duration
 	// searches counts the trade searches run, the cache's misses.

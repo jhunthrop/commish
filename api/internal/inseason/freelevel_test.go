@@ -65,10 +65,10 @@ func TestTheOrdersTradeMarksAreIdeasBothTake(t *testing.T) {
 		t.Fatal("the finder brings in nobody, so the test proves nothing")
 	}
 	listed := map[string]bool{}
-	for roster, trades := range a.found() {
+	for roster, found := range a.found() {
 		other, _ := a.Snap.TeamByRoster(roster)
 		theirs := a.active(other)
-		for _, tr := range trades {
+		for _, tr := range found.Trades {
 			if !Acceptable(tr.MyRest, a.weeks) || !Acceptable(tr.TheirRest, a.weeks) {
 				t.Fatalf("the search keeps a refused trade with %d: %v and %v", roster, tr.MyRest, tr.TheirRest)
 			}
