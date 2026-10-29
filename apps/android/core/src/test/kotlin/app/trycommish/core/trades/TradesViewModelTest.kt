@@ -22,6 +22,8 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -226,6 +228,31 @@ class TradesViewModelTest {
             assertEquals(PickSide.Get, vm.ui.value.drawn)
         }
 
+    /** Review M3 and L1: tick A, then tick B while A's check is out; B's answer lands and is live, and A's
+     * read is cancelled, so it can never land over B's. */
+    @Test
+    fun `a newer tick cancels the older check and its answer is live`() =
+        runTest(main) {
+            val gated = GatedTrades(TradeFixtures.trades(), TradeFixtures.check())
+            val vm = viewModel(gated)
+            open(vm)
+            run(vm.tap(PickSide.Give, "96", TradeFixtures.LEAGUE))
+            vm.tap(PickSide.Get, "7526", TradeFixtures.LEAGUE)
+            advanceUntilIdle()
+            val second = vm.tap(PickSide.Get, "8116", TradeFixtures.LEAGUE)
+            advanceUntilIdle()
+            assertEquals(listOf(listOf("7526"), listOf("7526", "8116")), gated.asked)
+            gated.release(listOf("7526", "8116"))
+            run(second)
+            gated.release(listOf("7526"))
+            advanceUntilIdle()
+            assertEquals(listOf(listOf("7526")), gated.cancelled)
+            assertEquals("Max_Jensen10, 2", builder(vm).rosters.theirs)
+            assertTrue(builder(vm).live)
+            assertEquals(best, builder(vm).pressed)
+            assertFalse(vm.ui.value.checking)
+        }
+
     @Test
     fun `a third pick waits for one put back`() {
         val picks = TradePicks(8, listOf("a", "b"), emptyList())
@@ -421,6 +448,42 @@ internal class TradesStub(
     ): TradeCheck? {
         checked += trade
         checkFailure?.let { throw it }
+        return check
+    }
+}
+
+/** The fixture's check held at a gate per trade until the test lets it through, so two checks can land out
+ * of order; a check whose coroutine is cancelled while it waits is counted as cancelled. */
+internal class GatedTrades(
+    private val advice: TradeAdvice,
+    private val check: TradeCheck,
+) : TradeReads {
+    private val gates = mutableMapOf<List<String>, CompletableDeferred<Unit>>()
+    val asked = mutableListOf<List<String>>()
+    val cancelled = mutableListOf<List<String>>()
+
+    private fun gate(get: List<String>): CompletableDeferred<Unit> = gates.getOrPut(get) { CompletableDeferred() }
+
+    fun release(get: List<String>) {
+        gate(get).complete(Unit)
+    }
+
+    override suspend fun trades(
+        leagueId: String,
+        player: String?,
+    ): String = envelopeOf(advice)
+
+    override suspend fun checkTrade(
+        leagueId: String,
+        trade: TradeCheckInput,
+    ): TradeCheck {
+        asked += trade.get
+        try {
+            gate(trade.get).await()
+        } catch (e: CancellationException) {
+            cancelled += trade.get
+            throw e
+        }
         return check
     }
 }

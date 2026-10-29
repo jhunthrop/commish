@@ -80,6 +80,9 @@ class TradesSnapshotTest(
         Refused("refused", TradeFixtures.WEEK, listOf(Part.Verdict)),
         Stale("stale", TradeFixtures.WEEK, listOf(Part.Verdict)),
         Sunday("sunday", TradeFixtures.SUNDAY, listOf(Part.Verdict, Part.Yours)),
+
+        /** Long team names on both sides (review M2): every name drawn whole. */
+        Long("long", TradeFixtures.WEEK, listOf(Part.Screen, Part.Verdict, Part.Theirs)),
     }
 
     enum class Part(
@@ -175,6 +178,20 @@ private fun oneX(twoX: DeviceConfig): DeviceConfig =
 /** The member's side as the iOS mock names it. */
 internal val ME = TradeMe("McConkey Kong Country", "1-4, 11th of 12")
 
+/** The long scene's names, each past what one line of its place holds on a phone. */
+private val LONG_ME = TradeMe("McConkey Kong Country Club and Grill", "1-4, 11th of 12")
+private const val LONG_TEAM = "Max_Jensen10 and the Sunday Afternoon Regulars"
+
+/** The best idea's team, renamed long in the long scene. */
+private const val BEST_TEAM = 8
+
+/** The fixture's trades, with the best idea's team renamed long in the long scene. */
+private fun adviceAt(scene: TradesSnapshotTest.Scene): TradeAdvice {
+    val advice = TradeFixtures.trades(scene.clock)
+    if (scene != TradesSnapshotTest.Scene.Long) return advice
+    return advice.copy(teams = advice.teams.map { if (it.rosterId == BEST_TEAM) it.copy(name = LONG_TEAM) else it })
+}
+
 /** The fixture's check, or one they would not take on their rest of season (Lane 277). */
 private fun checkAt(scene: TradesSnapshotTest.Scene): TradeCheck {
     val check = TradeFixtures.check(scene.clock, 1)
@@ -192,9 +209,25 @@ private const val REFUSED_REST = 21.6
  * refused idea, a saved read with no signal, and Sunday's idea. */
 internal fun viewModelAt(scene: TradesSnapshotTest.Scene): TradesViewModel {
     val clock = scene.clock
-    val stub = StubTrades(advice = TradeFixtures.trades(clock), check = checkAt(scene))
+    val stub = StubTrades(advice = adviceAt(scene), check = checkAt(scene))
     val vm =
-        TradesViewModel(stub, MemoryCache(), FixedClock(StartFixtures.instant(clock)), Fixtures.zone, LeagueHost.ffpc, ME, { true }, {}, {})
+        TradesViewModel(
+            stub,
+            MemoryCache(),
+            FixedClock(StartFixtures.instant(clock)),
+            Fixtures.zone,
+            LeagueHost.ffpc,
+            if (scene ==
+                TradesSnapshotTest.Scene.Long
+            ) {
+                LONG_ME
+            } else {
+                ME
+            },
+            { true },
+            {},
+            {},
+        )
     val league = TradeFixtures.LEAGUE
     vm.load(league)
     if (scene == TradesSnapshotTest.Scene.Stale) {

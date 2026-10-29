@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,7 +32,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -159,7 +158,7 @@ private fun RosterSwitchView(
         horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp),
     ) {
         Chip(rosters.yours, drawn == PickSide.Give) { show(PickSide.Give) }
-        Chip(rosters.theirs, drawn == PickSide.Get) { show(PickSide.Get) }
+        Chip(rosters.theirs, drawn == PickSide.Get, Modifier.weight(1f, fill = false)) { show(PickSide.Get) }
     }
 }
 
@@ -169,11 +168,13 @@ internal fun StampText(stamp: String) {
     Text(stamp, style = Faces.label.copy(letterSpacing = 0.sp), color = CommishTheme.colors.accentText)
 }
 
-/** A choice chip, lit in the ink when it is the one shown (the web's ChipGroup, iOS's ChoiceChip). */
+/** A choice chip, lit in the ink when it is the one shown (the web's ChipGroup, iOS's SwitchChip); a long
+ * team name wraps inside it, never cut. */
 @Composable
 private fun Chip(
     words: String,
     lit: Boolean,
+    modifier: Modifier = Modifier,
     choose: () -> Unit,
 ) {
     val c = CommishTheme.colors
@@ -182,17 +183,15 @@ private fun Chip(
         words,
         style = Faces.small.copy(fontWeight = FontWeight.SemiBold),
         color = if (lit) c.bg else c.ink2,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
         modifier =
-            Modifier
-                .height(CHIP_HEIGHT)
+            modifier
+                .heightIn(min = CHIP_HEIGHT)
                 .clip(pill)
                 .background(if (lit) c.ink else Color.Transparent)
                 .border(1.dp, if (lit) c.ink else c.lineStrong, pill)
                 .clickable(role = Role.Button, onClick = choose)
                 .semantics { selected = lit }
-                .padding(horizontal = Tokens.Space.s3.dp)
+                .padding(horizontal = Tokens.Space.s3.dp, vertical = Tokens.Space.s1.dp)
                 .wrapCenter(),
     )
 }

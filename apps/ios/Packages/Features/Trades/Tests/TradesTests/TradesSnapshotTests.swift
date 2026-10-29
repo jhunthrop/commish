@@ -16,7 +16,9 @@ import Testing
 /// answer line and the pin); a saved read whose check found no signal (the stamp, the web's line); and
 /// Sunday afternoon, the trade's players in play (no week, "--" in the Proj cells, the member's roster
 /// with its drop). Each state is the view model's, read from the shared fixtures through a stub of the
-/// API. With SNAPSHOT_SHOTS set each is also written at its phone's own scale for the persona panel.
+/// API. Long team names on both sides (review M2) draw whole: the member's head, the Best card's "With"
+/// line, the team choice and the verdict's rows. With SNAPSHOT_SHOTS set each is also written at its phone's own scale
+/// for the persona panel.
 @MainActor
 struct TradesSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -28,6 +30,24 @@ struct TradesSnapshotTests {
     static let host = Components.Schemas.LeagueHost(value1: .ffpc)
     static let me = TradeMe(name: "McConkey Kong Country", aside: "1-4, 11th of 12")
     static let best = "8:96>7526+8116"
+    /// The long scene's names, each past what one line of its place holds on a phone.
+    static let longMe = TradeMe(name: "McConkey Kong Country Club and Grill", aside: "1-4, 11th of 12")
+    static let longTeam = "Max_Jensen10 and the Sunday Afternoon Regulars"
+
+    /// The fixture's trades, with the best idea's team renamed long in the long scene.
+    static func advice(_ scene: Scene) throws -> TradeAdvice {
+        var advice = try answer(TradeAdvice.self, "trades-\(league)-\(scene.clock).json")
+        if scene == .long {
+            advice.teams = advice.teams.map { team in
+                var team = team
+                if team.rosterId == 8 {
+                    team.name = longTeam
+                }
+                return team
+            }
+        }
+        return advice
+    }
 
     enum Scene: String, CaseIterable, Sendable {
         case open
@@ -36,6 +56,8 @@ struct TradesSnapshotTests {
         case refused
         case stale
         case sunday
+        /// Long team names on both sides (review M2): every name drawn whole.
+        case long
 
         var clock: String {
             self == .sunday ? "2026-10-18T18-56-00Z" : "2026-10-17T17-00-00Z"
@@ -48,6 +70,7 @@ struct TradesSnapshotTests {
             case .ideas: [.ideas]
             case .refused, .stale: [.verdict]
             case .sunday: [.verdict, .yours]
+            case .long: [.screen, .verdict, .theirs]
             }
         }
     }
@@ -104,13 +127,12 @@ struct TradesSnapshotTests {
 
     /// The view model at the scene's state, through the stub.
     static func viewModel(_ scene: Scene) async throws -> TradesViewModel {
-        let stub = try StubTrades(
-            advice: answer(TradeAdvice.self, "trades-\(league)-\(scene.clock).json"), check: check(scene)
-        )
+        let stub = try StubTrades(advice: advice(scene), check: check(scene))
         let cache = FileCache(folder: FileManager.default.temporaryDirectory
             .appendingPathComponent("trades-snapshots-\(UUID().uuidString)"))
         let viewModel = TradesViewModel(
-            api: stub, cache: cache, clock: FixedClock(instant(scene.clock)), host: host, me: me, zone: zone,
+            api: stub, cache: cache, clock: FixedClock(instant(scene.clock)), host: host,
+            me: scene == .long ? longMe : me, zone: zone,
             copy: { _ in true }
         )
         await viewModel.load(leagueID: league)

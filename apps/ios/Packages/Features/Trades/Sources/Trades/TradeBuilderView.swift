@@ -12,11 +12,39 @@ struct RosterSwitchView: View {
 
     var body: some View {
         HStack(spacing: Tokens.Space.s2) {
-            ChoiceChip(rosters.yours, pressed: drawn == .give) { show(.give) }
-            ChoiceChip(rosters.theirs, pressed: drawn == .get) { show(.get) }
+            SwitchChip(words: rosters.yours, pressed: drawn == .give) { show(.give) }
+                .fixedSize()
+            SwitchChip(words: rosters.theirs, pressed: drawn == .get) { show(.get) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Words.Analyzer.rosters)
+    }
+}
+
+/// One side of the switch (ChoiceChip's look): a long team name wraps inside it, never cut.
+struct SwitchChip: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let words: String
+    let pressed: Bool
+    let action: () -> Void
+
+    var body: some View {
+        let theme = Theme(colorScheme)
+        let shape = RoundedRectangle(cornerRadius: 16)
+        Button(action: action) {
+            Text(words)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .medium))
+                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(theme.color(pressed ? Tokens.Color.bg : Tokens.Color.ink2))
+                .padding(.horizontal, Tokens.Space.s3)
+                .padding(.vertical, 6)
+                .frame(minHeight: 32)
+                .background(shape.fill(pressed ? theme.color(Tokens.Color.ink) : .clear))
+                .overlay(shape.strokeBorder(theme.color(pressed ? Tokens.Color.ink : Tokens.Color.lineStrong)))
+                .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(pressed ? [.isButton, .isSelected] : .isButton)
     }
 }
 
@@ -25,6 +53,8 @@ struct RosterSwitchView: View {
 /// each row at the Lineup's height with its tick, two a side at most.
 struct BuilderBoxView: View {
     @Environment(\.colorScheme) private var colorScheme
+    /// What the side holds takes this, wrapping in it, so the team's name keeps the rest of the head.
+    static let holdsWidth: Double = 84
     let shown: TradesShown
     let actions: TradeActions
 
@@ -66,25 +96,28 @@ struct BuilderBoxView: View {
         HStack(spacing: Tokens.Space.s2) {
             if box.mine {
                 Avatar(box.initials, side: 22, mine: true)
+                // The team whole: a long name wraps to a second line, never cut.
                 Text(box.team)
                     .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .bold))
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
                 Text(Words.Box.you)
                     .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .bold))
                     .textCase(.uppercase)
                     .foregroundStyle(theme.color(Tokens.Color.accentText))
+                    .fixedSize()
             } else {
-                // The team whole: what the side holds takes the room left, in two short lines.
+                // The team whole, wrapping where it is long: what the side holds yields the width.
                 TeamMenu(builder: shown.builder, choose: actions.team)
-                    .fixedSize(horizontal: true, vertical: false)
                     .layoutPriority(1)
             }
             Spacer(minLength: Tokens.Space.s1)
             Text(box.holds)
                 .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
                 .foregroundStyle(theme.color(Tokens.Color.ink2))
-                .lineLimit(2)
                 .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: Self.holdsWidth, alignment: .trailing)
         }
         .foregroundStyle(theme.color(Tokens.Color.ink))
     }
@@ -208,7 +241,6 @@ struct BuilderPin: View {
             Text(words)
                 .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
                 .foregroundStyle(theme.color(Tokens.Color.ink2))
-                .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

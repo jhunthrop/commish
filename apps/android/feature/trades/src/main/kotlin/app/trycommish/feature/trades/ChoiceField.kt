@@ -36,7 +36,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import app.trycommish.design.CommishTheme
@@ -92,13 +91,12 @@ internal fun ChoiceField(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp),
         ) {
+            // The choice whole, on a second line where it is long.
             Text(
                 value,
                 style = Faces.small.copy(fontWeight = FontWeight.SemiBold),
                 color = c.ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).padding(vertical = Tokens.Space.s1.dp),
             )
             Icon(painterResource(R.drawable.icon_chevron), contentDescription = null, tint = c.ink2, modifier = Modifier.size(14.dp))
         }

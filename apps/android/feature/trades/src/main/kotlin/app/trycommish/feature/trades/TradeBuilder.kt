@@ -4,11 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -26,7 +25,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,7 +48,9 @@ import app.trycommish.feature.boxscore.RowActions
 import app.trycommish.feature.boxscore.TableFrame
 
 private val PIN_SHADOW = 8.dp
-private val HOLDS_WIDTH = 150.dp
+
+/** What the side holds takes this, wrapping in it, so the team's name keeps the rest of the head. */
+private val HOLDS_WIDTH = 84.dp
 private const val CHECKING_ALPHA = 0.6f
 private const val HELD_ALPHA = 0.5f
 
@@ -81,16 +81,25 @@ internal fun BuilderBoxView(
         ) {
             if (box.mine) {
                 Avatar(box.initials, 22.dp, mine = true)
-                Text(
-                    box.team,
-                    style = Faces.small.copy(fontWeight = FontWeight.Bold),
-                    color = c.ink,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Text(Words.Box.you.uppercase(), style = Faces.label.copy(fontWeight = FontWeight.Bold), color = c.accentText)
-                Spacer(Modifier.weight(1f))
+                // The team whole: a long name wraps to a second line, never cut; You follows it.
+                Row(
+                    Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp),
+                ) {
+                    Text(
+                        box.team,
+                        style = Faces.small.copy(fontWeight = FontWeight.Bold),
+                        color = c.ink,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Text(
+                        Words.Box.you.uppercase(),
+                        style = Faces.label.copy(fontWeight = FontWeight.Bold),
+                        color = c.accentText,
+                        softWrap = false,
+                    )
+                }
             } else {
                 // The team takes the room what the side holds leaves it, which is two short lines at most.
                 ChoiceField(
@@ -105,9 +114,8 @@ internal fun BuilderBoxView(
                 box.holds,
                 style = Faces.label.copy(letterSpacing = 0.sp),
                 color = c.ink2,
-                maxLines = 2,
                 textAlign = TextAlign.End,
-                modifier = Modifier.widthIn(max = HOLDS_WIDTH),
+                modifier = Modifier.width(HOLDS_WIDTH),
             )
         }
         if (box.rows.isNotEmpty()) HeadRow(BoxStyle.Trade)

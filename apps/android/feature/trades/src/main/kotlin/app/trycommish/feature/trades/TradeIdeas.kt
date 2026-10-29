@@ -29,7 +29,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import app.trycommish.core.trades.IdeaPlace
@@ -108,7 +107,8 @@ private fun Places(
     }
 }
 
-/** One idea's card: "Best", "With Max_Jensen10" and both gains on its first line, the deal on its second. */
+/** One idea's card: "Best" and both gains on its first line, "With Max_Jensen10" whole on its own line (a
+ * long team name wraps, never cut), the deal under it. */
 @Composable
 private fun IdeaCard(
     preset: TradePreset,
@@ -129,20 +129,15 @@ private fun IdeaCard(
             .padding(horizontal = Tokens.Space.s3.dp, vertical = 3.dp),
         verticalArrangement = Arrangement.Center,
     ) {
+        val quiet = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.em)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             preset.mark?.let {
                 Text(it.uppercase(), style = Faces.label.copy(fontWeight = FontWeight.Bold), color = c.accentText)
             }
-            Text(
-                preset.with,
-                style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.em),
-                color = c.ink2,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Text(preset.gains, style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.em), color = c.ink2, maxLines = 1)
+            Spacer(Modifier.weight(1f))
+            Text(preset.gains, style = quiet, color = c.ink2)
         }
+        Text(preset.with, style = quiet, color = c.ink2)
         Text(preset.deal, style = Faces.small.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
     }
 }
@@ -171,7 +166,7 @@ private fun NoIdeaCard(
             .padding(horizontal = Tokens.Space.s3.dp, vertical = 3.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(line.with, style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.em), color = c.ink2, maxLines = 1)
+        Text(line.with, style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.em), color = c.ink2)
         Text(line.note, style = Faces.small.copy(fontWeight = FontWeight.Medium), color = c.ink2)
     }
 }

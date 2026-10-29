@@ -48,6 +48,8 @@ public final class TradesViewModel {
     private var answeredPicks: TradePicks?
     private var builderProblem: String?
     private var checkAsk = 0
+    /// The check being read: a newer tick cancels it, so only the latest is asked of the API.
+    private var checkTask: Task<TradeCheck?, any Error>?
 
     /// `me` is the member's team and standing as the switch names them; `copy` puts the offer on the
     /// clipboard and says whether it took; `onSignedOut` runs when the API refuses the device token.
@@ -190,21 +192,27 @@ public final class TradesViewModel {
     }
 
     /// Reads the check for the picks, keeping only the latest answer; the last answer stays, quieter,
-    /// while the next is read (TradeBuilder's ask).
+    /// while the next is read (TradeBuilder's ask). A newer tick cancels the read before it, and an
+    /// answer that still lands after a newer ask is dropped.
     private func ask(leagueID: String) async {
         builderProblem = nil
         builderCopied = nil
         shared = nil
         checkAsk += 1
         let mine = checkAsk
+        checkTask?.cancel()
+        checkTask = nil
         guard let picks = building, let input = picks.checkInput else {
             forgetAnswer()
             checking = false
             return
         }
         checking = true
+        let api = api
+        let task = Task { try await api.checkTrade(id: leagueID, trade: input) }
+        checkTask = task
         do {
-            let answer = try await api.checkTrade(id: leagueID, trade: input)
+            let answer = try await task.value
             guard mine == checkAsk else {
                 return
             }
@@ -212,6 +220,7 @@ public final class TradesViewModel {
             answeredPicks = answer == nil ? nil : picks
             builderProblem = answer == nil ? Words.InSeason.narrowingUnread : nil
         } catch where APIError.signsOut(error) {
+            checking = false
             signOut()
             return
         } catch {

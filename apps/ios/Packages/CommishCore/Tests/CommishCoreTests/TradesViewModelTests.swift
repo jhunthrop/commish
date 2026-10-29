@@ -150,6 +150,42 @@ struct TradesViewModelTests {
         return model.ideas.places.count
     }
 
+    /// Review M3 and L1: tick A, then tick B while A's check is out; B's answer lands and is live, and
+    /// A's read is cancelled, so it can never land over B's.
+    @Test func aNewerTickCancelsTheOlderCheckAndItsAnswerIsLive() async throws {
+        let gated = try GatedTrades(
+            advice: Fixtures.trades(Fixtures.week),
+            check: Fixtures.tradeCheck(Fixtures.week, 1)
+        )
+        let viewModel = model(gated)
+        await viewModel.load(leagueID: Fixtures.league)
+        await viewModel.tap(.give, player: "96", leagueID: Fixtures.league)
+        let first = Task { await viewModel.tap(.get, player: "7526", leagueID: Fixtures.league) }
+        try await Self.until { await gated.asked.count == 1 }
+        let second = Task { await viewModel.tap(.get, player: "8116", leagueID: Fixtures.league) }
+        try await Self.until { await gated.asked.count == 2 }
+        await gated.release(["7526", "8116"])
+        await second.value
+        await gated.release(["7526"])
+        await first.value
+        #expect(await gated.cancelled == [["7526"]])
+        #expect(viewModel.building == TradePicks(team: 8, give: ["96"], get: ["7526", "8116"]))
+        #expect(viewModel.builder?.live == true)
+        #expect(viewModel.builder?.pressed == Self.best)
+        #expect(viewModel.checking == false)
+    }
+
+    /// Waits for a condition the stub reaches on its own task, a few seconds at most.
+    static func until(_ condition: () async -> Bool) async throws {
+        for _ in 0 ..< 2000 {
+            if await condition() {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        Issue.record("the condition was never met")
+    }
+
     @Test func aThirdPickWaitsForOnePutBack() {
         let picks = TradePicks(team: 8, give: ["a", "b"], get: [])
         #expect(picks.tapped(.give, "c") == picks)

@@ -8,6 +8,7 @@ import app.trycommish.api.decodeEnvelope
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.TradeAdvice
 import app.trycommish.api.models.TradeCheck
+import app.trycommish.api.models.TradeCheckInput
 import app.trycommish.api.models.TradeTeam
 import app.trycommish.core.AppWords
 import app.trycommish.core.Cache
@@ -60,6 +61,9 @@ class TradesViewModel(
     private var answered: TradePicks? = null
     private var checkProblem: String? = null
     private var checkAsk = 0
+
+    /** The check being read: a newer tick cancels it, so only the latest is asked of the API. */
+    private var checkJob: Job? = null
 
     val ui: StateFlow<TradesUi> = mutableUi.asStateFlow()
 
@@ -190,11 +194,14 @@ class TradesViewModel(
     }
 
     /** Reads the check for the picks, keeping only the latest answer; the last answer stays, quieter, while
-     * the next is read (TradeBuilder's ask). */
+     * the next is read (TradeBuilder's ask). A newer tick cancels the read before it, and an answer that
+     * still lands after a newer ask is dropped. */
     private fun ask(leagueId: String): Job? {
         checkProblem = null
         checkAsk += 1
         val mine = checkAsk
+        checkJob?.cancel()
+        checkJob = null
         val asked = picks
         val input = asked?.checkInput
         if (input == null) {
@@ -205,29 +212,39 @@ class TradesViewModel(
         }
         mutableUi.update { it.copy(checking = true, builderCopied = null, shared = null) }
         redraw()
-        return viewModelScope.launch {
-            try {
-                val answer = reads.checkTrade(leagueId, input)
-                if (mine != checkAsk) return@launch
-                checked = answer
-                answered = if (answer == null) null else asked
-                checkProblem = if (answer == null) Words.InSeason.narrowingUnread else null
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Unauthorized) {
-                signOut()
-                return@launch
-            } catch (
-                @Suppress("TooGenericExceptionCaught") e: Exception,
-            ) {
-                if (mine != checkAsk) return@launch
-                forgetAnswer()
-                checkProblem = unread(e)
-                markStale(e)
-            }
-            mutableUi.update { it.copy(checking = false) }
-            redraw()
+        return viewModelScope
+            .launch {
+                checkAnswer(leagueId, input, asked, mine)
+            }.also { checkJob = it }
+    }
+
+    private suspend fun checkAnswer(
+        leagueId: String,
+        input: TradeCheckInput,
+        asked: TradePicks?,
+        mine: Int,
+    ) {
+        try {
+            val answer = reads.checkTrade(leagueId, input)
+            if (mine != checkAsk) return
+            checked = answer
+            answered = if (answer == null) null else asked
+            checkProblem = if (answer == null) Words.InSeason.narrowingUnread else null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Unauthorized) {
+            signOut()
+            return
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            if (mine != checkAsk) return
+            forgetAnswer()
+            checkProblem = unread(e)
+            markStale(e)
         }
+        mutableUi.update { it.copy(checking = false) }
+        redraw()
     }
 
     private fun forgetAnswer() {

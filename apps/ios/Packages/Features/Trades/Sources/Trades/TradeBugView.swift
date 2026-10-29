@@ -13,6 +13,8 @@ struct TradeBugView: View {
 
     /// The team's column, the web's 7.5rem at a phone's type.
     static let who: Double = 96
+    /// The rest-of-season column, its head in two short lines.
+    static let rest: Double = 58
 
     var body: some View {
         let theme = Theme(colorScheme)
@@ -23,7 +25,7 @@ struct TradeBugView: View {
                 head(Words.Trades.weekHead, theme: theme)
                 head(Words.Trades.gainHead, theme: theme)
                 head(Words.Trades.restHead, theme: theme)
-                    .frame(width: 58, alignment: .leading)
+                    .frame(width: Self.rest, alignment: .leading)
             }
             .padding(.bottom, 2)
             row(bug.yours, theme: theme)

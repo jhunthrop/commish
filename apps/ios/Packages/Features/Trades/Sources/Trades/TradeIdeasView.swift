@@ -16,8 +16,6 @@ struct TradeIdeasView: View {
 
     /// The web's card width on a phone, min(22rem, 86vw), at the phone's own width.
     static let cardWidth: Double = 300
-    /// A card's two lines with their padding, the still row's height.
-    static let stillHeight: Double = 44
 
     var body: some View {
         let theme = Theme(colorScheme)
@@ -40,9 +38,11 @@ struct TradeIdeasView: View {
                     places
                 }
             } else if still {
-                // An overlay sizes nothing, so the row runs past the edge without widening the screen.
-                Color.clear
-                    .frame(maxWidth: .infinity, minHeight: Self.stillHeight, maxHeight: Self.stillHeight)
+                // An overlay sizes nothing, so the row runs past the edge without widening the screen; the
+                // first card, hidden, gives the row its height.
+                first
+                    .hidden()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .overlay(alignment: .topLeading) {
                         HStack(alignment: .top, spacing: Tokens.Space.s2) {
                             places
@@ -64,21 +64,35 @@ struct TradeIdeasView: View {
         .accessibilityLabel(builder.ideasHead)
     }
 
+    /// The Best card alone, which sizes the still row.
+    @ViewBuilder
+    private var first: some View {
+        if let place = builder.ideas.first {
+            card(place)
+        }
+    }
+
     private var places: some View {
         ForEach(builder.ideas) { place in
-            switch place {
-            case let .idea(preset):
-                IdeaCard(preset: preset, pressed: builder.pressed == preset.id, wide: builder.more == nil) {
-                    actions.idea(preset.id)
-                }
-            case let .none(line):
-                NoIdeaCard(line: line, wide: builder.more == nil)
+            card(place)
+        }
+    }
+
+    @ViewBuilder
+    private func card(_ place: IdeaPlace) -> some View {
+        switch place {
+        case let .idea(preset):
+            IdeaCard(preset: preset, pressed: builder.pressed == preset.id, wide: builder.more == nil) {
+                actions.idea(preset.id)
             }
+        case let .none(line):
+            NoIdeaCard(line: line, wide: builder.more == nil)
         }
     }
 }
 
-/// One idea's card: "Best", "With Max_Jensen10" and both gains on its first line, the deal on its second.
+/// One idea's card: "Best" and both gains on its first line, "With Max_Jensen10" whole on its own line
+/// (a long team name wraps, never cut), the deal under it.
 struct IdeaCard: View {
     @Environment(\.colorScheme) private var colorScheme
     let preset: TradePreset
@@ -98,17 +112,16 @@ struct IdeaCard: View {
                             .textCase(.uppercase)
                             .foregroundStyle(theme.color(Tokens.Color.accentText))
                     }
-                    Text(preset.with)
-                        .foregroundStyle(theme.color(Tokens.Color.ink2))
-                        .lineLimit(1)
                     Spacer(minLength: Tokens.Space.s1)
                     Text(preset.gains)
                         .monospacedDigit()
                         .foregroundStyle(theme.color(Tokens.Color.ink2))
-                        .lineLimit(1)
-                        .layoutPriority(1)
                 }
                 .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
+                Text(preset.with)
+                    .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
+                    .foregroundStyle(theme.color(Tokens.Color.ink2))
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(preset.deal)
                     .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
                     .foregroundStyle(theme.color(Tokens.Color.ink))
@@ -146,7 +159,7 @@ struct NoIdeaCard: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(line.with)
                 .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
             Text(line.note)
                 .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .medium))
         }

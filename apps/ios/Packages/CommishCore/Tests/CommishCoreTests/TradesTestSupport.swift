@@ -40,3 +40,39 @@ actor TradesStub: TradesAPI {
         return check
     }
 }
+
+/// The fixture's check held at a gate per trade until the test lets it through, so two checks can land
+/// out of order; a check whose task is cancelled while it waits is counted as cancelled.
+actor GatedTrades: TradesAPI {
+    private let advice: TradeAdvice
+    private let check: TradeCheck
+    private var open: Set<[String]> = []
+    private(set) var asked: [[String]] = []
+    private(set) var cancelled: [[String]] = []
+
+    init(advice: TradeAdvice, check: TradeCheck) {
+        self.advice = advice
+        self.check = check
+    }
+
+    func release(_ get: [String]) {
+        open.insert(get)
+    }
+
+    func trades(id _: String, player _: String?) async throws -> TradeAdvice {
+        advice
+    }
+
+    func checkTrade(id _: String, trade: TradeCheckInput) async throws -> TradeCheck? {
+        asked.append(trade.get)
+        while !open.contains(trade.get) {
+            do {
+                try await Task.sleep(for: .milliseconds(2))
+            } catch {
+                cancelled.append(trade.get)
+                throw error
+            }
+        }
+        return check
+    }
+}
