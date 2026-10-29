@@ -4900,6 +4900,11 @@ export interface components {
 			trades: components['schemas']['TradeRow'][];
 			/** @description one sentence when every trade found with this team is a close call for them, else null */
 			note: string | null;
+			/**
+			 * @description why trades is empty (Lane 290, B283), absent when it lists a trade: same_need when every position their needs take is one the drafter's needs take too, no_need when they have no slot short of the median team, dropped when the search found trades the drafter's lineup gains from but none they would take or that fills a need without opening one, nothing when the search found none (or, with a player asked for, none holding him). The needs are read first: they say why a team takes nothing
+			 * @enum {string}
+			 */
+			empty_reason?: 'dropped' | 'same_need' | 'no_need' | 'nothing';
 		};
 		LineupMoves: {
 			/** @description true where the league's platform takes a lineup from our screen at all (ESPN, MyFantasyLeague), false where it has no write path (the verb is always Copy the lineup there) */

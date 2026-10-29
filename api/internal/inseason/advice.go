@@ -82,8 +82,8 @@ type advisor struct {
 	// finds is the league read's trades with each team, searched once per
 	// read across requests (Service.findsFor); nil searches for this
 	// advisor alone, once (found).
-	finds     func() (map[int][]Trade, error)
-	foundHere map[int][]Trade
+	finds     func() (map[int]Found, error)
+	foundHere map[int]Found
 	// searchErr is a search that stopped (shutdown, its deadline): the
 	// routes answer it as ErrSearchStopped, never as no trades (rereview
 	// 66u F2).
@@ -140,7 +140,7 @@ func (a *advisor) tradeLeague() TradeLeague {
 // id, in orderTrades' order: the Trades screen and the order's targets
 // both read it (Lane 66u N3). A search that stopped answers nothing and
 // leaves its error in searchErr.
-func (a *advisor) found() map[int][]Trade {
+func (a *advisor) found() map[int]Found {
 	if a.finds != nil {
 		got, err := a.finds()
 		if err != nil {
@@ -164,8 +164,8 @@ func (a *advisor) found() map[int][]Trade {
 // other team's. Empty when the drafter's team is not in the read. ctx
 // stops the search between teams (rereview 66u W3): a stopped search
 // answers ctx's error and nothing to keep.
-func (a *advisor) findAll(ctx context.Context) (map[int][]Trade, error) {
-	out := map[int][]Trade{}
+func (a *advisor) findAll(ctx context.Context) (map[int]Found, error) {
+	out := map[int]Found{}
 	team, ok := a.Snap.TeamByRoster(a.Me)
 	if !ok {
 		return out, nil
@@ -177,7 +177,7 @@ func (a *advisor) findAll(ctx context.Context) (map[int][]Trade, error) {
 			return nil, err
 		}
 		if t.RosterID != a.Me {
-			out[t.RosterID] = AllTrades(league, squad, a.squad(t, a.active(t), false))
+			out[t.RosterID] = Find(league, squad, a.squad(t, a.active(t), false))
 		}
 	}
 	return out, nil
@@ -1118,7 +1118,8 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		row := apitypes.TradeTeam{RosterId: t.RosterID, Name: t.Name, Owner: t.Owner,
 			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Roster: rosterLines(theirs), Trades: []apitypes.TradeRow{}}
 		close := 0
-		for _, tr := range Narrow(a.found()[t.RosterID], squad, a.squad(t, theirs, false), focus, TradesPerTeam) {
+		found := a.found()[t.RosterID]
+		for _, tr := range Narrow(found.Trades, squad, a.squad(t, theirs, false), focus, TradesPerTeam) {
 			row.Trades = append(row.Trades, a.tradeRow(mine, theirs, tr, a.tradeWeek(team, t, mine, theirs, tr)))
 			if tr.CloseForThem() {
 				close++
@@ -1128,6 +1129,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 			note := OnlyCloseCalls
 			row.Note = &note
 		}
+		row.EmptyReason = emptyReasonOf(found, len(row.Trades))
 		out.Teams = append(out.Teams, row)
 	}
 	out.Basis = TradesBasis(a.basis, a.weeks, a.horizon)
@@ -1138,6 +1140,24 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	out.PerGameBasis = perGameSaid(a.Board, shown...)
 	out.CheckBasis = TradeCheckBasis
 	return out, true
+}
+
+// emptyReasonOf is a team's empty_reason (Lane 290, B283) when the answer
+// lists listed of its trades: none while it lists one, the search's own
+// reason when it kept none, and EmptyNothing when a player asked for
+// narrowed every kept trade away. A search that did not run says none.
+func emptyReasonOf(found Found, listed int) *apitypes.TradeTeamEmptyReason {
+	reason := found.Empty
+	switch {
+	case listed > 0:
+		return nil
+	case len(found.Trades) > 0:
+		reason = EmptyNothing
+	case reason == "":
+		return nil
+	}
+	out := apitypes.TradeTeamEmptyReason(reason)
+	return &out
 }
 
 // positionOrder is the order the trade picker lists a roster in.

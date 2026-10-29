@@ -81,9 +81,14 @@ func TestTheFoundersLeague(t *testing.T) {
 		if tm.Roster == f.Me {
 			continue
 		}
-		listed := Trades(l, mine, tm.Squad, "", TradesPerTeam)
+		found := Find(l, mine, tm.Squad)
+		listed := Narrow(found.Trades, mine, tm.Squad, "", TradesPerTeam)
 		if len(listed) == 0 {
 			none++
+		}
+		// Lane 290 (B283): each empty team's reason, as Lane 287's report reads the recorded league.
+		if want := founderEmpty[tm.Roster]; found.Empty != want {
+			t.Errorf("roster %d: empty reason %q, want %q", tm.Roster, found.Empty, want)
 		}
 		for _, tr := range listed {
 			if tr.Fills >= 0 && l.slots[tr.Fills].Type == draft.SlotWR {
@@ -107,6 +112,17 @@ func TestTheFoundersLeague(t *testing.T) {
 	if none != 8 {
 		t.Fatalf("%d teams with no idea, the recorded read gives 8", none)
 	}
+}
+
+// founderEmpty is why each of the recorded read's eight teams has no idea
+// (Lane 287's report, fix round): Roar, Stroke and RayRay need receivers
+// as he does; 3 Putt Par and The usal suspect need nothing; Fayettenam,
+// JerkinGoff and Whats my name need a quarterback he cannot spare, so
+// their ideas are dropped. Every other team lists one ("").
+var founderEmpty = map[int]EmptyReason{
+	1: EmptySameNeed, 9: EmptySameNeed, 12: EmptySameNeed,
+	2: EmptyNoNeed, 6: EmptyNoNeed,
+	7: EmptyDropped, 10: EmptyDropped, 11: EmptyDropped,
 }
 
 // openedSlot is a starting slot the trade leaves short of the median team
