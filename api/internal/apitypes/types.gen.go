@@ -789,6 +789,36 @@ func (e LeaguePhase) Valid() bool {
 	}
 }
 
+// Defines values for LeaguePowerColumn.
+const (
+	LeaguePowerColumnFLEX      LeaguePowerColumn = "FLEX"
+	LeaguePowerColumnQB        LeaguePowerColumn = "QB"
+	LeaguePowerColumnRB        LeaguePowerColumn = "RB"
+	LeaguePowerColumnSUPERFLEX LeaguePowerColumn = "SUPERFLEX"
+	LeaguePowerColumnTE        LeaguePowerColumn = "TE"
+	LeaguePowerColumnWR        LeaguePowerColumn = "WR"
+)
+
+// Valid indicates whether the value is a known member of the LeaguePowerColumn enum.
+func (e LeaguePowerColumn) Valid() bool {
+	switch e {
+	case LeaguePowerColumnFLEX:
+		return true
+	case LeaguePowerColumnQB:
+		return true
+	case LeaguePowerColumnRB:
+		return true
+	case LeaguePowerColumnSUPERFLEX:
+		return true
+	case LeaguePowerColumnTE:
+		return true
+	case LeaguePowerColumnWR:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LeagueRecordWeekBenchmark.
 const (
 	LeagueRecordWeekBenchmarkEspn      LeagueRecordWeekBenchmark = "espn"
@@ -3256,6 +3286,31 @@ type LeaguePlayer struct {
 	Team string `json:"team"`
 }
 
+// LeaguePower every team's best lineup by our order over the weeks the order covers, byes counted, ranked against the league's other teams at each starting spot (the trade finder's team profile, Lane 287): each spot's points over replacement summed over its slots, ranked most first, a tie at the printed tenth sharing its place; the overall rank is the same over every spot ranked. Kickers and defenses are not ranked
+type LeaguePower struct {
+	// Basis what the ranks are, in one sentence the page prints under them
+	Basis string `json:"basis"`
+
+	// Columns the starting spots ranked, in the order the page draws them, only those the league starts
+	Columns []LeaguePowerColumn `json:"columns"`
+
+	// Teams every team read, in overall rank order, ties by roster id
+	Teams []LeaguePowerTeam `json:"teams"`
+}
+
+// LeaguePowerColumn defines model for LeaguePowerColumn.
+type LeaguePowerColumn string
+
+// LeaguePowerTeam defines model for LeaguePowerTeam.
+type LeaguePowerTeam struct {
+	// Rank the overall rank, 1 the strongest
+	Rank int `json:"rank"`
+
+	// Ranks the team's rank at each column, in columns' order
+	Ranks    []int `json:"ranks"`
+	RosterId int   `json:"roster_id"`
+}
+
 // LeagueRanking the week's weekly record in the member's own league (Lane 114), present only where the benchmark is espn: our set order and ESPN's own projection, each graded on every rostered player with a stat line at quarterback, running back, receiver and tight end (none on a bye, out, suspended or on injured reserve at the read before our order was set) by what he scored as the league scores; absent from an answer before Lane 114
 type LeagueRanking struct {
 	Espn LeagueRankingScore `json:"espn"`
@@ -3288,11 +3343,23 @@ type LeagueRecord struct {
 	// Lineup the league's starting lineup by our slots, and its bench
 	Lineup LeagueShape `json:"lineup"`
 
+	// StartSit the member's start and sit record over the graded weeks (Lane 292); absent with no graded week carrying the set lineup and from an older answer
+	StartSit *LeagueStartSit `json:"start_sit,omitempty"`
+
 	// Teams the league's teams, the count each starting slot is multiplied by
 	Teams int `json:"teams"`
 
 	// Weeks the graded weeks, in week order; empty on a platform whose week reads are not kept (every platform but ESPN) and before the first graded week whose roster was read before our order was set
 	Weeks []LeagueRecordWeek `json:"weeks"`
+}
+
+// LeagueRecordSet the lineup the member set that week (Lane 292): the starters ESPN's read of the played week holds in the member's quarterback, running back, receiver, tight end, flex and superflex slots, scored as the league scores, beside our picks from the same roster. Absent where the week's read does not hold it and from an older answer
+type LeagueRecordSet struct {
+	// Matched the set lineup started the same players as our picks
+	Matched bool `json:"matched"`
+
+	// Points the set lineup's points at those slots, to the tenth
+	Points float64 `json:"points"`
 }
 
 // LeagueRecordWeek defines model for LeagueRecordWeek.
@@ -3308,6 +3375,9 @@ type LeagueRecordWeek struct {
 
 	// Ranking the week's weekly record in the member's own league (Lane 114), present only where the benchmark is espn: our set order and ESPN's own projection, each graded on every rostered player with a stat line at quarterback, running back, receiver and tight end (none on a bye, out, suspended or on injured reserve at the read before our order was set) by what he scored as the league scores; absent from an answer before Lane 114
 	Ranking *LeagueRanking `json:"ranking,omitempty"`
+
+	// Set the lineup the member set that week (Lane 292): the starters ESPN's read of the played week holds in the member's quarterback, running back, receiver, tight end, flex and superflex slots, scored as the league scores, beside our picks from the same roster. Absent where the week's read does not hold it and from an older answer
+	Set *LeagueRecordSet `json:"set,omitempty"`
 
 	// Theirs the benchmark lineup's points, to the tenth, as the league scores
 	Theirs float64 `json:"theirs"`
@@ -3356,6 +3426,21 @@ type LeagueStanding struct {
 	Teams int `json:"teams"`
 	Ties  int `json:"ties"`
 	Wins  int `json:"wins"`
+}
+
+// LeagueStartSit the member's start and sit record (Lane 292), over the graded weeks that carry the set lineup (LeagueRecordWeek.set): how many matched our picks, and our picks' points less the set lineup's, summed
+type LeagueStartSit struct {
+	// Basis what the record is, in one sentence the page prints beside it
+	Basis string `json:"basis"`
+
+	// Matched those whose set lineup started the same players as our picks
+	Matched int `json:"matched"`
+
+	// OursLessSet our picks' points less the set lineup's, summed over those weeks from each week's printed tenths; plus is points our picks would have added
+	OursLessSet float64 `json:"ours_less_set"`
+
+	// Weeks the graded weeks with the set lineup read
+	Weeks int `json:"weeks"`
 }
 
 // LeagueSync defines model for LeagueSync.
@@ -5547,6 +5632,12 @@ type Scoreboard struct {
 	// Games the drafter's game first, then the rest in the host's order
 	Games []ScoreboardGame `json:"games"`
 
+	// Power every team's power rank, overall and at each starting spot (Lane 292); absent with fewer than two teams read and from an older answer
+	Power *LeaguePower `json:"power,omitempty"`
+
+	// ProjectionGapBasis what each game's projection_gap is, in one sentence the page prints once (Lane 292); absent from an older answer
+	ProjectionGapBasis *string `json:"projection_gap_basis,omitempty"`
+
 	// ProjectionReadAt when the week's published projection was captured, null with none
 	ProjectionReadAt *time.Time `json:"projection_read_at"`
 
@@ -5565,6 +5656,9 @@ type ScoreboardGame struct {
 
 	// NextKickoff the earliest kickoff still to come among both sides' starters, null when none is
 	NextKickoff *time.Time `json:"next_kickoff"`
+
+	// ProjectionGap the first side's projection less the second's, each as printed, to the tenth (Lane 292): plus favours the first side, the drafter's in their own game. Not a win chance: no spread for one is measured on a past season, so the figure is the gap between the projections alone (Scoreboard.projection_gap_basis). Null for a game with one side or a side with no projection; absent from an older answer
+	ProjectionGap *float64 `json:"projection_gap,omitempty"`
 
 	// Sides two sides, the drafter's first when the game is theirs; one for a team with no opponent
 	Sides []ScoreboardSide `json:"sides"`

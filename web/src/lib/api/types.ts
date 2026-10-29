@@ -4405,6 +4405,11 @@ export interface components {
 			to_play?: string | null;
 			/** @description two sides, the drafter's first when the game is theirs; one for a team with no opponent */
 			sides: components['schemas']['ScoreboardSide'][];
+			/**
+			 * Format: double
+			 * @description the first side's projection less the second's, each as printed, to the tenth (Lane 292): plus favours the first side, the drafter's in their own game. Not a win chance: no spread for one is measured on a past season, so the figure is the gap between the projections alone (Scoreboard.projection_gap_basis). Null for a game with one side or a side with no projection; absent from an older answer
+			 */
+			projection_gap?: number | null;
 		};
 		Scoreboard: {
 			week: number;
@@ -4421,6 +4426,28 @@ export interface components {
 			projection_scoring: components['schemas']['ProjectionScoring'];
 			/** @description the drafter's game first, then the rest in the host's order */
 			games: components['schemas']['ScoreboardGame'][];
+			/** @description what each game's projection_gap is, in one sentence the page prints once (Lane 292); absent from an older answer */
+			projection_gap_basis?: string;
+			/** @description every team's power rank, overall and at each starting spot (Lane 292); absent with fewer than two teams read and from an older answer */
+			power?: components['schemas']['LeaguePower'];
+		};
+		/** @description every team's best lineup by our order over the weeks the order covers, byes counted, ranked against the league's other teams at each starting spot (the trade finder's team profile, Lane 287): each spot's points over replacement summed over its slots, ranked most first, a tie at the printed tenth sharing its place; the overall rank is the same over every spot ranked. Kickers and defenses are not ranked */
+		LeaguePower: {
+			/** @description what the ranks are, in one sentence the page prints under them */
+			basis: string;
+			/** @description the starting spots ranked, in the order the page draws them, only those the league starts */
+			columns: components['schemas']['LeaguePowerColumn'][];
+			/** @description every team read, in overall rank order, ties by roster id */
+			teams: components['schemas']['LeaguePowerTeam'][];
+		};
+		/** @enum {string} */
+		LeaguePowerColumn: 'QB' | 'RB' | 'WR' | 'TE' | 'FLEX' | 'SUPERFLEX';
+		LeaguePowerTeam: {
+			roster_id: number;
+			/** @description the overall rank, 1 the strongest */
+			rank: number;
+			/** @description the team's rank at each column, in columns' order */
+			ranks: number[];
 		};
 		MemberWeek: {
 			/** @description every league the account follows, newest first, as GET /leagues/attached lists them */
@@ -5237,6 +5264,8 @@ export interface components {
 			lineup: components['schemas']['LeagueShape'];
 			/** @description the graded weeks, in week order; empty on a platform whose week reads are not kept (every platform but ESPN) and before the first graded week whose roster was read before our order was set */
 			weeks: components['schemas']['LeagueRecordWeek'][];
+			/** @description the member's start and sit record over the graded weeks (Lane 292); absent with no graded week carrying the set lineup and from an older answer */
+			start_sit?: components['schemas']['LeagueStartSit'];
 		};
 		LeagueRecordWeek: {
 			week: number;
@@ -5261,6 +5290,31 @@ export interface components {
 			 */
 			margin: number;
 			ranking?: components['schemas']['LeagueRanking'];
+			set?: components['schemas']['LeagueRecordSet'];
+		};
+		/** @description the lineup the member set that week (Lane 292): the starters ESPN's read of the played week holds in the member's quarterback, running back, receiver, tight end, flex and superflex slots, scored as the league scores, beside our picks from the same roster. Absent where the week's read does not hold it and from an older answer */
+		LeagueRecordSet: {
+			/**
+			 * Format: double
+			 * @description the set lineup's points at those slots, to the tenth
+			 */
+			points: number;
+			/** @description the set lineup started the same players as our picks */
+			matched: boolean;
+		};
+		/** @description the member's start and sit record (Lane 292), over the graded weeks that carry the set lineup (LeagueRecordWeek.set): how many matched our picks, and our picks' points less the set lineup's, summed */
+		LeagueStartSit: {
+			/** @description the graded weeks with the set lineup read */
+			weeks: number;
+			/** @description those whose set lineup started the same players as our picks */
+			matched: number;
+			/**
+			 * Format: double
+			 * @description our picks' points less the set lineup's, summed over those weeks from each week's printed tenths; plus is points our picks would have added
+			 */
+			ours_less_set: number;
+			/** @description what the record is, in one sentence the page prints beside it */
+			basis: string;
 		};
 		/** @description the week's weekly record in the member's own league (Lane 114), present only where the benchmark is espn: our set order and ESPN's own projection, each graded on every rostered player with a stat line at quarterback, running back, receiver and tight end (none on a bye, out, suspended or on injured reserve at the read before our order was set) by what he scored as the league scores; absent from an answer before Lane 114 */
 		LeagueRanking: {

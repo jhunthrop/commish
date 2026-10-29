@@ -335,7 +335,9 @@ func (s *Service) scoreboard(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	s.answer(w, r, a.Scoreboard(), true)
+	out := a.Scoreboard()
+	out.Power = a.Power()
+	s.answer(w, r, out, true)
 }
 
 func (s *Service) waivers(w http.ResponseWriter, r *http.Request) {

@@ -137,7 +137,11 @@ func rosterRead(points bool) espn.WeekRead {
 		if points {
 			p.Actual = f(r.actual)
 		}
-		team.Players = append(team.Players, espn.WeekPlayer{ID: r.id, Position: r.position, Team: r.team, Status: r.status,
+		slot, ok := memberSet[r.id]
+		if !ok {
+			slot = espn.SlotBench
+		}
+		team.Players = append(team.Players, espn.WeekPlayer{ID: r.id, Position: r.position, Team: r.team, Slot: slot, Status: r.status,
 			Points: map[int]espn.PeriodPoints{7: p}})
 	}
 	return espn.WeekRead{Season: 2026, Period: 7, ScoringPeriod: 7, Teams: []espn.WeekTeam{team}}
@@ -168,7 +172,8 @@ func TestServiceGradesAnESPNLeagueFromItsKeptReads(t *testing.T) {
 	if err == nil {
 		got[0].Ranking = nil
 	}
-	want := []Week{{Week: 7, Benchmark: BenchmarkESPN, Ours: 97, Theirs: 70, Margin: 27}}
+	// Lane 292: the member's set lineup, through the store's kept slots.
+	want := []Week{{Week: 7, Benchmark: BenchmarkESPN, Ours: 97, Theirs: 70, Margin: 27, Set: &SetLineup{Points: 87}}}
 	if err != nil || !reflect.DeepEqual(got, want) {
 		t.Fatalf("%+v %v", got, err)
 	}

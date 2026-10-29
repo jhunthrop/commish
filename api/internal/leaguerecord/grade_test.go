@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
@@ -44,10 +45,23 @@ var roster = []line{
 	{"l", "K", "DAL", "ACTIVE", 1, 30, 30},
 }
 
-func reads() []Row {
+// memberSet is the lineup the member set in week 7 by ESPN slot (Lane
+// 292): b at quarterback, not our a; everyone else on the bench but the
+// kicker.
+var memberSet = map[string]int{"b": 0, "c": 2, "d": 2, "g": 4, "h": 4, "j": 6, "e": 23, "l": 17}
+
+func reads() []Row { return readsSet(memberSet) }
+
+// readsSet is the week's reads with the member's lineup set by slot, every
+// player it does not name on the bench.
+func readsSet(set map[string]int) []Row {
 	var rows []Row
 	for _, r := range roster {
-		base := Row{Week: 7, PlayerID: r.id, TeamID: 3, Position: r.position, ProTeam: r.team, Status: r.status}
+		slot, ok := set[r.id]
+		if !ok {
+			slot = espn.SlotBench
+		}
+		base := Row{Week: 7, PlayerID: r.id, TeamID: 3, Slot: slot, Position: r.position, ProTeam: r.team, Status: r.status}
 		before, later := base, base
 		before.ReadAt, before.ReadPeriod, before.Projected = readAt, 7, f(r.projected)
 		later.ReadAt, later.ReadPeriod, later.Projected, later.Actual = after, 7, f(r.projected), f(r.actual)
@@ -82,7 +96,8 @@ func TestGradeScoresOurPicksAgainstESPNsProjectedLineup(t *testing.T) {
 		t.Errorf("ranking over %d players", got[0].Ranking.Players)
 	}
 	got[0].Ranking = nil
-	want := []Week{{Week: 7, Benchmark: BenchmarkESPN, Ours: 97, Theirs: 70, Margin: 27}}
+	// The member's set lineup scored 87: b's 10 where our a scored 20.
+	want := []Week{{Week: 7, Benchmark: BenchmarkESPN, Ours: 97, Theirs: 70, Margin: 27, Set: &SetLineup{Points: 87, Matched: false}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}

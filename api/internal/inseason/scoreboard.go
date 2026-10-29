@@ -12,8 +12,9 @@ import (
 // summed as printed, and the game's state read from its starters'
 // kickoffs. The drafter's game comes first, the rest in the host's order.
 func (a *advisor) Scoreboard() apitypes.Scoreboard {
+	gapBasis := ProjectionGapBasis
 	out := apitypes.Scoreboard{Week: a.Snap.Week, ReadAt: a.Snap.ReadAt, ProjectionReadAt: a.projectionReadAt(),
-		ProjectionScoring: projectionScoring(a.settings, a.preset), Games: []apitypes.ScoreboardGame{}}
+		ProjectionScoring: projectionScoring(a.settings, a.preset), Games: []apitypes.ScoreboardGame{}, ProjectionGapBasis: &gapBasis}
 	var mine []apitypes.ScoreboardGame
 	for _, sides := range a.pairings() {
 		g := a.scoreboardGame(sides)
@@ -180,6 +181,7 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 			out.Sides[i].Projection, out.Sides[i].ProjectionBestLineup, out.Sides[i].BestLineupSkipped = rosterProjection(best)
 		}
 	}
+	out.ProjectionGap = projectionGap(out.Sides)
 	out.State, out.NextKickoff = gameState(game, unlisted)
 	out.GameState = scoreboardGameState(out, a.now)
 	// Such a side's projected final once the game reads kicked off by the bug's own rule (Lane 127

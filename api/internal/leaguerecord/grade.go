@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 	"github.com/jhunthrop/commish/api/internal/tenth"
 )
@@ -35,6 +36,17 @@ type Week struct {
 	// order and ESPN's projection graded on every rostered player, as the
 	// league scores; nil where the benchmark is not ESPN's.
 	Ranking *Ranking
+	// Set is the lineup the member set that week (Lane 292), nil where
+	// the played week's read holds no starter of theirs at the graded slots.
+	Set *SetLineup
+}
+
+// SetLineup is the member's own lineup for a graded week: its points at
+// the graded slots, as the league scores, and whether it started the same
+// players as our picks.
+type SetLineup struct {
+	Points  float64
+	Matched bool
 }
 
 // Grade is every week the register has graded whose roster was read
@@ -81,6 +93,9 @@ func weekOf(order boards.SetOrder, rows []Row, team int, shape leaguesync.Shape,
 	}
 	ours, theirs := tenth.Round(Scored(ourPicks, actual)), tenth.Round(Scored(theirPicks, actual))
 	out := Week{Week: order.Week, Benchmark: benchmark, Ours: ours, Theirs: theirs, Margin: tenth.Round(ours - theirs)}
+	if set := setLineupOf(rows, order.Week, team, *order.GradedAt); len(set) > 0 {
+		out.Set = &SetLineup{Points: tenth.Round(Scored(set, actual)), Matched: sameStarters(set, ourPicks)}
+	}
 	if benchmark == BenchmarkESPN {
 		league, _ := leagueAt(rows, order.Week, order.SetAt)
 		var graded []Candidate
@@ -152,12 +167,7 @@ func rosterAt(rows []Row, week, team int, setAt time.Time) ([]Row, map[string]fl
 // read; one with no points split there played no snap and scored none.
 // False with no such read yet.
 func pointsAfter(rows []Row, week int, gradedAt time.Time) (map[string]float64, map[string]bool, bool) {
-	var newest time.Time
-	for _, r := range rows {
-		if r.Week == week && r.ReadPeriod == week && !r.ReadAt.Before(gradedAt) && r.ReadAt.After(newest) {
-			newest = r.ReadAt
-		}
-	}
+	newest := playedRead(rows, week, gradedAt)
 	if newest.IsZero() {
 		return nil, nil, false
 	}
@@ -171,6 +181,55 @@ func pointsAfter(rows []Row, week int, gradedAt time.Time) (map[string]float64, 
 		}
 	}
 	return out, carried, true
+}
+
+// playedRead is when the newest read of the week's own period taken after
+// the register graded it was taken, zero with none.
+func playedRead(rows []Row, week int, gradedAt time.Time) time.Time {
+	var newest time.Time
+	for _, r := range rows {
+		if r.Week == week && r.ReadPeriod == week && !r.ReadAt.Before(gradedAt) && r.ReadAt.After(newest) {
+			newest = r.ReadAt
+		}
+	}
+	return newest
+}
+
+// setLineupOf is the team's starters at the graded slots on the played week's
+// read (playedRead, the read pointsAfter scores): every quarterback,
+// running back, receiver and tight end the read holds in a starting slot,
+// neither the bench nor injured reserve. ESPN's read of a past period
+// carries each roster's slots as they stood then.
+func setLineupOf(rows []Row, week, team int, gradedAt time.Time) []string {
+	newest := playedRead(rows, week, gradedAt)
+	if newest.IsZero() {
+		return nil
+	}
+	var out []string
+	for _, r := range rows {
+		if r.Week == week && r.ReadPeriod == week && r.ReadAt.Equal(newest) && r.TeamID == team &&
+			superFlexPool[r.Position] && r.Slot != espn.SlotBench && r.Slot != espn.SlotReserve {
+			out = append(out, r.PlayerID)
+		}
+	}
+	return out
+}
+
+// sameStarters is whether two lineups start the same players, in any slot.
+func sameStarters(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	in := make(map[string]bool, len(a))
+	for _, id := range a {
+		in[id] = true
+	}
+	for _, id := range b {
+		if !in[id] {
+			return false
+		}
+	}
+	return true
 }
 
 func candidates(roster []Row, week int, byes map[string]int) []Candidate {
