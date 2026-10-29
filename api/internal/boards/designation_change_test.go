@@ -50,14 +50,15 @@ func TestDesignationPairs(t *testing.T) {
 	}
 
 	insert(injList(map[string]string{"p1": "Q"}, 20), at)
-	if pairs, err := src.DesignationPairs(ctx, time.Time{}); err != nil || len(pairs) != 0 {
-		t.Fatalf("one capture made pairs: %v %v", pairs, err)
+	if got, err := src.DesignationPairs(ctx, time.Time{}); err != nil || len(got.Pairs) != 0 {
+		t.Fatalf("one capture made pairs: %v %v", got.Pairs, err)
 	}
 	insert(injList(map[string]string{"p2": "O"}, 0), at.Add(time.Hour)) // cut short: under half
 	insert(injList(map[string]string{"p1": "Q", "p2": "O"}, 20), at.Add(2*time.Hour))
 	insert(injList(map[string]string{"p2": "O"}, 20), at.Add(3*time.Hour))
 
-	pairs, err := src.DesignationPairs(ctx, time.Time{})
+	got, err := src.DesignationPairs(ctx, time.Time{})
+	pairs := got.Pairs
 	if err != nil || len(pairs) != 2 {
 		t.Fatalf("pairs %v %v", len(pairs), err)
 	}
@@ -65,8 +66,8 @@ func TestDesignationPairs(t *testing.T) {
 	if !last.OlderAt.Equal(at.Add(2*time.Hour)) || !last.NewerAt.Equal(at.Add(3*time.Hour)) {
 		t.Fatalf("the newest pair compared %v with %v", last.NewerAt, last.OlderAt)
 	}
-	if within, err := src.DesignationPairs(ctx, at.Add(150*time.Minute)); err != nil || len(within) != 1 || !within[0].NewerAt.Equal(last.NewerAt) {
-		t.Fatalf("the window kept %d pairs %v", len(within), err)
+	if within, err := src.DesignationPairs(ctx, at.Add(150*time.Minute)); err != nil || len(within.Pairs) != 1 || !within.Pairs[0].NewerAt.Equal(last.NewerAt) {
+		t.Fatalf("the window kept %d pairs %v", len(within.Pairs), err)
 	}
 	if !pair.NewerAt.Equal(at.Add(2*time.Hour)) || !pair.OlderAt.Equal(at) {
 		t.Fatalf("compared %v with %v", pair.NewerAt, pair.OlderAt)
@@ -108,11 +109,57 @@ func TestDesignationPairsReadByTime(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	pairs, err := src.DesignationPairs(ctx, start)
+	got, err := src.DesignationPairs(ctx, start)
+	pairs := got.Pairs
 	if err != nil || len(pairs) != captures-1 {
 		t.Fatalf("%d pairs after the mark, want %d: %v", len(pairs), captures-1, err)
 	}
 	if !pairs[0].OlderAt.Equal(start) || !pairs[len(pairs)-1].NewerAt.Equal(start.Add((captures-1)*15*time.Minute)) {
 		t.Fatalf("pairs from %v to %v", pairs[0].OlderAt, pairs[len(pairs)-1].NewerAt)
+	}
+}
+
+// A read past MaxPairCaptures takes the oldest captures after the mark,
+// pairs them without a gap, and says where it stopped and how many are
+// left, so the mark never passes a capture it did not pair (re-review
+// L-e, Lane 285).
+func TestDesignationPairsCutAtTheBound(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	const schema = "lane285_pairs_cut"
+	for _, q := range []string{
+		`drop schema if exists ` + schema + ` cascade`,
+		`create schema ` + schema,
+		`create table ` + schema + `.capture_snapshots (source text, payload jsonb, captured_at timestamptz)`,
+	} {
+		if _, err := pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `drop schema if exists `+schema+` cascade`) })
+	src := &PGSource{Pool: pool, Schema: schema}
+	start := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
+	const after = MaxPairCaptures + 10
+	at := func(i int) time.Time { return start.Add(time.Duration(i) * time.Minute) }
+	if _, err := pool.Exec(ctx, `insert into `+schema+`.capture_snapshots
+		select 'tank01_injuries_by_date', $1::jsonb, $2::timestamptz + make_interval(mins => i) from generate_series(0, $3::int) i`,
+		injList(map[string]string{"p1": "Q"}, 20), start, after); err != nil {
+		t.Fatal(err)
+	}
+	got, err := src.DesignationPairs(ctx, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Cut || got.Read != MaxPairCaptures || got.Left != 10 || !got.CutAt.Equal(at(MaxPairCaptures)) {
+		t.Fatalf("cut %v at %v, read %d, left %d", got.Cut, got.CutAt, got.Read, got.Left)
+	}
+	if len(got.Pairs) != MaxPairCaptures || !got.Pairs[0].OlderAt.Equal(start) ||
+		!got.Pairs[len(got.Pairs)-1].NewerAt.Equal(at(MaxPairCaptures)) {
+		t.Fatalf("%d pairs from %v to %v", len(got.Pairs), got.Pairs[0].OlderAt, got.Pairs[len(got.Pairs)-1].NewerAt)
+	}
+	// The next read from where this one stopped takes the rest.
+	rest, err := src.DesignationPairs(ctx, got.CutAt)
+	if err != nil || rest.Cut || len(rest.Pairs) != 10 || !rest.Pairs[0].OlderAt.Equal(got.CutAt) {
+		t.Fatalf("the rest: %d pairs, cut %v, %v", len(rest.Pairs), rest.Cut, err)
 	}
 }

@@ -22,8 +22,11 @@ const (
 	OfferFailFor = 15 * time.Minute
 	// OfferTimeout bounds one landed read's offer reads, every link's.
 	OfferTimeout = ReadTimeout
-	// maxOfferHolds bounds the links the capture remembers; past it the
-	// holds already over are forgotten.
+	// maxOfferHolds bounds the links the capture remembers: past it the
+	// holds already over are forgotten, and when none is over, the one
+	// ending soonest goes (forgetting a hold only lets that link be read a
+	// little early, at the league's own cadence), so the map never grows
+	// past it however many links fail at once (Lane 285, B278).
 	maxOfferHolds = 4096
 )
 
@@ -128,7 +131,11 @@ func (c *OfferCapture) captureLink(ctx context.Context, reader OfferReader, link
 	c.hold(link.ID, OfferGap)
 	offers := c.keepable(link, read)
 	sort.Slice(offers, func(i, j int) bool { return offers[i].OfferID < offers[j].OfferID })
-	if err := c.Store.PutOffers(ctx, link, offers, c.Now()); err != nil {
+	err = c.Store.PutOffers(ctx, link, offers, c.Now())
+	switch {
+	case errors.Is(err, ErrOffersNotKept):
+		c.Log.Info("leaguesync: offers not kept, the link left while they were read", "league", link.Ref.Key(), "link", link.ID)
+	case err != nil:
 		c.Log.Warn("leaguesync: offers not kept", "league", link.Ref.Key(), "link", link.ID, "err", err)
 	}
 }
@@ -163,12 +170,29 @@ func (c *OfferCapture) hold(link uuid.UUID, d time.Duration) {
 	if c.until == nil {
 		c.until = map[uuid.UUID]time.Time{}
 	}
-	if len(c.until) >= maxOfferHolds {
-		for id, at := range c.until {
-			if !now.Before(at) {
-				delete(c.until, id)
-			}
-		}
+	if _, held := c.until[link]; !held && len(c.until) >= maxOfferHolds {
+		c.forgetHolds(now)
 	}
 	c.until[link] = now.Add(d)
+}
+
+// forgetHolds makes room for one more hold: every hold already over
+// forgotten, else the one ending soonest. c.mu is held.
+func (c *OfferCapture) forgetHolds(now time.Time) {
+	var soonest uuid.UUID
+	var soonestAt time.Time
+	forgot := false
+	for id, at := range c.until {
+		if !now.Before(at) {
+			delete(c.until, id)
+			forgot = true
+			continue
+		}
+		if soonestAt.IsZero() || at.Before(soonestAt) {
+			soonest, soonestAt = id, at
+		}
+	}
+	if !forgot {
+		delete(c.until, soonest)
+	}
 }

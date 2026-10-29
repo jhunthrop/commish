@@ -49,7 +49,7 @@ _DATABASE = "parity_test_week_reads"
 _QUESTIONABLE_READ = (
     "Bijan Robinson is Questionable on Friday's report, so whether he plays in week 6 of 2026 against Chicago is "
     "not settled until Sunday. He leads the Atlanta backfield when he plays. The Bears rank 9th of 32 against running backs, and the Falcons are expected "
-    "to score 25 points. If he is active, Bijan Robinson stays in your lineup over a lesser back."
+    "to score 25 points. If he is active, Bijan Robinson plays ahead of a lesser back."
 )
 _SHARED = "The Rams lean on him every single week."
 _MASKS = ShapeMasks.of(("Puka Nacua", "Bijan Robinson"))

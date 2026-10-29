@@ -17,7 +17,8 @@ type Target struct {
 	Token    string
 }
 
-// MaxPushAccounts bounds the accounts one producer run reads.
+// MaxPushAccounts bounds the accounts one page of a producer's walk reads;
+// a walk past it resumes after the page's last account (Lane 285).
 const MaxPushAccounts = 20000
 
 // activeDevice is the rule a device must meet to receive pushes, the same
@@ -61,14 +62,16 @@ func (s *Store) DropToken(ctx context.Context, deviceID uuid.UUID, token string)
 	return nil
 }
 
-// PushAccounts is every account with an active device registered for
-// push and the kind switched on: the accounts a producer may write for,
-// at most MaxPushAccounts (full says the bound was reached).
-func (s *Store) PushAccounts(ctx context.Context, kind Kind, activeSince time.Time) (ids []uuid.UUID, full bool, err error) {
+// PushAccounts is every account after after (uuid.Nil: from the first)
+// with an active device registered for push and the kind switched on: the
+// accounts a producer may write for, in id order, at most MaxPushAccounts
+// (full says the bound was reached, and the next page starts after the
+// last id).
+func (s *Store) PushAccounts(ctx context.Context, kind Kind, activeSince time.Time, after uuid.UUID) (ids []uuid.UUID, full bool, err error) {
 	rows, err := s.Pool.Query(ctx, `select distinct d.account_id from app.devices d
 		left join app.notification_preferences p on p.account_id = d.account_id
-		where not (coalesce(p.kinds_off, '{}') @> array[$1]::text[]) and `+activeDevice+`$3
-		order by 1 limit $2`, string(kind), MaxPushAccounts, activeSince)
+		where not (coalesce(p.kinds_off, '{}') @> array[$1]::text[]) and d.account_id > $4 and `+activeDevice+`$3
+		order by 1 limit $2`, string(kind), MaxPushAccounts, activeSince, after)
 	if err != nil {
 		return nil, false, fmt.Errorf("notify: push accounts: %w", err)
 	}

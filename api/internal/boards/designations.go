@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -157,21 +158,41 @@ func (s *PGSource) newestCapture(ctx context.Context, source string) (out map[st
 // captures is the source's newest n captures, newest first, each parsed,
 // at or before before when it is set.
 func (s *PGSource) captures(ctx context.Context, source string, n int, before time.Time) ([]capture, error) {
-	return s.capturesWhere(ctx, source, n, "($4::timestamptz is null or captured_at <= $4)", before)
+	return s.capturesWhere(ctx, source, n, "($4::timestamptz is null or captured_at <= $4)", "desc", before)
 }
 
-// capturesAfter is the source's captures stored after after, newest
-// first, at most n.
+// capturesAfter is the source's oldest n captures stored after after,
+// newest first: a read the bound cuts keeps the captures next after the
+// mark, so the mark can stop at the newest one read and the next read
+// picks up from there (re-review L-e, Lane 285).
 func (s *PGSource) capturesAfter(ctx context.Context, source string, n int, after time.Time) ([]capture, error) {
-	return s.capturesWhere(ctx, source, n, "captured_at > $4", after)
+	out, err := s.capturesWhere(ctx, source, n, "captured_at > $4", "asc", after)
+	slices.Reverse(out)
+	return out, err
 }
 
-// capturesWhere is the source's newest n captures meeting bound (on $4,
-// at; the zero time is null), newest first, each parsed.
-func (s *PGSource) capturesWhere(ctx context.Context, source string, n int, bound string, at time.Time) ([]capture, error) {
+// capturesAfterCount is how many of the source's captures are stored
+// after after.
+func (s *PGSource) capturesAfterCount(ctx context.Context, source string, after time.Time) (int, error) {
+	var n int
+	err := s.Pool.QueryRow(ctx, `select count(*) from `+s.table("capture_snapshots")+` where source = $1 and captured_at > $2`,
+		source, after).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("boards: count injury captures %s: %w", source, err)
+	}
+	return n, nil
+}
+
+// capturesWhere is n of the source's captures meeting bound (on $4, at;
+// the zero time is null), the newest n or with order "asc" the oldest,
+// in that order, each parsed.
+func (s *PGSource) capturesWhere(ctx context.Context, source string, n int, bound, order string, at time.Time) ([]capture, error) {
+	if order != "asc" && order != "desc" {
+		return nil, fmt.Errorf("boards: capture order %q", order)
+	}
 	query := `select case when octet_length(payload::text) <= $2 then payload end, captured_at
 		from ` + s.table("capture_snapshots") + ` where source = $1 and ` + bound + `
-		order by captured_at desc limit $3`
+		order by captured_at ` + order + ` limit $3`
 	var param any
 	if !at.IsZero() {
 		param = at

@@ -48,7 +48,9 @@ func newFFPCWiring(cfg config.API, pool *pgxpool.Pool, log *slog.Logger) (ffpcWi
 	if !on {
 		log.Warn("ffpc is off", "enabled", cfg.Hosts.FFPCEnabled, "key", vault.Ready())
 	}
-	store := &hosts.Store{Pool: pool}
+	// A disconnect retires the member's host offers in its own transaction
+	// (Lane 285, B278).
+	store := &hosts.Store{Pool: pool, OnDelete: leaguesync.RetireHostOffers}
 	client := ffpc.New()
 	if cfg.Dev.FFPCBaseURL != "" {
 		client = ffpc.NewAt(cfg.Dev.FFPCBaseURL)

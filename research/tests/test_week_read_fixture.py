@@ -62,7 +62,7 @@ HAND_WRITTEN: Final[dict[str, tuple[str, str]]] = {
     "Jahmyr Gibbs": (
         "The Lions are off in week 6 of 2026, so Gibbs does not play and scores nothing this week. There is no "
         "designation for him on the Tuesday-night list, and he still leads the Detroit backfield ahead of Sione Vaki. "
-        "Keep him on your roster, fill his spot with a back who plays, and he is back for week 7 at home against "
+        "Keep him rostered, fill his spot with a back who plays, and he is back for week 7 at home against "
         "Green Bay.",
         "sit",
     ),
@@ -70,7 +70,7 @@ HAND_WRITTEN: Final[dict[str, tuple[str, str]]] = {
         "CeeDee Lamb is Questionable on the Tuesday-night list, so his Sunday night in Green Bay is not settled yet. "
         "He brings 22.6 PPR points a game into week 6 of 2026. Green Bay sits 15th "
         "of 32 against receivers, and he leads the Dallas depth chart ahead of George Pickens. Wait on his status "
-        "before the 7:20 pm Central kickoff, and if he's cleared, he's in your lineup.",
+        "before the 7:20 pm Central kickoff, and if he's cleared, start him.",
         "hold",
     ),
 }

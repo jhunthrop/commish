@@ -23,6 +23,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/exports"
+	"github.com/jhunthrop/commish/api/internal/leaguesync"
 	"github.com/jhunthrop/commish/api/internal/mail"
 	"github.com/jhunthrop/commish/api/internal/mocks"
 	"github.com/jhunthrop/commish/api/internal/season"
@@ -42,8 +43,9 @@ func jobTable() map[string]job {
 		"billing-reconcile": runReconcile,
 		// renewal-reminders runs daily: the mail seven days before a renewal.
 		"renewal-reminders": runReminders,
-		// sweep runs daily: expired sessions, pairing codes and exports, and
-		// the sign-in users of deleted accounts the provider refused.
+		// sweep runs daily: expired sessions, pairing codes and exports, the
+		// host offer reads past leaguesync.OfferReadsKept, and the sign-in
+		// users of deleted accounts the provider refused.
 		"sweep": runSweep,
 		// stripe-setup runs by hand once per Stripe mode.
 		"stripe-setup": runStripeSetup,
@@ -158,6 +160,7 @@ func runSweep(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 	if err := retryUserDeletions(ctx, log, cfg, pool, now); err != nil {
 		return err
 	}
+	pruneOfferReads(ctx, log, &leaguesync.Store{Pool: pool}, now)
 	if !cfg.R2.Configured() {
 		log.Warn("r2 not configured", "effect", "exports not swept")
 		return nil
@@ -169,6 +172,24 @@ func runSweep(ctx context.Context, log *slog.Logger, cfg config.API, pool *pgxpo
 	m, err := exports.Sweep(ctx, &exports.Store{Pool: pool}, r2, now, sweepBatch)
 	log.Info("swept exports", "deleted", m)
 	return err
+}
+
+// offerReadPruner is the part of leaguesync.Store the sweep's prune uses.
+type offerReadPruner interface {
+	PruneOfferReads(ctx context.Context, before time.Time) (int64, error)
+}
+
+// pruneOfferReads is the sweep's archive prune (Lane 285, B278), its own
+// step after the deletion retries: a failure is logged, never returned,
+// so an archive problem never stops the sweep's other work or fails the
+// job; the next day's sweep tries again.
+func pruneOfferReads(ctx context.Context, log *slog.Logger, store offerReadPruner, now time.Time) {
+	n, err := store.PruneOfferReads(ctx, now.Add(-leaguesync.OfferReadsKept))
+	if err != nil {
+		log.Error("sweep: archived host offer reads not pruned", "deleted", n, "err", err)
+		return
+	}
+	log.Info("pruned archived host offer reads", "deleted", n)
 }
 
 // userDeletionBatch bounds how many sign-in users one sweep deletes.

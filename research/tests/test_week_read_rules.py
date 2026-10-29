@@ -56,7 +56,7 @@ STARTER_READ = (
 )
 BYE_READ = (
     "Jahmyr Gibbs and the Lions are on their bye in week 6 of 2026, so he does not play this week. Keep him "
-    "on your roster, because his 21.3 PPR points a game over 5 games make him a weekly starter. Fill his spot "
+    "rostered, because his 21.3 PPR points a game over 5 games make him a weekly starter. Fill his spot "
     "with a back who has a game, and bring Gibbs straight back for week 7 against Green Bay."
 )
 

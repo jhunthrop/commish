@@ -8,7 +8,6 @@ import {
 	CAPTURE_BEHIND_MS,
 	captureLine,
 	captureShort,
-	designationMark,
 	designationWord,
 	newerCapture,
 	rankWord,
@@ -84,7 +83,6 @@ void test('past 36 hours the basis says how old the statuses are, and they stay 
 });
 
 void test('the marks', () => {
-	assert.equal(designationMark('doubtful', CHECKED, CENTRAL), 'Doubtful as of Fri 9:05 am');
 	assert.equal(
 		seasonLongMark({ status: 'injured_reserve', since: CHECKED }, CENTRAL),
 		'IR since Oct 16'

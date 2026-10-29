@@ -11,7 +11,7 @@ from typing import Self
 
 import pytest
 
-from research.capsules.config import RETRY_WRITER_MODEL, writer_settings
+from research.capsules.config import CAPSULE_CONFIG, RETRY_WRITER_MODEL, writer_settings
 from research.capsules.gateway import Completion, GenerationError
 from research.capsules.gateway_ledger import ModelPrice, Usage
 from research.capsules.narrative import ShapeMasks
@@ -38,7 +38,8 @@ from research.capsules.week.prompt import (
     week_correction,
     week_prompt,
 )
-from research.capsules.week.sheet import Status
+from research.capsules.week.render import render_week_sheet
+from research.capsules.week.sheet import Status, WeekSheet
 from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
 from research.capsules.week.write import (
@@ -52,9 +53,9 @@ from research.capsules.week.write import (
 from research.db.schema.boards import WEEK_READ_REASONS
 from research.nightly.week_read_demotion import shared_week_sentences, stored_facts_block, week_demotions
 from research.nightly.week_reads import (
+    CHARS_PER_TOKEN,
     HOURLY_BUDGET_USD,
     HOURLY_DAY_USD,
-    MIN_CHARS_PER_TOKEN,
     NIGHTLY_BUDGET_USD,
     WORST_PROMPT_TOKENS,
     WeekReadSpend,
@@ -64,7 +65,7 @@ from research.nightly.week_reads import (
     worst_read_usd,
 )
 from research.tests.test_week_read_rules import BYE_READ, STARTER_READ
-from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, on_bye, questionable, starter
+from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, heaviest, on_bye, questionable, starter
 
 _USAGE = Usage(2400, 150, 2550, 0.0004)
 _A_DRAFT_AND_ONE_MORE = 2
@@ -312,20 +313,77 @@ def test_the_step_holds_a_dollar_budget_under_the_nightly_bound() -> None:
     assert worst_read_usd(_PRICE) == pytest.approx(2 * (9000 * 0.15 + 600 * 0.50) / 1_000_000)
 
 
-def test_the_worst_prompt_bound_holds_the_heaviest_correction() -> None:
-    """Review M4: the last correction a read can get (every rule broken so far, each with its sentence) on the
-    fullest fixture sheet, counted at the fewest characters a token took, fits WORST_PROMPT_TOKENS."""
+# The prompt bound's margin (Lane 286, B282): the heaviest correction, counted at the measured characters a
+# token, stays this share under WORST_PROMPT_TOKENS, or the test fails before the bound is ever met.
+BOUND_MARGIN = 0.10
+# Sentences other pages carry, as many as a correction quotes (`max_quoted_sentences`), each longer than the
+# longest of the 3,187 written sentences in Lane 282's six runs (231 characters).
+_AVOIDED = (
+    "Arizona has allowed the 26th-most PPR points a game to receivers through week 5 of 2026, and the Rams lean "
+    "on him whenever the game script asks for the ball to move quickly through the middle of the field on early "
+    "downs and late ones."
+)
+
+
+def heaviest_correction() -> tuple[str, str]:
+    """The heaviest ask a week read can carry (Lane 286, ruling 2): the heaviest sheet (`heaviest`), the last
+    correction a read can get, every rule broken so far with its sentence on an over-cap draft quoted and five
+    broken drafts, and every sentence a correction quotes to avoid at its longest. (system, user)."""
+    return worst_correction(heaviest())
+
+
+# A fifth draft (the writer's asks and its one overrun retry, the Lane 286 review's M2) that breaks the four rules
+# B282 added, each with its own note: a colon set-up, a spelled count his cell prints, the member's roster, a
+# rank stated twice.
+_FORM = (
+    "Bye week for him: he has played four games this season. Keep him on your roster for now. Detroit has "
+    "allowed the 9th-fewest PPR points a game to receivers, 9th of 32."
+)
+# The heaviest real correction this ledger builds on the lane286_bakeoff copy's 519 sheets (Tyquan Thornton's),
+# the floor the synthetic one never falls under.
+_HEAVIEST_REAL_CHARS = 21_761
+
+
+def worst_correction(sheet: WeekSheet) -> tuple[str, str]:
+    """The last correction a read of `sheet` can get, as `heaviest_correction` builds it."""
     long_read = _over_the_cap()
-    broken = [long_read, _BROKEN, STARTER_READ.replace("18.4 points", "18.7 points"), "Buy him. Buy him now."]
-    ledger = notes_of([(text, validate_week_read(text, starter()).violations) for text in broken])
-    user = week_correction(starter(), long_read, ledger, ("Start him with confidence.",) * 12)
-    chars = len(WEEK_RULES) + len(user)
-    assert chars / MIN_CHARS_PER_TOKEN <= WORST_PROMPT_TOKENS, chars
+    broken = [long_read, _BROKEN, STARTER_READ.replace("18.4 points", "18.7 points"), "Buy him. Buy him now.", _FORM]
+    ledger = notes_of([(text, validate_week_read(text, sheet).violations) for text in broken])
+    avoid = tuple(f"{_AVOIDED} ({n})" for n in range(CAPSULE_CONFIG.repetition.max_quoted_sentences))
+    return WEEK_RULES, week_correction(sheet, long_read, ledger, avoid)
+
+
+def test_the_worst_prompt_bound_holds_the_heaviest_correction_with_its_margin() -> None:
+    """Review M4, restated by Lane 286 (B282): the heaviest correction on the heaviest sheet, counted at the
+    characters a token the gateway measured for the writer and the retry writer (`CHARS_PER_TOKEN`), stays at
+    least BOUND_MARGIN under WORST_PROMPT_TOKENS."""
+    system, user = heaviest_correction()
+    # The floor (the review's M2): a refactor that drops a note shrinks the ask and must fail here, not pass.
+    assert len(system) + len(user) >= _HEAVIEST_REAL_CHARS
+    for reason in ("set-up clause", "spells out a figure", "addresses the member", "states the rank"):
+        assert reason in user, reason
+    tokens = (len(system) + len(user)) / CHARS_PER_TOKEN
+    assert tokens <= (1 - BOUND_MARGIN) * WORST_PROMPT_TOKENS, tokens
     assert step_budget(ModelPrice("m", None, None, "unread", None), HOURLY_BUDGET_USD).max_calls == int(0.05 / 0.00065)
     assert pytest.approx(4.00) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
 
 
+def test_the_heaviest_sheet_prints_every_section() -> None:
+    """Every line the sheet can print (`render_week_sheet`): the player, the day, the game, the injury report,
+    the published projection, the expected points, the forecast, the opponent's rank, the depth chart, his
+    games and our order."""
+    assert len(render_week_sheet(heaviest()).splitlines()) == 11  # noqa: PLR2004 - the sheet's eleven lines
+
+
 _NOW = WRITTEN_AT
+
+
+# A stored read every rule of the body alone takes (`rules.body_rule_violations`), so a row is due only for its
+# own reason.
+_STANDING_READ = (
+    "Bijan Robinson is Questionable on Friday's report for week 6 of 2026. He leads the Atlanta backfield when he "
+    "plays. Hold him until his status settles."
+)
 
 
 def _stored(sheet_week: int = 6, **changes: object) -> StoredWeekRead:
@@ -334,7 +392,7 @@ def _stored(sheet_week: int = 6, **changes: object) -> StoredWeekRead:
         season=2026,
         week=sheet_week,
         source="llm",
-        body="A read.",
+        body=_STANDING_READ,
         model="m/x",
         written_at=_NOW - timedelta(hours=2),
         facts_at=REPORT - timedelta(days=1),
@@ -402,11 +460,37 @@ def test_a_written_read_the_rules_now_refuse_is_due_once_a_day_at_the_nightly() 
     assert due_reason(sheet, _stored(body=_STALE_BODY), _NOW) is None  # attempted today already
     assert due_reason(sheet, _stored(), tomorrow) is None
     # His rest-of-season order is ours, never the week's published projection.
-    assert due_reason(sheet, _stored(body="He is RB4 in our rest-of-season order. Hold him."), tomorrow) is None
+    ours = f"{_STANDING_READ} He is RB4 in our rest-of-season order."
+    assert due_reason(sheet, _stored(body=ours), tomorrow) is None
     # A changed status comes first, and a facts block is the unwritten retry's.
     moved = replace(sheet, status=Status("out", REPORT))
     assert due_reason(moved, _stored(body=_STALE_BODY), tomorrow) == STATUS_CHANGED
     assert due_reason(sheet, _stored(body=_STALE_BODY, source="facts"), tomorrow) == UNWRITTEN
+
+
+@pytest.mark.parametrize(
+    "stale",
+    [
+        # Lane 286 (the re-review): every rule of the body alone makes a stored read due.
+        _STANDING_READ.replace("Hold him until his status settles.", "Keep him on your roster until it settles."),
+        "Bye week aside: Bijan Robinson is Questionable on Friday's report for week 6 of 2026. He leads the Atlanta "
+        "backfield. Hold him.",
+        f"{_STANDING_READ} Chicago allows the 9th-fewest PPR points a game to backs, 9th of 32.",
+    ],
+)
+def test_a_stored_read_a_body_rule_now_refuses_is_rule_stale_at_the_nightly(stale: str) -> None:
+    sheet, tomorrow = questionable(), _NOW + timedelta(days=1)
+    assert due_reason(sheet, _stored(body=stale), tomorrow) == RULE_STALE
+    assert due_reason(sheet, _stored(body=stale), tomorrow, hourly=True) is None
+
+
+def test_a_stored_read_only_todays_sheet_refuses_is_not_due() -> None:
+    """A sheet rule reads today's cells and status: a read right when written stays. Here his Avg moved, so
+    "17.6 PPR points a game" is no cell now, and the full validator refuses what the body rules take."""
+    sheet, tomorrow = replace(questionable(), points_per_game=18.2), _NOW + timedelta(days=1)
+    body = f"{_STANDING_READ} He averages 17.6 PPR points a game this season."
+    assert not validate_week_read(body, sheet, call="hold").ok
+    assert due_reason(sheet, _stored(body=body), tomorrow) is None
 
 
 def test_the_status_cap_counts_only_the_falls_since_the_written_read() -> None:

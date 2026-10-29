@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { MOCK_VERB, type LeaguePhase } from '#lib/ui/nav.ts';
-	import { zoneLine } from '#lib/format/clock.ts';
+	import { zoneLine } from '#lib/league/phase-words.ts';
 	import { links } from '#lib/site/links.ts';
 	import Label from '#lib/ui/Label.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
