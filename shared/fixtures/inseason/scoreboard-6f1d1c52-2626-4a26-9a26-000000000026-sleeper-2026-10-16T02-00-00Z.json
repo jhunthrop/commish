@@ -39,6 +39,7 @@
 						"starters_final": false
 					}
 				],
+				"projection_gap": -23.7,
 				"game_state": {
 					"state": "not_started",
 					"word": "Next kickoff"
@@ -74,6 +75,7 @@
 						"starters_final": false
 					}
 				],
+				"projection_gap": 7.9,
 				"game_state": {
 					"state": "kicked_off",
 					"word": "Kicked off"
@@ -109,6 +111,7 @@
 						"starters_final": false
 					}
 				],
+				"projection_gap": -7.5,
 				"game_state": {
 					"state": "kicked_off",
 					"word": "Kicked off"
@@ -144,6 +147,7 @@
 						"starters_final": false
 					}
 				],
+				"projection_gap": -14.8,
 				"game_state": {
 					"state": "kicked_off",
 					"word": "Kicked off"
@@ -179,6 +183,7 @@
 						"starters_final": false
 					}
 				],
+				"projection_gap": 6.1,
 				"game_state": {
 					"state": "kicked_off",
 					"word": "Kicked off"
@@ -214,12 +219,158 @@
 						"starters_final": false
 					}
 				],
+				"projection_gap": -2.1,
 				"game_state": {
 					"state": "not_started",
 					"word": "Next kickoff"
 				}
 			}
-		]
+		],
+		"projection_gap_basis": "Proj gap is your starters' published projection less your opponent's, not a win chance: we show none until one is measured on a past season.",
+		"power": {
+			"basis": "Power ranks each team's best lineup by our order at each starting spot, 1 the strongest, weeks 6 to 17, byes counted. Kickers and defenses are not ranked.",
+			"columns": [
+				"QB",
+				"RB",
+				"WR",
+				"TE",
+				"FLEX"
+			],
+			"teams": [
+				{
+					"roster_id": 10,
+					"rank": 1,
+					"ranks": [
+						1,
+						6,
+						11,
+						4,
+						9
+					]
+				},
+				{
+					"roster_id": 12,
+					"rank": 2,
+					"ranks": [
+						2,
+						7,
+						12,
+						5,
+						10
+					]
+				},
+				{
+					"roster_id": 3,
+					"rank": 3,
+					"ranks": [
+						3,
+						8,
+						1,
+						6,
+						11
+					]
+				},
+				{
+					"roster_id": 6,
+					"rank": 4,
+					"ranks": [
+						4,
+						9,
+						2,
+						7,
+						12
+					]
+				},
+				{
+					"roster_id": 4,
+					"rank": 5,
+					"ranks": [
+						5,
+						10,
+						3,
+						8,
+						1
+					]
+				},
+				{
+					"roster_id": 9,
+					"rank": 6,
+					"ranks": [
+						6,
+						11,
+						4,
+						9,
+						2
+					]
+				},
+				{
+					"roster_id": 11,
+					"rank": 7,
+					"ranks": [
+						7,
+						12,
+						5,
+						10,
+						3
+					]
+				},
+				{
+					"roster_id": 2,
+					"rank": 8,
+					"ranks": [
+						8,
+						1,
+						6,
+						11,
+						4
+					]
+				},
+				{
+					"roster_id": 5,
+					"rank": 9,
+					"ranks": [
+						9,
+						2,
+						7,
+						12,
+						5
+					]
+				},
+				{
+					"roster_id": 8,
+					"rank": 10,
+					"ranks": [
+						10,
+						3,
+						8,
+						1,
+						6
+					]
+				},
+				{
+					"roster_id": 7,
+					"rank": 11,
+					"ranks": [
+						11,
+						4,
+						9,
+						2,
+						7
+					]
+				},
+				{
+					"roster_id": 1,
+					"rank": 12,
+					"ranks": [
+						12,
+						5,
+						10,
+						3,
+						8
+					]
+				}
+			]
+		}
 	},
 	"error": null
 }

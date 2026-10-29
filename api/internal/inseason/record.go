@@ -38,9 +38,10 @@ func (s *Service) leagueRecord(w http.ResponseWriter, r *http.Request) {
 		for _, wk := range weeks {
 			out.Weeks = append(out.Weeks, apitypes.LeagueRecordWeek{
 				Week: wk.Week, Benchmark: apitypes.LeagueRecordWeekBenchmark(wk.Benchmark), Ours: wk.Ours, Theirs: wk.Theirs, Margin: wk.Margin,
-				Ranking: rankingOf(wk.Ranking),
+				Ranking: rankingOf(wk.Ranking), Set: setOf(wk.Set),
 			})
 		}
+		out.StartSit = startSitOf(weeks)
 	}
 	httpx.WriteOK(w, r, http.StatusOK, out)
 }
@@ -55,4 +56,13 @@ func rankingOf(r *leaguerecord.Ranking) *apitypes.LeagueRanking {
 		return apitypes.LeagueRankingScore{Agreement: s.Agreement, PlacesOff: s.PlacesOff, Starters: s.Starters, StartersOf: s.StartersOf}
 	}
 	return &apitypes.LeagueRanking{Players: r.Players, Ours: score(r.Ours), Espn: score(r.ESPN)}
+}
+
+// setOf is a week's set lineup as the route answers it (Lane 292), nil
+// where the week has none.
+func setOf(s *leaguerecord.SetLineup) *apitypes.LeagueRecordSet {
+	if s == nil {
+		return nil
+	}
+	return &apitypes.LeagueRecordSet{Points: s.Points, Matched: s.Matched}
 }

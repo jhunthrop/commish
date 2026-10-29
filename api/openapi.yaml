@@ -6091,6 +6091,15 @@ components:
           type: array
           description: two sides, the drafter's first when the game is theirs; one for a team with no opponent
           items: { $ref: "#/components/schemas/ScoreboardSide" }
+        projection_gap:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            the first side's projection less the second's, each as printed, to the tenth (Lane 292): plus favours the
+            first side, the drafter's in their own game. Not a win chance: no spread for one is measured on a past
+            season, so the figure is the gap between the projections alone (Scoreboard.projection_gap_basis). Null for
+            a game with one side or a side with no projection; absent from an older answer
     Scoreboard:
       type: object
       required: [week, read_at, projection_read_at, projection_scoring, games]
@@ -6107,6 +6116,49 @@ components:
           type: array
           description: the drafter's game first, then the rest in the host's order
           items: { $ref: "#/components/schemas/ScoreboardGame" }
+        projection_gap_basis:
+          type: string
+          description: >-
+            what each game's projection_gap is, in one sentence the page prints once (Lane 292), said for the
+            drafter's game: where the platform lists no starters for the opponent (projection_best_lineup on that side,
+            FFPC's opponent view) it says the opponent's figure is the best lineup we pick from his roster; absent from
+            an older answer
+        power:
+          allOf: [{ $ref: "#/components/schemas/LeaguePower" }]
+          description: >-
+            every team's power rank, overall and at each starting spot (Lane 292); absent with fewer than two teams
+            read and from an older answer
+    LeaguePower:
+      type: object
+      description: >-
+        every team's best lineup by our order over the weeks the order covers, byes counted, ranked against the
+        league's other teams at each starting spot (the trade finder's team profile, Lane 287): each spot's points over
+        replacement summed over its slots, ranked most first, a tie at the printed tenth sharing its place; the overall
+        rank is the same over every spot ranked. Kickers and defenses are not ranked
+      required: [basis, columns, teams]
+      properties:
+        basis: { type: string, description: "what the ranks are, in one sentence the page prints under them" }
+        columns:
+          type: array
+          description: the starting spots ranked, in the order the page draws them, only those the league starts
+          items: { $ref: "#/components/schemas/LeaguePowerColumn" }
+        teams:
+          type: array
+          description: every team read, in overall rank order, ties by roster id
+          items: { $ref: "#/components/schemas/LeaguePowerTeam" }
+    LeaguePowerColumn:
+      type: string
+      enum: [QB, RB, WR, TE, FLEX, SUPERFLEX]
+    LeaguePowerTeam:
+      type: object
+      required: [roster_id, rank, ranks]
+      properties:
+        roster_id: { type: integer }
+        rank: { type: integer, description: "the overall rank, 1 the strongest" }
+        ranks:
+          type: array
+          description: the team's rank at each column, in columns' order
+          items: { type: integer }
     MemberWeek:
       type: object
       required: [leagues]
@@ -7346,6 +7398,11 @@ components:
             the graded weeks, in week order; empty on a platform whose week reads are not kept (every platform but
             ESPN) and before the first graded week whose roster was read before our order was set
           items: { $ref: "#/components/schemas/LeagueRecordWeek" }
+        start_sit:
+          allOf: [{ $ref: "#/components/schemas/LeagueStartSit" }]
+          description: >-
+            the member's start and sit record over the graded weeks (Lane 292); absent with no graded week carrying
+            the set lineup and from an older answer
     LeagueRecordWeek:
       type: object
       required: [week, benchmark, ours, theirs, margin]
@@ -7362,6 +7419,34 @@ components:
         margin: { type: number, format: double, description: "ours less theirs, to the tenth" }
         ranking:
           $ref: "#/components/schemas/LeagueRanking"
+        set:
+          $ref: "#/components/schemas/LeagueRecordSet"
+    LeagueRecordSet:
+      type: object
+      description: >-
+        the lineup the member set that week (Lane 292): the starters ESPN's read of the played week holds in the
+        member's quarterback, running back, receiver, tight end, flex and superflex slots, scored as the league scores,
+        beside our picks from the same roster. Absent where the week's read does not hold it and from an older answer
+      required: [points, matched]
+      properties:
+        points: { type: number, format: double, description: "the set lineup's points at those slots, to the tenth" }
+        matched: { type: boolean, description: "the set lineup started the same players as our picks" }
+    LeagueStartSit:
+      type: object
+      description: >-
+        the member's start and sit record (Lane 292), over the graded weeks that carry the set lineup
+        (LeagueRecordWeek.set): how many matched our picks, and our picks' points less the set lineup's, summed
+      required: [weeks, matched, ours_less_set, basis]
+      properties:
+        weeks: { type: integer, description: "the graded weeks with the set lineup read" }
+        matched: { type: integer, description: "those whose set lineup started the same players as our picks" }
+        ours_less_set:
+          type: number
+          format: double
+          description: >-
+            our picks' points less the set lineup's, summed over those weeks from each week's printed tenths; plus is
+            points our picks would have added
+        basis: { type: string, description: "what the record is, in one sentence the page prints beside it" }
     LeagueRanking:
       type: object
       description: >-

@@ -24,7 +24,12 @@
 	import { followSwitch } from './follow-switch.svelte.ts';
 	import SeasonPanel from './SeasonPanel.svelte';
 	import { tabHref } from './inseason/tabs.ts';
-	import { inSeasonApi, type LineupAdvice, type Scoreboard } from './inseason/api.ts';
+	import {
+		inSeasonApi,
+		type LeagueRecord,
+		type LineupAdvice,
+		type Scoreboard
+	} from './inseason/api.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
 	import { leagueWeekParts, weekBasisText } from './home/week-basis.ts';
@@ -36,6 +41,9 @@
 	import LineupSummary from './home/LineupSummary.svelte';
 	import MovesFeed from './home/MovesFeed.svelte';
 	import LeagueSettings from './home/LeagueSettings.svelte';
+	import PowerPanel from './home/PowerPanel.svelte';
+	import StartSitRow from './home/StartSitRow.svelte';
+	import { gapFigure, powerPanel, startSitRow } from './home/figures.ts';
 	import {
 		HOME,
 		bugsOf,
@@ -85,6 +93,9 @@
 	 * good one, with when it was read. */
 	let scoreboard = $state<Scoreboard | null>(null);
 	let advice = $state<LineupAdvice | null>(null);
+	/** Our record in the league, for the member's start and sit row (Lane 292); null where the API has
+	 * none (an older API, a platform whose weeks are not kept): the row is then not drawn. */
+	let record = $state<LeagueRecord | null>(null);
 	/** Each week read's last good time, and whether its latest read failed: each carries its own. */
 	let scoreRead = $state<ReadStamp>({ at: null, stale: false });
 	let lineupRead = $state<ReadStamp>({ at: null, stale: false });
@@ -202,6 +213,17 @@
 		return read.stale && read.at !== null ? `Last read ${weekdayTime(read.at)}` : null;
 	}
 
+	/** The record, read on open and with the drafter's refresh: it changes once a week. A failed read
+	 * leaves the row out, never the page. */
+	async function readRecord(): Promise<void> {
+		if (!playing) return;
+		try {
+			record = await inSeasonApi.record(id);
+		} catch {
+			record = null;
+		}
+	}
+
 	async function read(): Promise<void> {
 		try {
 			const [answer] = await Promise.all([leagueApi.sync(id), readWeek()]);
@@ -232,6 +254,7 @@
 
 	async function refresh(): Promise<void> {
 		refreshing = true;
+		void readRecord();
 		try {
 			const [answer] = await Promise.all([leagueApi.refresh(id), readWeek()]);
 			take(answer);
@@ -245,7 +268,7 @@
 
 	onMount(() => {
 		void lazySheet.load();
-		void read();
+		void read().then(readRecord);
 		const timer = setInterval(() => void read(), POLL_MS);
 		return () => clearInterval(timer);
 	});
@@ -276,6 +299,17 @@
 			: null
 	);
 	const moves = $derived(sync ? feedRows(sync) : []);
+	const gap = $derived(
+		sync
+			? gapFigure(
+					scoreboard,
+					sync.me,
+					bugs.some((b) => b.mine && b.state === 'upcoming')
+				)
+			: null
+	);
+	const power = $derived(sync ? powerPanel(scoreboard, sync) : null);
+	const startSit = $derived(startSitRow(record));
 	const lineupHref = $derived(tabHref('start', id));
 	/** What every number on the in-season page is, said once in one paragraph, at most five lines at a
 	 * desk and eight on a phone (Lane 108, B82: merged so no sentence ends a short line): the standings,
@@ -441,23 +475,36 @@
 							{bugs}
 							matchupHref={tabHref('matchup', id)}
 							stamp={stampOf(scoreRead)}
+							{gap}
 						/>
 					{/if}
-					<div class="split" class:alone={summary === null}>
-						<Standings {rows} terms={sync.terms} host={sync.host} projected={scoreboard !== null} />
-						{#if summary && team}
-							<LineupSummary
-								team={team.name}
-								{platform}
-								{summary}
-								{lineupHref}
-								benchHref={`${lineupHref}#${BENCH_ANCHOR}`}
-								tagsOf={sheetTags}
-								stamp={stampOf(lineupRead)}
+					<div class="split" class:alone={summary === null && startSit === null}>
+						<div class="col">
+							<Standings
+								{rows}
+								terms={sync.terms}
 								host={sync.host}
-								now={now.getTime()}
+								projected={scoreboard !== null}
 							/>
-						{/if}
+							<!-- Stacked, the power panel follows the lineup: the lineup is the screen's verb. -->
+							{#if power}<div class="power-slot"><PowerPanel panel={power} /></div>{/if}
+						</div>
+						<div class="col">
+							{#if startSit}<StartSitRow row={startSit} />{/if}
+							{#if summary && team}
+								<LineupSummary
+									team={team.name}
+									{platform}
+									{summary}
+									{lineupHref}
+									benchHref={`${lineupHref}#${BENCH_ANCHOR}`}
+									tagsOf={sheetTags}
+									stamp={stampOf(lineupRead)}
+									host={sync.host}
+									now={now.getTime()}
+								/>
+							{/if}
+						</div>
 					</div>
 					{#if sync.moves_read}<MovesFeed rows={moves} none={HOME.noMoves} />{/if}
 					<!-- In season the page carries no draft plumbing: the mock draft lives under Account and
@@ -554,6 +601,13 @@
 		align-items: start;
 	}
 
+	.col {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-4);
+		min-width: 0;
+	}
+
 	.split.alone {
 		grid-template-columns: minmax(0, 1fr);
 	}
@@ -637,6 +691,14 @@
 		.grid,
 		.split {
 			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.split .col {
+			display: contents;
+		}
+
+		.power-slot {
+			order: 1;
 		}
 	}
 

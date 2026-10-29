@@ -34,6 +34,8 @@ export function leagueRecordAnswer(espn: boolean): LeagueRecord {
 						ours: 112.4,
 						theirs: 104,
 						margin: 8.4,
+						// Lane 292, STAND-IN: the member's set lineup that week.
+						set: { points: 101.2, matched: false },
 						// Lane 114, STAND-IN: the week's weekly record on the league's rostered players.
 						ranking: {
 							players: 168,
@@ -42,6 +44,22 @@ export function leagueRecordAnswer(espn: boolean): LeagueRecord {
 						}
 					}
 				]
-			: []
+			: [],
+		// Lane 292, STAND-IN: the member's start and sit record over the stand-in week; the sentence is
+		// dashboard.go StartSitBasis, word for word.
+		...(espn
+			? {
+					start_sit: {
+						weeks: 1,
+						matched: 0,
+						ours_less_set: 11.2,
+						basis: START_SIT_BASIS
+					}
+				}
+			: {})
 	};
 }
+
+/** dashboard.go StartSitBasis, word for word. */
+export const START_SIT_BASIS =
+	'Your start and sit: weeks your set lineup started the same players our order picks from your roster at quarterback, running back, receiver and tight end, and what our picks scored less yours, on played weeks.';

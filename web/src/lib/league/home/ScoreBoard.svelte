@@ -2,6 +2,7 @@
 	import BugCard from '../box/BugCard.svelte';
 	import { bugRoster, gameHref } from '../box/game.ts';
 	import { HOME, type Bug } from './home.ts';
+	import type { GapFigure } from './figures.ts';
 
 	/** The week's scoreboard (Lane 66i): every game as a score bug (BugCard) on the lit board, three
 	 * across on a desk and swiped in a hand, the drafter's first with its orange rim. Each bug opens
@@ -14,10 +15,15 @@
 		matchupHref: string;
 		/** "Last read 3:05 pm" when the latest read failed and the board shows the last good one. */
 		stamp?: string | null;
+		/** The drafter's game's Proj gap before its kickoff (Lane 292), drawn on their bug with its
+		 * sentence under the board; null draws neither. */
+		gap?: GapFigure | null;
 	}
 
-	let { week, bugs, matchupHref, stamp = null }: Props = $props();
+	let { week, bugs, matchupHref, stamp = null, gap = null }: Props = $props();
 </script>
+
+{#snippet gapFoot()}<span class="gap" data-figure="gap">{gap?.cell}</span>{/snippet}
 
 <section class="board" aria-label="{HOME.week} {week}">
 	<div class="head">
@@ -27,9 +33,16 @@
 	</div>
 	<ul class="bugs">
 		{#each bugs as bug (bug.key)}
-			<li><BugCard {bug} href={gameHref(matchupHref, bugRoster(bug))} /></li>
+			<li>
+				<BugCard
+					{bug}
+					href={gameHref(matchupHref, bugRoster(bug))}
+					foot={bug.mine && gap ? gapFoot : undefined}
+				/>
+			</li>
 		{/each}
 	</ul>
+	{#if gap}<p class="basis" data-basis="gap">{gap.basis}</p>{/if}
 </section>
 
 <style>
@@ -59,6 +72,19 @@
 		margin-left: auto;
 	}
 
+	.gap {
+		font-variant-numeric: tabular-nums;
+		font-weight: 600;
+		color: var(--scoreboard-ink);
+	}
+
+	.basis {
+		margin: var(--s-2) 0 0;
+		font-size: var(--t-sm);
+		color: var(--ink-3);
+		line-height: 1.5;
+	}
+
 	.bugs {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -81,6 +107,11 @@
 			overflow-x: auto;
 			scroll-snap-type: x mandatory;
 			scrollbar-width: none;
+		}
+
+		.basis {
+			font-size: var(--t-xs);
+			line-height: 1.45;
 		}
 
 		.bugs li {

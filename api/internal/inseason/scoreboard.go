@@ -24,6 +24,8 @@ func (a *advisor) Scoreboard() apitypes.Scoreboard {
 		out.Games = append(out.Games, g)
 	}
 	out.Games = append(mine, out.Games...)
+	gapBasis := gapBasisOf(out.Games, a.Me)
+	out.ProjectionGapBasis = &gapBasis
 	return out
 }
 
@@ -180,6 +182,7 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 			out.Sides[i].Projection, out.Sides[i].ProjectionBestLineup, out.Sides[i].BestLineupSkipped = rosterProjection(best)
 		}
 	}
+	out.ProjectionGap = projectionGap(out.Sides)
 	out.State, out.NextKickoff = gameState(game, unlisted)
 	out.GameState = scoreboardGameState(out, a.now)
 	// Such a side's projected final once the game reads kicked off by the bug's own rule (Lane 127

@@ -16,6 +16,7 @@ export type LineupSlot = Schemas['LineupSlot'];
 export type MatchupBox = Schemas['MatchupBox'];
 export type MatchupBoxSide = Schemas['MatchupBoxSide'];
 export type Scoreboard = Schemas['Scoreboard'];
+export type LeagueRecord = Schemas['LeagueRecord'];
 export type ProjectionScoring = Schemas['ProjectionScoring'];
 export type WaiverAdvice = Schemas['WaiverAdvice'];
 export type WaiverRow = Schemas['WaiverRow'];
@@ -73,6 +74,8 @@ export const inSeasonApi = {
 		),
 	/** Every game of the week: each side's points, its starters' projection and the game's state. */
 	scoreboard: (id: string) => client.call<Scoreboard>(path(id, 'scoreboard')),
+	/** Our record in the member's league (Lane 93), with their start and sit record (Lane 292). */
+	record: (id: string) => client.call<LeagueRecord>(path(id, 'record')),
 	/** The adds, at one position when given, keeping the asked player's row (his board id) past the
 	 * first page when given (review 66j N2). */
 	waivers: (id: string, position: WaiverPosition | null = null, player: string | null = null) =>

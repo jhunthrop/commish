@@ -81,6 +81,7 @@ import { MOCK_OUTPUT, renderMock } from './mock-parity.ts';
 import { renderOneValue } from './one-value-parity.ts';
 import { LOBBY_OUTPUT, renderLobby } from './lobby-parity.ts';
 import { SHEET_OUTPUT, renderSheet } from './sheet-parity.ts';
+import { FIGURES_OUTPUT, renderFigures } from './figures-parity.ts';
 import type { Account } from '../../web/src/lib/account/account-api.ts';
 import type { AttachedLeague } from '../../web/src/lib/league/api.ts';
 import type { Device } from '../../web/src/lib/hosts/api.ts';
@@ -636,6 +637,19 @@ export async function generate(): Promise<Outputs> {
 		[RAIL_OUTPUT, renderRail()],
 		[SHELL_OUTPUT, renderShell(await answer<SwitchLeague[]>('leagues-attached.json'))],
 		[GAME_STATE_OUTPUT, renderGameState(about, await gameStateRows(boards))],
+		[
+			FIGURES_OUTPUT,
+			await renderFigures(
+				generatedBy(
+					SCRIPT,
+					"web/src/lib/league/home/figures.ts (gapFigure, powerPanel, startSitRow) over shared/fixtures/inseason with the fixture API's Lane 292 fields (web/scripts/inseason-fixture/figures.ts)"
+				),
+				LEAGUE,
+				ZONE,
+				CLOCKS,
+				instantOf
+			)
+		],
 		[LINEUP_OUTPUT, await renderLineup(sync.host)],
 		[MATCHUP_OUTPUT, await renderMatchup()],
 		[
