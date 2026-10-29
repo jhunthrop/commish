@@ -135,6 +135,21 @@ type fakeYahooMember struct {
 	league  yahoo.League
 	reads   int
 	refused bool
+	// boards is each week's scoreboard the schedule keeper reads.
+	boards map[int]yahoo.Scoreboard
+	asked  [][]int
+}
+
+func (f *fakeYahooMember) Scoreboards(_ context.Context, accountID uuid.UUID, _ int, _ string, weeks []int) ([]yahoo.Scoreboard, error) {
+	if accountID != f.owner {
+		return nil, hosts.ErrNotConnected
+	}
+	f.asked = append(f.asked, weeks)
+	out := make([]yahoo.Scoreboard, 0, len(weeks))
+	for _, w := range weeks {
+		out = append(out, f.boards[w])
+	}
+	return out, nil
 }
 
 func (f *fakeYahooMember) ReadLeague(_ context.Context, accountID uuid.UUID, _ int, leagueID string) (yahoo.League, error) {

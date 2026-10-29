@@ -43,6 +43,9 @@ type Roster struct {
 	WaiverPosition int
 	// BudgetUsed is the waiver budget the team has spent.
 	BudgetUsed int
+	// Division is settings.division, the roster's division, 0 for none
+	// (Lane 298 fix round 1).
+	Division int
 }
 
 // Matchup is one team's side of a week's matchup, checked.
@@ -96,6 +99,7 @@ type wireRoster struct {
 		FptsAgainstDecimal int `json:"fpts_against_decimal"`
 		WaiverPosition     int `json:"waiver_position"`
 		WaiverBudgetUsed   int `json:"waiver_budget_used"`
+		Division           int `json:"division"`
 	} `json:"settings"`
 	Metadata struct {
 		Streak string `json:"streak"`
@@ -254,7 +258,8 @@ func validateRosters(w []wireRoster) ([]Roster, error) {
 			RosterID: r.RosterID, OwnerID: validOwner(r.OwnerID), CoOwners: owners, Players: r.Players,
 			Starters: r.Starters, Reserve: r.Reserve, Taxi: r.Taxi, Wins: s.Wins, Losses: s.Losses, Ties: s.Ties,
 			PointsFor: float64(s.Fpts) + float64(s.FptsDecimal)/100, PointsAgainst: float64(s.FptsAgainst) + float64(s.FptsAgainstDecimal)/100,
-			Streak: validStreak(r.Metadata.Streak), WaiverPosition: bounded(s.WaiverPosition, maxTeams), BudgetUsed: bounded(s.WaiverBudgetUsed, MaxBudget),
+			Division: max(min(s.Division, maxTeams), 0),
+			Streak:   validStreak(r.Metadata.Streak), WaiverPosition: bounded(s.WaiverPosition, maxTeams), BudgetUsed: bounded(s.WaiverBudgetUsed, MaxBudget),
 		})
 	}
 	return out, nil

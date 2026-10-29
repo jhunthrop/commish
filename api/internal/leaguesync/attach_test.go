@@ -60,6 +60,9 @@ func (offlineMFL) Rules(context.Context, int, string) ([]mfl.Rule, error)     { 
 func (offlineMFL) Standings(context.Context, int, string) ([]mfl.Standing, error) {
 	return nil, errOffline
 }
+func (offlineMFL) Schedule(context.Context, int, string) ([]mfl.ScheduleGame, error) {
+	return nil, errOffline
+}
 func (offlineMFL) LiveScoring(context.Context, int, string, int) ([]mfl.Matchup, error) {
 	return nil, errOffline
 }

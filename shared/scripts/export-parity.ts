@@ -642,7 +642,7 @@ export async function generate(): Promise<Outputs> {
 			await renderFigures(
 				generatedBy(
 					SCRIPT,
-					"web/src/lib/league/home/figures.ts (gapFigure, powerPanel, startSitRow) over shared/fixtures/inseason with the fixture API's Lane 292 fields (web/scripts/inseason-fixture/figures.ts)"
+					"web/src/lib/league/home/figures.ts (gapFigure, powerPanel, startSitRow, chanceCell, medianRow) over shared/fixtures/inseason with the fixture API's Lane 292 and Lane 298 fields (web/scripts/inseason-fixture/figures.ts, league-figures.ts)"
 				),
 				LEAGUE,
 				ZONE,

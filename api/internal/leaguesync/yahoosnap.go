@@ -33,7 +33,7 @@ func yahooSnapshot(l yahoo.League, ids map[string]string, now time.Time) Snapsho
 	byID := map[int]Team{}
 	for _, t := range l.Teams {
 		team := Team{RosterID: t.ID, Name: scoring.HostText(t.Name), Owner: scoring.HostText(t.Owner),
-			Wins: t.Wins, Losses: t.Losses, Ties: t.Ties, PointsFor: round2(t.PointsFor)}
+			Wins: t.Wins, Losses: t.Losses, Ties: t.Ties, PointsFor: round2(t.PointsFor), Division: t.Division}
 		for _, p := range t.Players {
 			id := snap.addYahooPlayer(p, ids)
 			team.Players = append(team.Players, id)
@@ -64,6 +64,8 @@ func yahooSnapshot(l yahoo.League, ids map[string]string, now time.Time) Snapsho
 	im := l.Settings.Scoring()
 	snap.Scoring = Scoring{Rules: im.Rules, Dropped: scoring.DroppedWords(im.Dropped), DroppedRules: im.Dropped, Defaulted: im.Defaulted}
 	snap.Shape = yahooShape(l.Settings, len(snap.Teams))
+	snap.Terms = Terms{PlayoffTeams: l.PlayoffTeams, PlayoffFirst: l.PlayoffStartWeek, StartWeek: l.StartWeek,
+		DivisionsRead: true, Divisions: divisionsOf(snap.Teams)}
 	return snap
 }
 
@@ -154,4 +156,16 @@ func yahooShape(s yahoo.Settings, teams int) Shape {
 	}
 	sh.Unfollowed = sortedKeys(unfollowed)
 	return sh
+}
+
+// divisionsOf is how many divisions the teams name (Yahoo's division_id on
+// each team, Lane 298 fix round 1): 0 when none does.
+func divisionsOf(teams []Team) int {
+	seen := map[int]bool{}
+	for _, t := range teams {
+		if t.Division > 0 {
+			seen[t.Division] = true
+		}
+	}
+	return len(seen)
 }

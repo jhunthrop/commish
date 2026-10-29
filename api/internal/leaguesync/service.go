@@ -89,6 +89,9 @@ type Service struct {
 
 	Now func() time.Time
 	Log *slog.Logger
+
+	// chances keeps each read's playoff chance (Lane 298).
+	chances chanceCache
 }
 
 // Routes is every route this package serves.

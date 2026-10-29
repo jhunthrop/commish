@@ -201,6 +201,15 @@ func (r MFLReplay) DraftResults(ctx context.Context, season int, id string) (mfl
 	return r.Live.DraftResults(ctx, season, id)
 }
 
+// Schedule reads the recording (2026-10-29, weeks 1 to 7 played) for the
+// recorded league.
+func (r MFLReplay) Schedule(ctx context.Context, season int, id string) ([]mfl.ScheduleGame, error) {
+	if r.recorded(season, id) {
+		return mfl.DecodeSchedule(replayFile("mfl/schedule.json"))
+	}
+	return r.Live.Schedule(ctx, season, id)
+}
+
 // SeasonStatus is the recording's for the recorded season.
 func (r MFLReplay) SeasonStatus(ctx context.Context, season int) (mfl.Status, error) {
 	if season == ReplayMFLSeason {

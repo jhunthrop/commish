@@ -32,6 +32,7 @@ import { FIXTURE_IDS } from './ids.ts';
 import { RECORDED_BOARDS, boardFile } from './record-boards.ts';
 import { leagueRecordAnswer } from './record.ts';
 import { withFigures } from './figures.ts';
+import { withLeagueFigures } from './league-figures.ts';
 import { playerWeek, type Sheet } from './player-week.ts';
 import {
 	BOARD_WEEK_VARIABLE,
@@ -276,10 +277,10 @@ const panelInputs = await (async (): Promise<Omit<PanelInputs, 'weeks'>> => {
 		proj: (id) => projection.players[id]?.ppr ?? null
 	};
 })();
-/** The league read with its playoffs through the horizon's last week. */
-const sync: LeagueSync =
+/** The league read with its playoffs through the horizon's last week, and the Lane 298 figures. */
+const sync: LeagueSync = withLeagueFigures(
 	recordedSync.terms.playoff_weeks === null ||
-	recordedSync.terms.playoff_weeks.last === HORIZON.last
+		recordedSync.terms.playoff_weeks.last === HORIZON.last
 		? recordedSync
 		: {
 				...recordedSync,
@@ -287,7 +288,8 @@ const sync: LeagueSync =
 					...recordedSync.terms,
 					playoff_weeks: { ...recordedSync.terms.playoff_weeks, last: HORIZON.last }
 				}
-			};
+			}
+);
 /** The sense check's case on the fixture when asked (waiver-beats.ts, Lane 98). */
 const irDrop = process.env[IR_DROP_VARIABLE] === '1';
 /** Waivers as for a league that states no regular season's end, when asked (Lane 121, B99). */

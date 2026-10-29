@@ -88,6 +88,7 @@ func ffpcSnapshot(l ffpc.League, now time.Time, week int) Snapshot {
 	if l.Banner.TeamID > 0 {
 		snap.Matchups = withMemberSide(snap.Matchups, snap.AllPlay, *team(l.Banner.TeamID), memberScore(l, week))
 	}
+	snap.Schedule = ffpcSchedule(l.Schedule, snap.Teams, snap.Week, now)
 	snap.Moves = ffpcMoves(l.Moves, &snap)
 	if l.Rules != nil {
 		snap.Scoring = ffpcScoring(*l.Rules)

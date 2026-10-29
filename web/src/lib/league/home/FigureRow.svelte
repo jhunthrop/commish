@@ -1,25 +1,26 @@
 <script lang="ts">
-	import { FIGURE_WORDS, type StartSitRow } from './figures.ts';
+	import type { FigureRow } from './figures.ts';
 
-	/** The member's start and sit record (Lane 292) as one row of cells: the weeks their set lineup
-	 * matched our picks, and what our picks scored less theirs, rose when ours would have added points
-	 * and green when theirs scored more; the API's sentence under it. */
+	/** One of the member's record rows as a row of cells (Lane 292's start and sit, Lane 298's points
+	 * against the median): the row's head, each cell's label and figure, a figure rose where it says
+	 * the member left points behind and green where they came out ahead; the API's sentence under it. */
 	interface Props {
-		row: StartSitRow;
+		row: FigureRow;
 	}
 
 	let { row }: Props = $props();
 </script>
 
-<section class="record" aria-label={FIGURE_WORDS.startSit}>
-	<div class="cells" data-figure="start-sit">
-		<span class="hd">{FIGURE_WORDS.startSit}</span>
-		<span class="cell"><span class="lb">{FIGURE_WORDS.matched}</span><b>{row.matched}</b></span>
-		<span class="cell"
-			><span class="lb">{FIGURE_WORDS.ours}</span><b class={row.tone}>{row.ours}</b></span
-		>
+<section class="record" aria-label={row.head}>
+	<div class="cells" data-figure={row.figure}>
+		<span class="hd">{row.head}</span>
+		{#each row.cells as cell (cell.label)}
+			<span class="cell"
+				><span class="lb">{cell.label}</span><b class={cell.tone}>{cell.value}</b></span
+			>
+		{/each}
 	</div>
-	<p class="basis" data-basis="start-sit">{row.basis}</p>
+	<p class="basis" data-basis={row.figure}>{row.basis}</p>
 </section>
 
 <style>
@@ -62,11 +63,11 @@
 		font-size: var(--t-lg);
 	}
 
-	b.ahead {
+	b.short {
 		color: var(--loss-ink);
 	}
 
-	b.behind {
+	b.over {
 		color: var(--gain-ink);
 	}
 

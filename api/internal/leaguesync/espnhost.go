@@ -152,7 +152,7 @@ func espnSnapshot(l espn.FullLeague, now time.Time) Snapshot {
 	for _, t := range l.Teams {
 		against := round2(t.PointsAgainst)
 		team := Team{RosterID: t.ID, Name: scoring.HostText(t.Name), Wins: t.Wins, Losses: t.Losses, Ties: t.Ties, PointsFor: round2(t.PointsFor),
-			PointsAgainst: &against, Streak: t.Streak, WaiverOrder: t.WaiverRank}
+			PointsAgainst: &against, Streak: t.Streak, WaiverOrder: t.WaiverRank, Division: t.Division}
 		if l.Acquisition.Budget && t.BudgetSpent != nil {
 			left := max(l.Acquisition.Total-*t.BudgetSpent, 0)
 			team.BudgetLeft = &left
@@ -194,6 +194,7 @@ func espnSnapshot(l espn.FullLeague, now time.Time) Snapshot {
 	snap.Scoring = Scoring{Rules: im.Rules, Dropped: scoring.DroppedWords(im.Dropped), DroppedRules: im.Dropped, Defaulted: im.Defaulted}
 	snap.Shape = espnShape(l.LineupSlotCount, len(snap.Teams))
 	snap.Terms = espnTerms(l)
+	snap.Schedule = espnSchedule(l.Schedule)
 	return snap
 }
 

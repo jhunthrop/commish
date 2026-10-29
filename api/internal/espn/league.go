@@ -154,6 +154,28 @@ type FullLeague struct {
 	// TOTAL_POINTS_SCORED and the like; espn-api's playoff_seed_tie_rule),
 	// empty when the read carries none.
 	SeedingTiebreak string
+	// Divisions is the number of divisions scheduleSettings.divisions
+	// lists, and DivisionsRead whether the read carries the list at all
+	// (Lane 298 fix round 1). Each team's division is Team.Division.
+	Divisions     int
+	DivisionsRead bool
+	// Schedule is every regular-season matchup of the season, past and to
+	// come, from the same read's schedule (Lane 298): the matchup periods up
+	// to scheduleSettings.matchupPeriodCount, each placed at its first
+	// scoring period. The playoffs' brackets are left out.
+	Schedule []Scheduled
+}
+
+// Scheduled is one regular-season matchup: its scoring period, the two
+// teams (Away 0 for a team ESPN gives no opponent), each side's points
+// once ESPN has decided it, and whether it has.
+type Scheduled struct {
+	Period             int
+	Home, Away         int
+	HomePoints, Points float64
+	// Final is a winner ESPN has decided (HOME, AWAY or TIE): the points
+	// are the period's final totalPoints. Undecided, they say nothing.
+	Final bool
 }
 
 // DraftState is ESPN's draftDetail: whether the league has drafted, and
@@ -207,6 +229,8 @@ type Team struct {
 	Streak string
 	// WaiverRank is the team's place in the waiver order, 0 when unset.
 	WaiverRank int
+	// Division is the team's divisionId (Lane 298 fix round 1).
+	Division int
 }
 
 // Player is one rostered player and the slot he fills.
@@ -373,6 +397,9 @@ type wireFull struct {
 			MatchupPeriods      map[string][]int `json:"matchupPeriods"`
 			PlayoffTeamCount    int              `json:"playoffTeamCount"`
 			PlayoffSeedingRule  string           `json:"playoffSeedingRule"`
+			Divisions           *[]struct {
+				ID int `json:"id"`
+			} `json:"divisions"`
 		} `json:"scheduleSettings"`
 		RosterSettings struct {
 			LineupSlotCounts map[string]int `json:"lineupSlotCounts"`
@@ -393,6 +420,7 @@ type wireFull struct {
 		Nickname   string   `json:"nickname"`
 		Owners     []string `json:"owners"`
 		WaiverRank int      `json:"waiverRank"`
+		DivisionID int      `json:"divisionId"`
 		Counter    *struct {
 			BudgetSpent *int `json:"acquisitionBudgetSpent"`
 		} `json:"transactionCounter"`
@@ -573,12 +601,17 @@ func checkFull(w wireFull) (FullLeague, error) {
 		if t.WaiverRank > 0 && t.WaiverRank <= maxTeams {
 			tm.WaiverRank = t.WaiverRank
 		}
+		tm.Division = t.DivisionID
 		l.Teams = append(l.Teams, tm)
 	}
 	kicked := kickedOff(l.Teams)
 	byID := make(map[int]Team, len(l.Teams))
 	for _, t := range l.Teams {
 		byID[t.ID] = t
+	}
+	l.Schedule = regularSeason(w)
+	if d := w.Settings.ScheduleSettings.Divisions; d != nil && len(*d) <= maxTeams {
+		l.Divisions, l.DivisionsRead = len(*d), true
 	}
 	for _, g := range w.Schedule {
 		if g.MatchupPeriodID != l.MatchupPeriod || g.Away == nil {
@@ -590,6 +623,43 @@ func checkFull(w wireFull) (FullLeague, error) {
 			HomePlayerPoints: g.Home.playerPoints(byID[g.Home.TeamID]), PlayerPoints: g.Away.playerPoints(byID[g.Away.TeamID])})
 	}
 	return l, nil
+}
+
+// regularSeason is the schedule's regular-season matchups, each at its
+// matchup period's first scoring period; none when ESPN states no
+// regular season (matchupPeriodCount).
+func regularSeason(w wireFull) []Scheduled {
+	s := w.Settings.ScheduleSettings
+	if s.MatchupPeriodCount < 1 || s.MatchupPeriodCount > maxPeriod {
+		return nil
+	}
+	length := max(s.MatchupPeriodLength, 1)
+	var out []Scheduled
+	for _, g := range w.Schedule {
+		if g.MatchupPeriodID < 1 || g.MatchupPeriodID > s.MatchupPeriodCount {
+			continue
+		}
+		first := (g.MatchupPeriodID-1)*length + 1
+		if periods := s.MatchupPeriods[strconv.Itoa(g.MatchupPeriodID)]; len(periods) > 0 {
+			first = periods[0]
+		}
+		if period(first) == 0 || g.Home.TeamID <= 0 {
+			continue
+		}
+		final := g.Winner != "" && g.Winner != undecided
+		game := Scheduled{Period: first, Home: g.Home.TeamID, Final: final}
+		if final {
+			game.HomePoints = score(g.Home.TotalPoints)
+		}
+		if g.Away != nil && g.Away.TeamID > 0 {
+			game.Away = g.Away.TeamID
+			if final {
+				game.Points = score(g.Away.TotalPoints)
+			}
+		}
+		out = append(out, game)
+	}
+	return out
 }
 
 // maxStreak bounds a run of wins or losses.

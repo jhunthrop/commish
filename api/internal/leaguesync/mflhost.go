@@ -24,6 +24,7 @@ type MFLAPI interface {
 	SeasonStatus(ctx context.Context, season int) (mfl.Status, error)
 	Players(ctx context.Context, season int) ([]mfl.Player, error)
 	DraftResults(ctx context.Context, season int, id string) (mfl.DraftResults, error)
+	Schedule(ctx context.Context, season int, id string) ([]mfl.ScheduleGame, error)
 }
 
 // mflDraftTTL is how long a league's draft results answer is kept while

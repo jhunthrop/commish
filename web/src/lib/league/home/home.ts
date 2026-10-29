@@ -503,7 +503,7 @@ export function waiverCell(
 }
 
 /** The columns the standings sort by. */
-export type StandingsKey = 'rank' | 'record' | 'pf' | 'pa' | 'proj' | 'waiver';
+export type StandingsKey = 'rank' | 'record' | 'chance' | 'pf' | 'pa' | 'proj' | 'waiver';
 
 export interface StandingsRow {
 	team: LeagueTeam;
@@ -526,6 +526,8 @@ export function sortStandings(
 				return -r.rank;
 			case 'record':
 				return r.team.wins + r.team.ties / 2;
+			case 'chance':
+				return r.team.playoff_chance ?? null;
 			case 'pf':
 				return r.team.points_for;
 			case 'pa':

@@ -81,6 +81,10 @@ type Poller struct {
 	// After is the live wait's timer (poll.Poller.After), time.After when
 	// nil: a test's fake clock gives its own.
 	After func(time.Duration) <-chan time.Time
+	// Schedule fills each read's season schedule from the kept weeks for a
+	// host whose read carries none, reading the weeks it lacks behind the
+	// read (Lane 298); nil leaves such a read without one.
+	Schedule *ScheduleKeeper
 
 	once  sync.Once
 	inner *poll.Poller[Snapshot]
@@ -131,6 +135,9 @@ func (p *Poller) read(ctx context.Context, ref Ref, gap time.Duration, mode poll
 	r, err := p.shared().Read(ctx, ref.Key(), gap, mode, func(ctx context.Context) (Snapshot, error) {
 		snap, err := host.Read(ctx, ref)
 		snap.Ref.As = ref.As
+		if err == nil {
+			snap = p.Schedule.Fill(ctx, host, snap)
+		}
 		return snap, err
 	})
 	if errors.Is(err, poll.ErrNoRead) {

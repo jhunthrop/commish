@@ -114,6 +114,13 @@ type League struct {
 	// player ruled out may take one (Lane 118, B79).
 	ReserveSlots    int
 	ReserveAllowOut bool
+	// Divisions is settings.divisions, 0 when unset (a league with none);
+	// StartWeek is settings.start_week, 0 when unset (Lane 298 fix round 1).
+	Divisions int
+	StartWeek int
+	// MedianMatch is settings.league_average_match: each week every team
+	// also plays the week's median score (Lane 298).
+	MedianMatch bool
 }
 
 type wireDraft struct {
@@ -354,6 +361,15 @@ func (w wireLeague) validate(id string) (League, error) {
 	}
 	if n, ok := intSetting(w.Settings["reserve_allow_out"]); ok {
 		l.ReserveAllowOut = n == 1
+	}
+	if n, ok := intSetting(w.Settings["divisions"]); ok && n >= 0 && n <= maxTeams {
+		l.Divisions = n
+	}
+	if n, ok := intSetting(w.Settings["start_week"]); ok && n > 0 && n <= maxWeek {
+		l.StartWeek = n
+	}
+	if n, ok := intSetting(w.Settings["league_average_match"]); ok {
+		l.MedianMatch = n == 1
 	}
 	return l, nil
 }

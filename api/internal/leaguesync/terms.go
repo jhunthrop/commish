@@ -57,6 +57,20 @@ type Terms struct {
 	// Seeds is how the host's rules seed the playoffs, seed by seed
 	// (SeedRecord or SeedPoints); none where the host states no seeding.
 	Seeds []string `json:"seeds,omitempty"`
+	// MedianGame says every team also plays the week's median score each
+	// week (Sleeper's league_average_match, Lane 298).
+	MedianGame bool `json:"median_game,omitempty"`
+	// DivisionsRead says the platform's read states the league's divisions
+	// (Lane 298 fix round 1); Divisions is how many it has (0 or 1 for a
+	// league with none), each team's Team.Division. DivisionWinners says
+	// the platform's rules seat each division's winner, as read; no read
+	// states it today, so a league of several divisions draws no proof.
+	DivisionsRead   bool `json:"divisions_read,omitempty"`
+	Divisions       int  `json:"divisions,omitempty"`
+	DivisionWinners bool `json:"division_winners,omitempty"`
+	// StartWeek is the league's first week where the platform states it,
+	// 0 for week 1 (Sleeper's start_week, Yahoo's start_week).
+	StartWeek int `json:"start_week,omitempty"`
 }
 
 // How a playoff seed is earned, as the contract (LeagueTerms.playoff_seeds)
@@ -86,7 +100,8 @@ func sleeperStreak(s string) string {
 }
 
 func sleeperTerms(l sleeper.League) Terms {
-	t := Terms{PlayoffTeams: l.PlayoffTeams, PlayoffFirst: l.PlayoffWeekStart}
+	t := Terms{PlayoffTeams: l.PlayoffTeams, PlayoffFirst: l.PlayoffWeekStart, MedianGame: l.MedianMatch,
+		DivisionsRead: true, Divisions: l.Divisions, StartWeek: l.StartWeek}
 	switch l.WaiverType {
 	case sleeper.WaiverBudget:
 		t.Waivers, t.Budget = WaiversBudget, l.WaiverBudget
@@ -142,7 +157,8 @@ func playoffRounds(teams int) int {
 
 func espnTerms(l espn.FullLeague) Terms {
 	t := Terms{PlayoffTeams: l.PlayoffTeams, PlayoffFirst: l.PlayoffStartWeek, Waivers: WaiversOrder,
-		WaiverOrder: espnWaiverOrder(l.Acquisition.OrderReset), Tiebreak: espnTiebreaks[l.SeedingTiebreak]}
+		WaiverOrder: espnWaiverOrder(l.Acquisition.OrderReset), Tiebreak: espnTiebreaks[l.SeedingTiebreak],
+		DivisionsRead: l.DivisionsRead, Divisions: l.Divisions}
 	if l.Acquisition.Budget {
 		t.Waivers, t.Budget, t.WaiverOrder = WaiversBudget, l.Acquisition.Total, ""
 	}
@@ -217,7 +233,7 @@ func terms(snap Snapshot) apitypes.LeagueTerms {
 // the league playoffs' weeks, each seed by record or points as it states.
 // Its blind bidding is not read here.
 func ffpcTerms(r ffpc.Rules) Terms {
-	t := Terms{PlayoffFirst: r.PlayoffStartWeek, PlayoffLast: r.PlayoffLastWeek}
+	t := Terms{PlayoffFirst: r.PlayoffStartWeek, PlayoffLast: r.PlayoffLastWeek, DivisionsRead: true}
 	for _, s := range r.Seeds {
 		switch s {
 		case ffpc.SeedRecord:
@@ -225,7 +241,7 @@ func ffpcTerms(r ffpc.Rules) Terms {
 		case ffpc.SeedPoints:
 			t.Seeds = append(t.Seeds, SeedPoints)
 		default:
-			return Terms{PlayoffFirst: t.PlayoffFirst, PlayoffLast: t.PlayoffLast}
+			return Terms{PlayoffFirst: t.PlayoffFirst, PlayoffLast: t.PlayoffLast, DivisionsRead: true}
 		}
 	}
 	// playoff_teams draws a cut under that many teams by record: a field
