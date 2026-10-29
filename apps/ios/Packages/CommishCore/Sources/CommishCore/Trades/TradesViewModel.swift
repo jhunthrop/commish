@@ -116,20 +116,18 @@ public final class TradesViewModel {
         }
     }
 
-    /// One tap loads an idea into the ticks; the member changes it freely from there.
+    /// One tap loads an idea or a host's offer into the ticks; the member changes it freely from there. An
+    /// offer the builder cannot hold loads nothing.
     public func load(idea key: String, leagueID: String) async {
-        guard case let .loaded(model, _, _) = state, let preset = model.ideas.places.compactMap({ place in
-            if case let .idea(preset) = place, preset.id == key {
-                return preset
-            }
-            return nil
-        }).first else {
+        guard case let .loaded(model, _, _) = state,
+              let picks = model.ideas.at(clock.now).places.first(where: { $0.id == key })?.picks
+        else {
             return
         }
-        if preset.picks.team != building?.team {
+        if picks.team != building?.team {
             forgetAnswer()
         }
-        building = preset.picks
+        building = picks
         await ask(leagueID: leagueID)
     }
 

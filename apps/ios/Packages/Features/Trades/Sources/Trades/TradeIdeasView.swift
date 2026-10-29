@@ -2,10 +2,11 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// Our ideas (TradeBuilder's .ideas at 390, Lanes 260, 268, B271): the head over a row of two-line cards
-/// that scrolls sideways from the Best card, the best three, and "N more" at the head's end; once every idea shows they
-/// stack in place, the Best card first. A card loads its trade into the ticks, pressed while the ticks
-/// hold it; a team the finder lists no trade with keeps its place, dashed, nothing to press.
+/// Our ideas (TradeBuilder's .ideas at 390, Lanes 260, 268, 290, B271): the head over a row of cards that
+/// scrolls sideways from its first, the first three, and "N more" at the head's end; once every idea
+/// shows they stack in place. The host's newest offer heads the row, then Best. A card loads its trade
+/// into the ticks, pressed while the ticks hold it; an offer the builder cannot hold and a team the finder
+/// lists no trade with keep their place, dashed, nothing to press.
 struct TradeIdeasView: View {
     @Environment(\.colorScheme) private var colorScheme
     let builder: TradeBuilderModel
@@ -81,6 +82,10 @@ struct TradeIdeasView: View {
     @ViewBuilder
     private func card(_ place: IdeaPlace) -> some View {
         switch place {
+        case let .offer(offer):
+            OfferCard(offer: offer, pressed: builder.pressed == offer.id, wide: builder.more == nil) {
+                actions.idea(offer.id)
+            }
         case let .idea(preset):
             IdeaCard(preset: preset, pressed: builder.pressed == preset.id, wide: builder.more == nil) {
                 actions.idea(preset.id)
@@ -92,7 +97,7 @@ struct TradeIdeasView: View {
 }
 
 /// One idea's card: "Best" and both gains on its first line, "With Max_Jensen10" whole on its own line
-/// (a long team name wraps, never cut), the deal under it.
+/// (a long team name wraps, never cut), the deal under it with what it fills at its end (Lane 290).
 struct IdeaCard: View {
     @Environment(\.colorScheme) private var colorScheme
     let preset: TradePreset
@@ -122,10 +127,7 @@ struct IdeaCard: View {
                     .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
                     .foregroundStyle(theme.color(Tokens.Color.ink2))
                     .fixedSize(horizontal: false, vertical: true)
-                Text(preset.deal)
-                    .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
-                    .foregroundStyle(theme.color(Tokens.Color.ink))
-                    .fixedSize(horizontal: false, vertical: true)
+                DealLine(deal: preset.deal, fact: preset.fills, factInk: Tokens.Color.accentText)
             }
             .frame(width: wide ? nil : TradeIdeasView.cardWidth, alignment: .leading)
             .frame(maxWidth: wide ? .infinity : nil, minHeight: 38, alignment: .leading)
@@ -142,9 +144,103 @@ struct IdeaCard: View {
             .contentShape(RoundedRectangle(cornerRadius: Tokens.Radius.md))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel([preset.mark, preset.with, preset.deal, preset.gains].compactMap(\.self)
+        .accessibilityLabel([preset.mark, preset.with, preset.deal, preset.fills, preset.gains].compactMap(\.self)
             .joined(separator: ", "))
         .accessibilityAddTraits(pressed ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// The deal and its fact at the line's end (what it fills, when an offer lapses, or where to answer it),
+/// the fact wrapping under the deal where the two do not fit.
+struct DealLine: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let deal: String
+    let fact: String?
+    var factInk = Tokens.Color.ink2
+
+    var body: some View {
+        let theme = Theme(colorScheme)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                dealText(theme)
+                Spacer(minLength: Tokens.Space.s1)
+                factText(theme)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                dealText(theme).fixedSize(horizontal: false, vertical: true)
+                factText(theme)
+            }
+        }
+    }
+
+    private func dealText(_ theme: Theme) -> some View {
+        Text(deal)
+            .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
+            .foregroundStyle(theme.color(Tokens.Color.ink))
+    }
+
+    @ViewBuilder
+    private func factText(_ theme: Theme) -> some View {
+        if let fact {
+            Text(fact)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
+                .foregroundStyle(theme.color(factInk))
+        }
+    }
+}
+
+/// A trade offered to the member on the host (Lane 290): "Offered to you" marked, "With Muttdogs", then
+/// give for get with its expiry at the line's end. One the builder can hold loads its ticks like an idea;
+/// one it cannot is dashed, nothing to press, and says where to answer it. Nothing is sent to the host.
+struct OfferCard: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let offer: OfferPreset
+    let pressed: Bool
+    let wide: Bool
+    let load: () -> Void
+
+    var body: some View {
+        let theme = Theme(colorScheme)
+        let shape = RoundedRectangle(cornerRadius: Tokens.Radius.md)
+        let label = [offer.label, offer.with, offer.deal, offer.fact].compactMap(\.self).joined(separator: ", ")
+        if offer.picks == nil {
+            face(theme)
+                .overlay(shape.strokeBorder(
+                    theme.color(Tokens.Color.line), style: StrokeStyle(lineWidth: 1, dash: [4, 3])
+                ))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(label)
+        } else {
+            Button(action: load) {
+                face(theme)
+                    .background(shape.fill(theme.color(Tokens.Color.surface)))
+                    .overlay(shape.strokeBorder(
+                        theme.color(pressed ? Tokens.Color.accent : Tokens.Color.line), lineWidth: pressed ? 2 : 1
+                    ))
+                    .contentShape(shape)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(label)
+            .accessibilityAddTraits(pressed ? [.isButton, .isSelected] : .isButton)
+        }
+    }
+
+    private func face(_ theme: Theme) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(offer.label)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .bold))
+                .textCase(.uppercase)
+                .foregroundStyle(theme.color(Tokens.Color.accentText))
+            Text(offer.with)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
+                .foregroundStyle(theme.color(Tokens.Color.ink2))
+                .fixedSize(horizontal: false, vertical: true)
+            DealLine(deal: offer.deal, fact: offer.fact)
+        }
+        .frame(width: wide ? nil : TradeIdeasView.cardWidth, alignment: .leading)
+        .frame(maxWidth: wide ? .infinity : nil, minHeight: 38, alignment: .leading)
+        .padding(.horizontal, Tokens.Space.s3)
+        .padding(.vertical, 3)
     }
 }
 

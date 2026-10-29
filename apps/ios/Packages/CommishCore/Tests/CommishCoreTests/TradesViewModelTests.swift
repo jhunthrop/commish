@@ -105,6 +105,27 @@ struct TradesViewModelTests {
         #expect(builder.verbEnabled)
     }
 
+    /// Lane 290: a host's offer loads its team and ticks like an idea and is pressed; one the builder
+    /// cannot hold loads nothing and asks nothing. Nothing is ever written to the host.
+    @Test func anOfferLoadsItsTicksAndOneTheBuilderCannotHoldLoadsNothing() async throws {
+        let stub = try TradesStub(
+            advice: Fixtures.trades(TradesNeedsParityTests.clock), check: Fixtures.tradeCheck(Fixtures.week, 1)
+        )
+        let viewModel = model(stub)
+        await viewModel.load(leagueID: Fixtures.league)
+        let offers = TradesNeedsParityTests.needs.offers
+        let unheld = try #require(offers.first { $0.picks == nil })
+        await viewModel.load(idea: unheld.key, leagueID: Fixtures.league)
+        #expect(await stub.checked.isEmpty)
+        let offer = try #require(offers.first { $0.picks != nil })
+        let picks = try #require(offer.picks)
+        await viewModel.load(idea: offer.key, leagueID: Fixtures.league)
+        #expect(await stub.checked == [TradeCheckInput(team: picks.team, give: picks.give, get: picks.get)])
+        #expect(viewModel.building?.team == picks.team)
+        #expect(viewModel.builder?.pressed == offer.key)
+        #expect(viewModel.builder?.ideas.first?.id == offer.key)
+    }
+
     @Test func ticksAskForBothSidesThenCheckAsTheyLand() async throws {
         let stub = try Self.stub()
         let viewModel = model(stub)
