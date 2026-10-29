@@ -76,13 +76,6 @@ _PICK_ANGLES: Final = (
     "season, the weather, the opponent, his depth chart) only when it decides the call, and leave the rest unquoted. "
     "A player with no angle is read from his status, his game and his season."
 )
-# Read on the angles, the first week named is most often the injury report's (Lane 300's first pair: 17 reads
-# fell on "before week 8's game status report" opening the read), so the angles' rule names it.
-_SEASON: Final = "every later week without it. Never the year twice"
-_SEASON_ANGLES: Final = (
-    "the injury report's week too when it comes first (\"before week 8 of 2026's game status report\"), and every "
-    "later week without it. Never the year twice"
-)
 _CAP: Final = f"quote at most {MAX_FIGURES} figures in all"
 _CAP_ANGLES: Final = (
     f"quote at most {MAX_FIGURES + ANGLE_FIGURES} figures in all, counting each angle's figures: when two angles "
@@ -104,7 +97,7 @@ def _rules(*, angles: bool) -> str:
     text = _RULES_TEXT.replace(_PICK, _PICK_ANGLES) if angles else _RULES_TEXT
     if angles:
         text = text.replace(_SAY, _SAY_ANGLES).replace(_SEE, _SEE_ANGLES).replace(_NAMED, _NAMED_ANGLES)
-        text = text.replace(_CAP, _CAP_ANGLES).replace(_SEASON, _SEASON_ANGLES)
+        text = text.replace(_CAP, _CAP_ANGLES)
     return text
 
 
