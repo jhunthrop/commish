@@ -268,7 +268,7 @@ async function boxFacts(page: Page): Promise<{
 }
 const PER_GAME = /\d+\.\d a game/;
 const TRADE_BASIS_FIRST =
-	"Each team's best trades, those for your weakest starting spot first. Every one fills a weak spot on one side or both, and neither lineup loses by it. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot.";
+	"Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot.";
 /** An idea's gains a week in its one line (Lane 268): "+5.7 yours, +0.7 theirs". */
 const IDEA_GAINS = /^[+−]\d+\.\d yours, [+−]\d+\.\d theirs$/;
 
