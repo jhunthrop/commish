@@ -28,7 +28,8 @@
 				"streak": "W5",
 				"waiver_order": 6,
 				"waiver_budget_left": 675,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 100
 			},
 			{
 				"roster_id": 3,
@@ -42,7 +43,8 @@
 				"streak": "W1",
 				"waiver_order": 10,
 				"waiver_budget_left": 780,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 97
 			},
 			{
 				"roster_id": 12,
@@ -56,7 +58,8 @@
 				"streak": "W2",
 				"waiver_order": 3,
 				"waiver_budget_left": 800,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 88
 			},
 			{
 				"roster_id": 6,
@@ -70,7 +73,8 @@
 				"streak": "W3",
 				"waiver_order": 9,
 				"waiver_budget_left": 863,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 74
 			},
 			{
 				"roster_id": 2,
@@ -84,7 +88,8 @@
 				"streak": "L1",
 				"waiver_order": 12,
 				"waiver_budget_left": 700,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 61
 			},
 			{
 				"roster_id": 5,
@@ -98,7 +103,8 @@
 				"streak": "W2",
 				"waiver_order": 2,
 				"waiver_budget_left": 664,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 52
 			},
 			{
 				"roster_id": 4,
@@ -112,7 +118,8 @@
 				"streak": "W1",
 				"waiver_order": 8,
 				"waiver_budget_left": 915,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 40
 			},
 			{
 				"roster_id": 9,
@@ -126,7 +133,8 @@
 				"streak": "L3",
 				"waiver_order": 4,
 				"waiver_budget_left": 911,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 29
 			},
 			{
 				"roster_id": 11,
@@ -140,7 +148,8 @@
 				"streak": "L1",
 				"waiver_order": 7,
 				"waiver_budget_left": 556,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 18
 			},
 			{
 				"roster_id": 8,
@@ -154,7 +163,8 @@
 				"streak": "L3",
 				"waiver_order": 11,
 				"waiver_budget_left": 830,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 9
 			},
 			{
 				"roster_id": 7,
@@ -168,7 +178,8 @@
 				"streak": "L2",
 				"waiver_order": 5,
 				"waiver_budget_left": 959,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 3
 			},
 			{
 				"roster_id": 1,
@@ -182,7 +193,8 @@
 				"streak": "L2",
 				"waiver_order": 1,
 				"waiver_budget_left": 1000,
-				"avatar": null
+				"avatar": null,
+				"playoff_chance": 0
 			}
 		],
 		"roster": [
@@ -1787,7 +1799,45 @@
 				"points"
 			]
 		},
-		"moves_read": true
+		"moves_read": true,
+		"playoff_chance_basis": "Playoff chance from 2,000 replays of the schedule left, each team at its season rate, scores varying week to week as this league's have. The top 6 by record make it, ties by points for. Only a clinched place reads 100 and only a team that is out reads 0. Divisions are not counted.",
+		"points_vs_median": {
+			"weeks": [
+				{
+					"week": 1,
+					"points": 118.4,
+					"median": 104.2,
+					"diff": 14.2
+				},
+				{
+					"week": 2,
+					"points": 96.1,
+					"median": 101.7,
+					"diff": -5.6
+				},
+				{
+					"week": 3,
+					"points": 131,
+					"median": 108.5,
+					"diff": 22.5
+				},
+				{
+					"week": 4,
+					"points": 99.8,
+					"median": 99.8,
+					"diff": 0
+				},
+				{
+					"week": 5,
+					"points": 112.6,
+					"median": 106,
+					"diff": 6.6
+				}
+			],
+			"above": 3,
+			"total": 37.7,
+			"basis": "Vs median is your points less the league's median score each played week, from the platform's scores. Weeks the platform did not score for every team are left out."
+		}
 	},
 	"error": null
 }

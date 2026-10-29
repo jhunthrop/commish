@@ -2,6 +2,7 @@
 	import { fixed } from '#lib/format/number.ts';
 	import TeamAvatar from '../box/TeamAvatar.svelte';
 	import { BOX } from '../box/box.ts';
+	import { FIGURE_WORDS, chanceCell } from './figures.ts';
 	import type { LeagueHost, LeagueTerms } from '../api.ts';
 	import {
 		HOME,
@@ -27,9 +28,12 @@
 		host: LeagueHost;
 		/** Whether a projection column shows: the week has one. */
 		projected: boolean;
+		/** The playoff chance's sentence when every team has one (Lane 298), null to draw no column. */
+		chanceBasis?: string | null;
 	}
 
-	let { rows, terms, host, projected }: Props = $props();
+	let { rows, terms, host, projected, chanceBasis = null }: Props = $props();
+	const chance = $derived(chanceBasis !== null);
 
 	/** How the platform seeds its playoffs, said under the table where no cut can show it. */
 	const seeding = $derived(seedingWords(terms, host));
@@ -38,7 +42,7 @@
 	const sorted = $derived(sortStandings(rows, sortBy, terms));
 	const waiver = $derived(waiverColumn(terms));
 	const rule = $derived(sortBy === 'rank' ? playoffRule(terms, rows.length) : null);
-	const columns = $derived(6 + (projected ? 1 : 0) + (waiver === null ? 0 : 1));
+	const columns = $derived(6 + (chance ? 1 : 0) + (projected ? 1 : 0) + (waiver === null ? 0 : 1));
 
 	function number(value: number | null): string {
 		return value === null ? BOX.none : fixed(value, 1);
@@ -67,6 +71,7 @@
 				{@render head('rank', HOME.rank, 'rk')}
 				<th class="tm" scope="col">{HOME.team}</th>
 				{@render head('record', HOME.record, 'wl')}
+				{#if chance}{@render head('chance', FIGURE_WORDS.chance, 'pc')}{/if}
 				{@render head('pf', HOME.pointsFor, 'pf')}
 				{@render head('pa', HOME.pointsAgainst, 'pa')}
 				<th class="sk" scope="col">{HOME.streak}</th>
@@ -95,6 +100,7 @@
 						</span>
 					</td>
 					<td class="n wl">{recordCell(row.team)}</td>
+					{#if chance}<td class="n pc" data-figure="playoff-chance">{chanceCell(row.team)}</td>{/if}
 					<td class="n pf">{fixed(row.team.points_for, 1)}</td>
 					<td class="n pa">{number(row.team.points_against)}</td>
 					<td class="sk"
@@ -114,6 +120,7 @@
 		</tbody>
 	</table>
 	{#if seeding}<p class="seeding">{seeding}</p>{/if}
+	{#if chanceBasis !== null}<p class="chance" data-basis="playoff-chance">{chanceBasis}</p>{/if}
 </section>
 
 <style>
@@ -224,6 +231,7 @@
 	}
 
 	.wl,
+	.pc,
 	.pf,
 	.pa,
 	.pj,
@@ -242,6 +250,7 @@
 	}
 
 	thead .pa,
+	thead .pc,
 	thead .pj,
 	thead .wv,
 	thead .wl,
@@ -301,6 +310,24 @@
 		color: var(--ink-2);
 	}
 
+	/* The chance's head wraps to two short lines over its narrow column. */
+	thead th.pc {
+		white-space: normal;
+		width: 64px;
+		line-height: 1.1;
+	}
+
+	td.pc {
+		font-weight: 700;
+	}
+
+	.chance {
+		margin: var(--s-2) 0 0;
+		font-size: var(--t-sm);
+		color: var(--ink-3);
+		line-height: 1.5;
+	}
+
 	tr.rule td {
 		height: 0;
 		padding: 0;
@@ -349,9 +376,19 @@
 		}
 
 		.wl,
+		.pc,
 		.pf,
 		.pj {
 			font-size: var(--t-md);
+		}
+
+		thead th.pc {
+			width: 50px;
+		}
+
+		.chance {
+			font-size: var(--t-xs);
+			line-height: 1.45;
 		}
 
 		.tmn b {

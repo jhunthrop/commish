@@ -1,13 +1,23 @@
 /** The League page's figures (Lane 292) as the web's readers draw them (web/src/lib/league/home/
  * figures.ts), for the apps' ports to hold to: the member's Proj gap at each fixture clock (drawn only
  * before the game's kickoff), the power panel over the fixture's power answer, and the start and sit
- * row over each record case. Each case carries the answer's fields it reads, so a port reads the
+ * row over each record case; Lane 298's playoff chance cells and the member's points against the
+ * median over the fixture's stand-in league figures, with an answer from before them drawing
+ * neither. Each case carries the answer's fields it reads, so a port reads the
  * same input the web did. */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { REPOSITORY } from './generated.ts';
 import { bugsOf } from '../../web/src/lib/league/home/home.ts';
-import { gapFigure, powerPanel, startSitRow } from '../../web/src/lib/league/home/figures.ts';
+import {
+	chanceCell,
+	chanceShown,
+	gapFigure,
+	medianRow,
+	powerPanel,
+	startSitRow
+} from '../../web/src/lib/league/home/figures.ts';
+import { withLeagueFigures } from '../../web/scripts/inseason-fixture/league-figures.ts';
 import { withFigures, withSuperflex } from '../../web/scripts/inseason-fixture/figures.ts';
 import { START_SIT_BASIS } from '../../web/scripts/inseason-fixture/record.ts';
 import type { LeagueSync } from '../../web/src/lib/league/api.ts';
@@ -103,5 +113,26 @@ export async function renderFigures(
 			{ start_sit: record.start_sit ?? null, row: startSitRow(record) }
 		])
 	);
-	return `${JSON.stringify({ about, league, me: sync.me, gaps, power, superflex, records }, null, '\t')}\n`;
+	// An answer from before Lane 298: the same league with neither figure.
+	const { playoff_chance_basis: _basis, points_vs_median: _median, ...older } = sync;
+	const before: LeagueSync = {
+		...older,
+		teams: sync.teams.map(({ playoff_chance: _chance, ...t }) => t)
+	};
+	const standings = [
+		{ name: 'figures', sync: withLeagueFigures(before) },
+		{ name: 'before', sync: before }
+	].map(({ name, sync: answer }) => ({
+		name,
+		chances: answer.teams.map((t) => ({
+			roster_id: t.roster_id,
+			playoff_chance: t.playoff_chance ?? null,
+			cell: chanceCell(t)
+		})),
+		shown: chanceShown(answer),
+		basis: answer.playoff_chance_basis ?? null,
+		points_vs_median: answer.points_vs_median ?? null,
+		median_row: medianRow(answer)
+	}));
+	return `${JSON.stringify({ about, league, me: sync.me, gaps, power, superflex, records, standings }, null, '\t')}\n`;
 }

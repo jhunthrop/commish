@@ -42,8 +42,8 @@
 	import MovesFeed from './home/MovesFeed.svelte';
 	import LeagueSettings from './home/LeagueSettings.svelte';
 	import PowerPanel from './home/PowerPanel.svelte';
-	import StartSitRow from './home/StartSitRow.svelte';
-	import { gapFigure, powerPanel, startSitRow } from './home/figures.ts';
+	import FigureRow from './home/FigureRow.svelte';
+	import { chanceShown, gapFigure, medianRow, powerPanel, startSitRow } from './home/figures.ts';
 	import {
 		HOME,
 		bugsOf,
@@ -310,6 +310,11 @@
 	);
 	const power = $derived(sync ? powerPanel(scoreboard, sync) : null);
 	const startSit = $derived(startSitRow(record));
+	const vsMedian = $derived(medianRow(sync));
+	/** The playoff chance's sentence when the standings draw the column (Lane 298). */
+	const chanceBasis = $derived(
+		sync && chanceShown(sync) ? (sync.playoff_chance_basis ?? null) : null
+	);
 	const lineupHref = $derived(tabHref('start', id));
 	/** What every number on the in-season page is, said once in one paragraph, at most five lines at a
 	 * desk and eight on a phone (Lane 108, B82: merged so no sentence ends a short line): the standings,
@@ -478,19 +483,24 @@
 							{gap}
 						/>
 					{/if}
-					<div class="split" class:alone={summary === null && startSit === null}>
+					<div
+						class="split"
+						class:alone={summary === null && startSit === null && vsMedian === null}
+					>
 						<div class="col">
 							<Standings
 								{rows}
 								terms={sync.terms}
 								host={sync.host}
 								projected={scoreboard !== null}
+								{chanceBasis}
 							/>
 							<!-- Stacked, the power panel follows the lineup: the lineup is the screen's verb. -->
 							{#if power}<div class="power-slot"><PowerPanel panel={power} /></div>{/if}
 						</div>
 						<div class="col">
-							{#if startSit}<StartSitRow row={startSit} />{/if}
+							{#if startSit}<FigureRow row={startSit} />{/if}
+							{#if vsMedian}<FigureRow row={vsMedian} />{/if}
 							{#if summary && team}
 								<LineupSummary
 									team={team.name}
@@ -526,7 +536,7 @@
 							: sectionHref('mock')}
 						{now}
 					/>
-					<Standings {rows} terms={sync.terms} host={sync.host} projected={false} />
+					<Standings {rows} terms={sync.terms} host={sync.host} projected={false} {chanceBasis} />
 					{#if boardBasis}<p class="basis-line">{boardBasis}</p>{/if}
 					<div class="grid">
 						{#if drafted}

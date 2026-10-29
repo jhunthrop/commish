@@ -1,10 +1,13 @@
 /** The League page's figures (Lane 292): the Proj gap on the member's score bug, the power panel by
- * position and the member's start and sit row. Pure functions over the scoreboard and record
+ * position and the member's start and sit row; Lane 298's playoff chance on the standings and the
+ * member's points against the median, a second record row. Pure functions over the scoreboard and record
  * answers; every sentence beside a figure is the API's, the cells' words are here. An answer from
  * before Lane 292 carries none of the fields, and the page then draws none of the figures. */
 import { signed } from '#lib/format/number.ts';
 import type { components } from '#lib/api/types.ts';
 import type { LeagueSync } from '../api.ts';
+
+type LeagueTeam = LeagueSync['teams'][number];
 import type { LeagueRecord, Scoreboard } from '../inseason/api.ts';
 
 type LeaguePowerColumn = components['schemas']['LeaguePowerColumn'];
@@ -18,7 +21,11 @@ export const FIGURE_WORDS = {
 	startSit: 'Start/sit',
 	matched: 'Matched',
 	ours: 'Our picks',
-	of: 'of'
+	of: 'of',
+	chance: 'Playoff chance',
+	vsMedian: 'Vs median',
+	above: 'Above',
+	net: 'Net'
 } as const;
 
 /** The power panel's column heads: the API's spot keys, the superflex as the boards say it. */
@@ -88,24 +95,81 @@ export function powerPanel(board: Scoreboard | null, sync: LeagueSync): PowerPan
 	return { heads: power.columns.map((c) => POWER_HEADS[c]), rows, basis: power.basis };
 }
 
-/** The member's start and sit row: weeks matched of weeks read, and what our picks scored less the
- * set lineup's, signed, with the API's sentence; null with no record. */
-export interface StartSitRow {
-	matched: string;
-	ours: string;
-	/** ahead (rose) when our picks would have added points, the member's lineup leaving them on the
-	 * bench; behind (green) when the member's scored more; even at none. */
-	tone: 'ahead' | 'behind' | 'even';
+/** One cell of a record row: its label, its figure, and its tone: short (rose) where the member's
+ * lineup left points behind, over (green) where it came out ahead, even at none. */
+export interface FigureCell {
+	label: string;
+	value: string;
+	tone: 'short' | 'over' | 'even';
+}
+
+/** One of the member's record rows: its head, its cells and the API's sentence; figure keys the
+ * row's data-figure and data-basis. */
+export interface FigureRow {
+	figure: 'start-sit' | 'vs-median';
+	head: string;
+	cells: readonly FigureCell[];
 	basis: string;
 }
 
-export function startSitRow(record: LeagueRecord | null): StartSitRow | null {
+/** A signed figure's tone: points behind is short, ahead over. */
+function toneOf(ahead: number): FigureCell['tone'] {
+	return ahead > 0 ? 'over' : ahead < 0 ? 'short' : 'even';
+}
+
+/** The member's start and sit row: weeks matched of weeks read, and what our picks scored less the
+ * set lineup's, signed (rose when our picks would have added points), with the API's sentence; null
+ * with no record. */
+export function startSitRow(record: LeagueRecord | null): FigureRow | null {
 	const s = record?.start_sit;
 	if (s === undefined) return null;
 	return {
-		matched: `${String(s.matched)} ${FIGURE_WORDS.of} ${String(s.weeks)}`,
-		ours: signed(s.ours_less_set),
-		tone: s.ours_less_set > 0 ? 'ahead' : s.ours_less_set < 0 ? 'behind' : 'even',
+		figure: 'start-sit',
+		head: FIGURE_WORDS.startSit,
+		cells: [
+			{
+				label: FIGURE_WORDS.matched,
+				value: `${String(s.matched)} ${FIGURE_WORDS.of} ${String(s.weeks)}`,
+				tone: 'even'
+			},
+			{ label: FIGURE_WORDS.ours, value: signed(s.ours_less_set), tone: toneOf(-s.ours_less_set) }
+		],
 		basis: s.basis
 	};
+}
+
+/** The member's points against the median (Lane 298): the weeks above it of the weeks read, and the
+ * weeks' net, signed (green above the median), with the API's sentence; null where the answer has
+ * none. */
+export function medianRow(sync: Pick<LeagueSync, 'points_vs_median'> | null): FigureRow | null {
+	const m = sync?.points_vs_median;
+	if (m === undefined) return null;
+	return {
+		figure: 'vs-median',
+		head: FIGURE_WORDS.vsMedian,
+		cells: [
+			{
+				label: FIGURE_WORDS.above,
+				value: `${String(m.above)} ${FIGURE_WORDS.of} ${String(m.weeks.length)}`,
+				tone: 'even'
+			},
+			{ label: FIGURE_WORDS.net, value: signed(m.total), tone: toneOf(m.total) }
+		],
+		basis: m.basis
+	};
+}
+
+/** A team's playoff chance as its cell ("64%"), null where the answer has none. */
+export function chanceCell(team: Pick<LeagueTeam, 'playoff_chance'>): string | null {
+	const pct = team.playoff_chance;
+	return pct === undefined || pct === null ? null : `${String(pct)}%`;
+}
+
+/** Whether the standings draw the chance column: every team has a figure, with its sentence. */
+export function chanceShown(sync: Pick<LeagueSync, 'teams' | 'playoff_chance_basis'>): boolean {
+	return (
+		sync.playoff_chance_basis !== undefined &&
+		sync.teams.length > 0 &&
+		sync.teams.every((t) => chanceCell(t) !== null)
+	);
 }

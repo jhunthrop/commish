@@ -13,7 +13,21 @@ import {
 	POWER_BASIS
 } from '../../../../scripts/inseason-fixture/figures.ts';
 import { START_SIT_BASIS } from '../../../../scripts/inseason-fixture/record.ts';
-import { FIGURE_WORDS, POWER_HEADS, gapFigure, powerPanel, startSitRow } from './figures.ts';
+import {
+	CHANCE_BASIS,
+	VS_MEDIAN_BASIS,
+	withLeagueFigures
+} from '../../../../scripts/inseason-fixture/league-figures.ts';
+import {
+	FIGURE_WORDS,
+	POWER_HEADS,
+	chanceCell,
+	chanceShown,
+	gapFigure,
+	medianRow,
+	powerPanel,
+	startSitRow
+} from './figures.ts';
 
 type Game = Scoreboard['games'][number];
 
@@ -103,16 +117,69 @@ void test('the start and sit row: matched of weeks, our picks less the set lineu
 			start_sit: { weeks: 5, matched: 3, ours_less_set: ours, basis: START_SIT_BASIS }
 		}) as LeagueRecord;
 	assert.deepEqual(startSitRow(record(12.4)), {
-		matched: '3 of 5',
-		ours: '+12.4',
-		tone: 'ahead',
+		figure: 'start-sit',
+		head: FIGURE_WORDS.startSit,
+		cells: [
+			{ label: FIGURE_WORDS.matched, value: '3 of 5', tone: 'even' },
+			{ label: FIGURE_WORDS.ours, value: '+12.4', tone: 'short' }
+		],
 		basis: START_SIT_BASIS
 	});
-	assert.equal(startSitRow(record(-3.1))?.tone, 'behind');
-	assert.equal(startSitRow(record(-3.1))?.ours, '−3.1');
-	assert.equal(startSitRow(record(0))?.tone, 'even');
+	assert.equal(startSitRow(record(-3.1))?.cells[1]?.tone, 'over');
+	assert.equal(startSitRow(record(-3.1))?.cells[1]?.value, '−3.1');
+	assert.equal(startSitRow(record(0))?.cells[1]?.tone, 'even');
 	assert.equal(startSitRow({} as LeagueRecord), null);
 	assert.equal(startSitRow(null), null);
+});
+
+void test('points against the median: weeks above of weeks read, the net signed and toned (Lane 298)', () => {
+	const median = (total: number, above: number): Pick<LeagueSync, 'points_vs_median'> => ({
+		points_vs_median: {
+			weeks: [1, 2, 3, 4].map((week) => ({ week, points: 100, median: 100, diff: 0 })),
+			above,
+			total,
+			basis: VS_MEDIAN_BASIS
+		}
+	});
+	assert.deepEqual(medianRow(median(12.4, 3)), {
+		figure: 'vs-median',
+		head: FIGURE_WORDS.vsMedian,
+		cells: [
+			{ label: FIGURE_WORDS.above, value: '3 of 4', tone: 'even' },
+			{ label: FIGURE_WORDS.net, value: '+12.4', tone: 'over' }
+		],
+		basis: VS_MEDIAN_BASIS
+	});
+	assert.equal(medianRow(median(-8, 1))?.cells[1]?.tone, 'short');
+	assert.equal(medianRow({}), null);
+	assert.equal(medianRow(null), null);
+});
+
+void test('the playoff chance column: a percent per team, drawn only when every team has one (Lane 298)', () => {
+	assert.equal(chanceCell({ playoff_chance: 64 }), '64%');
+	assert.equal(chanceCell({ playoff_chance: 100 }), '100%');
+	assert.equal(chanceCell({ playoff_chance: null }), null);
+	assert.equal(chanceCell({}), null);
+	const team = (pct: number | undefined) =>
+		({ playoff_chance: pct }) as LeagueSync['teams'][number];
+	assert.equal(
+		chanceShown({ teams: [team(50), team(50)], playoff_chance_basis: CHANCE_BASIS }),
+		true
+	);
+	assert.equal(
+		chanceShown({ teams: [team(50), team(undefined)], playoff_chance_basis: CHANCE_BASIS }),
+		false
+	);
+	assert.equal(chanceShown({ teams: [team(50)] }), false);
+	assert.equal(chanceShown({ teams: [], playoff_chance_basis: CHANCE_BASIS }), false);
+	// The fixture's stand-in carries both figures on every team.
+	const sync = withLeagueFigures({
+		teams: Array.from({ length: 12 }, (_, i) => ({ roster_id: i + 1 }))
+	} as unknown as LeagueSync);
+	assert.equal(chanceShown(sync), true);
+	assert.equal(sync.teams[0]?.playoff_chance, 100);
+	assert.equal(sync.teams[11]?.playoff_chance, 0);
+	assert.equal(medianRow(sync)?.cells[0]?.value, '3 of 5');
 });
 
 void test('every figure word and sentence passes the copy guard', () => {
@@ -122,7 +189,9 @@ void test('every figure word and sentence passes the copy guard', () => {
 		GAP_BASIS,
 		GAP_BEST_LINEUP_BASIS,
 		POWER_BASIS,
-		START_SIT_BASIS
+		START_SIT_BASIS,
+		CHANCE_BASIS,
+		VS_MEDIAN_BASIS
 	].join(' ');
 	assert.doesNotMatch(words, bannedPattern());
 	assert.doesNotMatch(words, /\bour model\b/i);
@@ -142,4 +211,12 @@ void test('the fixture’s sentences are the API’s, word for word (dashboard.g
 	);
 	assert.ok(go.includes(START_SIT_BASIS), 'StartSitBasis');
 	assert.ok(go.includes(POWER_BASIS.replace('weeks 6 to 17', '%s')), 'powerWords, the weeks aside');
+});
+
+void test('the fixture’s median sentence is the API’s, word for word (median.go)', () => {
+	const go = readFileSync(
+		new URL('../../../../../api/internal/leaguesync/median.go', import.meta.url),
+		'utf8'
+	).replace(/" \+\n\s*"/g, '');
+	assert.ok(go.includes(`VsMedianBasis = "${VS_MEDIAN_BASIS}"`), 'VsMedianBasis');
 });

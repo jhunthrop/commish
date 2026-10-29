@@ -1,7 +1,8 @@
 // Screenshots of the League page's figures (Lane 292) against the fixture API
 // (scripts/inseason-fixture/serve.ts) and the built site, in both themes at 1440 and 390: the
 // recorded Sleeper league (the Proj gap on the member's score bug, the power panel by position) and
-// the ESPN stand-in (the member's start and sit row). It asserts each figure draws with its one
+// the ESPN stand-in (the member's start and sit row); on both, Lane 298's playoff chance column on
+// the standings and the member's points against the median, each with its sentence. It asserts each figure draws with its one
 // sentence beside it, the power panel's columns and one row a team, and that the page never scrolls
 // sideways. BEFORE=1 takes the same shots with no assertion, for the before set.
 //
@@ -99,6 +100,24 @@ async function check(page: Page, where: string, expect: Expect): Promise<void> {
 		const basis = await visibleText(page, '[data-basis="power"]');
 		if (!basis?.startsWith('Power ranks')) faults.push(`${where}: power without its sentence`);
 	}
+	const chances = await page
+		.locator('td[data-figure="playoff-chance"]')
+		.filter({ visible: true })
+		.allInnerTexts();
+	if (chances.length !== TEAMS || !chances.every((c) => /^[0-9]{1,3}%$/.test(c.trim())))
+		faults.push(`${where}: playoff chance cells ${chances.join(' ')}`);
+	const chanceHead = await visibleText(page, 'section.stand thead th.pc');
+	if (chanceHead?.toLowerCase().replace(/\s+/g, ' ') !== FIGURE_WORDS.chance.toLowerCase())
+		faults.push(`${where}: the chance column's head ${String(chanceHead)}`);
+	const chanceBasis = await visibleText(page, '[data-basis="playoff-chance"]');
+	if (!chanceBasis?.startsWith(FIGURE_WORDS.chance))
+		faults.push(`${where}: the playoff chance without its sentence`);
+	const median = await visibleText(page, '[data-figure="vs-median"]');
+	if (!median?.toLowerCase().includes(FIGURE_WORDS.net.toLowerCase()))
+		faults.push(`${where}: no points against the median row`);
+	const medianBasis = await visibleText(page, '[data-basis="vs-median"]');
+	if (!medianBasis?.startsWith(FIGURE_WORDS.vsMedian))
+		faults.push(`${where}: the median row without its sentence`);
 	if (record) {
 		const row = await visibleText(page, '[data-figure="start-sit"]');
 		if (!row?.toLowerCase().includes(FIGURE_WORDS.matched.toLowerCase()))
