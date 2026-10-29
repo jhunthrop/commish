@@ -74,6 +74,19 @@ object TradesWords {
         }
     }
 
+    /** builder.ts fillsWords: the slot a trade fills (Lane 287) as its card names it, "Fills your WR", "Fills
+     * your flex"; null for none, an older answer, or a slot this app does not know. */
+    fun fills(fills: TradeRow.Fills?): String? {
+        val slot =
+            when (fills) {
+                null, TradeRow.Fills.unknown_default_open_api -> return null
+                TradeRow.Fills.FLEX -> Words.Trades.flexSlot
+                TradeRow.Fills.SUPERFLEX -> Words.Trades.superflexSlot
+                else -> fills.value
+            }
+        return "${Words.Trades.fillsYour} $slot"
+    }
+
     /** trades.ts shortSide: a side by last names, "Skattebo and Strong". */
     fun shortSide(side: List<PlayerLine>): String = list(side.map { StartRows.lastName(it.player.name) })
 

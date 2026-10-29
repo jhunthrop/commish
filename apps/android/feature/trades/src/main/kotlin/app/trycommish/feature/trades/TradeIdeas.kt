@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import app.trycommish.core.trades.IdeaPlace
 import app.trycommish.core.trades.NoIdeaLine
+import app.trycommish.core.trades.OfferPreset
 import app.trycommish.core.trades.TradeBuilderModel
 import app.trycommish.core.trades.TradePreset
 import app.trycommish.design.CommishTheme
@@ -45,10 +47,11 @@ private val CARD_WIDTH = 300.dp
 private val CARD_HEIGHT = 38.dp
 private val DASH = floatArrayOf(8f, 6f)
 
-/** Our ideas (TradeBuilder's .ideas at 390, Lanes 260, 268, B271): the head with "N more" at its end over a
- * row of two-line cards that scrolls sideways from the Best card, the best three; once every idea shows
- * they stack in place, the Best card first. A card loads its trade into the ticks, pressed while the ticks
- * hold it; a team the finder lists no trade with keeps its place, dashed, nothing to press. */
+/** Our ideas (TradeBuilder's .ideas at 390, Lanes 260, 268, 290, B271): the head with "N more" at its end
+ * over a row of cards that scrolls sideways from its first, the first three; once every idea shows they
+ * stack in place. The host's newest offer heads the row, then Best. A card loads its trade into the ticks,
+ * pressed while the ticks hold it; an offer the builder cannot hold and a team the finder lists no trade
+ * with keep their place, dashed, nothing to press. */
 @Composable
 internal fun TradeIdeasView(
     builder: TradeBuilderModel,
@@ -101,6 +104,7 @@ private fun Places(
     val size = if (wide) Modifier.fillMaxWidth() else Modifier.width(CARD_WIDTH)
     builder.ideas.forEach { place ->
         when (place) {
+            is IdeaPlace.Offer -> OfferCard(place.offer, builder.pressed == place.key, size) { actions.idea(place.key) }
             is IdeaPlace.Idea -> IdeaCard(place.preset, builder.pressed == place.key, size) { actions.idea(place.key) }
             is IdeaPlace.None -> NoIdeaCard(place.line, size)
         }
@@ -108,7 +112,7 @@ private fun Places(
 }
 
 /** One idea's card: "Best" and both gains on its first line, "With Max_Jensen10" whole on its own line (a
- * long team name wraps, never cut), the deal under it. */
+ * long team name wraps, never cut), the deal under it with what it fills at its end (Lane 290). */
 @Composable
 private fun IdeaCard(
     preset: TradePreset,
@@ -138,9 +142,79 @@ private fun IdeaCard(
             Text(preset.gains, style = quiet, color = c.ink2)
         }
         Text(preset.with, style = quiet, color = c.ink2)
-        Text(preset.deal, style = Faces.small.copy(fontWeight = FontWeight.SemiBold), color = c.ink)
+        DealLine(preset.deal, preset.fills, c.accentText)
     }
 }
+
+/** The deal and its fact at the line's end (what it fills, when an offer lapses, or where to answer it); a
+ * deal too long for the line wraps beside the fact, never cut. */
+@Composable
+private fun DealLine(
+    deal: String,
+    fact: String?,
+    factInk: Color,
+) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+        Text(
+            deal,
+            style = Faces.small.copy(fontWeight = FontWeight.SemiBold),
+            color = CommishTheme.colors.ink,
+            modifier = Modifier.weight(1f),
+        )
+        fact?.let {
+            Text(
+                it,
+                style = Faces.label.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.em),
+                color = factInk,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+    }
+}
+
+/** A trade offered to the member on the host (Lane 290): "Offered to you" marked, "With Muttdogs", then give
+ * for get with its expiry at the line's end. One the builder can hold loads its ticks like an idea; one it
+ * cannot is dashed, nothing to press, and says where to answer it. Nothing is sent to the host. */
+@Composable
+private fun OfferCard(
+    offer: OfferPreset,
+    pressed: Boolean,
+    size: Modifier,
+    load: () -> Unit,
+) {
+    val c = CommishTheme.colors
+    val shape = RoundedCornerShape(Tokens.Radius.md.dp)
+    val frame =
+        if (offer.picks == null) {
+            size.heightIn(min = CARD_HEIGHT).dashed(c.line).semantics(mergeDescendants = true) {}
+        } else {
+            size
+                .heightIn(min = CARD_HEIGHT)
+                .clip(shape)
+                .background(c.surface)
+                .border(if (pressed) 2.dp else 1.dp, if (pressed) c.accent else c.line, shape)
+                .clickable(role = Role.Button, onClick = load)
+                .semantics { selected = pressed }
+        }
+    Column(frame.padding(horizontal = Tokens.Space.s3.dp, vertical = 3.dp), verticalArrangement = Arrangement.Center) {
+        Text(offer.label.uppercase(), style = Faces.label.copy(fontWeight = FontWeight.Bold), color = c.accentText)
+        Text(offer.with, style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.em), color = c.ink2)
+        DealLine(offer.deal, offer.fact, c.ink2)
+    }
+}
+
+/** A dashed rounded outline: a card with nothing to press. */
+private fun Modifier.dashed(ink: Color): Modifier =
+    drawBehind {
+        val radius =
+            Tokens.Radius.md.dp
+                .toPx()
+        drawRoundRect(
+            ink,
+            cornerRadius = CornerRadius(radius, radius),
+            style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(DASH)),
+        )
+    }
 
 /** A team with no idea (B271): its card's two lines, quiet and dashed, nothing to press. */
 @Composable
@@ -149,20 +223,11 @@ private fun NoIdeaCard(
     size: Modifier,
 ) {
     val c = CommishTheme.colors
-    val line2 = c.line
     Column(
         size
             .heightIn(min = CARD_HEIGHT)
-            .drawBehind {
-                val radius =
-                    Tokens.Radius.md.dp
-                        .toPx()
-                drawRoundRect(
-                    line2,
-                    cornerRadius = CornerRadius(radius, radius),
-                    style = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(DASH)),
-                )
-            }.semantics(mergeDescendants = true) {}
+            .dashed(c.line)
+            .semantics(mergeDescendants = true) {}
             .padding(horizontal = Tokens.Space.s3.dp, vertical = 3.dp),
         verticalArrangement = Arrangement.Center,
     ) {

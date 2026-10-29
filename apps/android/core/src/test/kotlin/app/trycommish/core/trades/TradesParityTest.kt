@@ -127,7 +127,7 @@ internal object TradesParity {
 
     fun model(clock: String): TradesModel = TradesModel(TradeFixtures.trades(clock), host, StartFixtures.instant(clock), Fixtures.zone)
 
-    private val placeKeys = listOf("kind", "key", "rosterId", "team", "mark", "gains", "deal", "note")
+    private val placeKeys = listOf("kind", "key", "rosterId", "team", "mark", "gains", "deal", "note", "fills")
 
     /** An ideas row's place as the web's JSON writes it. */
     fun place(web: JsonObject): List<String?> = placeKeys.map(web::text)
@@ -135,13 +135,17 @@ internal object TradesParity {
     /** The same place from the port. */
     fun place(place: IdeaPlace): List<String?> =
         when (place) {
+            is IdeaPlace.Offer -> {
+                val o = place.offer
+                listOf("offer", o.key, o.rosterId.toString(), o.team, o.label, null, o.deal, o.note, null)
+            }
             is IdeaPlace.Idea -> {
                 val p = place.preset
-                listOf("idea", p.key, p.rosterId.toString(), p.team, p.mark, p.gains, p.deal, null)
+                listOf("idea", p.key, p.rosterId.toString(), p.team, p.mark, p.gains, p.deal, null, p.fills)
             }
             is IdeaPlace.None -> {
                 val line = place.line
-                listOf("none", place.key, line.id.toString(), line.team, null, null, null, line.note)
+                listOf("none", place.key, line.id.toString(), line.team, null, null, null, line.note, null)
             }
         }
 
