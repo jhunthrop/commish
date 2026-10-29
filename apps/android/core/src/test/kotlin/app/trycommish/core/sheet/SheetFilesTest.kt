@@ -113,18 +113,106 @@ class SheetFilesTest {
                 assertEquals(listOf(SheetImportBody.Names(list.text)), stub.imports, list.text)
                 val words = vm.done()
                 assertEquals(SheetWords.read(kept.size), words.read, list.text)
+                val named = list.skipped.take(SheetWords.SKIPS_SHOWN).map { said(it.line, it.reason.replace("line", "row"), list.text) }
+                assertEquals(named, words.rows.take(named.size), list.text)
                 if (kept.isEmpty()) {
                     assertEquals(SheetStub.EMPTY_READ, words.kept, list.text)
-                    assertTrue(words.rows.isEmpty())
+                    assertEquals(if (list.skipped.isEmpty()) SheetWords.listShape else null, words.shape, list.text)
+                    assertEquals(SheetWords.fixList, words.verb)
                     assertEquals(8, vm.players(), "the sheet is as it was")
                     assertTrue(stub.writes.isEmpty())
                     return@forEach
                 }
-                val named = list.skipped.take(SheetWords.SKIPS_SHOWN).map { "Row ${it.line}: ${it.reason.replace("line", "row")}" }
-                assertEquals(named, words.rows.take(named.size), list.text)
                 assertNull(words.kept)
                 assertEquals(kept.size, vm.players())
             }
+        }
+
+    /** "Row 3, Michael Thomas: reason" for a row of [text] that holds something (its rank set aside), else "Row 3:
+     * reason": what the phone says for a pasted list's skipped row, written out here apart from the code. */
+    private fun said(
+        line: Int,
+        reason: String,
+        text: String,
+    ): String {
+        val typed =
+            text
+                .split("\n")
+                .getOrNull(line - 1)
+                ?.trim { it.isWhitespace() || it == '\uFEFF' }
+                ?.replace(Regex("""(?U)^[0-9]+\s*[.)\-:]?\s+"""), "")
+                ?.take(40)
+                ?.trimEnd()
+                .orEmpty()
+        return if (typed.isEmpty()) "Row $line: $reason" else "Row $line, $typed: $reason"
+    }
+
+    /** Every refusal of the parity file (Lane 297), pasted as the member would: a list the account refuses shows,
+     * under "0 players read" and the account's sentence, each row it skipped with what was typed on it and why; a
+     * CSV of a header alone is read on the phone, never sent, and says it held a header alone, never a list's
+     * shape. The verb is "Fix the list", which goes back to the box with the text kept; nothing is written. */
+    @Test
+    fun `every parity refusal lists its skipped rows and Fix the list keeps the text`() =
+        runTest(main) {
+            val refusals = SheetParity.load().refusals
+            assertTrue(refusals.any { it.skipped.isNotEmpty() })
+            assertTrue(refusals.any { it.skipped.isEmpty() })
+            refusals.forEach { refusal ->
+                val (stub, vm) = loaded()
+                stub.importRefusal = refusal.failure
+                vm.openImport()
+                vm.paste(refusal.text)
+                vm.importText(vm.ui.value.importText)
+                settle()
+                val words = vm.done()
+                assertEquals("0 players read", words.read)
+                assertEquals(refusal.body, words.kept)
+                assertEquals(if (refusal.skipped.isEmpty()) null else SheetWords.skipped(refusal.skipped.size), words.skipped)
+                assertEquals(refusal.skipped.map { said(it.line, SheetWords.rowWords(it.reason), refusal.text) }, words.rows)
+                assertEquals(if (refusal.skipped.isEmpty()) SheetWords.headerOnly else null, words.shape, refusal.text)
+                assertEquals("Fix the list", words.verb)
+                assertEquals(if (refusal.csv) 0 else 1, stub.imports.size, "a CSV is read on the phone first")
+                assertTrue(stub.writes.isEmpty())
+                assertEquals(8, vm.players(), "the sheet is as it was")
+                vm.finishImport()
+                assertEquals(SheetImport.Open(), vm.ui.value.importing)
+                assertEquals(refusal.text, vm.ui.value.pasted, "the text is kept to fix")
+            }
+            val named = refusals.first { it.skipped.isNotEmpty() }
+            assertEquals("Row 3, Michael Thomas: x", said(3, "x", named.text), "the typed name, not the count")
+            assertEquals("Row 1, Puka Nacua: x", said(1, "x", named.text), "the rank set aside")
+        }
+
+    @Test
+    fun `a typed row is cut and a missing one says the row alone`() {
+        val long = "Amon-Ra St. Brown ".repeat(4)
+        val words =
+            SheetImportWords.of(
+                0,
+                listOf(SheetCsv.Skip(1, "R"), SheetCsv.Skip(3, "R"), SheetCsv.Skip(9, "R")),
+                "K",
+                "$long\r\n   \nGibbs\r",
+            )
+        assertEquals("Row 1, ${long.take(40).trimEnd()}: R", words.rows[0])
+        assertEquals("Row 3, Gibbs: R", words.rows[1])
+        assertEquals("Row 9: R", words.rows[2])
+    }
+
+    /** An API from before Lane 297 refuses with its sentence alone: shown as the import's result, the shape said,
+     * the verb "Fix the list"; a result that read players says Done. */
+    @Test
+    fun `an older API's refusal without rows still reads as the result`() =
+        runTest(main) {
+            val (stub, vm) = loaded()
+            stub.importRefusal = ApiFailure(400, "invalid", "Some of that did not check out", mapOf("body" to SheetStub.EMPTY_READ))
+            vm.importText("Gibbs")
+            settle()
+            val words = vm.done()
+            assertEquals(SheetStub.EMPTY_READ, words.kept)
+            assertTrue(words.rows.isEmpty())
+            assertEquals(SheetWords.listShape, words.shape)
+            assertEquals(SheetWords.fixList, words.verb)
+            assertEquals(SheetWords.done, SheetImportWords.of(1, emptyList(), null).verb)
         }
 
     @Test
@@ -138,14 +226,15 @@ class SheetFilesTest {
     @Test
     fun `a list is told from a CSV by its first line`() {
         SheetParity.load().lists.forEach { assertEquals(it.csv, SheetCsv.looksLikeCsv(it.text), it.text) }
-        assertTrue(SheetCsv.looksLikeCsv("﻿\n  Rank,Player_ID,Name,Position\n1,a,B,QB"))
+        assertTrue(SheetCsv.looksLikeCsv("\uFEFF\n  Rank,Player_ID,Name,Position\n1,a,B,QB"))
         // As the API reads it: a no-break space is not set aside, and "\r" alone does not end the line.
         assertFalse(SheetCsv.looksLikeCsv(" \nrank,player_id,name,position"))
         assertTrue(SheetCsv.looksLikeCsv("Gibbs\rrank,player_id,name,position"))
     }
 
-    /** A list the account reads no player from says why (its sentence), what a list that reads looks like, and
-     * Done goes back to the box with the text kept to fix it; an import that read players closes. */
+    /** A list the account reads no player from and names no row for says why (its sentence), what a list that
+     * reads looks like, and "Fix the list" goes back to the box with the text kept; an import that read players
+     * closes. */
     @Test
     fun `a list that reads nothing says what to paste and Done keeps the text`() =
         runTest(main) {

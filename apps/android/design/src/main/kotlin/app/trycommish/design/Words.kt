@@ -1139,6 +1139,8 @@ object Words {
         const val replace = "Replace my sheet"
         const val use = "Use this sheet"
         const val cancel = "Cancel"
+        const val fixList = "Fix the list"
+        const val headerOnly = "The file has a header and no players"
         const val unreadable = "That file does not read as CSV"
         const val didNotOpen = "That file did not open"
         const val tooLarge = "That file is over 1 MB"

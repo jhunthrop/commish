@@ -2842,6 +2842,9 @@ type ErrorBody struct {
 	Feature *Feature           `json:"feature,omitempty"`
 	Fields  *map[string]string `json:"fields,omitempty"`
 	Message string             `json:"message"`
+
+	// Skipped The import's 400 for a body that read to no player (Lane 297, B281): each line skipped with its reason, the same rows as a 200 import's skipped, empty when the body held no line to read. Absent from every other error and from an older answer.
+	Skipped *[]ImportSkip `json:"skipped,omitempty"`
 }
 
 // Export defines model for Export.

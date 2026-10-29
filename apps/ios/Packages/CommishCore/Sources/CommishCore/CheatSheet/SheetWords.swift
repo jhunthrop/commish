@@ -149,12 +149,16 @@ public enum SheetWords {
     /// ImportPanel.svelte PASTE_EXAMPLE.
     public static let pastePlaceholder = Words.SheetImport.pasteExample
     /// The phone's own: what a list that reads looks like, said under an import that read nothing and named
-    /// no skipped row (the account's refusal carries no row's reason).
+    /// no skipped row, so the format itself was wrong.
     public static let listShape = "Paste one player to a row, like 1. Puka Nacua"
     public static let replace = Words.SheetImport.replace
     public static let use = Words.SheetImport.use
     public static let cancel = Words.SheetImport.cancel
     public static let done = Words.Sheet.done
+    /// The verb under an import that read no player: back to the box, the text kept (Lane 297).
+    public static let fixList = Words.SheetImport.fixList
+    /// Under a CSV that read no player and skipped no row: its header and nothing under it.
+    public static let headerOnly = Words.SheetImport.headerOnly
     public static let tooLarge = Words.SheetImport.tooLarge
     public static let unreadable = Words.SheetImport.unreadable
     /// How many skipped lines the result names before it counts the rest (SKIPS_SHOWN).
@@ -176,6 +180,16 @@ public enum SheetWords {
     public static func skip(line: Int, reason: String) -> String {
         "Row \(line): \(reason)"
     }
+
+    /// "Row 3, Michael Thomas: Two players share this name. Add his position after a comma": a pasted list's
+    /// row with what was typed on it, so a long list's skipped row is found without counting (Lane 297
+    /// review, M1).
+    public static func skip(line: Int, typed: String, reason: String) -> String {
+        "Row \(line), \(typed): \(reason)"
+    }
+
+    /// How much of a typed row a skipped row repeats.
+    public static let typedShown = 40
 
     /// "And 9 more".
     public static func more(_ count: Int) -> String {

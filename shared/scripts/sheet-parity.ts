@@ -7,7 +7,8 @@
  * sheet's name for every state the apps draw (status.ts statusWords), at instants and in a zone that
  * read the same on every machine; the sheet's bounds and its first name; and what the web's import reads
  * from a file before it lets it replace a sheet (csv.ts decodeCsv: the header's sentence, the players kept
- * in rank order, each skipped line's reason), which the phone reads before it sends a file. Written by export-parity.ts
+ * in rank order, each skipped line's reason), which the phone reads before it sends a file; and the import's
+ * 400 for a body that reads to no player, its skipped lines with their reasons. Written by export-parity.ts
  * beside the others. */
 import { CsvHeaderError, decodeCsv, encodeCsv } from '../../web/src/lib/sheet/csv.ts';
 import { SHEET_LIMITS } from '../../web/src/lib/sheet/limits.ts';
@@ -197,6 +198,49 @@ const LISTS: readonly string[] = [
 	''
 ];
 
+/** The import's 400 for a body that reads to no player (api/internal/sheets/handler.go: WriteInvalidSkipped
+ * with emptyReadSentence), which the API's handler is held to by its own test: the code, the envelope's
+ * sentence, the body's sentence, and each line skipped with its reason (Lane 297). */
+const REFUSED = {
+	code: 'invalid',
+	message: 'Some of that did not check out',
+	body: 'No player read, so your sheet is as it was.'
+} as const;
+
+/** Bodies the import refuses: a names list of no player on the board, each line with a different reason
+ * (a name not on it, a name two players share, a city two clubs share), and a CSV of its header alone,
+ * which carries an empty list: no line said why, so the format itself was wrong. */
+const REFUSALS: readonly { text: string; csv: boolean }[] = [
+	{ text: '1. Puka Nacua\n\nMichael Thomas\nLos Angeles D/ST', csv: false },
+	{ text: 'rank,player_id,name,position\n', csv: true }
+];
+
+function refusalOf({ text, csv }: { text: string; csv: boolean }): {
+	text: string;
+	csv: boolean;
+	error: {
+		code: string;
+		message: string;
+		fields: { body: string };
+		skipped: readonly { line: number; reason: string }[];
+	};
+} {
+	const read = csv ? decodeCsv(text) : readList(text, nameIndex(LIST_BOARD));
+	if (looksLikeCsv(text) !== csv || read.rows.length > 0) {
+		throw new Error(`a refusal case reads a player or is read the other way: ${JSON.stringify(text)}`);
+	}
+	return {
+		text,
+		csv,
+		error: {
+			code: REFUSED.code,
+			message: REFUSED.message,
+			fields: { body: REFUSED.body },
+			skipped: read.skipped
+		}
+	};
+}
+
 function listOf(text: string): {
 	text: string;
 	csv: boolean;
@@ -276,6 +320,7 @@ export function renderSheet(about: string): string {
 		reads: READS.map(readOf),
 		listBoard: LIST_BOARD,
 		lists: LISTS.map(listOf),
+		refusals: REFUSALS.map(refusalOf),
 		limitBoard: LIMIT_BOARD.map((p) => ({ id: p.id, name: p.name, position: p.position })),
 		limitList: limitRead()
 	};

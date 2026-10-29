@@ -224,7 +224,8 @@ func (h *Handler) updateRow(w http.ResponseWriter, r *http.Request) {
 }
 
 // emptyReadSentence refuses a body that read to no player: the import
-// replaces the sheet, so an empty read would empty it.
+// replaces the sheet, so an empty read would empty it. The refusal carries
+// the skipped lines with their reasons, as a 200 import does.
 const emptyReadSentence = "No player read, so your sheet is as it was."
 
 // badHeaderSentence refuses a CSV whose first line is not the header.
@@ -300,7 +301,7 @@ func (h *Handler) importCSV(w http.ResponseWriter, r *http.Request) {
 			h.fail(w, r, "sheets: import", err)
 			return
 		}
-		httpx.WriteInvalid(w, r, map[string]string{"body": emptyReadSentence})
+		httpx.WriteInvalidSkipped(w, r, map[string]string{"body": emptyReadSentence}, skipped)
 		return
 	}
 	d, err := h.Store.ReplaceRows(r.Context(), auth.AccountID(r), id, rows, nil, nil)
