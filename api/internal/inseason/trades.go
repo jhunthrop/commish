@@ -87,6 +87,8 @@ type tradeSide struct {
 	needs     []Need
 	// flatBase is the rest-of-season fill's strength before the trade.
 	flatBase float64
+	// needPositions is the positions its needs' slots take.
+	needPositions map[draft.Position]bool
 }
 
 // tradeFill is the search's two fills: the rest-of-season fill with
@@ -126,6 +128,12 @@ func newSide(f tradeFill, l TradeLeague, squad Squad, own bool) tradeSide {
 	}
 	s.slots = append([]float64(nil), f.w.slotPoints(s.players)...)
 	s.needs = l.Needs(TeamProfile{Slots: s.slots})
+	s.needPositions = map[draft.Position]bool{}
+	for _, n := range s.needs {
+		for _, p := range l.slots[n.Slot].Eligible {
+			s.needPositions[p] = true
+		}
+	}
 	for i, c := range squad.Players {
 		if skill(c.Position) && !c.InjuredReserve && !(own && squad.Held[c.ID]) {
 			s.tradeable = append(s.tradeable, i)
@@ -168,7 +176,7 @@ func (s tradeSide) change(f tradeFill, out []int, in []*Candidate, always bool) 
 		c.Open = s.emptied(f.f.out)
 		return c
 	}
-	if len(in) <= len(out) || s.squad.Open || (!always && !positive(c.Gain)) {
+	if len(in) <= len(out) || s.squad.Open || (!always && printedSign(c.Gain) <= 0) {
 		return c
 	}
 	drop, ok := s.withDrop(f, flat-s.flatBase, out, in)
@@ -489,21 +497,21 @@ func AllTrades(l TradeLeague, mine, theirs Squad) []Trade {
 	t := newSearch(l, mine, theirs)
 	var out []Trade
 	try := func(give, get []int) {
-		if !t.restPossible(give, get) {
+		if !t.couldFill(give, get) || !t.restPossible(give, get) {
 			return
 		}
 		my := t.mine(give, get, false)
-		if !my.stands() || !positive(my.Gain) {
+		if !my.stands() || printedSign(my.Gain) <= 0 {
 			return
 		}
 		// Their drop is looked for only where they could take the trade: a
 		// drop never raises a lineup, so one that falls already is refused,
 		// and one that holds even is reckoned again with its drop.
 		their := t.theirs(give, get, false)
-		if roundTenth(their.Gain) < 0 {
+		if printedSign(their.Gain) < 0 {
 			return
 		}
-		if !positive(their.Gain) {
+		if printedSign(their.Gain) == 0 {
 			their = t.theirs(give, get, true)
 		}
 		if !their.stands() {
@@ -605,6 +613,25 @@ func sideTakes(rest, gain float64, fills, weeks int) bool {
 	return positive(gain)
 }
 
+// couldFill is whether the trade could fill a need on either side: a slot
+// rises only when a player who can play there comes in, so a trade that
+// brings neither side a player at a position its needs take fills none
+// (the search's cheapest refusal).
+func (t *tradeSearch) couldFill(give, get []int) bool {
+	return t.me.wants(t.them.players, get) || t.them.wants(t.me.players, give)
+}
+
+// wants is whether any of players at in can play at one of the side's
+// needs.
+func (s tradeSide) wants(players []*Candidate, in []int) bool {
+	for _, p := range in {
+		if s.needPositions[players[p].Position] {
+			return true
+		}
+	}
+	return false
+}
+
 // restPossible is whether both sides could still take the trade on rest
 // of season: a drop only lowers a side's, so a trade either side refuses
 // before any drop is refused after one.
@@ -613,7 +640,41 @@ func (t *tradeSearch) restPossible(give, get []int) bool {
 	mine := t.me.restOfSeason(give, -1, t.buffer)
 	t.buffer = t.me.at(give, t.buffer)
 	theirs := t.them.restOfSeason(get, -1, t.buffer)
-	return Acceptable(mine, t.league.Weeks()) && Acceptable(theirs, t.league.Weeks())
+	return roughlyAcceptable(mine, t.league.Weeks()) && roughlyAcceptable(theirs, t.league.Weeks())
+}
+
+// printedSign is the sign of a figure as a page prints it to the tenth,
+// the tenth read only near zero (as roughlyAcceptable).
+func printedSign(v float64) int {
+	switch {
+	case v >= 0.06:
+		return 1
+	case v <= -0.06:
+		return -1
+	case v > -0.04 && v < 0.04:
+		return 0
+	}
+	switch t := roundTenth(v); {
+	case t > 0:
+		return 1
+	case t < 0:
+		return -1
+	}
+	return 0
+}
+
+// roughlyAcceptable is Acceptable, the printed tenth read only near the
+// limit: a figure a tenth or more clear of it falls the same side however
+// it prints, and the search asks thousands of times a read.
+func roughlyAcceptable(rest float64, weeks int) bool {
+	limit := -GiveUp(weeks)
+	switch {
+	case rest >= limit+0.1:
+		return true
+	case rest < limit-0.1:
+		return false
+	}
+	return Acceptable(rest, weeks)
 }
 
 // Narrow is Trades' focus and limit applied to all, one search's trades in
