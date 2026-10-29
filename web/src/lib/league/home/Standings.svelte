@@ -65,7 +65,7 @@
 
 <section class="stand" aria-label={HOME.standings}>
 	<h2>{HOME.standings}</h2>
-	<table class="standings">
+	<table class="standings" class:chanced={chance}>
 		<thead>
 			<tr>
 				{@render head('rank', HOME.rank, 'rk')}
@@ -383,7 +383,14 @@
 		}
 
 		thead th.pc {
-			width: 50px;
+			width: 44px;
+			font-size: 9px;
+			letter-spacing: 0;
+		}
+
+		/* The chance column takes its room from the team's name. */
+		.chanced .tmn b {
+			max-width: 12ch;
 		}
 
 		.chance {

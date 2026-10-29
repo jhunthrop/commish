@@ -119,10 +119,12 @@ func TestTheFieldSettledAndFFPCsSeeds(t *testing.T) {
 // fewer than three weeks played.
 func TestNoChanceWithoutItsInputs(t *testing.T) {
 	cases := map[string]func(*Snapshot){
-		"no seats":         func(s *Snapshot) { s.Terms.PlayoffTeams = 0 },
-		"a week missing":   func(s *Snapshot) { s.Schedule = s.Schedule[:6] },
-		"two weeks played": func(s *Snapshot) { s.Schedule = append(s.Schedule[:4], ahead2(3, 1, 2), ahead2(3, 3, 4), ahead2(4, 1, 4), ahead2(4, 2, 3)) },
-		"no season's end":  func(s *Snapshot) { s.Terms.PlayoffFirst = 0 },
+		"no seats":       func(s *Snapshot) { s.Terms.PlayoffTeams = 0 },
+		"a week missing": func(s *Snapshot) { s.Schedule = s.Schedule[:6] },
+		"two weeks played": func(s *Snapshot) {
+			s.Schedule = append(s.Schedule[:4], ahead2(3, 1, 2), ahead2(3, 3, 4), ahead2(4, 1, 4), ahead2(4, 2, 3))
+		},
+		"no season's end": func(s *Snapshot) { s.Terms.PlayoffFirst = 0 },
 	}
 	for name, change := range cases {
 		snap := syntheticLeague()
