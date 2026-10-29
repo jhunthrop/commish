@@ -62,15 +62,29 @@ func TestChangesFromACaptureDiff(t *testing.T) {
 }
 
 // fakeDesignations answers its pairs whose newer capture is after since,
-// as the store does.
-type fakeDesignations struct{ pairs []boards.DesignationPair }
+// as the store does; with bound set, only the oldest bound of them, cut
+// as the store cuts a read at boards.MaxPairCaptures.
+type fakeDesignations struct {
+	pairs []boards.DesignationPair
+	bound int
+}
 
-func (f fakeDesignations) DesignationPairs(_ context.Context, since time.Time) ([]boards.DesignationPair, error) {
-	var out []boards.DesignationPair
+func (f fakeDesignations) DesignationPairs(_ context.Context, since time.Time) (boards.PairRead, error) {
+	var out boards.PairRead
 	for _, p := range f.pairs {
-		if p.NewerAt.After(since) {
-			out = append(out, p)
+		if !p.NewerAt.After(since) {
+			continue
 		}
+		if f.bound > 0 && len(out.Pairs) == f.bound {
+			out.Cut = true
+			out.Left++
+			continue
+		}
+		out.Pairs = append(out.Pairs, p)
+		out.Read++
+	}
+	if out.Cut {
+		out.CutAt = out.Pairs[len(out.Pairs)-1].NewerAt
 	}
 	return out, nil
 }
@@ -107,7 +121,7 @@ func TestStarterStatusProducer(t *testing.T) {
 	c := &clock{now: newerAt.Add(20 * time.Minute)}
 	p := &StarterStatus{Designations: pairsOf(fixturePair()), Lineups: lineups, Queue: f.store, Now: c.Now, Log: quiet()}
 
-	got, err := p.Produce(context.Background(), c.Now().Add(-FirstRunWindow))
+	got, err := p.Produce(context.Background(), Window{Since: c.Now().Add(-FirstRunWindow)})
 	if err != nil || got.Changes != 6 || got.Queued != 1 || got.NewerAt == nil || !got.NewerAt.Equal(newerAt) {
 		t.Fatalf("produced %+v %v", got, err)
 	}
@@ -128,7 +142,7 @@ func TestStarterStatusProducer(t *testing.T) {
 		t.Fatalf("data %v, send after %v", data, sendAfter)
 	}
 
-	again, err := p.Produce(context.Background(), c.Now().Add(-FirstRunWindow))
+	again, err := p.Produce(context.Background(), Window{Since: c.Now().Add(-FirstRunWindow)})
 	if err != nil || again.Queued != 0 {
 		t.Fatalf("again %+v %v", again, err)
 	}
@@ -137,7 +151,7 @@ func TestStarterStatusProducer(t *testing.T) {
 		t.Fatalf("rows %d %v", rows, err)
 	}
 
-	if stale, err := p.Produce(context.Background(), newerAt); err != nil || stale.NewerAt != nil || stale.Queued != 0 {
+	if stale, err := p.Produce(context.Background(), Window{Since: newerAt}); err != nil || stale.NewerAt != nil || stale.Queued != 0 {
 		t.Fatalf("nothing after since: %+v %v", stale, err)
 	}
 }
@@ -153,7 +167,7 @@ func TestStarterStatusQuietAndSwitchedOff(t *testing.T) {
 	pair.NewerAt = late.Add(-10 * time.Minute)
 	c := &clock{now: late}
 	p := &StarterStatus{Designations: pairsOf(pair), Lineups: lineups, Queue: f.store, Now: c.Now, Log: quiet()}
-	if got, err := p.Produce(context.Background(), c.Now().Add(-FirstRunWindow)); err != nil || got.Queued != 1 {
+	if got, err := p.Produce(context.Background(), Window{Since: c.Now().Add(-FirstRunWindow)}); err != nil || got.Queued != 1 {
 		t.Fatalf("%+v %v", got, err)
 	}
 	if r := f.row(); !r.sendAfter.Equal(mustAt(t, "America/New_York", "2026-10-26 08:00")) {
@@ -167,7 +181,7 @@ func TestStarterStatusQuietAndSwitchedOff(t *testing.T) {
 	}
 	pair.NewerAt = pair.NewerAt.Add(time.Minute) // a new capture, a new key
 	p.Designations = pairsOf(pair)
-	if got, err := p.Produce(context.Background(), c.Now().Add(-FirstRunWindow)); err != nil || got.Queued != 0 {
+	if got, err := p.Produce(context.Background(), Window{Since: c.Now().Add(-FirstRunWindow)}); err != nil || got.Queued != 0 {
 		t.Fatalf("switched off: %+v %v", got, err)
 	}
 }
@@ -197,7 +211,7 @@ func TestStarterStatusCatchesUp(t *testing.T) {
 	bc := boards.DesignationPair{Older: ab.Newer, Newer: designated(map[string]string{}, nil, third), OlderAt: second, NewerAt: third}
 	c := &clock{now: third.Add(5 * time.Minute)}
 	p := &StarterStatus{Designations: pairsOf(ab, bc), Lineups: lineups, Queue: f.store, Now: c.Now, Log: quiet()}
-	got, err := p.Produce(context.Background(), c.Now().Add(-FirstRunWindow))
+	got, err := p.Produce(context.Background(), Window{Since: c.Now().Add(-FirstRunWindow)})
 	if err != nil || got.Pairs != 2 || got.Changes != 2 || got.Queued != 2 || got.Skipped != 1 {
 		t.Fatalf("caught up %+v %v", got, err)
 	}
@@ -211,7 +225,7 @@ func TestStarterStatusCatchesUp(t *testing.T) {
 	if len(rows) != 2 || !given[outKey] || given[clearedKey] {
 		t.Fatalf("the older change was not given up for the newer: %+v", rows)
 	}
-	if again, err := p.Produce(context.Background(), c.Now().Add(-FirstRunWindow)); err != nil || again.Queued != 0 {
+	if again, err := p.Produce(context.Background(), Window{Since: c.Now().Add(-FirstRunWindow)}); err != nil || again.Queued != 0 {
 		t.Fatalf("again %+v %v", again, err)
 	}
 }
@@ -243,14 +257,14 @@ func TestStarterStatusSkipsStaleLeagues(t *testing.T) {
 	}}
 	c := &clock{now: newerAt.Add(20 * time.Minute)}
 	p := &StarterStatus{Designations: pairsOf(fixturePair()), Lineups: lineups, Queue: f.store, Now: c.Now, Log: quiet()}
-	got, err := p.Produce(context.Background(), c.Now().Add(-FirstRunWindow))
+	got, err := p.Produce(context.Background(), Window{Since: c.Now().Add(-FirstRunWindow)})
 	if err != nil || got.StaleLeagues != 1 || got.Queued != 1 {
 		t.Fatalf("%+v %v", got, err)
 	}
 	stale := fakeLineups{f.acct: {{LinkID: uuid.New(), LeagueName: "Stale", Stale: true,
 		Players: []leaguesync.StartingPlayer{{BoardID: "out", Name: "Ja'Marr Chase"}}}}}
 	p.Lineups = stale
-	if got, err := p.Produce(context.Background(), c.Now().Add(-FirstRunWindow)); err != nil || got.Queued != 0 || got.StaleLeagues != 1 {
+	if got, err := p.Produce(context.Background(), Window{Since: c.Now().Add(-FirstRunWindow)}); err != nil || got.Queued != 0 || got.StaleLeagues != 1 {
 		t.Fatalf("a stale league's starter was pushed: %+v %v", got, err)
 	}
 }

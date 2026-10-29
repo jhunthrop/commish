@@ -337,7 +337,7 @@ func TestDrainSkipsLapsedDevices(t *testing.T) {
 	if sent := fcm.tokens(); len(sent) != 1 || sent[0] != tabletToken {
 		t.Fatalf("sent to %v", sent)
 	}
-	accounts, _, err := f.store.PushAccounts(context.Background(), KindStarterStatus, noon.Add(-auth.SessionTTL))
+	accounts, _, err := f.store.PushAccounts(context.Background(), KindStarterStatus, noon.Add(-auth.SessionTTL), uuid.Nil)
 	if err != nil || len(accounts) != 1 {
 		t.Fatalf("push accounts %v %v", accounts, err)
 	}

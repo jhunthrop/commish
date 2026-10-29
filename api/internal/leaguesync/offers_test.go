@@ -339,6 +339,7 @@ func TestPutOffersRetiresThePreviousClaim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	connectHost(t, pool, alice.ID, HostESPN)
 	at := time.Date(2026, 10, 25, 17, 0, 0, 0, time.UTC)
 	expires := at.Add(48 * time.Hour)
 	a := Offer{OfferID: "a", From: 2, Give: []string{"1"}, Get: []string{"2"}, Drop: []string{}, ExpiresAt: &expires}
