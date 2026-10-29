@@ -10,8 +10,9 @@ them, so its score is unusual against his own baseline as well as his peers'. A 
 family (his snaps, his targets, his carries, his air yards, his red-zone work, his spread, the club's expected
 score, vacated work, his return), the strongest.
 
-The sheet carries the top `LEAD_ANGLES`, and a third when it scores `THIRD_ANGLE_SCORE` or more, most unusual
-first (`render`). An angle on a thin basis (`THIN_FLOORS`: under three games, a share on fewer than 20 snaps or
+The sheet carries at most `MAX_ANGLES`, most unusual first (`render`), and only angles that score
+`MIN_ANGLE_SCORE` or more: a sheet with none over it carries none, and the writer leans on his status and his game
+(the coordinator's fix round 1). An angle on a thin basis (`THIN_FLOORS`: under three games, a share on fewer than 20 snaps or
 10 targets or carries) is never carried, so it never leads. `ANGLES_ON` is the one switch: off, the sheet, the
 prompt and the validator are main's before Lane 300.
 """
@@ -48,10 +49,10 @@ from research.capsules.week.angle_candidates import (
 )
 from research.capsules.week.usage_reads import UsageWeek
 
-# The switch (Lane 300's ship bar): False and every sheet, ask and check is main's before the angles, and the
-# nightly reads no usage for them. Held off: the bake-off of 2026-10-29 missed the bar (the Lane 300 report); the
-# bake-off's `--angles on` runs the arm.
-ANGLES_ON: Final = False
+# The switch (Lane 300): on, merging turns the angles on (the coordinator's fix round 1). False and every sheet,
+# ask and check is main's before the angles and the nightly reads no usage for them; the bake-off's `--angles`
+# sets it for a run's arm.
+ANGLES_ON: Final = True
 
 
 def angles_on() -> bool:
@@ -65,8 +66,12 @@ THIN_GAMES: Final = 3
 # A peer z-score needs this many peers at his position, or the candidate has no score.
 MIN_PEERS: Final = 8
 # The sheet carries two angles, and a third only when it is about one standard deviation out (the top sixth).
-LEAD_ANGLES: Final = 2
-THIRD_ANGLE_SCORE: Final = 1.0
+# Two angles at most (fix round 1): a third ran the reads past the figure cap and the word band, the two
+# largest of the angles arm's fall causes in Lane 300's first three pairs.
+MAX_ANGLES: Final = 2
+# An angle under this score never reaches the sheet (fix round 1): about three quarters of a standard deviation
+# from his position's middle, so "the 26th-highest snap share among tight ends" is left to his card.
+MIN_ANGLE_SCORE: Final = 0.75
 # Work vacated: a teammate ruled out this week who drew at least this share of his club's targets (or carries,
 # for a back) in his games, and played within this many weeks of this one (a player out for a month has had
 # his work taken already). Its score is the share over `VACATED_SHARE_PER_SCORE`: 15% scores 1.5.
@@ -229,7 +234,7 @@ def expected(team: str | None, clubs: Mapping[str, float]) -> Candidate | None:
     else:
         return None
     figure = page_tenth(points)
-    text = f"Expected score: {page_tenth_text(figure)} points for {club_possessive(team)[:-1]}, {place}"
+    text = f"Expected score: {club_possessive(team)} expected score is {page_tenth_text(figure)} points, {place}"
     return Candidate(
         "expected", "expected", None, text, (figure,), Basis(THIN_GAMES, THIN_FLOORS[GAMES], GAMES),
         fixed=CLUB_FACT_WEIGHT * abs(_z(points, list(clubs.values())) or 0.0),
@@ -288,7 +293,7 @@ def _scored(c: Candidate, pool: Sequence[float], position: str) -> Angle | None:
     if c.ends is not None and c.measure is not None:
         text = f"{text}, {place_words(c.measure, pool, c.ends)} among the {POSITION_WORDS[position]} we rank"
     if c.key == "spread":
-        text = f"{'Boom or bust' if z > 0 else 'A steady floor'}: his {text}"
+        text = f"{'Boom or bust' if z > 0 else 'Steady week to week'}: {text}"
     return Angle(c.key, f"{text}.", figures, c.names, round(abs(z), 2), c.basis)
 
 
@@ -308,15 +313,14 @@ _FAMILY: Final = {
 
 
 def chosen(angles: Iterable[Angle]) -> tuple[Angle, ...]:
-    """The strongest angle a family, most unusual first: `LEAD_ANGLES`, and a third at `THIRD_ANGLE_SCORE`."""
+    """The strongest angle a family, most unusual first, `MAX_ANGLES` of those at `MIN_ANGLE_SCORE` or more."""
     best: dict[str, Angle] = {}
     for angle in angles:
         family = _FAMILY.get(angle.key, angle.key)
         if family not in best or angle.score > best[family].score:
             best[family] = angle
     ordered = sorted(best.values(), key=lambda a: (-a.score, a.key))
-    third = [a for a in ordered[LEAD_ANGLES : LEAD_ANGLES + 1] if a.score >= THIRD_ANGLE_SCORE]
-    return (*ordered[:LEAD_ANGLES], *third)
+    return tuple(a for a in ordered if a.score >= MIN_ANGLE_SCORE)[:MAX_ANGLES]
 
 
 def board_angles(players: Sequence[AnglePlayer], clubs: Mapping[str, float], week: int) -> dict[str, tuple[Angle, ...]]:

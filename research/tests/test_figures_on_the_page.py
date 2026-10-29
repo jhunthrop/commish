@@ -3,10 +3,12 @@
 the card's figures, and a draft quoting another is refused by the figure guard, named first so the
 nightly's fallback line says why."""
 
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import date, timedelta
 
 import httpx
+import pytest
 
 from research.capsules.gateway import GatewayClient
 from research.capsules.page_figures import FIGURE_OFF_PAGE
@@ -34,7 +36,7 @@ from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
 from research.capsules.week.write import WeekReadResult, write_week_read
 from research.nightly.week_reads import WeekReadSpend
-from research.tests.week_read_fixtures import BOARD, CAPTURED, FIGURES, KICKOFF, starter
+from research.tests.week_read_fixtures import BOARD, CAPTURED, FIGURES, KICKOFF, main_sheet, starter
 
 
 def allen() -> WeekSheet:
@@ -197,3 +199,11 @@ def test_the_sheet_prints_a_tie_as_the_page_does() -> None:
     assert points_text(9.45) == "9.5"
     moved = replace(allen(), projection=PublishedProjection(26.4, CAPTURED, 26.6, CAPTURED))
     assert moved.projection_change == -0.2  # noqa: PLR2004 - the card's tenths, 26.4 less 26.6
+
+
+@pytest.fixture(autouse=True)
+def _main_sheet() -> Iterator[None]:
+    """These tests pin main's sheet, its lines and the reads written from it (Lane 300 turned the angles on; the
+    angles' sheet is `test_week_read_angles`'s)."""
+    with main_sheet():
+        yield

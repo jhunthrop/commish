@@ -7,6 +7,7 @@ PARITY_DATABASE_URL (a server where the harness may create `parity_*` databases)
 
 import json
 import os
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -41,7 +42,7 @@ from research.nightly.week_read_demotion import DEMOTED, demote_shared, demote_s
 from research.nightly.week_reads import WeekReadSpend, _write, record_spend
 from research.parity import databases
 from research.tests.test_week_read_rules import STARTER_READ
-from research.tests.week_read_fixtures import WRITTEN_AT, questionable, starter
+from research.tests.week_read_fixtures import WRITTEN_AT, main_sheet, questionable, starter
 
 _DATABASE = "parity_test_week_reads"
 # Lane 100 (B17, B44): the read quotes only the page's cells, at most three figures. The points the Bears allow
@@ -386,3 +387,11 @@ def test_a_carrier_whose_earlier_read_shares_a_shape_too_becomes_its_facts_block
     assert demotion.demoted == {(second.player_id, 6)} and not demotion.restored
     with engine.connect() as conn:
         assert stored_week_reads(conn, 2026, [6])[(second.player_id, 6)].source == FACTS_SOURCE
+
+
+@pytest.fixture(autouse=True)
+def _main_sheet() -> Iterator[None]:
+    """These tests pin main's sheet, its lines and the reads written from it (Lane 300 turned the angles on; the
+    angles' sheet is `test_week_read_angles`'s)."""
+    with main_sheet():
+        yield

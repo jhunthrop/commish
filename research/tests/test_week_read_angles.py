@@ -9,7 +9,8 @@ import pytest
 from research.capsules.week import angles as angles_module
 from research.capsules.week.angle_candidates import Basis
 from research.capsules.week.angles import (
-    LEAD_ANGLES,
+    MAX_ANGLES,
+    MIN_ANGLE_SCORE,
     Angle,
     AnglePlayer,
     board_angles,
@@ -29,11 +30,18 @@ from research.capsules.week.rules import ANGLE_FIGURES, MAX_FIGURES, max_figures
 from research.capsules.week.sheet import Allowed, DepthPlace, Status, Weather, WeekSheet, week_name_ledger
 from research.capsules.week.usage_reads import UsageWeek
 from research.capsules.week.validate import validate_week_read
+from research.capsules.week.voices import VOICES, _brief
 from research.explore.writer_bakeoff.angles_compare import categories
 from research.explore.writer_bakeoff.blind import Masker, answer_letter
 from research.nightly.week_reads import CHARS_PER_TOKEN, WORST_PROMPT_TOKENS
 from research.tests.test_week_read_writer import BOUND_MARGIN, worst_correction
-from research.tests.week_read_fixtures import heaviest, starter
+from research.tests.week_read_fixtures import heaviest, main_sheet, starter
+
+
+@pytest.fixture
+def angles_off() -> Iterator[None]:
+    with main_sheet():
+        yield
 
 
 @pytest.fixture
@@ -129,17 +137,18 @@ def _angle(key: str, score: float) -> Angle:
     return Angle(key, f"{key}.", (1.0,), (), score, Basis(5, 100, "snaps"))
 
 
-def test_one_angle_a_family_two_lead_and_a_third_only_when_strong() -> None:
+def test_one_angle_a_family_and_two_at_most() -> None:
     picked = chosen(
-        [_angle("target_share", 2.0), _angle("target_trend", 1.5), _angle("snap_share", 1.2), _angle("spread", 0.4)]
+        [_angle("target_share", 2.0), _angle("target_trend", 1.5), _angle("snap_share", 1.2), _angle("spread", 1.1)]
     )
     assert [a.key for a in picked] == ["target_share", "snap_share"]
-    assert len(picked) == LEAD_ANGLES
-    assert [a.key for a in chosen([_angle("spread", 2.0), _angle("red_zone", 1.5), _angle("expected", 1.1)])] == [
-        "spread",
-        "red_zone",
-        "expected",
-    ]
+    assert len(picked) == MAX_ANGLES
+
+
+def test_an_angle_under_the_minimum_never_reaches_the_sheet() -> None:
+    under = MIN_ANGLE_SCORE - 0.01
+    assert [a.key for a in chosen([_angle("spread", 2.0), _angle("red_zone", under)])] == ["spread"]
+    assert chosen([_angle("spread", under), _angle("red_zone", under / 2)]) == ()
 
 
 def test_place_words_count_from_the_nearer_end() -> None:
@@ -207,13 +216,14 @@ def test_the_sheet_leads_with_the_angles_and_leaves_off_what_does_not_bite() -> 
     text = render_week_sheet(_angled())
     assert ANGLES_HEAD in text and f"1. {_TARGETS.text}" in text and f"2. {_VACATED.text}" in text
     assert "Venue:" not in text and "Expected points:" not in text and "Depth chart" not in text
-    assert "ARI against WRs" not in text  # 26th of 32 is outside the six either end
+    assert "ARI against WRs" not in text  # 26th of 32 is outside the four either end
     assert "ARI against WRs" in render_week_sheet(
-        replace(_angled(), allowed=Allowed(28, 32, 41.3, "WR", 5, starter().written_at))
+        replace(_angled(), allowed=Allowed(29, 32, 41.3, "WR", 5, starter().written_at))
     )
     assert NO_ANGLE in render_week_sheet(starter())
 
 
+@pytest.mark.usefixtures("angles_off")
 def test_with_the_switch_off_the_sheet_is_mains() -> None:
     text = render_week_sheet(_angled())
     assert ANGLES_HEAD not in text
@@ -248,6 +258,7 @@ def test_the_prompt_and_the_correction_carry_the_angles() -> None:
     assert ANGLES_REMINDER in correction and _TARGETS.text in correction
 
 
+@pytest.mark.usefixtures("angles_off")
 def test_with_the_switch_off_the_prompt_is_mains() -> None:
     assert week_rules() == WEEK_RULES
     assert ANGLES_REMINDER not in week_correction(_angled(), "A read.", (), ())
@@ -283,6 +294,18 @@ def test_the_category_tally_counts_mentions_and_where_they_do_not_bite() -> None
     assert got["weather"]["mentions"] == 1 and got["weather"]["where_it_does_not_bite"] == 1
     assert got["depth"]["mentions"] == 1 and got["depth"]["where_it_does_not_bite"] == 0
     assert got["rank"]["mentions"] == 1 and got["rank"]["bites_on_sheets"] == 1
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_the_matchup_voice_leans_on_the_angle_unless_the_rank_bites() -> None:
+    matchup = next(v for v in VOICES if v.key == "matchup")
+    verdict = next(v for v in VOICES if v.key == "verdict")
+    sheet = _angled()  # 26th of 32 does not bite
+    assert _brief(matchup, sheet)[0] == matchup.angles_brief
+    biting = replace(sheet, allowed=Allowed(30, 32, 41.3, "WR", 5, sheet.written_at))
+    assert _brief(matchup, biting)[0] == matchup.brief
+    assert _brief(verdict, sheet)[0] == verdict.angles_brief
+    assert _brief(verdict, starter())[0] == verdict.brief  # no angles, its own brief
 
 
 def _long_angle(n: int) -> Angle:

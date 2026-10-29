@@ -1,12 +1,14 @@
 """Week-ahead sheets for the tests (Lane 72): a starter, a Questionable player and a player on bye, built
 from the dataclasses alone, so no test needs a store."""
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import fields, is_dataclass, replace
 from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Any, Final
 
+from research.capsules.week import angles
 from research.capsules.week.sheet import (
     Allowed,
     BoardPlace,
@@ -222,3 +224,15 @@ def sheet_from_json(raw: Json) -> WeekSheet:
     """The recorded fixture's sheet, read back."""
     # A field recorded before it existed (Lane 300's angles) keeps its default.
     return WeekSheet(**{f.name: _field_value(f.name, raw[f.name]) for f in fields(WeekSheet) if f.name in raw})
+
+
+@contextmanager
+def main_sheet() -> Iterator[None]:
+    """Main's sheet for the span, the angles off (Lane 300): a test that pins main's lines, its stub reads or
+    its prompt runs under it; the angles' sheet is `test_week_read_angles`'s."""
+    held = angles.ANGLES_ON
+    setattr(angles, "ANGLES_ON", False)  # noqa: B010 (a Final switch, set for the test)
+    try:
+        yield
+    finally:
+        setattr(angles, "ANGLES_ON", held)  # noqa: B010

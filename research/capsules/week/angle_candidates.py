@@ -201,10 +201,15 @@ def red_zone(position: str, team: str | None, weeks: Sequence[UsageWeek]) -> Can
     if held is None:
         return None
     own, club = held
-    word = "touchdown" if touchdowns == 1 else "touchdowns"
+    # No touchdown is said in words, never "0 touchdowns" (a zero beside a scoring word reads as a claim).
+    scored = (
+        "no touchdown yet"
+        if touchdowns == 0
+        else f"{js_string(touchdowns)} {'touchdown' if touchdowns == 1 else 'touchdowns'}"
+    )
     text = (
         f"Red zone: {percent_text(own / club)} of {club_possessive(team)} red-zone carries and targets in his "
-        f"games this season, and {js_string(touchdowns)} {word}"
+        f"games this season, and {scored}"
     )
     # The measure is set by the ranking pass (touchdowns less his chances at his peers' rate); `own` rides here.
     return Candidate(
@@ -222,5 +227,9 @@ def spread(points: Sequence[float]) -> Candidate | None:
         return None
     sd = (sum((p - mean) ** 2 for p in points) / len(points)) ** 0.5
     low, high = page_tenth(min(points)), page_tenth(max(points))
-    text = f"games this season run from {page_tenth_text(low)} to {page_tenth_text(high)} PPR points"
+    # Each end with its unit (a range's "14.2 to 28.9 PPR points" lost its first unit in the reads).
+    text = (
+        f"his lowest game this season is {page_tenth_text(low)} PPR points and his highest "
+        f"{page_tenth_text(high)} PPR points"
+    )
     return Candidate("spread", "spread", sd / mean, text, (low, high), Basis(len(points), len(points), GAMES))

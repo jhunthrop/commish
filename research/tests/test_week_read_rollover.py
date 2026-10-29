@@ -11,7 +11,7 @@ server where the harness may create `parity_*` databases); skipped without it.""
 
 import json
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -43,7 +43,7 @@ from research.nightly.week_read_demotion import demote_shared_keeping
 from research.parity import databases
 from research.tests.test_week_read_rules import STARTER_READ
 from research.tests.test_week_read_store import _QUESTIONABLE_READ
-from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, questionable, starter
+from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, main_sheet, questionable, starter
 
 _DATABASE = "parity_test_week_read_rollover"
 _PRICE = ModelPrice("zai/glm-5.3-flash", 0.15, 0.50, "test", True)
@@ -806,3 +806,11 @@ def test_a_nightly_status_rewrite_is_asked_twice_and_leaves_the_day_one_hourly_r
     later = _MORNING + timedelta(hours=1)
     capped = _step(engine, monkeypatch, _on(moved, later), _Writer(asked=asked), hourly=True, at=later)
     assert len(asked) == 3 * MAX_CALLS_PER_READ and "0 reads due" in capped.summary
+
+
+@pytest.fixture(autouse=True)
+def _main_sheet() -> Iterator[None]:
+    """These tests pin main's sheet, its lines and the reads written from it (Lane 300 turned the angles on; the
+    angles' sheet is `test_week_read_angles`'s)."""
+    with main_sheet():
+        yield

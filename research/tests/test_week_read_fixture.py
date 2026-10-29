@@ -39,7 +39,7 @@ from research.capsules.week.rules import CALLS, MAX_FIGURES, WEEK_NEVER_WORDS, s
 from research.capsules.week.sheet import WeekSheet, week_name_ledger
 from research.capsules.week.validate import WEEK_BAND, sentence_shapes, validate_week_read
 from research.capsules.week.write import write_week_read
-from research.tests.week_read_fixtures import sheet_from_json
+from research.tests.week_read_fixtures import main_sheet, sheet_from_json
 
 _FIXTURE = Path(__file__).parent / "testdata" / "week_reads" / "recorded.json"
 # The player page shots' stand-in read at the cap (Lane 121, B98), checked here against the recorded sheet.
@@ -233,3 +233,11 @@ def test_no_sentence_shape_sits_on_two_of_the_reads(reads: list[str]) -> None:
 def test_the_caption_is_the_write_in_central_time_for_the_week() -> None:
     sheet, _ = _sheet(_NAMES[0])
     assert written_caption(sheet.written_at, sheet.week) == "Written Sat Oct 17, 1:12 pm CT, for week 6"
+
+
+@pytest.fixture(autouse=True)
+def _main_sheet() -> Iterator[None]:
+    """These tests pin main's sheet, its lines and the reads written from it (Lane 300 turned the angles on; the
+    angles' sheet is `test_week_read_angles`'s)."""
+    with main_sheet():
+        yield

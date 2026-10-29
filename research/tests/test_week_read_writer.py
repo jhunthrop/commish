@@ -67,7 +67,7 @@ from research.nightly.week_reads import (
     worst_read_usd,
 )
 from research.tests.test_week_read_rules import BYE_READ, STARTER_READ
-from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, heaviest, on_bye, questionable, starter
+from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, heaviest, main_sheet, on_bye, questionable, starter
 
 _USAGE = Usage(2400, 150, 2550, 0.0004)
 _A_DRAFT_AND_ONE_MORE = 2
@@ -693,3 +693,11 @@ def test_the_hourly_retries_never_ask_one_read_twice_in_an_hour() -> None:
     out = replace(sheet, status=Status("out", REPORT))
     held = _stored(attempt_day=today, attempts=1 + STATUS_REWRITES_A_DAY)
     assert due_reason(out, held, _NOW, hourly=True) is None
+
+
+@pytest.fixture(autouse=True)
+def _main_sheet() -> Iterator[None]:
+    """These tests pin main's sheet, its lines and the reads written from it (Lane 300 turned the angles on; the
+    angles' sheet is `test_week_read_angles`'s)."""
+    with main_sheet():
+        yield

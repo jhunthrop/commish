@@ -18,8 +18,9 @@ SNOW_BITES_CHANCE: Final = 30.0
 _RAIN: Final = frozenset({"rain", "thunderstorms"})
 _SNOW: Final = frozenset({"snow", "ice"})
 _ROOFED: Final = frozenset({"dome", "retractable"})
-# The opponent's rank bites at the six clubs either end: the middle of the 32 sits within a few points a game.
-RANK_EDGE: Final = 6
+# The opponent's rank bites at the four clubs either end (the coordinator's fix round 1, from six): at six it
+# bit on about a third of sheets and the writer used it nearly every time, over the quarter the founder's ask sets.
+RANK_EDGE: Final = 4
 # A depth-chart move is this week's news only when its release came out within the week before the write.
 DEPTH_MOVE_WINDOW: Final = timedelta(days=8)
 

@@ -9,6 +9,7 @@ his place in our order said with which order (M2); the season named once (the ru
 five sentences; no sentence shape another page carries (M4). The season read in season refuses the
 draft-time sentence."""
 
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime
 
@@ -43,6 +44,7 @@ from research.tests.week_read_fixtures import (
     LINES,
     REPORT,
     WRITTEN_AT,
+    main_sheet,
     on_bye,
     on_injured_reserve,
     questionable,
@@ -774,3 +776,11 @@ def test_a_short_list_names_the_nearer_end() -> None:
     """Review LOW-2: 1st of 4 is the fewest, never among the most."""
     assert rank_words(1, 4) == "the fewest"
     assert rank_words(4, 4) == "the most"
+
+
+@pytest.fixture(autouse=True)
+def _main_sheet() -> Iterator[None]:
+    """These tests pin main's sheet, its lines and the reads written from it (Lane 300 turned the angles on; the
+    angles' sheet is `test_week_read_angles`'s)."""
+    with main_sheet():
+        yield

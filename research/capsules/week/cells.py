@@ -10,6 +10,10 @@ draws in no cell (a full-season preseason figure, a range, his touchdowns, point
 the read, so a reader never meets a number he cannot find on the page. The published projection and its
 change are cells the read never quotes (Lane 275, `quotable_figures`): the Wk cell carries them, and the read
 stands when they move.
+
+THE ONE EXCEPTION TO LANE 100 (Lane 300, the coordinator's fix round 1): a figure one of his angles states may be
+quoted though no cell prints it. It is the verified why of his week, computed from the store with its basis
+(`angles`), on the sheet in the angle's own words, and checked to the figure like a cell's.
 """
 
 import re
