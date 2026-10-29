@@ -704,6 +704,28 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
     ]
 
 
+def body_rule_violations(text: str, season: int) -> list[str]:
+    """The week rules `text` breaks that judge the body alone, never a sheet (the Lane 286 re-review): its
+    paragraph and sentence count, the never words, the projection or card named, every figure's unit, the season
+    named once, a club's code, the opener, a rank stated twice, the member addressed. The cadence's check on a
+    stored read (`cadence.RULE_STALE`): a rule that reads today's sheet (the cells, the status, the report day,
+    a spelled number's cell) would refuse a read that was right when it was written."""
+    sentences = split_sentences(text.strip())
+    named = [] if not names_the_projection(text) else ["The read names the published projection or the card."]
+    return [
+        *_paragraph_violation(text),
+        *_count_violation(sentences),
+        *_word_violations(sentences),
+        *named,
+        *_unit_violations(sentences, season),
+        *_season_violation(text, season),
+        *_code_violations(sentences),
+        *_opener_violation(sentences, season),
+        *_twice_ranked_violations(sentences),
+        *_addressed_violations(sentences),
+    ]
+
+
 def shown_week_words() -> tuple[str, ...]:
     """The week's own refused words, as the prompt lists them."""
     return tuple(dict.fromkeys(word for rule in WEEK_NEVER_WORDS for word in rule.shown))

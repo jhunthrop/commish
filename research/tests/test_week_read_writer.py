@@ -378,13 +378,21 @@ def test_the_heaviest_sheet_prints_every_section() -> None:
 _NOW = WRITTEN_AT
 
 
+# A stored read every rule of the body alone takes (`rules.body_rule_violations`), so a row is due only for its
+# own reason.
+_STANDING_READ = (
+    "Bijan Robinson is Questionable on Friday's report for week 6 of 2026. He leads the Atlanta backfield when he "
+    "plays. Hold him until his status settles."
+)
+
+
 def _stored(sheet_week: int = 6, **changes: object) -> StoredWeekRead:
     row = StoredWeekRead(
         player_id="00-0038542",
         season=2026,
         week=sheet_week,
         source="llm",
-        body="A read.",
+        body=_STANDING_READ,
         model="m/x",
         written_at=_NOW - timedelta(hours=2),
         facts_at=REPORT - timedelta(days=1),
@@ -452,11 +460,37 @@ def test_a_written_read_the_rules_now_refuse_is_due_once_a_day_at_the_nightly() 
     assert due_reason(sheet, _stored(body=_STALE_BODY), _NOW) is None  # attempted today already
     assert due_reason(sheet, _stored(), tomorrow) is None
     # His rest-of-season order is ours, never the week's published projection.
-    assert due_reason(sheet, _stored(body="He is RB4 in our rest-of-season order. Hold him."), tomorrow) is None
+    ours = f"{_STANDING_READ} He is RB4 in our rest-of-season order."
+    assert due_reason(sheet, _stored(body=ours), tomorrow) is None
     # A changed status comes first, and a facts block is the unwritten retry's.
     moved = replace(sheet, status=Status("out", REPORT))
     assert due_reason(moved, _stored(body=_STALE_BODY), tomorrow) == STATUS_CHANGED
     assert due_reason(sheet, _stored(body=_STALE_BODY, source="facts"), tomorrow) == UNWRITTEN
+
+
+@pytest.mark.parametrize(
+    "stale",
+    [
+        # Lane 286 (the re-review): every rule of the body alone makes a stored read due.
+        _STANDING_READ.replace("Hold him until his status settles.", "Keep him on your roster until it settles."),
+        "Bye week aside: Bijan Robinson is Questionable on Friday's report for week 6 of 2026. He leads the Atlanta "
+        "backfield. Hold him.",
+        f"{_STANDING_READ} Chicago allows the 9th-fewest PPR points a game to backs, 9th of 32.",
+    ],
+)
+def test_a_stored_read_a_body_rule_now_refuses_is_rule_stale_at_the_nightly(stale: str) -> None:
+    sheet, tomorrow = questionable(), _NOW + timedelta(days=1)
+    assert due_reason(sheet, _stored(body=stale), tomorrow) == RULE_STALE
+    assert due_reason(sheet, _stored(body=stale), tomorrow, hourly=True) is None
+
+
+def test_a_stored_read_only_todays_sheet_refuses_is_not_due() -> None:
+    """A sheet rule reads today's cells and status: a read right when written stays. Here his Avg moved, so
+    "17.6 PPR points a game" is no cell now, and the full validator refuses what the body rules take."""
+    sheet, tomorrow = replace(questionable(), points_per_game=18.2), _NOW + timedelta(days=1)
+    body = f"{_STANDING_READ} He averages 17.6 PPR points a game this season."
+    assert not validate_week_read(body, sheet, call="hold").ok
+    assert due_reason(sheet, _stored(body=body), tomorrow) is None
 
 
 def test_the_status_cap_counts_only_the_falls_since_the_written_read() -> None:
