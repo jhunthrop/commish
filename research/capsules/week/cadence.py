@@ -9,8 +9,8 @@ rewrite only the reads whose week moved.
   fallen read is asked again at once (`nightly.week_reads.ROLLOVER_ROUNDS`).
 - His status changed since it was written (Lane 63's capture marks it): `STATUS_CHANGED`, nightly and hourly.
   A rewrite that falls keeps the written read (Lane 275 fix round 1, `kept_read`), so its status still differs;
-  the rewrites that fell since that read was written are capped at `STATUS_REWRITES_A_DAY` a Central day
-  (`status_rewrite_capped`, fix round 2), and a written read's attempts restart at one, so a success never
+  the status rewrites that fell since that read was written (Lane 293: never a rule-stale one's) are capped at
+  `STATUS_REWRITES_A_DAY` a Central day (`status_rewrite_capped`, fix round 2), and a written read's attempts restart at one, so a success never
   spends the next change's tries. A capped read is asked again at the first pass of the next Central day.
 - The written read breaks a rule the writer holds reads to now (`RULE_STALE`, Lane 275 fix round 1: a read
   written while the rules asked for the published projection names it; Lane 286: every rule of the body alone,
@@ -88,11 +88,15 @@ def status_rewrite_capped(stored: StoredWeekRead, now: datetime) -> bool:
     return stored.source == WRITTEN_SOURCE and falls_since_written(stored, now) >= STATUS_REWRITES_A_DAY
 
 
-def kept_read(before: StoredWeekRead, at: datetime) -> StoredWeekRead:
+def kept_read(before: StoredWeekRead, at: datetime, *, status_fall: bool = True) -> StoredWeekRead:
     """A written read kept over a rewrite that fell, or was demoted for a shared shape (Lane 275 fix rounds 1
-    and 2, the founder: "we should always show a read"): its body, call, status and stamps as written, one more
-    fall counted on `at`'s Central day (a read written on an earlier day counts its write as one)."""
-    return replace(before, attempt_day=central_day(at), attempts=max(attempts_today(before, at), 1) + 1)
+    and 2, the founder: "we should always show a read"): its body, call, status and stamps as written, and `at`'s
+    Central day marked attempted (a read written on an earlier day counts its write as one). Only a status
+    rewrite's fall (`status_fall`: the read's status differs from his current one) counts one more toward
+    `STATUS_REWRITES_A_DAY` (Lane 293 review, H1): a rule-stale rewrite that falls every nightly round leaves the
+    day's status rewrites whole, and the day marked keeps it from being due again until the next one."""
+    attempts = max(attempts_today(before, at), 1)
+    return replace(before, attempt_day=central_day(at), attempts=attempts + status_fall)
 
 
 def _rule_stale(stored: StoredWeekRead, now: datetime) -> bool:

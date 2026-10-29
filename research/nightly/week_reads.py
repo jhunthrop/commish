@@ -113,7 +113,8 @@ NIGHTLY_BUDGET_USD: Final = 2.50
 # The asks of a read within a nightly pass: its first, then two more for a read that fell to its facts block or
 # was demoted for a shared sentence, a rewrite held over the written read among them (Lane 293: the 2026-10-29
 # nightly's rule-stale rewrites fell at 153 of 407 in one round, the held rows never asked again); one still not
-# landed is asked again on the next nightly. A status rewrite's falls count toward `cadence.STATUS_REWRITES_A_DAY`.
+# landed is asked again on the next nightly. A status rewrite's falls count toward `cadence.STATUS_REWRITES_A_DAY`,
+# at most two of them within a nightly (`status_reask_allowed`); a rule-stale rewrite's never do (`cadence.kept_read`).
 ROLLOVER_ROUNDS: Final = 3
 HOURLY_BUDGET_USD: Final = 0.05
 HOURLY_DAY_USD: Final = 1.50  # 0.60 before the game-day status passes (Lane 263): headroom over $0.93 of waves
@@ -149,17 +150,28 @@ WORST_CALL_USD: Final = 0.00065
 Log = Callable[[str], None]
 
 
+RowStamp = tuple[str, datetime] | None
+
+
+def row_stamp(row: StoredWeekRead | None) -> RowStamp:
+    """What says another pass wrote a read: its source and written instant, as `replace_week_read` compares."""
+    return None if row is None else (row.source, row.written_at)
+
+
 @dataclass(slots=True)
 class WeekReadSpend:
     due: dict[str, int] = field(default_factory=dict)
     written: int = 0
     facts_blocks: int = 0
-    # The fallen rewrites that kept the written read they would have replaced (Lane 275 fix round 1).
-    held: int = 0
+    # The reads whose rewrite fell (or was demoted) and kept the written read it would have replaced, at the
+    # pass's end, each counted once (Lane 275 fix round 1; Lane 293 review, M2), and the asks that held one.
+    held_reads: set[tuple[str, int]] = field(default_factory=set)
+    held_asks: int = 0
     # The reads whose rewrite landed this pass and still stands, (player, week) (Lane 275 fix round 2).
     written_reads: set[tuple[str, int]] = field(default_factory=set)
-    # The reads another pass replaced while this one asked (re-review N1): never asked again this pass.
-    superseded: set[tuple[str, int]] = field(default_factory=set)
+    # Each read's row as this pass last left it, (source, written_at), for the next round's check that no other
+    # pass wrote it since (Lane 293 review, M1).
+    stood: dict[tuple[str, int], RowStamp] = field(default_factory=dict)
     budget_stopped: int = 0
     landed: int = 0
     calls: int = 0
@@ -191,6 +203,15 @@ class WeekReadSpend:
             self.completion_tokens += usage.completion_tokens or 0
             self.cost_usd += usage.cost_usd or 0.0
 
+    def hold(self, key: tuple[str, int]) -> None:
+        self.held_reads.add(key)
+        self.held_asks += 1
+
+    @property
+    def held(self) -> int:
+        """The reads still held over their written read: a later round's write takes one out."""
+        return len(self.held_reads - self.written_reads)
+
     def fell_to_facts(self, name: str, why: str) -> None:
         self.fell.append(f"{name}: {why}")
 
@@ -211,7 +232,8 @@ class WeekReadSpend:
         body = (
             f"{sum(self.due.values())} reads due ({due}), {self.written} written, {self.facts_blocks} facts blocks "
             f"({self.held} held over the written read), "
-            f"{self.budget_stopped} stopped by the budget, {self.rounds} rounds, {self.retry_line()}, "
+            f"{self.budget_stopped} stopped by the budget, {self.rounds} rounds ({self.held_asks} asks held over a "
+            f"written read), {self.retry_line()}, "
             f"{self.calls} calls, "
             f"{self.prompt_tokens} prompt and {self.completion_tokens} completion tokens, ${self.cost_usd:.6f}, "
             f"{self.demoted} demoted for a sentence on two pages{fell}{'' if tail is None else f'; {tail}'}"
@@ -319,7 +341,7 @@ def landed_row(
 ) -> StoredWeekRead:
     """What a landed read stores: the new row, or the written read kept over a fallen rewrite."""
     if before is not None and keeps_written(result, before):
-        return kept_read(before, at)
+        return kept_read(before, at, status_fall=before.status != sheet.status.status)
     return stored_row(sheet, result, reason, before, at)
 
 
@@ -391,12 +413,13 @@ def _write(  # noqa: PLR0913 - the pass's parts
             stood = replace_week_read(conn, row, before)
         if not stood:
             # Another pass replaced the row this one read (the nightly and an hourly pass overlapping, re-review N1):
-            # nothing written over it, the read counted held and left to the cadence.
-            spend.held += 1
+            # nothing written over it, the read counted held and left to the cadence (`asked_again` skips it).
+            spend.hold(key)
             spend.written_reads.discard(key)
-            spend.superseded.add(key)
             return
-        spend.held += keeps_written(result, before)
+        spend.stood[key] = row_stamp(row)
+        if keeps_written(result, before):
+            spend.hold(key)
         if row.source == WRITTEN_SOURCE and not keeps_written(result, before):
             spend.written_reads.add(key)
         else:
@@ -413,8 +436,9 @@ def _reread(engine: Engine, week: int) -> dict[tuple[str, int], StoredWeekRead]:
 
 
 # The day's status-rewrite falls (`cadence.STATUS_REWRITES_A_DAY`) a nightly's rounds leave for the hourly passes
-# (Lane 293 fix round 1): the nightly runs at 00:30 CT, so a status rewrite it asks twice and loses twice still has
-# one hourly retry that Central day.
+# (Lane 293 fix round 1): in daylight time the 05:30 UTC nightly runs at 00:30 CT, so a status rewrite it asks
+# twice and loses twice still has one hourly retry that Central day. In standard time it runs at 23:30 CT, after
+# that day's hourly passes, and the next pass is on a new day with all three (the review's LOW-3).
 STATUS_FALLS_LEFT_FOR_HOURLY: Final = 1
 
 
@@ -428,18 +452,21 @@ def asked_again(
     due: Sequence[tuple[WeekSheet, str]],
     stored: Mapping[tuple[str, int], StoredWeekRead],
     spend: WeekReadSpend,
+    started: Mapping[tuple[str, int], StoredWeekRead],
 ) -> list[tuple[WeekSheet, str]]:
     """The due reads the next round asks again: every one whose read did not land and stand this pass. One with
     nothing written is asked as `UNWRITTEN`; a written read kept over a rewrite that fell, or that the demotion
     restored, is asked under its own reason (Lane 293: on 2026-10-29 the nightly's 404 rule-stale rewrites ran one
     round, and the 153 that fell kept the old reads, the held rows counting as written), a status rewrite while
-    `status_reask_allowed` on the sheet's instant (the one its fall was counted on, `landed_row`). One another pass
-    replaced meanwhile is left to the cadence."""
+    `status_reask_allowed` on the sheet's instant (the one its fall was counted on, `landed_row`). A row whose
+    source or written instant is no longer the one this pass left (`spend.stood`, else the one it `started` from)
+    another pass wrote meanwhile, and the cadence has it (Lane 293 review, M1)."""
     again = []
     for sheet, reason in due:
         key = (sheet.player_id, sheet.week)
         row = stored.get(key)
-        if key in spend.written_reads or key in spend.superseded:
+        left = spend.stood[key] if key in spend.stood else row_stamp(started.get(key))
+        if key in spend.written_reads or row_stamp(row) != left:
             continue
         if row is None or row.source != WRITTEN_SOURCE:
             again.append((sheet, UNWRITTEN))
@@ -482,10 +509,12 @@ def _write_rounds(  # noqa: PLR0913 - the pass's parts
         _write(engine, gateway, stored, batch, room=room, spend=spend, masks=night.masks, judge=judge)
         demotion = demote_shared_keeping(engine, night.sheets, night.board_week, now, night.masks, kept=night.stored)
         spend.demoted_reads |= demotion.demoted
-        spend.held += len(demotion.restored)
+        for key in demotion.restored:
+            spend.hold(key)
         spend.written_reads -= demotion.demoted | demotion.restored
         stored = _reread(engine, night.board_week)
-        batch = asked_again(due, stored, spend)
+        spend.stood |= {key: row_stamp(stored.get(key)) for key in demotion.demoted | demotion.restored}
+        batch = asked_again(due, stored, spend, night.stored)
     spend.rounds = max(spend.rounds, done)
     spend.unwritten += [sheet.name for sheet in _not_landed(due, spend.written_reads)]
 
