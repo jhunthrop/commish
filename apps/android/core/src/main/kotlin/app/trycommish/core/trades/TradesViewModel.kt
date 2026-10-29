@@ -8,6 +8,7 @@ import app.trycommish.api.decodeEnvelope
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.TradeAdvice
 import app.trycommish.api.models.TradeCheck
+import app.trycommish.api.models.TradeTeam
 import app.trycommish.core.AppWords
 import app.trycommish.core.Cache
 import app.trycommish.core.Cached
@@ -26,13 +27,12 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * The Trades screen's view model, the iOS one's in the Waivers' pattern: the reads, the cache and the
- * clock injected; the saved finder at once (dated), then the API's; each team's best or every trade, by
- * either gain; the trades holding one player, read from the API as the picker narrows, the latest choice's
- * answer kept; a trade opened into its players; the builder, from a trade or new, posting the check of the
- * trade built as each pick lands and keeping only the latest answer; the verbs copy a trade's offer and
- * open the platform's trade page. A read that fails keeps what is shown, the finder dated by its stamp,
- * unless the API refused it in its own words. A 401 anywhere signs the device out.
+ * The Trades screen's view model, the iOS one's in the Waivers' pattern: the reads, the cache and the clock
+ * injected; the saved trades at once (dated), then the API's; the builder is the screen (Lane 260): it opens
+ * on our best trade's team with nothing ticked, an idea loads its ticks, a tick or another team posts the
+ * check of the trade built, keeping only the latest answer; the verb copies the built trade's offer and
+ * opens the platform's trade page, Share copies it as text. A read that fails keeps what is shown, dated by
+ * its stamp, unless the API refused it in its own words. A 401 anywhere signs the device out.
  */
 class TradesViewModel(
     private val reads: TradeReads,
@@ -41,7 +41,7 @@ class TradesViewModel(
     private val zone: ZoneId,
     private val host: LeagueHost,
     private val me: TradeMe,
-    /** Puts the offer on the clipboard and says whether it took. */
+    /** Puts the text on the clipboard and says whether it took. */
     private val copy: (String) -> Boolean,
     /** Opens the platform's trade page. */
     private val openPage: (String) -> Unit,
@@ -51,16 +51,13 @@ class TradesViewModel(
     private val mutableRefreshing = MutableStateFlow(false)
     private var loadJob: Job? = null
 
-    /** The finder's answer, which the strip, the chips and the picker are drawn from. */
+    /** The trades' answer, which the ideas and the rosters are drawn from. */
     private var answer: TradeAdvice? = null
 
-    /** The trades holding the picked player, as the API answered. */
-    private var narrowed: TradeAdvice? = null
-    private var narrowAsk = 0
-
-    /** The builder's picks while it is open, its latest answer and why it has none. */
+    /** The builder's picks, its latest answer with the picks it was read for, and why it has none. */
     private var picks: TradePicks? = null
     private var checked: TradeCheck? = null
+    private var answered: TradePicks? = null
     private var checkProblem: String? = null
     private var checkAsk = 0
 
@@ -75,13 +72,13 @@ class TradesViewModel(
 
     private val platform: String get() = ValueWords.platform(host)
 
-    /** "Last read Sat 12:00 pm" while the finder shown is a saved read. */
+    /** "Last read Sat 12:00 pm" while the trades shown are a saved read. */
     fun stampWords(ui: TradesUi = this.ui.value): String? = tradesStamp(ui, zone)
 
     // Reads.
 
-    /** The saved finder at once on the first open, then the API's; a failed read keeps the finder shown,
-     * dated; a refused token signs out. Each call cancels the one before. */
+    /** The saved trades at once on the first open, then the API's; a failed read keeps them shown, dated;
+     * a refused token signs out. The picks hold across a read again. Each call cancels the one before. */
     fun load(leagueId: String): Job {
         shown = leagueId
         loadJob?.cancel()
@@ -118,119 +115,39 @@ class TradesViewModel(
         }
     }
 
-    // The finder.
+    // The screen's own choices.
 
-    /** Every trade, or each team's best. */
-    fun showEvery(every: Boolean) {
-        mutableUi.update { it.copy(every = every) }
+    /** "N more": every idea in place. */
+    fun showAllIdeas() {
+        mutableUi.update { it.copy(allIdeas = true) }
         redraw()
     }
 
-    /** The finder by your gain or theirs. */
-    fun sortBy(sort: TradeSort) {
-        mutableUi.update { it.copy(sort = sort) }
-        redraw()
-    }
-
-    /** Opens a trade's players under its row, or closes them. */
-    fun toggle(key: String) {
-        mutableUi.update { it.copy(opened = if (key in it.opened) it.opened - key else it.opened + key) }
-    }
-
-    /** The Trades holding picker (TradeScreen's pick): every trade again, or the trades holding one player
-     * read from the API; a player our board does not place is in no trade, so nothing is read. The last
-     * rows stay while the next are read, and only the latest choice's answer lands. */
-    fun pick(
-        key: String?,
-        leagueId: String,
-    ): Job? {
-        narrowed = null
-        narrowAsk += 1
-        val mine = narrowAsk
-        val asks = key != null && !key.startsWith(TradeFinder.UNPLACED)
-        mutableUi.update { it.copy(holding = key, problem = null, narrowing = asks) }
-        redraw()
-        if (!asks) return null
-        return viewModelScope.launch {
-            try {
-                val advice = decodeEnvelope<TradeAdvice>(reads.trades(leagueId, key))
-                if (mine != narrowAsk) return@launch
-                narrowed = advice
-                mutableUi.update { it.copy(narrowing = false) }
-                redraw()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Unauthorized) {
-                signOut()
-            } catch (
-                @Suppress("TooGenericExceptionCaught") e: Exception,
-            ) {
-                if (mine != narrowAsk) return@launch
-                mutableUi.update { it.copy(narrowing = false, problem = unread(e)) }
-                markStale(e)
-            }
-        }
-    }
-
-    // The verbs.
-
-    /** The verb on a finder row or a strip card: the trade's offer on the clipboard, the line under it,
-     * then the platform's trade page, as the web's verb does. */
-    fun press(key: String) {
-        val model = ui.value.model ?: return
-        val line = model.row(key) ?: cardLine(key) ?: return
-        val done = copy(line.offer)
-        mutableUi.update { it.copy(copied = it.copied + (key to TradesWords.copied(done, model.platform))) }
-        model.page?.let(openPage)
-    }
-
-    /** The builder's verb: the built trade's offer, once its check has answered, then the platform's page. */
-    fun pressBuilder() {
-        val advice = answer ?: return
-        val check = checked ?: return
-        val team = advice.teams.firstOrNull { it.rosterId == picks?.team } ?: return
-        val done = copy(TradesWords.offer(team.name, check.trade))
-        mutableUi.update { it.copy(builderCopied = TradesWords.copied(done, platform)) }
-        advice.hostTradesUrl.ifEmpty { null }?.let(openPage)
+    /** The roster switch: the member's roster or theirs. */
+    fun show(side: PickSide) {
+        mutableUi.update { it.copy(drawn = side) }
     }
 
     // The builder.
 
-    /** Build a trade: the builder opened on the first team with a trade found. */
-    fun buildNew() {
-        val model = ui.value.model ?: return
-        open(model.opening)
-    }
-
-    /** Build from this: the builder opened with a finder row's trade, its check read. */
-    fun buildFrom(
+    /** One tap loads an idea into the ticks; the member changes it freely from there. */
+    fun loadIdea(
         key: String,
         leagueId: String,
     ): Job? {
-        val built =
-            ui.value.model
-                ?.row(key)
-                ?.built ?: return null
-        open(built)
+        val preset = ui.value.model?.preset(key) ?: return null
+        if (preset.picks.team != picks?.team) forgetAnswer()
+        picks = preset.picks
         return ask(leagueId)
     }
 
-    /** Not now: the builder closed. */
-    fun closeBuilder() {
-        picks = null
-        checked = null
-        checkProblem = null
-        checkAsk += 1
-        mutableUi.update { it.copy(builderCopied = null, checking = false) }
-        redraw()
-    }
-
-    /** Another team: their side starts again. */
+    /** Another team: their side starts again, and the last answer, for the last team, goes. */
     fun chooseTeam(
         team: Int,
         leagueId: String,
     ): Job? {
         val current = picks ?: return null
+        forgetAnswer()
         picks = TradePicks(team, current.give, emptyList())
         return ask(leagueId)
     }
@@ -246,12 +163,30 @@ class TradesViewModel(
         return ask(leagueId)
     }
 
-    private fun open(next: TradePicks) {
-        picks = next
-        checked = null
-        checkProblem = null
-        mutableUi.update { it.copy(builderCopied = null) }
-        redraw()
+    // The verbs.
+
+    /** The verb: the built trade's offer on the clipboard and the line under it, while the answer is the
+     * picks', then the platform's page, as the web's verb does. */
+    fun pressBuilder() {
+        val (team, check) = liveTrade() ?: return
+        val done = copy(TradesWords.offer(team.name, check.trade))
+        mutableUi.update { it.copy(builderCopied = TradesWords.copied(done, platform)) }
+        answer?.hostTradesUrl?.ifEmpty { null }?.let(openPage)
+    }
+
+    /** Share: the built trade as text in our words, and the line beside it. */
+    fun share() {
+        val (team, check) = liveTrade() ?: return
+        val done = copy(TradesWords.share(team.name, check.trade))
+        mutableUi.update { it.copy(shared = if (done) Words.Analyzer.shared else Words.Trades.copyFailed) }
+    }
+
+    /** The team and the answer the verbs act on: only while the answer is the picks' (proposable). */
+    private fun liveTrade(): Pair<TradeTeam, TradeCheck>? {
+        if (ui.value.builder?.live != true) return null
+        val check = checked ?: return null
+        val team = answer?.teams?.firstOrNull { it.rosterId == picks?.team } ?: return null
+        return team to check
     }
 
     /** Reads the check for the picks, keeping only the latest answer; the last answer stays, quieter, while
@@ -260,20 +195,22 @@ class TradesViewModel(
         checkProblem = null
         checkAsk += 1
         val mine = checkAsk
-        val input = picks?.checkInput
+        val asked = picks
+        val input = asked?.checkInput
         if (input == null) {
-            checked = null
-            mutableUi.update { it.copy(checking = false, builderCopied = null) }
+            forgetAnswer()
+            mutableUi.update { it.copy(checking = false, builderCopied = null, shared = null) }
             redraw()
             return null
         }
-        mutableUi.update { it.copy(checking = true, builderCopied = null) }
+        mutableUi.update { it.copy(checking = true, builderCopied = null, shared = null) }
         redraw()
         return viewModelScope.launch {
             try {
                 val answer = reads.checkTrade(leagueId, input)
                 if (mine != checkAsk) return@launch
                 checked = answer
+                answered = if (answer == null) null else asked
                 checkProblem = if (answer == null) Words.InSeason.narrowingUnread else null
             } catch (e: CancellationException) {
                 throw e
@@ -284,13 +221,18 @@ class TradesViewModel(
                 @Suppress("TooGenericExceptionCaught") e: Exception,
             ) {
                 if (mine != checkAsk) return@launch
-                checked = null
+                forgetAnswer()
                 checkProblem = unread(e)
                 markStale(e)
             }
             mutableUi.update { it.copy(checking = false) }
             redraw()
         }
+    }
+
+    private fun forgetAnswer() {
+        checked = null
+        answered = null
     }
 
     // Drawing.
@@ -301,53 +243,37 @@ class TradesViewModel(
         stale: Boolean,
     ) {
         answer = advice
-        draw(stamp, stale)
+        val model = TradesModel(advice, host, clock.now(), zone)
+        if (picks == null) picks = model.opening
+        mutableUi.update { it.copy(state = TradesState.Loaded(model, stamp, stale)) }
+        redraw()
     }
 
     private fun redraw() {
-        val loaded = ui.value.loaded ?: return
-        draw(loaded.stamp, loaded.stale)
-    }
-
-    private fun draw(
-        stamp: Instant,
-        stale: Boolean,
-    ) {
         val advice = answer ?: return
-        mutableUi.update { ui ->
-            ui.copy(state = TradesState.Loaded(model(advice, ui), stamp, stale), builder = builder(advice))
-        }
-    }
-
-    private fun model(
-        advice: TradeAdvice,
-        ui: TradesUi,
-    ): TradesModel = TradesModel(advice, narrowed, ui.holding, host, me.name, ui.every, ui.sort, clock.now(), zone)
-
-    private fun builder(advice: TradeAdvice): TradeBuilderModel? {
-        val current = picks ?: return null
+        val model = ui.value.model ?: return
+        val current = picks ?: return
         val now = clock.now()
-        return TradeBuilder.model(
-            TradeBuilder.Inputs(
-                advice = TradeFinder.held(advice, now),
-                picks = current,
-                answer = checked,
-                problem = checkProblem,
-                me = me,
-                pageKnown = advice.hostTradesUrl.isNotEmpty(),
-                zone = zone,
-                now = now,
-            ),
-        )
+        val builder =
+            TradeBuilder.model(
+                TradeBuilder.Inputs(
+                    advice = TradeFinder.held(advice, now),
+                    ideas = model.ideas,
+                    allIdeas = ui.value.allIdeas,
+                    picks = current,
+                    answer = checked,
+                    answered = answered,
+                    problem = checkProblem,
+                    me = me,
+                    pageKnown = advice.hostTradesUrl.isNotEmpty(),
+                    zone = zone,
+                    now = now,
+                ),
+            )
+        mutableUi.update { it.copy(builder = builder) }
     }
 
-    /** A strip card's trade where the finder shown no longer lists it (narrowed to a player). */
-    private fun cardLine(key: String): TradeLine? {
-        val advice = answer ?: return null
-        return TradesModel(advice, null, null, host, me.name, true, ui.value.sort, clock.now(), zone).row(key)
-    }
-
-    /** A read that found no signal dates the finder shown; an API refusal does not. */
+    /** A read that found no signal dates the trades shown; an API refusal does not. */
     private fun markStale(e: Exception) {
         if (e is ApiFailure) return
         mutableUi.update { ui -> ui.copy(state = ui.loaded?.copy(stale = true) ?: ui.state) }
@@ -355,7 +281,7 @@ class TradesViewModel(
 
     private fun signOut() {
         sessionEnd.signedOut()
-        mutableUi.update { it.copy(state = TradesState.SignedOut, narrowing = false, checking = false) }
+        mutableUi.update { it.copy(state = TradesState.SignedOut, checking = false) }
     }
 
     private fun decoded(body: String): TradeAdvice? =
@@ -371,8 +297,8 @@ class TradesViewModel(
         /** With nothing shown: the API's own sentence where it answered one, else no connection. */
         fun failure(e: Exception): String = (e as? ApiFailure)?.message?.takeIf { it.isNotEmpty() } ?: AppWords.cannotLoad
 
-        /** Why a narrowed read or a check is missing: the API's own sentence where it refused, else the
-         * web's line that the last read stands (state.ts Narrowing). */
+        /** Why a check is missing: the API's own sentence where it refused, else the web's line that the
+         * last read stands (state.ts Narrowing). */
         fun unread(e: Exception): String = (e as? ApiFailure)?.message?.takeIf { it.isNotEmpty() } ?: Words.InSeason.narrowingUnread
     }
 }

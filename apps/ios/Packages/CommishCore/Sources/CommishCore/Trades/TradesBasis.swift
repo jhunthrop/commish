@@ -2,10 +2,10 @@ import CommishAPI
 import CommishDesign
 import Foundation
 
-/// The Trades' basis as a phone says it once under the rows (trades.ts tradeBasis, drawnText for the
-/// phone): which trades are listed and who decides, what a game is while a trade is opened, what Proj
-/// is or the day it arrives, when Final and the stats land, what Opp is while a trade is opened, and
-/// the rules our stats lack; the record's link follows it. A port, held to the web's paragraph at every
+/// The Trades' basis as a phone says it once under the builder (trades.ts tradeBasis with the builder
+/// open, drawnText for the phone): which trades are listed and who decides, what the rest-of-season
+/// cells are, what a game is, what Proj is or the day it arrives, when Final and the stats land, and the
+/// rules our stats lack; the record's link follows it. A port, held to the web's paragraph at every
 /// clock by the parity file.
 enum TradesBasis {
     /// basis.ts DEFENSES_CLAUSE: the Proj sentence's clause where a defense is drawn.
@@ -14,28 +14,23 @@ enum TradesBasis {
     struct Facts {
         let advice: TradeAdvice
         let host: Components.Schemas.LeagueHost
-        /// Every line the finder and its opened trades can show (TradeScreen's lines).
+        /// Every line the builder can show (TradeScreen's lines).
         let lines: [PlayerLine]
-        /// What is open: a trade's players' columns, or the builder's rosters, are on the screen.
-        let opened: TradesOpened
         let zone: TimeZone
         let now: Date
     }
 
     static func phone(_ facts: Facts) -> String {
         let advice = facts.advice
-        let open = facts.opened != .none
+        // The builder's phone rows draw no Opp rank (TradeBox), so no Opp sentence.
         let parts: [String?] = [
             advice.basis,
-            // What the verdict's rest-of-season cells are, with the builder open (Lane 277).
-            facts.opened == .builder ? Words.Trades.restBasis : nil,
-            open ? advice.perGameBasis : nil,
+            // What the verdict's rest-of-season cells are (Lane 277).
+            Words.Trades.restBasis,
+            advice.perGameBasis,
             arrives(facts) ?? proj(facts),
             finals(facts),
-            // The builder's phone rows draw no Opp rank (TradeBox), so its sentence is the desk's there.
-            facts.opened == .trade ? Words.Basis.oppPhone : nil,
-            open
-                ? BasisParts.uncounted(note: advice.basisNote, list: advice.basisNoteList, lines: facts.lines) : nil,
+            BasisParts.uncounted(note: advice.basisNote, list: advice.basisNoteList, lines: facts.lines),
         ]
         return parts.compactMap(\.self).filter { !$0.isEmpty }.joined(separator: " ")
     }
@@ -61,23 +56,23 @@ enum TradesBasis {
         let read = advice.projectionReadAt.map { "read \(Formatting.weekdayTime($0, zone: facts.zone))" }
             ?? "not in yet"
         // The builder's boxes draw a defense; a trade never holds one (Lane 66g).
-        let defense = facts.opened == .builder && facts.lines.contains { $0.player.position == "DEF" }
+        let defense = facts.lines.contains { $0.player.position == "DEF" }
             ? defensesClause : ""
         let said = "\(Words.Box.proj) is \(week) published projection"
             + "\(BasisParts.scoringWords(scoring, host: nil))\(defense), \(read)."
         return BasisParts.teBonusSentence(scoring.teBonus, host: nil).map { "\(said) \($0)" } ?? said
     }
 
-    /// basis.ts finalsParts on a phone over the trades' rows: the one sentence where nothing waits on
-    /// Final, else the phone's short sentence of what Avg and Last count; with a trade opened, when Final
-    /// lands is left to the desk.
+    /// basis.ts finalsParts on a phone over the builder's rows: the one sentence where nothing waits on
+    /// Final, else the phone's short sentence of what Avg and Last count; when Final lands is left to the
+    /// desk.
     static func finals(_ facts: Facts) -> String? {
         let timing = LineupBasis.kickedOffPart(lines: facts.lines, now: facts.now)
         guard let full = finalsAt(facts) else {
             return nil
         }
         guard timing != nil, full != timing else {
-            return facts.opened != .none && full == Words.Basis.kickedOffPart ? nil : full
+            return full == Words.Basis.kickedOffPart ? nil : full
         }
         return "\(Words.Box.avg) and \(Words.Box.last) count \(ValueWords.platform(facts.host))'s finals, "
             + "our stats \(Words.Basis.statsByWednesday)"

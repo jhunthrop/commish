@@ -2,19 +2,17 @@ import CommishAPI
 @testable import CommishCore
 import Foundation
 
-/// The fixture's trades, the trades holding Aaron Rodgers, and the checks, counted; or failing as told.
+/// The fixture's trades and the checks, counted; or failing as told.
 actor TradesStub: TradesAPI {
     private let advice: TradeAdvice
-    private let holding: TradeAdvice?
     private let check: TradeCheck?
     private var failure: (any Error)?
     private var checkFailure: (any Error)?
     private(set) var reads: [String?] = []
     private(set) var checked: [TradeCheckInput] = []
 
-    init(advice: TradeAdvice, holding: TradeAdvice? = nil, check: TradeCheck?) {
+    init(advice: TradeAdvice, check: TradeCheck?) {
         self.advice = advice
-        self.holding = holding
         self.check = check
     }
 
@@ -31,7 +29,7 @@ actor TradesStub: TradesAPI {
         if let failure {
             throw failure
         }
-        return player == nil ? advice : holding ?? advice
+        return advice
     }
 
     func checkTrade(id _: String, trade: TradeCheckInput) async throws -> TradeCheck? {

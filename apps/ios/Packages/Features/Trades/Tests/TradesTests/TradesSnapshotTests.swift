@@ -8,16 +8,15 @@ import SwiftUI
 import Testing
 @testable import Trades
 
-/// The Trades' mock: the fixture league's trades, both themes, iPhone 17 Pro and iPhone SE, at 1x. The
-/// finder on Saturday noon (the phone's first screen, the strip, the picker with the chips and the
-/// finder, the basis); the best trade opened into its players with Build from this; the same trade's
-/// verb pressed (the offer copied, the line under it); the trades holding Aaron Rodgers; the builder
-/// opened from the best trade with its check (the scoreboard, the answer line, the pin, then each
-/// roster with its ticks); the builder opened new (the prompt, the board at "--"); a saved finder whose
-/// read and check found no signal (the stamp, the web's line in the builder); and Sunday afternoon,
-/// the trade's players in play (no week, "--" on the board). Each state is the view model's, read from
-/// the shared fixtures through a stub of the API. With SNAPSHOT_SHOTS set each is also written at its
-/// phone's own scale for the persona panel.
+/// The Trades' mock, builder-first (Lane 289 after the web's Lanes 260, 268 and 277): the fixture
+/// league's trades, both themes, iPhone 17 Pro and iPhone SE, at 1x. The screen as it opens on Saturday
+/// noon (the phone's first screen between the top bar and the tab bar with the pin over it, and the
+/// verdict before a tick); the Best idea loaded (the first screen with its ticks, the verdict and the
+/// pin, their roster from the switch); every idea shown; an idea they would not take (the refusal in the
+/// answer line and the pin); a saved read whose check found no signal (the stamp, the web's line); and
+/// Sunday afternoon, the trade's players in play (no week, "--" in the Proj cells, the member's roster
+/// with its drop). Each state is the view model's, read from the shared fixtures through a stub of the
+/// API. With SNAPSHOT_SHOTS set each is also written at its phone's own scale for the persona panel.
 @MainActor
 struct TradesSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -29,15 +28,12 @@ struct TradesSnapshotTests {
     static let host = Components.Schemas.LeagueHost(value1: .ffpc)
     static let me = TradeMe(name: "McConkey Kong Country", aside: "1-4, 11th of 12")
     static let best = "8:96>7526+8116"
-    static let rodgers = "8439"
 
     enum Scene: String, CaseIterable, Sendable {
-        case finder
-        case opened
-        case copied
-        case holding
-        case builder
-        case new
+        case open
+        case idea
+        case ideas
+        case refused
         case stale
         case sunday
 
@@ -47,28 +43,23 @@ struct TradesSnapshotTests {
 
         var parts: [Part] {
             switch self {
-            case .finder: [.phone, .strip, .finder, .basis]
-            case .opened, .copied: [.opened]
-            case .holding: [.finder]
-            case .builder: [.board, .yours, .theirs]
-            case .new: [.board]
-            case .stale: [.phone, .board]
-            case .sunday: [.opened, .board]
+            case .open: [.screen, .verdict]
+            case .idea: [.screen, .verdict, .theirs]
+            case .ideas: [.ideas]
+            case .refused, .stale: [.verdict]
+            case .sunday: [.verdict, .yours]
             }
         }
     }
 
     enum Part: String, Sendable {
-        /// The phone's first screen: the strip and what fits under it.
-        case phone
-        case strip
-        case finder
-        case basis
-        /// The best trade's row opened: its players, Build from this, its verb.
-        case opened
-        /// The builder's head, its scoreboard and answer line, and the pin above the bar.
-        case board
-        /// The builder's rosters, each with its ticks.
+        /// The phone's first screen: the ideas, the switch and the roster shown, the pin over its foot.
+        case screen
+        /// Every idea in place.
+        case ideas
+        /// The verdict and its lines, the pin under them.
+        case verdict
+        /// Each roster whole, with its ticks.
         case yours
         case theirs
     }
@@ -98,12 +89,23 @@ struct TradesSnapshotTests {
         try APIDecoding.envelopeData(T.self, from: Data(contentsOf: inseason.appendingPathComponent(file)))
     }
 
+    /// The fixture's check, or one they would not take on their rest of season (Lane 277).
+    static func check(_ scene: Scene) throws -> TradeCheck {
+        var check = try answer(TradeCheck.self, "trade-check-\(league)-\(scene.clock)-1.json")
+        if scene == .refused {
+            check.acceptable = .init(value1: .init(yours: true, theirs: false))
+            var trade = check.trade.value1
+            trade.myRestOfSeason = 21.6
+            trade.theirRestOfSeason = -21.6
+            check.trade = .init(value1: trade)
+        }
+        return check
+    }
+
     /// The view model at the scene's state, through the stub.
     static func viewModel(_ scene: Scene) async throws -> TradesViewModel {
         let stub = try StubTrades(
-            advice: answer(TradeAdvice.self, "trades-\(league)-\(scene.clock).json"),
-            holding: answer(TradeAdvice.self, "trades-\(league)-player-\(rodgers)-2026-10-17T17-00-00Z.json"),
-            check: answer(TradeCheck.self, "trade-check-\(league)-\(scene.clock)-1.json")
+            advice: answer(TradeAdvice.self, "trades-\(league)-\(scene.clock).json"), check: check(scene)
         )
         let cache = FileCache(folder: FileManager.default.temporaryDirectory
             .appendingPathComponent("trades-snapshots-\(UUID().uuidString)"))
@@ -116,45 +118,23 @@ struct TradesSnapshotTests {
             await stub.dropSignal()
             await viewModel.load(leagueID: league)
         }
-        try await act(scene, on: viewModel)
-        return viewModel
-    }
-
-    /// What the member did in the scene.
-    static func act(_ scene: Scene, on viewModel: TradesViewModel) async throws {
-        switch scene {
-        case .opened, .copied:
-            viewModel.toggle(best)
-            if scene == .copied {
-                viewModel.press(best)
-            }
-        case .sunday:
-            viewModel.toggle(best)
-            await viewModel.build(from: best, leagueID: league)
-        case .holding:
-            await viewModel.pick(rodgers, leagueID: league)
-        case .builder, .stale:
-            await viewModel.build(from: best, leagueID: league)
-        case .new:
-            viewModel.buildNew()
-        case .finder:
-            break
+        if scene != .open, scene != .ideas {
+            await viewModel.load(idea: best, leagueID: league)
         }
+        if scene == .ideas {
+            viewModel.showAllIdeas()
+        }
+        return viewModel
     }
 
     static func view(_ item: Case) async throws -> some View {
         let viewModel = try await viewModel(item.scene)
-        guard case let .loaded(model, _, _) = viewModel.state else {
+        guard case let .loaded(model, _, _) = viewModel.state, let builder = viewModel.builder else {
             throw SceneError.notLoaded(item.scene.rawValue)
         }
-        let shown = TradesShown(
-            every: viewModel.every, sort: viewModel.sort, opened: viewModel.opened, copied: viewModel.copied,
-            narrowing: viewModel.narrowing, problem: viewModel.problem, builder: viewModel.builder,
-            checking: viewModel.checking, builderCopied: viewModel.builderCopied
-        )
-        return TradesMock(
-            model: model, stamp: viewModel.stampWords, shown: shown, part: item.part, device: item.device
-        )
+        let drawn: TradePicks.Side = item.part == .theirs ? .get : .give
+        let shown = TradesShown(builder: builder, drawn: drawn, checking: viewModel.checking)
+        return TradesMock(model: model, stamp: viewModel.stampWords, shown: shown, part: item.part, device: item.device)
     }
 
     @Test(arguments: 0 ..< cases.count)
@@ -175,6 +155,12 @@ struct TradesSnapshotTests {
         let viewModel = try await Self.viewModel(.stale)
         #expect(viewModel.stampWords == "Last read Sat 12:00 pm")
         #expect(viewModel.builder?.sentence == Words.InSeason.narrowingUnread)
+    }
+
+    @Test func theRefusedSceneSaysWhyInThePin() async throws {
+        let viewModel = try await Self.viewModel(.refused)
+        #expect(viewModel.builder?.pin == .words(Words.Trades.theyGiveUp))
+        #expect(viewModel.builder?.bug.theirs.rest.refuses == true)
     }
 
     enum SceneError: Error {
@@ -198,88 +184,50 @@ struct TradesMock: View {
 
     var body: some View {
         switch part {
-        case .phone:
-            VStack(alignment: .leading, spacing: Tokens.Space.s4) {
-                TradesPartView(part: .strip, model: model, stamp: stamp, shown: shown, actions: TradeActions())
-                TradesPartView(part: .finder, model: model, stamp: stamp, shown: shown, actions: TradeActions())
+        case .screen:
+            VStack(alignment: .leading, spacing: Tokens.Space.s2) {
+                TradesTop(stamp: stamp, shown: shown, actions: TradeActions(), still: true)
+                BuilderBoxView(shown: shown, actions: TradeActions())
             }
-            .padding(.top, Tokens.Space.s4)
-            .frame(height: room, alignment: .top)
+            .padding(Tokens.Space.s3)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, minHeight: room, maxHeight: room, alignment: .top)
+            .overlay(alignment: .bottom) { pin }
             .clipped()
-        case .strip:
-            draw(.strip)
-        case .finder:
-            draw(.finder)
-        case .basis:
-            draw(.basis)
-        case .opened:
-            opened
-        case .board, .yours, .theirs:
-            builder
-        }
-    }
-
-    private func draw(_ part: TradesPart) -> some View {
-        TradesPartView(part: part, model: model, stamp: stamp, shown: shown, actions: TradeActions())
-            .padding(.vertical, Tokens.Space.s4)
-    }
-
-    /// The opened trade alone under its row, in the finder's frame.
-    @ViewBuilder
-    private var opened: some View {
-        if let line = model.rows.first(where: { shown.opened.contains($0.id) }) {
+        case .ideas:
+            TradesTop(stamp: stamp, shown: shown, actions: TradeActions(), still: true)
+                .padding(Tokens.Space.s3)
+        case .verdict:
             VStack(alignment: .leading, spacing: Tokens.Space.s3) {
                 if let stamp {
                     StampText(stamp)
                 }
-                TableFrame {
-                    FinderRowView(line: line, open: true, sort: shown.sort) {}
-                    OpenedTradeView(line: line, model: model, copied: shown.copied[line.id], actions: TradeActions())
-                }
+                VerdictView(builder: shown.builder, checking: shown.checking)
+                pin.clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.md))
             }
             .padding(Tokens.Space.s3)
-            .padding(.vertical, Tokens.Space.s2)
+        case .yours, .theirs:
+            BuilderBoxView(shown: shown, actions: TradeActions())
+                .padding(Tokens.Space.s3)
         }
     }
 
-    /// The builder's head and board with its pin under them, or one of its rosters.
-    @ViewBuilder
-    private var builder: some View {
-        if let builder = shown.builder {
-            VStack(alignment: .leading, spacing: Tokens.Space.s3) {
-                switch part {
-                case .yours:
-                    BuilderBoxView(box: builder.yours, side: .give, actions: TradeActions())
-                case .theirs:
-                    if let theirs = builder.theirs {
-                        BuilderBoxView(box: theirs, side: .get, actions: TradeActions())
-                    }
-                default:
-                    if let stamp {
-                        StampText(stamp)
-                    }
-                    BuilderBoardView(builder: builder, checking: shown.checking, actions: TradeActions())
-                    BuilderPin(builder: builder, verb: model.verb, page: model.page, copied: shown.builderCopied) {}
-                        .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.md))
-                }
-            }
-            .padding(Tokens.Space.s3)
-            .padding(.vertical, Tokens.Space.s2)
-        }
+    private var pin: some View {
+        BuilderPin(
+            builder: shown.builder, verb: model.verb, page: model.page, checking: shown.checking, copied: nil,
+            shared: nil, actions: TradeActions()
+        )
     }
 }
 
-/// The finder, the trades holding a player and the check as the fixture answers them at a clock, or no
-/// signal.
+/// The trades and the check as the fixture answers them at a clock, or no signal.
 actor StubTrades: TradesAPI {
     let advice: TradeAdvice
-    let holding: TradeAdvice
     let check: TradeCheck
     private var offline = false
 
-    init(advice: TradeAdvice, holding: TradeAdvice, check: TradeCheck) {
+    init(advice: TradeAdvice, check: TradeCheck) {
         self.advice = advice
-        self.holding = holding
         self.check = check
     }
 
@@ -287,11 +235,11 @@ actor StubTrades: TradesAPI {
         offline = true
     }
 
-    func trades(id _: String, player: String?) async throws -> TradeAdvice {
+    func trades(id _: String, player _: String?) async throws -> TradeAdvice {
         if offline {
             throw URLError(.notConnectedToInternet)
         }
-        return player == nil ? advice : holding
+        return advice
     }
 
     func checkTrade(id _: String, trade _: TradeCheckInput) async throws -> TradeCheck? {

@@ -4,11 +4,11 @@ import CommishDesign
 import Foundation
 import Testing
 
-/// The Trades' picker, builder and built sentences held to the web (shared/fixtures/parity/trades.json,
-/// Lane 189 fix round 1): every checkWords branch over the fixture's check edited as builder.test.ts
-/// edits one, the decisions with no trade and with a gain under what a page shows, the strip's titles,
-/// the builder's prompts, the Trades holding picker and its narrowed rows, and the builder opened from
-/// the best trade with its check (both rosters with their ticks, the answer line, the pin).
+/// The Trades' builder and built sentences held to the web (shared/fixtures/parity/trades.json, Lane
+/// 189 fix round 1, Lane 277): every checkWords branch over the fixture's check edited as
+/// builder.test.ts edits one with its refusal and cells, the builder's prompts, and the builder at the
+/// Best idea's ticks with its check (both rosters with their ticks, the answer line, the pin), a
+/// refusal in the pin, a stale answer, and no team chosen.
 struct TradesBuilderParityTests {
     static let parity: BuilderParity = {
         do {
@@ -38,19 +38,8 @@ struct TradesBuilderParityTests {
         #expect(Self.parity.words.checks.contains { $0.refusal == Words.Trades.bothGiveUp })
     }
 
-    @Test func theDecisionsTitlesAndPromptsAreTheWebs() throws {
-        let words = Self.parity.words
-        #expect(TradesWords.decision(nil) == words.noTrade)
-        var row = try Self.check().trade.value1
-        row.myGain = 0.04
-        row.theirGain = 0.6
-        row.drop = nil
-        #expect(TradesWords.decision((row, "Max_Jensen10")) == words.under)
-        for title in words.titles {
-            #expect(TradesWords.worthTitle(title.count) == title.title)
-        }
-        #expect(TradesWords.noTradeWith("Josh Downs") == words.noTradeWith)
-        for prompt in words.prompts {
+    @Test func thePromptsAreTheWebs() {
+        for prompt in Self.parity.words.prompts {
             let picks = TradePicks(
                 team: 1, give: (0 ..< prompt.give).map { "g\($0)" }, get: (0 ..< prompt.get).map { "t\($0)" }
             )
@@ -58,46 +47,29 @@ struct TradesBuilderParityTests {
         }
     }
 
-    @Test func thePickerAndTheTradesHoldingAPlayerAreTheWebs() throws {
-        let web = Self.parity.holding
+    static func builder(_ picks: TradePicks, answer: TradeCheck?, answered: TradePicks?) throws -> TradeBuilderModel {
         let advice = try Fixtures.trades(Fixtures.week)
-        let model = { (every: Bool) in
-            try TradesModel(
-                advice: advice, narrowed: Fixtures.tradesHolding(), holding: web.player,
-                host: TradesParityTests.host, me: TradesParityTests.parity.me, every: every, sort: .mine,
-                now: Fixtures.instant(Fixtures.week), zone: Fixtures.zone
-            )
-        }
-        let best = try model(false)
-        // The web's key for a player our board does not place names the platform's id field; the app's
-        // prefix is its own (TradeFinder.unplaced).
-        let key = { (key: String) in key.replacingOccurrences(of: "host:", with: TradeFinder.unplaced) }
-        #expect(best.picker.yours.map(\.id) == web.yours.map { key($0.key) })
-        #expect(best.picker.yours.map(\.name) == web.yours.map(\.name))
-        #expect(best.picker.theirs.map(\.id) == web.theirs.map(\.key))
-        #expect(best.decision == web.decision)
-        #expect(best.rows.map(TradesParity.Row.init) == web.rows)
-        #expect(try model(true).rows.map(TradesParity.Row.init) == web.every)
-        let unheld = try #require(web.unheld)
-        let none = TradesModel(
-            advice: advice, holding: unheld.key, host: TradesParityTests.host, me: TradesParityTests.parity.me,
-            every: false, sort: .mine, now: Fixtures.instant(Fixtures.week), zone: Fixtures.zone
-        )
-        #expect(none.decision == unheld.decision)
-        #expect(none.noneHolding)
-        #expect(none.strip == nil)
-        #expect(none.rows.isEmpty)
+        let now = Fixtures.instant(Fixtures.week)
+        return try TradeBuilder.model(.init(
+            advice: TradeFinder.held(advice, now: now), ideas: TradesParityTests.model(Fixtures.week).ideas,
+            allIdeas: false, picks: picks, answer: answer, answered: answered, problem: nil,
+            me: TradeMe(name: TradesParityTests.parity.me, aside: ""), pageKnown: true, zone: Fixtures.zone,
+            now: now
+        ))
     }
 
-    @Test func theBuilderFromTheBestTradeIsTheWebs() throws {
+    /// The Best idea loads the web's builder picks, and the builder at them with its check is the web's:
+    /// the team choices, the answer line, both rosters with their ticks, the cells, the pin.
+    @Test func theBestIdeaLoadsTheWebsBuilder() throws {
         let web = Self.parity.builder
-        let advice = try Fixtures.trades(Fixtures.week)
         let picks = TradePicks(team: web.picks.team, give: web.picks.give, get: web.picks.get)
-        let model = try TradeBuilder.model(.init(
-            advice: TradeFinder.held(advice, now: Fixtures.instant(Fixtures.week)), picks: picks,
-            answer: Self.check(), problem: nil, me: TradeMe(name: TradesParityTests.parity.me, aside: ""),
-            pageKnown: true, zone: Fixtures.zone, now: Fixtures.instant(Fixtures.week)
-        ))
+        let ideas = try TradesParityTests.model(Fixtures.week).ideas
+        guard case let .idea(best) = try #require(ideas.places.first) else {
+            throw BuilderParity.Missing.pin
+        }
+        #expect(best.picks.same(picks))
+        let model = try Self.builder(picks, answer: Self.check(), answered: picks)
+        #expect(model.pressed == best.id)
         #expect(model.teams.map(\.id) == web.teams.map(\.rosterId))
         #expect(model.teams.map(\.choice) == web.teams.map(\.choice))
         #expect(model.sentence == web.sentence)
@@ -106,14 +78,48 @@ struct TradesBuilderParityTests {
         #expect(TradesParity.Rest(model.bug.yours.rest) == web.rest.yours)
         #expect(TradesParity.Rest(model.bug.theirs.rest) == web.rest.theirs)
         #expect(BuilderParity.Box(model.yours) == web.yours)
-        let theirs = try #require(model.theirs)
-        #expect(BuilderParity.Box(theirs) == web.theirs)
-        #expect(theirs.aside == web.theirs.aside)
+        #expect(BuilderParity.Box(model.theirs) == web.theirs)
+        #expect(model.theirs.aside == web.theirs.aside)
+        #expect(model.rosters == RosterSwitch(yours: "You, 1", theirs: "\(web.theirs.team), 2"))
         guard case let .gains(mine, rest) = model.pin else {
             throw BuilderParity.Missing.pin
         }
         #expect(web.pin == "\(mine) \(rest)")
+        #expect(model.live)
         #expect(model.verbEnabled)
+    }
+
+    /// Lane 277: where a side would not take it, the pin says why in place of the gains, as the web's
+    /// pin; an answer for other ticks is drawn but no verb acts on it (builder.ts proposable).
+    @Test func aRefusalTakesThePinAndAStaleAnswerHoldsTheVerbs() throws {
+        let web = Self.parity.builder
+        let picks = TradePicks(team: web.picks.team, give: web.picks.give, get: web.picks.get)
+        let base = try Self.check()
+        for edit in Self.parity.words.checks {
+            let edited = edit.applied(to: base)
+            let model = try Self.builder(picks, answer: edited, answered: picks)
+            if TradeChecks.fillsBoth(edited), let refusal = edit.refusal {
+                #expect(model.pin == .words(refusal), "\(edit.name)")
+            } else if !TradeChecks.fillsBoth(edited) {
+                #expect(model.pin == .words(edit.sentence), "\(edit.name)")
+                #expect(!model.live, "\(edit.name)")
+            }
+        }
+        let other = picks.tapped(.get, web.picks.get[0])
+        let stale = try Self.builder(other, answer: base, answered: picks)
+        #expect(!stale.live)
+        #expect(stale.pressed == nil)
+    }
+
+    /// No team chosen: the web's line, their box the choice alone, the switch's "Pick a team".
+    @Test func beforeATeamIsChosenTheBuilderSaysPickATeam() throws {
+        let model = try Self.builder(TradePicks(team: nil, give: [], get: []), answer: nil, answered: nil)
+        #expect(model.sentence == Words.Analyzer.noTeam)
+        #expect(model.teamLabel == Words.Analyzer.pickTeam)
+        #expect(model.rosters == RosterSwitch(yours: "You", theirs: Words.Analyzer.pickTeam))
+        #expect(model.theirs.rows.isEmpty)
+        #expect(model.theirs.holds.isEmpty)
+        #expect(!model.verbEnabled)
     }
 }
 
@@ -200,11 +206,6 @@ struct BuilderParity: Decodable {
         }
     }
 
-    struct Title: Decodable {
-        let count: Int
-        let title: String
-    }
-
     struct Prompt: Decodable {
         let give: Int
         let get: Int
@@ -213,43 +214,17 @@ struct BuilderParity: Decodable {
 
     struct Words: Decodable {
         let checks: [Edit]
-        let noTrade: String
-        let under: String
-        let titles: [Title]
-        let noTradeWith: String
         let prompts: [Prompt]
-    }
-
-    struct Option: Decodable {
-        let key: String
-        let name: String
-    }
-
-    struct Unheld: Decodable {
-        let key: String
-        let decision: String
-    }
-
-    struct Holding: Decodable {
-        let yours: [Option]
-        let theirs: [Option]
-        let player: String
-        let decision: String
-        let rows: [TradesParity.Row]
-        let every: [TradesParity.Row]
-        let unheld: Unheld?
     }
 
     struct Row: Decodable, Equatable {
         let cells: LineupParity.Row
         let season: String
-        let line: String
         let pick: String
 
         init(_ row: BuilderRow) {
             cells = LineupParity.Row(row.cells)
             season = row.cells.season
-            line = row.line
             switch row.tick {
             case .picked: pick = "on"
             case let .open(disabled): pick = disabled ? "off-full" : "off"
@@ -262,12 +237,11 @@ struct BuilderParity: Decodable {
             cells = try LineupParity.Row(from: decoder)
             let values = try decoder.container(keyedBy: Keys.self)
             season = try values.decode(String.self, forKey: .season)
-            line = try values.decode(String.self, forKey: .line)
             pick = try values.decode(String.self, forKey: .pick)
         }
 
         enum Keys: String, CodingKey {
-            case season, line, pick
+            case season, pick
         }
     }
 
@@ -319,7 +293,6 @@ struct BuilderParity: Decodable {
     }
 
     let words: Words
-    let holding: Holding
     let builder: Builder
 }
 

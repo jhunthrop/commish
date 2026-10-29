@@ -8,17 +8,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import app.trycommish.api.models.LeagueHost
+import app.trycommish.api.models.TradeAcceptable
 import app.trycommish.api.models.TradeAdvice
 import app.trycommish.api.models.TradeCheck
 import app.trycommish.api.models.TradeCheckInput
@@ -36,7 +35,6 @@ import app.trycommish.core.trades.TradesViewModel
 import app.trycommish.core.trades.envelopeOf
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Tokens
-import app.trycommish.feature.boxscore.TableFrame
 import com.android.ide.common.rendering.api.SessionParams.RenderingMode
 import com.android.resources.Density
 import kotlinx.coroutines.Dispatchers
@@ -53,15 +51,15 @@ import org.junit.runners.Parameterized
 import java.io.IOException
 
 /**
- * The Trades screen's mock, the same states as the iOS screen's (Lane 189 after its fix round), each the
- * view model's over the shared fixtures through a stub of the API. The finder on Saturday noon (the
- * phone's first screen, the strip, the picker with the chips and the finder, the basis); the best trade
- * opened into its players with Build from this; the same trade's verb pressed (the offer copied, the line
- * under it); the trades holding Aaron Rodgers; the builder opened from the best trade with its check (the
- * scoreboard, the answer line, the pin, then each roster with its ticks); the builder opened new (the
- * prompt, the board at "--"); a saved finder whose read and check found no signal (the stamp, the web's
- * line in the builder); and Sunday afternoon, the trade's players in play (no week, "--" on the board).
- * Both themes, a Pixel 9 and a small phone (the Nexus 5's 360 by 640 dp). The persona panel reads these.
+ * The Trades screen's mock, builder-first (Lane 289 after the web's Lanes 260, 268 and 277), the same states
+ * as the iOS screen's, each the view model's over the shared fixtures through a stub of the API. The screen
+ * as it opens on Saturday noon (the phone's first screen between the top bar and the bottom bar with the
+ * pin over it, and the verdict before a tick); the Best idea loaded (the first screen with its ticks, the
+ * verdict and the pin, their roster from the switch); every idea shown; an idea they would not take (the
+ * refusal in the answer line and the pin); a saved read whose check found no signal (the stamp, the web's
+ * line); and Sunday afternoon, the trade's players in play (no week, "--" in the Proj cells, the member's
+ * roster with its drop). Both themes, a Pixel 9 and a small phone (the Nexus 5's 360 by 640 dp). The
+ * persona panel reads these.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(Parameterized::class)
@@ -76,14 +74,12 @@ class TradesSnapshotTest(
         val clock: String,
         val parts: List<Part>,
     ) {
-        Finder("finder", TradeFixtures.WEEK, listOf(Part.Phone, Part.Strip, Part.Finder, Part.Basis)),
-        Opened("opened", TradeFixtures.WEEK, listOf(Part.Opened)),
-        Copied("copied", TradeFixtures.WEEK, listOf(Part.Opened)),
-        Holding("holding", TradeFixtures.WEEK, listOf(Part.Finder)),
-        Builder("builder", TradeFixtures.WEEK, listOf(Part.Board, Part.Yours, Part.Theirs)),
-        New("new", TradeFixtures.WEEK, listOf(Part.Board)),
-        Stale("stale", TradeFixtures.WEEK, listOf(Part.Phone, Part.Board)),
-        Sunday("sunday", TradeFixtures.SUNDAY, listOf(Part.Opened, Part.Board)),
+        Open("open", TradeFixtures.WEEK, listOf(Part.Screen, Part.Verdict)),
+        Idea("idea", TradeFixtures.WEEK, listOf(Part.Screen, Part.Verdict, Part.Theirs)),
+        Ideas("ideas", TradeFixtures.WEEK, listOf(Part.Ideas)),
+        Refused("refused", TradeFixtures.WEEK, listOf(Part.Verdict)),
+        Stale("stale", TradeFixtures.WEEK, listOf(Part.Verdict)),
+        Sunday("sunday", TradeFixtures.SUNDAY, listOf(Part.Verdict, Part.Yours)),
     }
 
     enum class Part(
@@ -91,19 +87,16 @@ class TradesSnapshotTest(
         /** Drawn at 1x so the long runs stay under 300 KB, the rest at 2x as the Start screen's. */
         val long: Boolean = false,
     ) {
-        /** The phone's first screen: the strip and what fits under it. */
-        Phone("phone"),
-        Strip("strip"),
-        Finder("finder", long = true),
-        Basis("basis"),
+        /** The phone's first screen: the ideas, the switch and the roster shown, the pin over its foot. */
+        Screen("screen"),
 
-        /** The best trade's row opened: its players, Build from this, its verb. */
-        Opened("opened", long = true),
+        /** Every idea in place. */
+        Ideas("ideas", long = true),
 
-        /** The builder's head, its scoreboard and answer line, and the pin above the bar. */
-        Board("board"),
+        /** The verdict and its lines, the pin under them. */
+        Verdict("verdict"),
 
-        /** The builder's rosters, each with its ticks. */
+        /** Each roster whole, with its ticks. */
         Yours("yours", long = true),
         Theirs("theirs", long = true),
     }
@@ -132,7 +125,7 @@ class TradesSnapshotTest(
 
     @Test
     fun trades() {
-        val mode = if (part == Part.Phone) RenderingMode.SHRINK else RenderingMode.V_SCROLL
+        val mode = if (part == Part.Screen) RenderingMode.SHRINK else RenderingMode.V_SCROLL
         paparazzi.unsafeUpdateConfig(deviceConfig = if (part.long) oneX(phone.config) else phone.config, renderingMode = mode)
         val vm = viewModelAt(scene)
         val ui = vm.ui.value
@@ -182,40 +175,36 @@ private fun oneX(twoX: DeviceConfig): DeviceConfig =
 /** The member's side as the iOS mock names it. */
 internal val ME = TradeMe("McConkey Kong Country", "1-4, 11th of 12")
 
-/** The view model at the scene's state, through the stub: loaded, a trade opened and its verb pressed,
- * the picker on Aaron Rodgers, the builder from the best trade or new, a saved finder with no signal, and
- * Sunday's builder. */
+/** The fixture's check, or one they would not take on their rest of season (Lane 277). */
+private fun checkAt(scene: TradesSnapshotTest.Scene): TradeCheck {
+    val check = TradeFixtures.check(scene.clock, 1)
+    if (scene != TradesSnapshotTest.Scene.Refused) return check
+    return check.copy(
+        acceptable = TradeAcceptable(yours = true, theirs = false),
+        trade = check.trade.copy(myRestOfSeason = REFUSED_REST, theirRestOfSeason = -REFUSED_REST),
+    )
+}
+
+/** The refused idea's rest of season, as the web's word case writes it. */
+private const val REFUSED_REST = 21.6
+
+/** The view model at the scene's state, through the stub: loaded, the Best idea loaded, every idea shown, a
+ * refused idea, a saved read with no signal, and Sunday's idea. */
 internal fun viewModelAt(scene: TradesSnapshotTest.Scene): TradesViewModel {
     val clock = scene.clock
-    val stub =
-        StubTrades(
-            advice = TradeFixtures.trades(clock),
-            holding = TradeFixtures.holding(),
-            check = TradeFixtures.check(clock, 1),
-        )
+    val stub = StubTrades(advice = TradeFixtures.trades(clock), check = checkAt(scene))
     val vm =
         TradesViewModel(stub, MemoryCache(), FixedClock(StartFixtures.instant(clock)), Fixtures.zone, LeagueHost.ffpc, ME, { true }, {}, {})
     val league = TradeFixtures.LEAGUE
-    val best = TradeFixtures.BEST
     vm.load(league)
     if (scene == TradesSnapshotTest.Scene.Stale) {
         stub.offline = true
         vm.load(league)
     }
     when (scene) {
-        TradesSnapshotTest.Scene.Opened -> vm.toggle(best)
-        TradesSnapshotTest.Scene.Copied -> {
-            vm.toggle(best)
-            vm.press(best)
-        }
-        TradesSnapshotTest.Scene.Sunday -> {
-            vm.toggle(best)
-            vm.buildFrom(best, league)
-        }
-        TradesSnapshotTest.Scene.Holding -> vm.pick(TradeFixtures.RODGERS, league)
-        TradesSnapshotTest.Scene.Builder, TradesSnapshotTest.Scene.Stale -> vm.buildFrom(best, league)
-        TradesSnapshotTest.Scene.New -> vm.buildNew()
-        TradesSnapshotTest.Scene.Finder -> Unit
+        TradesSnapshotTest.Scene.Open -> Unit
+        TradesSnapshotTest.Scene.Ideas -> vm.showAllIdeas()
+        else -> vm.loadIdea(TradeFixtures.BEST, league)
     }
     return vm
 }
@@ -230,61 +219,38 @@ private fun Mock(
     phone: TradesSnapshotTest.Phone,
 ) {
     val model = (ui.state as TradesState.Loaded).model
+    val builder = requireNotNull(ui.builder)
     val actions = TradeActions()
     val bg = Modifier.background(CommishTheme.colors.bg)
     val pad = bg.padding(horizontal = Tokens.Space.s3.dp, vertical = Tokens.Space.s4.dp)
-    val gap = Arrangement.spacedBy(Tokens.Space.s3.dp)
+    val pin = @Composable { BuilderPin(builder, model.verb, model.page, ui.checking, null, null, actions) }
     when (part) {
-        TradesSnapshotTest.Part.Phone ->
+        TradesSnapshotTest.Part.Screen ->
             Box(bg.fillMaxWidth().height(phone.room).clipToBounds()) {
-                TradesPage(
-                    model,
-                    ui,
-                    stamp,
-                    actions,
-                    listOf(TradesPart.Strip, TradesPart.Finder),
-                    Modifier.wrapContentHeight(Alignment.Top, unbounded = true),
-                )
-            }
-        TradesSnapshotTest.Part.Strip -> TradesPage(model, ui, stamp, actions, listOf(TradesPart.Strip), bg)
-        TradesSnapshotTest.Part.Finder -> TradesPage(model, ui, stamp, actions, listOf(TradesPart.Finder), bg)
-        TradesSnapshotTest.Part.Basis -> TradesPage(model, ui, stamp, actions, listOf(TradesPart.Basis), bg)
-        TradesSnapshotTest.Part.Opened -> {
-            val line = model.rows.first { it.key in ui.opened }
-            Column(pad, verticalArrangement = gap) {
-                stamp?.let { StampText(it) }
-                TableFrame {
-                    FinderRow(line, open = true, sort = ui.sort) {}
-                    OpenedTrade(line, model, ui.copied[line.key], actions)
+                Column(
+                    Modifier.wrapContentHeight(Alignment.Top, unbounded = true).padding(Tokens.Space.s3.dp),
+                    verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp),
+                ) {
+                    TradesTop(builder, PickSide.Give, stamp, actions)
+                    BuilderBoxView(builder, PickSide.Give, actions)
                 }
+                Box(Modifier.align(Alignment.BottomCenter)) { pin() }
             }
-        }
-        TradesSnapshotTest.Part.Board -> {
-            val builder = requireNotNull(ui.builder)
-            Column(pad, verticalArrangement = gap) {
+        TradesSnapshotTest.Part.Ideas -> Column(pad) { TradesTop(builder, PickSide.Give, stamp, actions) }
+        TradesSnapshotTest.Part.Verdict ->
+            Column(pad, verticalArrangement = Arrangement.spacedBy(Tokens.Space.s3.dp)) {
                 stamp?.let { StampText(it) }
-                BuilderBoard(builder, ui.checking, actions)
-                BuilderPin(
-                    builder,
-                    model.verb,
-                    model.page,
-                    ui.builderCopied,
-                    {},
-                    Modifier.clip(RoundedCornerShape(Tokens.Radius.md.dp)),
-                )
+                VerdictView(builder, ui.checking)
+                pin()
             }
-        }
-        TradesSnapshotTest.Part.Yours -> Column(pad) { BuilderBoxView(requireNotNull(ui.builder).yours, PickSide.Give, actions) }
-        TradesSnapshotTest.Part.Theirs ->
-            Column(pad) { requireNotNull(ui.builder).theirs?.let { BuilderBoxView(it, PickSide.Get, actions) } }
+        TradesSnapshotTest.Part.Yours -> Column(pad) { BuilderBoxView(builder, PickSide.Give, actions) }
+        TradesSnapshotTest.Part.Theirs -> Column(pad) { BuilderBoxView(builder, PickSide.Get, actions) }
     }
 }
 
-/** The finder, the trades holding a player and the check as the fixture answers them at a clock, or no
- * signal. */
+/** The trades and the check as the fixture answers them at a clock, or no signal. */
 internal class StubTrades(
     private val advice: TradeAdvice,
-    private val holding: TradeAdvice,
     private val check: TradeCheck,
 ) : TradeReads {
     var offline = false
@@ -294,7 +260,7 @@ internal class StubTrades(
         player: String?,
     ): String {
         if (offline) throw IOException("no signal")
-        return envelopeOf(if (player == null) advice else holding)
+        return envelopeOf(advice)
     }
 
     override suspend fun checkTrade(

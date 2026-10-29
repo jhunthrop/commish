@@ -52,7 +52,7 @@ data class TradeFigures(
     }
 }
 
-/** One half of the scoreboard: You or With, the team, its figures and its room. */
+/** One row of the verdict: You or With, the team, its figures, its room and its bar. */
 data class TradeBugSide(
     val label: String,
     val name: String,
@@ -62,6 +62,8 @@ data class TradeBugSide(
     val room: String,
     /** Its rest of season (Lane 277). */
     val rest: TradeRest,
+    /** Its gain a week as a share of the longer side's, 0 to 1 (builder.ts gainBars). */
+    val bar: Double = 0.0,
 ) {
     companion object {
         fun of(
@@ -72,6 +74,7 @@ data class TradeBugSide(
             projChange: Double?,
             room: String,
             rest: TradeRest,
+            bar: Double = 0.0,
         ): TradeBugSide =
             TradeBugSide(
                 label = if (me) Words.Trades.yourSide else Words.Trades.theirSide,
@@ -81,6 +84,7 @@ data class TradeBugSide(
                 figures = TradeFigures.of(totals, gain, projChange),
                 room = room,
                 rest = rest,
+                bar = bar,
             )
     }
 }

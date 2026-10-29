@@ -61,7 +61,7 @@ public struct TradeRest: Equatable, Sendable {
     }
 }
 
-/// One half of the scoreboard: You or With, the team, its figures and its room.
+/// One row of the verdict: You or With, the team, its figures, its room and its bar.
 public struct TradeBugSide: Equatable, Sendable {
     public let label: String
     public let name: String
@@ -71,12 +71,15 @@ public struct TradeBugSide: Equatable, Sendable {
     public let room: String
     /// Its rest of season (Lane 277).
     public let rest: TradeRest
+    /// Its gain a week as a share of the longer side's, 0 to 1 (builder.ts gainBars).
+    public let bar: Double
 
     init(
         me: Bool, name: String, totals: TradeSideTotals?, gain: Double?, projChange: Double?, room: String,
-        rest: TradeRest
+        rest: TradeRest, bar: Double = 0
     ) {
         self.rest = rest
+        self.bar = bar
         label = me ? Words.Trades.yourSide : Words.Trades.theirSide
         self.name = name
         initials = Initials.of(name)

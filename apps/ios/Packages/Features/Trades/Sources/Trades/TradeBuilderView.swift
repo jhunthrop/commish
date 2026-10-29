@@ -3,96 +3,102 @@ import CommishCore
 import CommishDesign
 import SwiftUI
 
-/// The builder as a phone draws it (TradeBuilder.svelte at 390): Build a trade with the team chosen by
-/// name and record and Not now; the scoreboard of each side before and after; the answer line, quiet
-/// while it is the prompt, with the close call's chip; the builder's own line; then the member's roster
-/// and theirs as box scores with a tick on every row, two a side at most. The gains and the verb are
-/// pinned above the bar by the caller (BuilderPin), as the web pins them.
-struct TradeBuilderView: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let builder: TradeBuilderModel
-    let checking: Bool
-    let actions: TradeActions
+/// The switch between the rosters as a phone stacks them (TradeBuilder's .switch): "You, 1" and
+/// "Max_Jensen10, 2", one roster drawn at a time; the ticks are the picks, so they hold across it.
+struct RosterSwitchView: View {
+    let rosters: RosterSwitch
+    let drawn: TradePicks.Side
+    let show: (TradePicks.Side) -> Void
 
     var body: some View {
-        let theme = Theme(colorScheme)
-        VStack(alignment: .leading, spacing: Tokens.Space.s3) {
-            BuilderBoardView(builder: builder, checking: checking, actions: actions)
-            BuilderBoxView(box: builder.yours, side: .give, actions: actions)
-            if let theirs = builder.theirs {
-                BuilderBoxView(box: theirs, side: .get, actions: actions)
-            }
+        HStack(spacing: Tokens.Space.s2) {
+            ChoiceChip(rosters.yours, pressed: drawn == .give) { show(.give) }
+            ChoiceChip(rosters.theirs, pressed: drawn == .get) { show(.get) }
         }
-        .padding(Tokens.Space.s4)
-        .background(theme.color(Tokens.Color.surface))
-        .overlay(alignment: .leading) {
-            Rectangle().fill(theme.color(Tokens.Color.accent)).frame(width: 4)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.md))
-        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.md).strokeBorder(theme.color(Tokens.Color.line)))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(Words.Builder.open)
+        .accessibilityLabel(Words.Analyzer.rosters)
     }
 }
 
-/// The builder's head (Build a trade, Not now, the team), its scoreboard, the answer line with the
-/// close call's chip, and its own line.
-struct BuilderBoardView: View {
+/// The roster the switch shows (TradeBox.svelte at 390): its head in one line (the member's team with
+/// its face, You and its record, or the team choice on theirs) and what the side holds, the heads, and
+/// each row at the Lineup's height with its tick, two a side at most.
+struct BuilderBoxView: View {
     @Environment(\.colorScheme) private var colorScheme
-    let builder: TradeBuilderModel
-    let checking: Bool
+    let shown: TradesShown
     let actions: TradeActions
+
+    private var side: TradePicks.Side {
+        shown.drawn
+    }
+
+    private var box: BuilderBox {
+        side == .give ? shown.builder.yours : shown.builder.theirs
+    }
 
     var body: some View {
         let theme = Theme(colorScheme)
-        VStack(alignment: .leading, spacing: Tokens.Space.s3) {
+        TableFrame {
             head(theme)
-            TradeBugView(bug: builder.bug)
-                .opacity(checking ? 0.6 : 1)
-            HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s2) {
-                Text(builder.sentence)
-                    .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: builder.quiet ? .regular : .semibold))
-                    .foregroundStyle(theme.color(builder.quiet ? Tokens.Color.ink2 : Tokens.Color.ink))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .opacity(checking ? 0.6 : 1)
-                if let close = builder.close {
-                    Pill(close)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Tokens.Space.s2)
+                .padding(.vertical, 6)
+                .background(theme.color(Tokens.Color.bg))
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(theme.color(box.mine ? Tokens.Color.accent : Tokens.Color.lineStrong))
+                        .frame(height: 2)
+                }
+            if !box.rows.isEmpty {
+                HeadRow(style: .trade)
+            }
+            ForEach(box.rows) { row in
+                PickRowView(cells: row.cells, tick: row.tick, actions: RowActions(open: actions.open)) {
+                    actions.tap(side, row.id)
                 }
             }
-            BasisText(builder.own)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(box.team.isEmpty ? Words.Builder.team : box.team)
     }
 
     private func head(_ theme: Theme) -> some View {
-        VStack(alignment: .leading, spacing: Tokens.Space.s2) {
-            HStack {
-                Text(Words.Builder.open)
-                    .font(Faces.font(.num, size: Tokens.TypeScale.xl, weight: .bold))
+        HStack(spacing: Tokens.Space.s2) {
+            if box.mine {
+                Avatar(box.initials, side: 22, mine: true)
+                Text(box.team)
+                    .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .bold))
+                    .lineLimit(1)
+                Text(Words.Box.you)
+                    .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .bold))
                     .textCase(.uppercase)
-                    .foregroundStyle(theme.color(Tokens.Color.ink))
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: Tokens.Space.s2)
-                QuietButton(Words.Builder.notNow, action: actions.builder.close)
+                    .foregroundStyle(theme.color(Tokens.Color.accentText))
+            } else {
+                // The team whole: what the side holds takes the room left, in two short lines.
+                TeamMenu(builder: shown.builder, choose: actions.team)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .layoutPriority(1)
             }
-            HStack(spacing: Tokens.Space.s2) {
-                Text(Words.Builder.team)
-                    .font(Faces.font(.ui, size: Tokens.TypeScale.sm))
-                    .foregroundStyle(theme.color(Tokens.Color.ink2))
-                TeamMenu(builder: builder, choose: actions.builder.team)
-            }
+            Spacer(minLength: Tokens.Space.s1)
+            Text(box.holds)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .semibold))
+                .foregroundStyle(theme.color(Tokens.Color.ink2))
+                .lineLimit(2)
+                .multilineTextAlignment(.trailing)
         }
+        .foregroundStyle(theme.color(Tokens.Color.ink))
     }
 }
 
-/// The team the trade is with, by name, owner and record (TradeBuilder's PickSelect).
+/// The team the trade is with, by name, owner and record (TradeBuilder's PickSelect at the head of
+/// their roster), "Pick a team" before one is chosen.
 struct TeamMenu: View {
     let builder: TradeBuilderModel
     let choose: (Int) -> Void
 
     var body: some View {
-        let chosen = builder.teams.first { $0.id == builder.team }
         ChoiceField(
-            label: Words.Builder.team, value: chosen?.choice ?? "", chosen: chosen.map { String($0.id) },
+            label: Words.Builder.team, value: builder.teamLabel, chosen: builder.team.map(String.init),
             groups: [ChoiceGroup(title: nil, choices: builder.teams.map { (String($0.id), $0.choice) })]
         ) { key in
             if let team = Int(key) {
@@ -102,70 +108,49 @@ struct TeamMenu: View {
     }
 }
 
-/// One roster of the builder (TradeBox.svelte at 390): the team with its face, You on the member's,
-/// its record, what the side holds, the heads, and its rows with their ticks.
-struct BuilderBoxView: View {
+/// The verdict under the rosters (TradeBuilder's .verdict at 390): one box-score row per side, read
+/// again on every tick, the answer line under it with the close call's chip, then the platform's line
+/// and the builder's own.
+struct VerdictView: View {
     @Environment(\.colorScheme) private var colorScheme
-    let box: BuilderBox
-    let side: TradePicks.Side
-    let actions: TradeActions
+    let builder: TradeBuilderModel
+    let checking: Bool
 
     var body: some View {
         let theme = Theme(colorScheme)
-        TableFrame {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: Tokens.Space.s2) {
-                    Avatar(box.initials, side: 30, mine: box.mine)
-                    Text(box.team)
-                        .font(Faces.font(.ui, size: Tokens.TypeScale.md, weight: .bold))
-                        .lineLimit(1)
-                    if box.mine {
-                        Text(Words.Box.you)
-                            .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: .bold))
-                            .textCase(.uppercase)
-                            .foregroundStyle(theme.color(Tokens.Color.accentText))
-                    }
-                    if !box.aside.isEmpty {
-                        Text(box.aside)
-                            .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .medium))
-                            .foregroundStyle(theme.color(Tokens.Color.ink3))
-                            .lineLimit(1)
-                    }
+        VStack(alignment: .leading, spacing: Tokens.Space.s2) {
+            TradeBugView(bug: builder.bug)
+                .opacity(checking ? 0.6 : 1)
+            HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s2) {
+                Text(builder.sentence)
+                    .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: builder.quiet ? .regular : .medium))
+                    .foregroundStyle(theme.color(builder.quiet ? Tokens.Color.ink2 : Tokens.Color.ink))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .opacity(checking ? 0.6 : 1)
+                if let close = builder.close {
+                    Pill(close)
                 }
-                Text(box.holds)
-                    .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
-                    .foregroundStyle(theme.color(Tokens.Color.ink2))
             }
-            .foregroundStyle(theme.color(Tokens.Color.ink))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Tokens.Space.s3)
-            .background(theme.color(Tokens.Color.bg))
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(theme.color(box.mine ? Tokens.Color.accent : Tokens.Color.lineStrong))
-                    .frame(height: 2)
+            .accessibilityElement(children: .combine)
+            if let line = builder.hostLine {
+                BasisText(line)
             }
-            HeadRow(style: .trade)
-            ForEach(box.rows) { row in
-                PickRowView(
-                    cells: row.cells, line: row.line, tick: row.tick, actions: RowActions(open: actions.open)
-                ) { actions.builder.tap(side, row.id) }
-            }
+            BasisText(builder.own)
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(box.team)
     }
 }
 
-/// The builder's pin above the bar (TradeBuilder's .pin under 760 px), on the lit board: the two
-/// gains, or the answer line before an answer; the verb; the line under it once pressed.
+/// The pin above the bar (TradeBuilder's .pin under 1180 px): why a side would not take it, or the two
+/// gains, or the answer line; Share and the verb; the line under them once pressed.
 struct BuilderPin: View {
     @Environment(\.colorScheme) private var colorScheme
     let builder: TradeBuilderModel
     let verb: String
     let page: URL?
+    let checking: Bool
     let copied: CopiedLine?
-    let press: () -> Void
+    let shared: String?
+    let actions: TradeActions
 
     var body: some View {
         let theme = Theme(colorScheme)
@@ -173,7 +158,11 @@ struct BuilderPin: View {
             HStack(spacing: Tokens.Space.s2) {
                 gains(theme)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Button(action: press) {
+                    .opacity(checking ? 0.6 : 1)
+                QuietButton(Words.Analyzer.share, action: actions.share)
+                    .disabled(!builder.live)
+                    .opacity(builder.live ? 1 : 0.5)
+                Button(action: actions.press) {
                     Text(verb)
                         .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .bold))
                         .foregroundStyle(theme.color(builder.verbEnabled ? Tokens.Color.accentInk : Tokens.Color.ink3))
@@ -187,14 +176,21 @@ struct BuilderPin: View {
                 .buttonStyle(.plain)
                 .disabled(!builder.verbEnabled)
             }
+            if let shared {
+                Text(shared)
+                    .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
+                    .foregroundStyle(theme.color(Tokens.Color.ink2))
+            }
             if let copied {
-                CopiedText(line: copied, page: page, onBoard: true)
+                CopiedText(line: copied, page: page)
             }
         }
         .padding(.horizontal, Tokens.Space.s3)
         .padding(.vertical, Tokens.Space.s2)
-        .background(theme.color(Tokens.Color.scoreboard))
-        .foregroundStyle(theme.color(Tokens.Color.scoreboardInk))
+        .background(theme.color(Tokens.Color.surface))
+        .overlay(alignment: .top) {
+            Rectangle().fill(theme.color(Tokens.Color.lineStrong)).frame(height: 1)
+        }
     }
 
     @ViewBuilder
@@ -202,14 +198,18 @@ struct BuilderPin: View {
         switch builder.pin {
         case let .gains(mine, rest):
             (Text(mine)
-                .font(Faces.font(.num, size: Tokens.TypeScale.lg, weight: .bold))
-                .foregroundStyle(theme.color(Tokens.Color.scoreboardNum))
-                + Text(verbatim: " \(rest)").font(Faces.font(.ui, size: Tokens.TypeScale.xs)))
+                .font(Faces.font(.num, size: Tokens.TypeScale.md, weight: .bold))
+                .foregroundStyle(theme.color(Tokens.Color.gainInk))
+                + Text(verbatim: " \(rest)")
+                .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
+                .foregroundStyle(theme.color(Tokens.Color.ink2)))
                 .fixedSize(horizontal: false, vertical: true)
         case let .words(words):
             Text(words)
                 .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
-                .lineLimit(2)
+                .foregroundStyle(theme.color(Tokens.Color.ink2))
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

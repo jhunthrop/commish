@@ -64,13 +64,6 @@ enum Fixtures {
         try APIDecoding.envelopeData(TradeAdvice.self, from: data("fixtures/inseason/trades-\(league)-\(clock).json"))
     }
 
-    /// The trades holding one player at the week's clock (GET .../trades?player=8439, Aaron Rodgers).
-    static func tradesHolding() throws -> TradeAdvice {
-        try APIDecoding.envelopeData(
-            TradeAdvice.self, from: data("fixtures/inseason/trades-\(league)-player-8439-\(week).json")
-        )
-    }
-
     /// The check of the strip's trade `number` at a clock (POST /leagues/attached/{id}/trades/check).
     static func tradeCheck(_ clock: String, _ number: Int) throws -> TradeCheck {
         try APIDecoding.envelopeData(
