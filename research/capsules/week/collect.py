@@ -30,6 +30,8 @@ from sqlalchemy import Connection, text
 from research.capsules.page_figures import expected_score, page_tenth, projection_tenth
 from research.capsules.sweep import Subject
 from research.capsules.week.angles import AnglePlayer, angles_on, board_angles
+from research.capsules.week.depth import WeeklyChart, weekly_charts, weekly_place
+from research.capsules.week.depth_moves import depth_moves
 from research.capsules.week.rollover import Rollover, projection_held, published_from_week, rollover
 from research.capsules.week.sheet import (
     CANNOT_PLAY,
@@ -47,7 +49,7 @@ from research.capsules.week.sheet import (
     WeekSheet,
 )
 from research.capsules.week.store import StoredWeekRead
-from research.capsules.week.usage_reads import UsageWeek, depth_changes, usage_by_player
+from research.capsules.week.usage_reads import UsageWeek, usage_by_player
 from research.db.schema.provider import GAME_TO_PLAY
 from research.model.domain import Position
 from research.nightly.build.page_club import call_for
@@ -305,14 +307,18 @@ def allowed_by_opponent(
     read_at: datetime,
 ) -> dict[tuple[str, str], Allowed]:
     """Each club's PPR points allowed a game to each position this season over its games in the records,
-    ranked 1 for the fewest (the API's `rankAllowed`): a position with no counted line is not ranked."""
+    ranked 1 for the fewest (the API's `rankAllowed`): a position with no counted line is not ranked. A line
+    counts only under the club the store says he played for that week, as the API counts it (`StatLines` joins
+    `player_week_teams`, and a line with no club edge is no game's): the sheet had put such a line under his
+    board club, so its rank against receivers parted from the card's Opp rank for nine week 8 opponents
+    (Lane 299: "the Chargers 13th of 32 against receivers" beside a card printing 8th)."""
     sums: dict[tuple[str, str], float] = {}
     for pid, block in blocks.items():
-        position, team = players[pid]
+        position, _club = players[pid]
         clubs = context.store.teams.get(pid, {})
         for row in block["log"]:
-            club = clubs.get(row["week"], team)
-            if row["status"] == "played" and (club, row["week"]) in context.store.in_records:
+            club = clubs.get(row["week"])
+            if row["status"] == "played" and club is not None and (club, row["week"]) in context.store.in_records:
                 key = (row["opponent"], position)
                 sums[key] = sums.get(key, 0.0) + row["points"]
     games: dict[str, int] = {}
@@ -353,10 +359,12 @@ class WeekFacts:
     board_week: int
     # Whether the board week's reads are written on a pass at `as_of` (Lane 256, `rollover`).
     rollover: Rollover
+    # Every club's newest weekly depth chart by position (Lane 299, `week.depth`); empty before any is loaded.
+    charts: Mapping[tuple[str, str], WeeklyChart] = field(default_factory=dict)
     # Every player's weeks of usage and the depth-chart moves by universe id, read while the angles are on
     # (Lane 300).
     usage: Mapping[str, tuple[UsageWeek, ...]] = field(default_factory=dict)
-    depth_moves: Mapping[str, tuple[float, datetime]] = field(default_factory=dict)
+    depth_moves: Mapping[str, float] = field(default_factory=dict)
 
 
 def _status(read: StatusRead | None, player_id: str, at: datetime | None, checked: datetime | None) -> Status:
@@ -411,8 +419,9 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         stamp,
         the_board_week,
         rollover(the_board_week, context.games, states, published_from, held, as_of),
+        weekly_charts(conn, season, the_board_week, as_of),
         usage_by_player(conn, season, as_of) if angles_on() else {},
-        depth_changes(conn, season, as_of) if angles_on() else {},
+        depth_moves(conn, season, the_board_week, as_of) if angles_on() else {},
     )
 
 
@@ -431,8 +440,11 @@ def _touchdowns(block: Json) -> float | None:
     return None if any(v is None for v in values) or block["games"] == 0 else float(sum(values))
 
 
-def _depth(subject: Subject) -> DepthPlace | None:
-    """The depth chart from the night's facts pass, stamped by its release day (midnight UTC)."""
+def _depth(subject: Subject, club: str, charts: Mapping[tuple[str, str], WeeklyChart]) -> DepthPlace | None:
+    """His place on his club's newest weekly chart (Lane 299, `week.depth`); before any weekly chart is loaded,
+    the week-one chart from the night's facts pass, stamped by its release day (midnight UTC)."""
+    if charts:
+        return weekly_place(charts, club, subject.facts.identity.position, subject.universe_id)
     chart = subject.facts.depth.depth_chart
     if chart is None:
         return None
@@ -493,7 +505,7 @@ def week_sheet(
         weather=None if cw.bye else _weather(facts.roofs.get(key), facts.forecasts.get(key)),
         allowed=None if game is None or cw.bye else facts.allowed.get((game.opponent, identity.position)),
         status=facts.statuses.get(identity.id, Status(None, None)),
-        depth=_depth(subject),
+        depth=_depth(subject, club, facts.charts),
         last_games=last_games(block),
         points_per_game=block["pointsPerGame"],
         games_played=int(block["games"]),
@@ -509,8 +521,7 @@ def week_sheet(
 
 
 def _moved_from(facts: WeekFacts, player_id: str) -> float | None:
-    move = facts.depth_moves.get(player_id)
-    return None if move is None else move[0]
+    return facts.depth_moves.get(player_id)
 
 
 def _figures(facts: WeekFacts, key: tuple[int, str], kickoff: datetime) -> TeamWeekRead | None:

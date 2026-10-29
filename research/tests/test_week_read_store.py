@@ -21,7 +21,7 @@ from research.capsules.gateway import GatewayClient
 from research.capsules.narrative import ShapeMasks
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.run_budget import RunBudget
-from research.capsules.week.cadence import FIRST, RULE_STALE, STATUS_CHANGED
+from research.capsules.week.cadence import FACT_STALE, FIRST, RULE_STALE, STATUS_CHANGED
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.store import (
     StoredWeekRead,
@@ -329,6 +329,20 @@ def test_a_rule_stale_rewrite_lands_with_its_reason(engine: Engine) -> None:
     with engine.connect() as conn:
         landed = stored_week_reads(conn, 2026, [6])[(pid, 6)]
     assert (landed.body, landed.reason) == (STARTER_READ, RULE_STALE)
+
+
+def test_a_fact_stale_rewrite_lands_with_its_reason(engine: Engine) -> None:
+    """Revision 0025 (Lane 299): the table takes the cadence's `fact` reason."""
+    pid = starter().player_id
+    stale = _row(pid, 6, "Puka Nacua sits second among Rams receivers. Start him.")
+    with engine.begin() as conn:
+        upsert_week_read(conn, stale)
+    spend = WeekReadSpend()
+    gateway = _gateway(lambda _request: _completion(STARTER_READ, "start"))
+    _write(engine, gateway, {(pid, 6): stale}, [(starter(), FACT_STALE)], room=lambda: True, spend=spend, masks=_MASKS)
+    with engine.connect() as conn:
+        landed = stored_week_reads(conn, 2026, [6])[(pid, 6)]
+    assert (landed.body, landed.reason) == (STARTER_READ, FACT_STALE)
 
 
 def _same_shape_rewrites(engine: Engine) -> tuple[StoredWeekRead, StoredWeekRead]:

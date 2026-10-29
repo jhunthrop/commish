@@ -9,9 +9,6 @@ One read of the stored facts at or before the instant, the newest statement of e
   (`facts.season_usage_reads`);
 - his rushing and receiving touchdowns (the weekly stat lines).
 
-And one read of the depth chart's releases (`depth_changes`): whether his slot on the newest release differs
-from the release before it, so a move reaches the writer only when it is new (`bites`).
-
 A week he has no snap and no touch in is no week of his. Nothing is estimated: a fact the store does not
 hold is None, and an angle that needs it is left out.
 """
@@ -28,7 +25,6 @@ from research.model.reads.teams import player_teams_as_of
 from research.pipeline.nflverse.participation import NflverseSource, ParticipationMetric
 from research.pipeline.nflverse.pbp import PBP_PLAYER_SOURCE, PbpPlayerMetric
 from research.pipeline.nflverse.team_codes import product_team_code
-from research.pipeline.preseason.rosters import DEPTH_METRIC, DEPTH_SOURCE
 
 _SNAPS: Final = (NflverseSource.SNAP_COUNTS, ParticipationMetric.OFFENSIVE_SNAPS)
 _TEAM_SNAPS: Final = (NflverseSource.SNAP_COUNTS, ParticipationMetric.TEAM_OFFENSIVE_SNAPS)
@@ -73,11 +69,6 @@ _READ: Final = text(
     "and as_of <= :as_of and source = any(:sources) and metric = any(:metrics) "
     "order by week, player_id, source, metric, as_of desc"
 )
-_DEPTH_RELEASES: Final = text(
-    "select player_id, value, as_of from research.player_week_observations where season = :season "
-    "and source = :source and metric = :metric and as_of <= :as_of order by player_id, as_of desc"
-)
-
 Fact = tuple[str, str]
 
 
@@ -190,19 +181,3 @@ def usage_by_player(conn: Connection, season: int, as_of: datetime) -> dict[str,
             club = clubs.get((team, week), {}) if team is not None else {}
             out.setdefault(player, []).append(_week(week, team, own, club))
     return {player: tuple(weeks) for player, weeks in out.items()}
-
-
-def depth_changes(conn: Connection, season: int, as_of: datetime) -> dict[str, tuple[float, datetime]]:
-    """Each player whose slot on the newest depth-chart release by `as_of` differs from the release before it:
-    his slot before, and the newest release's stamp. A player on one release only has no change."""
-    rows = conn.execute(
-        _DEPTH_RELEASES, {"season": season, "source": DEPTH_SOURCE, "metric": DEPTH_METRIC, "as_of": as_of}
-    )
-    releases: dict[str, list[tuple[float, datetime]]] = {}
-    for row in rows:
-        releases.setdefault(str(row.player_id), []).append((float(row.value), row.as_of))
-    return {
-        player: (held[1][0], held[0][1])
-        for player, held in releases.items()
-        if len(held) > 1 and held[0][0] != held[1][0]
-    }

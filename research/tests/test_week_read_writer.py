@@ -19,6 +19,7 @@ from research.capsules.rule_notes import notes_of
 from research.capsules.run_budget import BudgetSpentError
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.week.cadence import (
+    FACT_STALE,
     FIRST,
     PRIORITY,
     RETRIES_A_DAY,
@@ -485,13 +486,15 @@ def test_a_stored_read_a_body_rule_now_refuses_is_rule_stale_at_the_nightly(stal
     assert due_reason(sheet, _stored(body=stale), tomorrow, hourly=True) is None
 
 
-def test_a_stored_read_only_todays_sheet_refuses_is_not_due() -> None:
-    """A sheet rule reads today's cells and status: a read right when written stays. Here his Avg moved, so
-    "17.6 PPR points a game" is no cell now, and the full validator refuses what the body rules take."""
+def test_a_stored_read_only_todays_sheet_refuses_is_due_only_for_a_fact_it_states() -> None:
+    """A sheet rule reads today's cells and status, so a read is never rule-stale for one. Lane 299 (the founder:
+    "a wrong average never is" fine): a read whose Avg the card no longer prints is fact-stale and written again,
+    and one whose Avg still holds stays."""
     sheet, tomorrow = replace(questionable(), points_per_game=18.2), _NOW + timedelta(days=1)
     body = f"{_STANDING_READ} He averages 17.6 PPR points a game this season."
     assert not validate_week_read(body, sheet, call="hold").ok
-    assert due_reason(sheet, _stored(body=body), tomorrow) is None
+    assert due_reason(sheet, _stored(body=body), tomorrow) == FACT_STALE
+    assert due_reason(replace(sheet, points_per_game=17.6), _stored(body=body), tomorrow) is None
 
 
 def test_the_status_cap_counts_only_the_falls_since_the_written_read() -> None:

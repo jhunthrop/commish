@@ -28,6 +28,8 @@ This week's rulings and the Lane 72 review's, each a rule the validator reads:
 - The first sentence opens on no set-up clause ended by a colon (C25, made strict by B282: "Bye week for
   Kittle:" sets a scene even when its words name the bye).
 - Every figure is digits, never spelled out ("Fourteen PPR points" is "14 PPR points", B282).
+- His place on the depth chart is the sheet's, and a game's figure tied to a week is that week's game
+  (Lane 299, `fact_rules`).
 
 Each violation names its sentence in the writer's form (`the sentence "..."`), so a correction hands it
 back word for word (`rule_notes`).
@@ -42,6 +44,7 @@ from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
 from research.capsules.week.cells import cell_figures, misnamed, misranked, quotable_figures
+from research.capsules.week.fact_rules import place_violations, weather_violations, week_figure_violations
 from research.capsules.week.rank_words import fits, rank_words, superlatives_in
 from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import STATUS_WORDS, WeekSheet
@@ -710,6 +713,9 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_twice_ranked_violations(sentences),
         *_addressed_violations(sentences),
         *_spelled_figure_violations(sentences, sheet),
+        *place_violations(sentences, sheet),
+        *week_figure_violations(sentences, sheet),
+        *weather_violations(sentences, sheet),
     ]
 
 
