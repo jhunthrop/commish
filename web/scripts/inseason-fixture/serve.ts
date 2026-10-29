@@ -31,6 +31,7 @@ import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { FIXTURE_IDS } from './ids.ts';
 import { RECORDED_BOARDS, boardFile } from './record-boards.ts';
 import { leagueRecordAnswer } from './record.ts';
+import { withFigures } from './figures.ts';
 import { playerWeek, type Sheet } from './player-week.ts';
 import {
 	BOARD_WEEK_VARIABLE,
@@ -1210,7 +1211,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			matchup: isEspn(id ?? '') ? espnMatchup(matchupBox) : matchupBox,
 			// The ESPN leagues show the week on its Sunday afternoon, a stand-in (league.ts): the
 			// points are made up so the board's played states can be drawn.
-			scoreboard: isEspn(id ?? '') ? scoreboardLive : scoreboardNow(),
+			scoreboard: withFigures(isEspn(id ?? '') ? scoreboardLive : scoreboardNow(), sync),
 			waivers: isEspn(id ?? '')
 				? espnWaivers(url.searchParams.get('position'))
 				: platformed(waiversAt(url.searchParams.get('position')), platformNow()),
