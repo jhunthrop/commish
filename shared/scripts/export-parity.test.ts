@@ -307,27 +307,24 @@ void test("the Waivers at every clock, each ESPN stand-in's with its claim made 
 	assert.ok(espn?.results.some((r) => r.words.includes('processes it Wed 2:00 am')));
 });
 
-void test("the Trades at every clock: each row's offer in the web's words, the strip's checks scored", async () => {
-	interface Row {
-		offer: string;
-		opened: { groups: { rows: { slot: string }[] }[] };
+void test("the Trades at every clock: the ideas row in the finder's order, the strip's checks scored", async () => {
+	interface Place {
+		kind: string;
+		deal: string | null;
 	}
 	const parity = JSON.parse((await generate()).get(TRADES_OUTPUT) ?? '{}') as {
-		clocks: Record<string, { finder: { every: { mine: Row[] } }; basis: { closed: string } }>;
+		clocks: Record<string, { ideas: { places: Place[] }; basis: { closed: string } }>;
 		checks: Record<string, { yours: { figures: { projBefore: string } }; sentence: string }[]>;
 		copied: { done: string };
 		words: { checks: { sentence: string; cells: unknown }[]; under: string };
-		holding: { rows: { key: string }[]; unheld: { decision: string } | null };
+		holding: { decision: string; unheld: { decision: string } | null };
 		builder: { yours: { rows: { pick: string }[] }; pin: string };
 	};
 	assert.deepEqual(Object.keys(parity.clocks), [...CLOCKS]);
 	for (const clock of CLOCKS) {
-		const rows = parity.clocks[clock]?.finder.every.mine ?? [];
-		assert.ok(rows.length > 0, clock);
-		for (const row of rows) {
-			assert.match(row.offer, /^Trade with .+: .+ for .+\.$/, clock);
-			assert.deepEqual(row.opened.groups.length, 2, clock);
-		}
+		const ideas = (parity.clocks[clock]?.ideas.places ?? []).filter((p) => p.kind === 'idea');
+		assert.ok(ideas.length > 0, clock);
+		for (const idea of ideas) assert.match(idea.deal ?? '', /^.+ for .+$/, clock);
 		assert.match(parity.clocks[clock]?.basis.closed ?? '', /How the order has done$/, clock);
 	}
 	// On Sunday afternoon the strip's trades move players already playing: no Proj before or after.
@@ -342,7 +339,7 @@ void test("the Trades at every clock: each row's offer in the web's words, the s
 		parity.words.checks.length
 	);
 	assert.match(parity.words.under, /gains under 0\.1 points/);
-	assert.ok(parity.holding.rows.length > 0);
+	assert.ok(parity.holding.decision.length > 0);
 	assert.match(parity.holding.unheld?.decision ?? '', /^No trade we found includes /);
 	assert.deepEqual(
 		['on', 'drop'].map((pick) => parity.builder.yours.rows.some((r) => r.pick === pick)),
