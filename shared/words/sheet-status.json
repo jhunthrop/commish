@@ -1,0 +1,13 @@
+{
+	"inBrowser": "Saved in this browser",
+	"saving": "Saving to your account",
+	"saved": "Saved to your account",
+	"offline": "Offline.",
+	"unreachable": "Your account can't be reached right now",
+	"notSaved": "Not saved to your account",
+	"notKept": "This browser is not keeping it",
+	"functions": [
+		"savedAt",
+		"savedOn"
+	]
+}

@@ -14,21 +14,21 @@ public enum SheetSave: Equatable, Sendable {
     case failed(reason: String, changed: Bool)
 }
 
-/// The cheat sheet's words: the web's, written inline in web/src/lib/sheet (SheetPage.svelte,
-/// RowEditor.svelte, ImportPanel.svelte, EmptySheet.svelte, status.ts), copied here because the web keeps
-/// no word table for them; the status line and the tags are held to shared/fixtures/parity/sheet.json.
-/// The phone's own words, where the web has no such state, are marked so.
+/// The cheat sheet's words: the web's plain words read from the generated tables (Words.Sheet,
+/// Words.SheetImport, Words.SheetStatus, from web/src/lib/sheet/words.ts, Lane 283), the words with a slot
+/// spelled here until B256, and the phone's own, marked so. apps/ios/scripts/sheet-words.test.ts fails on
+/// a copy of a table's word; the status line and the tags are held to shared/fixtures/parity/sheet.json.
 public enum SheetWords {
     /// limits.ts DEFAULT_SHEET_NAME.
-    public static let defaultName = "My sheet"
+    public static let defaultName = Words.Sheet.defaultName
     /// The page's title in the bar (SheetPage.svelte Shell title).
-    public static let title = "Cheat sheet"
+    public static let title = Words.Sheet.title
 
     // MARK: the status line (status.ts STATUS_WORDS and statusWords)
 
-    static let saving = "Saving to your account"
-    static let saved = "Saved to your account"
-    static let notSaved = "Not saved to your account"
+    static let saving = Words.SheetStatus.saving
+    static let saved = Words.SheetStatus.saved
+    static let notSaved = Words.SheetStatus.notSaved
 
     /// The status beside the name, or nil for an empty sheet with nothing to say (statusWords): "Saved to
     /// your account at 7:41 PM" for a change today on the phone's clock, "... Oct 13" for one before.
@@ -94,10 +94,10 @@ public enum SheetWords {
 
     // MARK: the tools and the filters (SheetPage.svelte)
 
-    public static let importTool = "Import"
+    public static let importTool = Words.Sheet.importTool
     /// The export, handed to the phone's share sheet where the site downloads it and prints.
-    public static let exportTool = "Export CSV"
-    public static let all = "All"
+    public static let exportTool = Words.Sheet.exportTool
+    public static let all = Words.Sheet.all
 
     /// "3 players shown" while a filter narrows the sheet.
     public static func shown(_ count: Int) -> String {
@@ -106,10 +106,10 @@ public enum SheetWords {
 
     // MARK: a row and its editor (SheetRow.svelte, RowEditor.svelte)
 
-    public static let notePlaceholder = "Your note"
-    public static let ownTagPlaceholder = "Your own tag"
-    public static let addTag = "Add tag"
-    public static let remove = "Take off my sheet"
+    public static let notePlaceholder = Words.Sheet.notePlaceholder
+    public static let ownTagPlaceholder = Words.Sheet.ownTagPlaceholder
+    public static let addTag = Words.Sheet.addTag
+    public static let remove = Words.Sheet.remove
     public static let full = "Keep it to \(SheetLimits.tags) tags"
 
     /// "Edit Ja'Marr Chase": the row's disclosure, for a screen reader.
@@ -122,7 +122,7 @@ public enum SheetWords {
         "\(Formatting.plural(marks.count, "tag")): \(marks.map(\.label).joined(separator: ", "))"
     }
 
-    public static let hasNote = "Has a note"
+    public static let hasNote = Words.Sheet.hasNote
 
     // MARK: a row not saved (the phone's own: the web keeps an edit in the browser, the phone does not)
 
@@ -141,24 +141,22 @@ public enum SheetWords {
 
     // MARK: import (ImportPanel.svelte)
 
-    public static let importHead = "Import"
-    public static let fileLabel = "A CSV file"
-    public static let chooseFile = "Choose a CSV"
-    /// The web's label without its "one per line", a word the copy rules keep for the field: the placeholder
-    /// shows a list's shape. The account's import reads the list against our board (Lane 278).
-    public static let pasteLabel = "Or paste a CSV or a list of names"
+    public static let importHead = Words.SheetImport.head
+    public static let fileLabel = Words.SheetImport.fileLabel
+    public static let chooseFile = Words.SheetImport.chooseFile
+    /// The account's import reads the list against our board (Lane 278).
+    public static let pasteLabel = Words.SheetImport.pasteLabel
     /// ImportPanel.svelte PASTE_EXAMPLE.
-    public static let pastePlaceholder = "1. Puka Nacua\n2. Ja'Marr Chase, WR"
+    public static let pastePlaceholder = Words.SheetImport.pasteExample
     /// The phone's own: what a list that reads looks like, said under an import that read nothing and named
-    /// no skipped row (the account's refusal carries no row's reason). The web says "one per line" in its
-    /// label; the copy rules keep that word for the field.
+    /// no skipped row (the account's refusal carries no row's reason).
     public static let listShape = "Paste one player to a row, like 1. Puka Nacua"
-    public static let replace = "Replace my sheet"
-    public static let use = "Use this sheet"
-    public static let cancel = "Cancel"
-    public static let done = "Done"
-    public static let tooLarge = "That file is over 1 MB"
-    public static let unreadable = "That file does not read as CSV"
+    public static let replace = Words.SheetImport.replace
+    public static let use = Words.SheetImport.use
+    public static let cancel = Words.SheetImport.cancel
+    public static let done = Words.Sheet.done
+    public static let tooLarge = Words.SheetImport.tooLarge
+    public static let unreadable = Words.SheetImport.unreadable
     /// How many skipped lines the result names before it counts the rest (SKIPS_SHOWN).
     public static let skipsShown = 12
 
@@ -211,10 +209,10 @@ public enum SheetWords {
 
     // MARK: the empty sheet (EmptySheet.svelte, SheetPage.svelte)
 
-    public static let startHead = "Start your sheet"
-    public static let start = "Start from our board"
-    public static let importSheet = "Import a sheet"
-    public static let boardFailed = "Our board did not load. Try again in a moment"
+    public static let startHead = Words.Sheet.startHead
+    public static let start = Words.Sheet.start
+    public static let importSheet = Words.Sheet.importSheet
+    public static let boardFailed = Words.Sheet.boardFailed
 
     /// "Our PPR board, best first".
     public static func boardLead(_ format: String) -> String {

@@ -105,7 +105,9 @@
 			<div class="heads" aria-hidden="true">
 				{#each Array.from({ length: heads }, (_, column) => column) as column (column)}
 					<span class="head"
-						><span>{page.position}</span><span>Player</span><span>Overall</span></span
+						><span>{page.position}</span><span>{PRINT_WORDS.player}</span><span
+							>{PRINT_WORDS.overall}</span
+						></span
 					>
 				{/each}
 			</div>

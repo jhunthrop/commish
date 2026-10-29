@@ -5,7 +5,8 @@
  */
 import type { components } from '#lib/api/types.ts';
 import { POSITIONS, type Position } from '#lib/types/player.ts';
-import { DEFAULT_SHEET_NAME, SHEET_LIMITS } from './limits.ts';
+import { SHEET_LIMITS } from './limits.ts';
+import { SHEET } from './words.ts';
 import { toggledTags } from './tags.ts';
 import { repairTiers } from './tiers.ts';
 
@@ -37,7 +38,7 @@ export interface Sheet {
 export const DEFAULT_FORMAT: BoardFormat = 'ppr';
 
 export function emptySheet(format: BoardFormat = DEFAULT_FORMAT): Sheet {
-	return { name: DEFAULT_SHEET_NAME, format, rows: [] };
+	return { name: SHEET.defaultName, format, rows: [] };
 }
 
 /** A position as the API or a file spells it, read into ours. */

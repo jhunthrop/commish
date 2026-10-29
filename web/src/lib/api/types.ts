@@ -4831,7 +4831,7 @@ export interface components {
 			drop_reason: string | null;
 			/**
 			 * Format: double
-			 * @description points over replacement a week to the drafter's lineup
+			 * @description points over replacement a week to the drafter's best lineup over the weeks gain_basis names, one decimal: the lineup filled week by week as the Lineup screen fills it from the players whose clubs play that week (Lane 287), each at his rest-of-season points a game, a slot no one fills at the best free agent's level
 			 */
 			my_gain: number;
 			/**
@@ -4861,6 +4861,31 @@ export interface components {
 			 * @description the same for theirs, their drop counted against them; absent from an older answer
 			 */
 			their_rest_of_season?: number;
+			/**
+			 * Format: double
+			 * @description the drafter's best lineup's change over the weeks gain_basis names (Lane 287), byes counted: my_gain over all those weeks, one decimal; absent from an older answer
+			 */
+			my_lineup_rest_of_season?: number;
+			/**
+			 * Format: double
+			 * @description the same for theirs; absent from an older answer
+			 */
+			their_lineup_rest_of_season?: number;
+			/**
+			 * @description the drafter's starting slot the trade fills (Lane 287): of the slots where his best lineup over the weeks left falls below the league's median team, the furthest below that the trade makes up half the gap at least (and 0.5 a week at least), so the card can say "Fills your WR"; null when it fills none of his, absent from an older answer
+			 * @enum {string|null}
+			 */
+			fills?: 'QB' | 'RB' | 'WR' | 'TE' | 'FLEX' | 'SUPERFLEX' | null;
+			/**
+			 * @description the same for theirs. The finder lists a trade only when it fills a slot on at least one side; null when it fills none of theirs, absent from an older answer
+			 * @enum {string|null}
+			 */
+			their_fills?: 'QB' | 'RB' | 'WR' | 'TE' | 'FLEX' | 'SUPERFLEX' | null;
+			/**
+			 * @description the position the drafter gives from (Lane 287): a player he gives who sits on his bench and would start for the league's median team, or whose position's own slots stay at that team's or over after the trade; null for neither, absent from an older answer
+			 * @enum {string|null}
+			 */
+			gives?: 'QB' | 'RB' | 'WR' | 'TE' | null;
 			/** @description the trade's sentence when the need is why it is listed (Lane 103): it sends out a player we rank first at his position for under 1.0 a week and fills a starting spot of the drafter's lineup for the week the page addresses that no one of his who can play fills, leaving no other spot empty ("Fills your empty WR2 while Gibbs sits on bye."); null on every other row, absent from an older answer */
 			need?: string | null;
 		};
@@ -4871,7 +4896,7 @@ export interface components {
 			record: components['schemas']['TradeRecord'];
 			/** @description every player on their active roster (injured reserve and taxi spots left out), by position then name: the builder's players on their side */
 			roster: components['schemas']['PlayerLine'][];
-			/** @description at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first; a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills a need (Lane 103) */
+			/** @description at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group with the trades that fill one of the drafter's slots first (fills), then best for the drafter over the weeks left, then by this week's Proj change; a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills a need (Lane 103). One or two players a side (Lane 287); a trade is listed only when the drafter's lineup gains, theirs gains or loses nothing for a slot it fills, it fills a slot on at least one side and opens or deepens none of the drafter's (a slot short of the median team by 0.5 a week or more), it sends out no player this week's lineup needs to fill a spot, neither side gives up more rest of season than the rule allows, and it is not a listed trade with a player added who changes nothing. The array's order is the finder's and is the contract: a client keeps it for the team's list (Lane 287; sorting by my_gain alone undoes the fills-first order) */
 			trades: components['schemas']['TradeRow'][];
 			/** @description one sentence when every trade found with this team is a close call for them, else null */
 			note: string | null;

@@ -11,6 +11,7 @@
  */
 import { SHEET_LIMITS, characterCount } from './limits.ts';
 import { parsePosition, type SheetRow } from './model.ts';
+import { SHEET_IMPORT } from './words.ts';
 import {
 	canonicalTag,
 	joinTagCell,
@@ -145,7 +146,7 @@ function headerIndex(header: readonly string[]): ColumnIndex {
 	});
 	const missing = REQUIRED.filter((column) => index[column] === undefined);
 	if (missing.length > 0) {
-		throw new CsvHeaderError('The first line must name rank, player_id, name and position');
+		throw new CsvHeaderError(SHEET_IMPORT.badHeader);
 	}
 	return index;
 }
@@ -171,7 +172,7 @@ function readTags(raw: string): { tags: readonly string[] } | { reason: string }
 	if (tags.length > SHEET_LIMITS.tags) return { reason: `Keep it to ${SHEET_LIMITS.tags} tags` };
 	// Target and Avoid never sit on one player. The line says which, rather than keep one quietly.
 	const kept = normalizeTags(tags);
-	if (kept.length < tags.length) return { reason: 'Target and Avoid are both set, pick one' };
+	if (kept.length < tags.length) return { reason: SHEET_IMPORT.bothTargetAndAvoid };
 	return { tags: kept };
 }
 
@@ -179,8 +180,7 @@ type Read = { rank: number; row: SheetRow } | { reason: string };
 
 function readRecord(record: readonly string[], index: ColumnIndex): Read {
 	const rank = Number(cell(record, index, 'rank'));
-	if (!Number.isInteger(rank) || rank < 1)
-		return { reason: 'The rank is not a whole number from 1' };
+	if (!Number.isInteger(rank) || rank < 1) return { reason: SHEET_IMPORT.badRank };
 	const id = cell(record, index, 'player_id');
 	const name = cell(record, index, 'name');
 	const team = cell(record, index, 'team');
@@ -192,7 +192,7 @@ function readRecord(record: readonly string[], index: ColumnIndex): Read {
 		lengthProblem('note', note, 0, SHEET_LIMITS.note);
 	if (problem) return { reason: problem };
 	const position = parsePosition(cell(record, index, 'position'));
-	if (position === null) return { reason: 'The position is not QB, RB, WR, TE, K or DST' };
+	if (position === null) return { reason: SHEET_IMPORT.badPosition };
 	const rawTier = cell(record, index, 'tier');
 	const tier = rawTier === '' ? null : Number(rawTier);
 	if (tier !== null && (!Number.isInteger(tier) || tier < 1 || tier > SHEET_LIMITS.tier)) {
@@ -219,7 +219,7 @@ function readRecord(record: readonly string[], index: ColumnIndex): Read {
 export function decodeCsv(text: string): CsvRead {
 	const { records, unterminated } = parseRecords(text);
 	const [header, ...body] = records;
-	if (!header) throw new CsvHeaderError('The file is empty');
+	if (!header) throw new CsvHeaderError(SHEET_IMPORT.emptyFile);
 	const index = headerIndex(header);
 	const kept: { rank: number; line: number; row: SheetRow }[] = [];
 	const skipped: CsvSkip[] = [];
@@ -228,13 +228,12 @@ export function decodeCsv(text: string): CsvRead {
 		const line = k + 2;
 		const isLast = k === body.length - 1;
 		if (unterminated && isLast) {
-			skipped.push({ line, reason: 'This line is not valid CSV' });
+			skipped.push({ line, reason: SHEET_IMPORT.notCsv });
 			return;
 		}
 		const read = readRecord(record, index);
 		if ('reason' in read) skipped.push({ line, reason: read.reason });
-		else if (seen.has(read.row.id))
-			skipped.push({ line, reason: 'This player is already on an earlier line' });
+		else if (seen.has(read.row.id)) skipped.push({ line, reason: SHEET_IMPORT.earlier });
 		else if (kept.length >= SHEET_LIMITS.rows)
 			skipped.push({ line, reason: `A sheet holds at most ${SHEET_LIMITS.rows} players` });
 		else {

@@ -1,14 +1,15 @@
-// The iOS Sheet's words held to the web's (Lane 254, until B266 lifts the web's sheet words into a module
-// gen-words carries): every string literal in SheetWords.swift, cut at its interpolations, is found in the
-// web's sheet sources, or is listed below as the phone's own with the reason. A web wording change fails
-// here until the phone follows. Run with `node --test apps/ios/scripts/*.test.ts`.
+// The iOS Sheet's words (Lane 254; Lane 283, B266): the words the web and the phones share are generated
+// from web/src/lib/sheet/words.ts and print-words.ts into the Words tables (shared/scripts/gen-words.ts),
+// and SheetWords reads them there; a copy of one in SheetWords fails here. What SheetWords still spells
+// is a word with a slot (B256), each piece of which is found in the web's sheet sources, or the phone's
+// own word, listed below with the reason. Run with `node --test apps/ios/scripts/*.test.ts`.
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
 const REPOSITORY = join(import.meta.dirname, '..', '..', '..');
-const SWIFT = join(
+const SOURCE = join(
 	REPOSITORY,
 	'apps/ios/Packages/CommishCore/Sources/CommishCore/CheatSheet/SheetWords.swift'
 );
@@ -103,14 +104,14 @@ export function literals(swift: string): string[] {
 
 test('every word the phone prints on the Sheet is the web’s, or listed as the phone’s own', () => {
 	const web = WEB.flatMap(sources).join('\n');
-	const missing = literals(readFileSync(SWIFT, 'utf8')).filter(
+	const missing = literals(readFileSync(SOURCE, 'utf8')).filter(
 		(piece) => PHONE_OWN[piece] === undefined && !web.includes(piece)
 	);
 	assert.deepEqual(missing, []);
 });
 
 test('the phone’s own list names only words SheetWords still prints', () => {
-	const printed = new Set(literals(readFileSync(SWIFT, 'utf8')));
+	const printed = new Set(literals(readFileSync(SOURCE, 'utf8')));
 	assert.deepEqual(
 		Object.keys(PHONE_OWN).filter((piece) => !printed.has(piece)),
 		[]
@@ -121,5 +122,28 @@ test('a literal is cut at its interpolations', () => {
 	assert.deepEqual(
 		literals('let a = "Our \\(format) board, \\(plural(n, "player")) first"\n// "Not this"'),
 		['Our ', ' board, ', 'player', ' first']
+	);
+});
+
+/** Every word the generated sheet tables carry (shared/words/sheet*.json, from web/src/lib/sheet). */
+function tableWords(): Set<string> {
+	const dir = join(REPOSITORY, 'shared/words');
+	return new Set(
+		readdirSync(dir)
+			.filter((name) => /^sheet(-[a-z]+)?\.json$/.test(name))
+			.flatMap((name) =>
+				Object.entries(JSON.parse(readFileSync(join(dir, name), 'utf8')) as Record<string, unknown>)
+					.filter(([key]) => key !== 'functions')
+					.map(([, word]) => String(word))
+			)
+	);
+}
+
+test('a word the generated sheet tables carry is read from Words, never copied', () => {
+	const words = tableWords();
+	assert.ok(words.has('Start from our board'));
+	assert.deepEqual(
+		literals(readFileSync(SOURCE, 'utf8')).filter((piece) => words.has(piece.replaceAll('\\n', '\n'))),
+		[]
 	);
 });

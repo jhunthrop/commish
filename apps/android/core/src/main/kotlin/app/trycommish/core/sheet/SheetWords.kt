@@ -10,23 +10,22 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * The cheat sheet's words (the iOS SheetWords): the web's, written inline in web/src/lib/sheet
- * (SheetPage.svelte, RowEditor.svelte, ImportPanel.svelte, EmptySheet.svelte, status.ts), copied here
- * because the web keeps no word table for them, held to the web's sources by
- * apps/android/scripts/sheet-words.test.ts; the status line and the tags are held to
- * shared/fixtures/parity/sheet.json. The phone's own words, where the web has no such state, are listed
- * there with their reason. The web says "line" for a row of a file, a word the copy rules keep for the
- * field (shared/words/banned-words.json), so the phone says "row".
+ * The cheat sheet's words (the iOS SheetWords): the web's plain words read from the generated tables
+ * (Words.Sheet, Words.SheetImport, Words.SheetStatus, from web/src/lib/sheet/words.ts, Lane 283), the
+ * words with a slot spelled here until B256, and the phone's own, listed with their reason in
+ * apps/android/scripts/sheet-words.test.ts, which fails on a copy of a table's word; the status line and
+ * the tags are held to shared/fixtures/parity/sheet.json. The web's slot words still say "line" for a row of
+ * a file, a word the copy rules keep for the field (shared/words/banned-words.json), so the phone says "row".
  */
 @Suppress("ktlint:standard:property-naming") // A word table reads like Words.LeagueHome.
 object SheetWords {
     /** limits.ts DEFAULT_SHEET_NAME. */
-    const val defaultName = "My sheet"
+    const val defaultName = Words.Sheet.defaultName
 
     // The status line (status.ts STATUS_WORDS and statusWords).
-    const val saving = "Saving to your account"
-    const val saved = "Saved to your account"
-    const val notSaved = "Not saved to your account"
+    const val saving = Words.SheetStatus.saving
+    const val saved = Words.SheetStatus.saved
+    const val notSaved = Words.SheetStatus.notSaved
 
     /** date.ts dayLabel's clock: the NFL's. */
     private val eastern: ZoneId = ZoneId.of("America/New_York")
@@ -82,23 +81,23 @@ object SheetWords {
         }
 
     // The tools and the filters (SheetPage.svelte).
-    const val importTool = "Import"
+    const val importTool = Words.Sheet.importTool
 
     /** The export, handed to the phone's share sheet where the site downloads it and prints. */
-    const val exportTool = "Export CSV"
-    const val all = "All"
+    const val exportTool = Words.Sheet.exportTool
+    const val all = Words.Sheet.all
 
     /** "3 players shown" while a filter narrows the sheet. */
     fun shown(count: Int): String = "${Format.plural(count, "player", "players")} shown"
 
     // A row and its editor (SheetRow.svelte, RowEditor.svelte).
-    const val notePlaceholder = "Your note"
-    const val ownTagPlaceholder = "Your own tag"
-    const val addTag = "Add tag"
-    const val remove = "Take off my sheet"
+    const val notePlaceholder = Words.Sheet.notePlaceholder
+    const val ownTagPlaceholder = Words.Sheet.ownTagPlaceholder
+    const val addTag = Words.Sheet.addTag
+    const val remove = Words.Sheet.remove
     const val full = "Keep it to ${SheetLimits.TAGS} tags"
     const val tagShape = "A tag is 1 to ${SheetLimits.TAG_LENGTH} letters or numbers"
-    const val bothTargetAndAvoid = "Target and Avoid are both set, pick one"
+    const val bothTargetAndAvoid = Words.SheetImport.bothTargetAndAvoid
 
     /** "Edit Ja'Marr Chase": the row's disclosure, for a screen reader. */
     fun edit(name: String): String = "Edit $name"
@@ -106,7 +105,7 @@ object SheetWords {
     /** "2 tags: Target, Sleeper" (SheetRow.svelte's count, said). */
     fun tagsSaid(marks: List<TagMark>): String = "${Format.plural(marks.size, "tag", "tags")}: ${marks.joinToString(", ") { it.label }}"
 
-    const val hasNote = "Has a note"
+    const val hasNote = Words.Sheet.hasNote
 
     // A row not saved (the phone's own: the web keeps an edit in the browser, the phone does not).
 
@@ -124,33 +123,31 @@ object SheetWords {
     const val tryAgain = AppWords.tryAgain
 
     // Import (ImportPanel.svelte).
-    const val importHead = "Import"
-    const val fileLabel = "A CSV file"
-    const val chooseFile = "Choose a CSV"
+    const val importHead = Words.SheetImport.head
+    const val fileLabel = Words.SheetImport.fileLabel
+    const val chooseFile = Words.SheetImport.chooseFile
 
-    /** The web's label without its "one per line", a word the copy rules keep for the field: the placeholder
-     * shows a list's shape. The account's import reads the list against our board (Lane 278). */
-    const val pasteLabel = "Or paste a CSV or a list of names"
+    /** The account's import reads the list against our board (Lane 278). */
+    const val pasteLabel = Words.SheetImport.pasteLabel
 
     /** ImportPanel.svelte PASTE_EXAMPLE. */
-    const val pastePlaceholder = "1. Puka Nacua\n2. Ja'Marr Chase, WR"
+    const val pastePlaceholder = Words.SheetImport.pasteExample
 
     /** The phone's own: what a list that reads looks like, said under an import that read nothing and named no
-     * skipped row (the account's refusal carries no row's reason). The web says "one per line" in its label; the
-     * copy rules keep that word for the field. */
+     * skipped row (the account's refusal carries no row's reason). */
     const val listShape = "Paste one player to a row, like 1. Puka Nacua"
-    const val replace = "Replace my sheet"
-    const val use = "Use this sheet"
-    const val cancel = "Cancel"
-    const val done = "Done"
-    const val tooLarge = "That file is over 1 MB"
+    const val replace = Words.SheetImport.replace
+    const val use = Words.SheetImport.use
+    const val cancel = Words.SheetImport.cancel
+    const val done = Words.Sheet.done
+    const val tooLarge = Words.SheetImport.tooLarge
 
     /** FilePick.svelte's words beside the button until a file is chosen. */
-    const val noFile = "No file chosen"
+    const val noFile = Words.SheetImport.noFile
 
     /** The phone's own: the export's file could not be kept on the phone for the share sheet. */
     const val notKept = "The file could not be saved on this phone."
-    const val unreadable = "That file does not read as CSV"
+    const val unreadable = Words.SheetImport.unreadable
 
     /** How many skipped rows the result names before it counts the rest (SKIPS_SHOWN). */
     const val SKIPS_SHOWN = 12
@@ -186,14 +183,14 @@ object SheetWords {
             (if (first.first().isUpperCase()) "Row" else "row") + plural
         }
 
-    // A file's rows refused (csv.ts decodeCsv), "row" where the web says "line".
-    const val emptyFile = "The file is empty"
-    const val badHeader = "The first row must name rank, player_id, name and position"
-    const val notCsv = "This row is not valid CSV"
-    const val earlier = "This player is already on an earlier row"
+    // A file's rows refused (csv.ts decodeCsv), the generated words where they need no slot.
+    const val emptyFile = Words.SheetImport.emptyFile
+    const val badHeader = Words.SheetImport.badHeader
+    const val notCsv = Words.SheetImport.notCsv
+    const val earlier = Words.SheetImport.earlier
     const val tooMany = "A sheet holds at most ${SheetLimits.ROWS} players"
-    const val badRank = "The rank is not a whole number from 1"
-    const val badPosition = "The position is not QB, RB, WR, TE, K or DST"
+    const val badRank = Words.SheetImport.badRank
+    const val badPosition = Words.SheetImport.badPosition
     const val badTier = "The tier is not a whole number from 1 to ${SheetLimits.TIER}"
 
     /** "The note runs 0 to 500 characters". */
@@ -212,10 +209,10 @@ object SheetWords {
     fun tagsReplaced(name: String): String = "Your tags on $name were replaced by the ones saved on another device"
 
     // The empty sheet (EmptySheet.svelte, SheetPage.svelte).
-    const val startHead = "Start your sheet"
-    const val start = "Start from our board"
-    const val importSheet = "Import a sheet"
-    const val boardFailed = "Our board did not load. Try again in a moment"
+    const val startHead = Words.Sheet.startHead
+    const val start = Words.Sheet.start
+    const val importSheet = Words.Sheet.importSheet
+    const val boardFailed = Words.Sheet.boardFailed
 
     /** "Our PPR board, best first". */
     fun boardLead(format: String): String = "Our $format board, best first"

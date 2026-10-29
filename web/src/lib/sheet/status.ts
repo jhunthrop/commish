@@ -8,6 +8,7 @@
  */
 import { sameDay } from '#lib/format/clock.ts';
 import { dayLabel, localTimeLabel } from '#lib/format/date.ts';
+import { SHEET_STATUS } from './words.ts';
 
 export type SyncStatus =
 	| 'local'
@@ -42,18 +43,7 @@ export function reconcilingStatus(
 	return writes ? 'saving' : current;
 }
 
-const STATUS_WORDS = {
-	inBrowser: 'Saved in this browser',
-	saving: 'Saving to your account',
-	saved: 'Saved to your account',
-	savedAt: (time: string) => `Saved to your account at ${time}`,
-	savedOn: (day: string) => `Saved to your account ${day}`,
-	offline: 'Offline.',
-	unreachable: "Your account can't be reached right now",
-	notSaved: 'Not saved to your account',
-	notKept: 'This browser is not keeping it'
-} as const;
-const IN_BROWSER = STATUS_WORDS.inBrowser;
+const IN_BROWSER = SHEET_STATUS.inBrowser;
 
 export interface StatusFacts {
 	status: SyncStatus;
@@ -69,32 +59,32 @@ export interface StatusFacts {
 
 /** "Saved to your account at 7:41 PM" for a change today, "... Oct 13" for one before. */
 function savedWords(changedAt: string | null, answeredAt: Date | null): string {
-	if (changedAt === null) return STATUS_WORDS.saved;
+	if (changedAt === null) return SHEET_STATUS.saved;
 	const today = answeredAt !== null && sameDay(new Date(changedAt), answeredAt);
 	return today
-		? STATUS_WORDS.savedAt(localTimeLabel(new Date(changedAt)))
-		: STATUS_WORDS.savedOn(dayLabel(changedAt));
+		? SHEET_STATUS.savedAt(localTimeLabel(new Date(changedAt)))
+		: SHEET_STATUS.savedOn(dayLabel(changedAt));
 }
 
 /** The status line, or null for an empty sheet with no problem to say. */
 export function statusWords(facts: StatusFacts): string | null {
 	const { status, problem } = facts;
-	if (facts.players === 0) return status === 'failed' ? (problem ?? STATUS_WORDS.notSaved) : null;
+	if (facts.players === 0) return status === 'failed' ? (problem ?? SHEET_STATUS.notSaved) : null;
 	switch (status) {
 		case 'local':
 		case 'checking':
 			return IN_BROWSER;
 		case 'saving':
-			return STATUS_WORDS.saving;
+			return SHEET_STATUS.saving;
 		case 'saved':
 			return savedWords(facts.changedAt, facts.answeredAt);
 		case 'offline':
-			return `${STATUS_WORDS.offline} ${IN_BROWSER}`;
+			return `${SHEET_STATUS.offline} ${IN_BROWSER}`;
 		case 'unreachable':
-			return `${IN_BROWSER}. ${STATUS_WORDS.unreachable}`;
+			return `${IN_BROWSER}. ${SHEET_STATUS.unreachable}`;
 		case 'failed':
-			return problem ?? STATUS_WORDS.notSaved;
+			return problem ?? SHEET_STATUS.notSaved;
 		case 'storage-blocked':
-			return STATUS_WORDS.notKept;
+			return SHEET_STATUS.notKept;
 	}
 }

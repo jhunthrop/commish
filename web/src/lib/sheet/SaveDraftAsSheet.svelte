@@ -5,6 +5,7 @@
 	import { rowsFromDraft, type FinishedDraft } from './draft.ts';
 	import { emptySheet, renameSheet, replaceRows, type BoardFormat } from './model.ts';
 	import { sheetStore } from './store.svelte.ts';
+	import { SHEET, SHEET_STATUS } from './words.ts';
 
 	/**
 	 * The report's "Save this draft as a sheet". It never replaces the sheet you have: it waits
@@ -36,12 +37,12 @@
 
 <span aria-live="polite">
 	{#if saved === 'account'}
-		<Quiet href={resolve('/sheet')}>Saved to your sheets</Quiet>
+		<Quiet href={resolve('/sheet')}>{SHEET.savedToSheets}</Quiet>
 	{:else if saved === 'browser'}
-		<Quiet href={resolve('/sheet')}>Saved in this browser</Quiet>
+		<Quiet href={resolve('/sheet')}>{SHEET_STATUS.inBrowser}</Quiet>
 	{:else if !sheetStore.resolved}
-		<Quiet disabled>Checking your account</Quiet>
+		<Quiet disabled>{SHEET.checkingAccount}</Quiet>
 	{:else}
-		<Quiet disabled={saving} onclick={() => void save()}>Save this draft as a sheet</Quiet>
+		<Quiet disabled={saving} onclick={() => void save()}>{SHEET.saveDraft}</Quiet>
 	{/if}
 </span>

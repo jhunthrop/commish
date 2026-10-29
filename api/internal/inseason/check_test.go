@@ -12,12 +12,12 @@ func TestCheckGivesTheFindersNumbers(t *testing.T) {
 	mine, theirs := deepAtBack(), deepAtReceiver()
 	held := map[string]bool{"m-wr4": true}
 	me, them := Squad{Players: mine, Held: held}, Squad{Players: theirs}
-	found := Trades(config, SeasonGames, me, them, "", 1000)
+	found := pairTrades(config, SeasonGames, me, them, "", 1000)
 	if len(found) == 0 {
 		t.Fatal("the finder found no trade")
 	}
 	for _, tr := range found {
-		got := Check(config, SeasonGames, me, them, tr.Give, tr.Get)
+		got := pairCheck(config, SeasonGames, me, them, tr.Give, tr.Get)
 		words := tradeWords(tr, mine, theirs)
 		if got.MyGain != tr.MyGain || got.TheirGain != tr.TheirGain || got.Drop != tr.Drop {
 			t.Fatalf("%s: checked %+v, the finder %+v", words, got.Trade, tr)
@@ -33,7 +33,7 @@ func TestCheckGivesTheFindersNumbers(t *testing.T) {
 func TestCheckAnswersALoss(t *testing.T) {
 	mine, theirs := deepAtBack(), deepAtReceiver()
 	// His best back for their third.
-	got := Check(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{1}, []int{2})
+	got := pairCheck(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{1}, []int{2})
 	if got.MyGain >= 0 || got.TheirGain <= 0 {
 		t.Fatalf("m-rb1 for t-rb2: mine %v, theirs %v", got.MyGain, got.TheirGain)
 	}
@@ -47,7 +47,7 @@ func TestCheckAnswersALoss(t *testing.T) {
 func TestCheckNamesTheSlotItEmpties(t *testing.T) {
 	config := twelveTeamPPR(t)
 	mine, theirs := deepAtBack(), deepAtReceiver()
-	got := Check(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{8, 12}, []int{3})
+	got := pairCheck(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{8, 12}, []int{3})
 	if got.Mine.Fills || got.Mine.Open < 0 || SlotLabel(Slots(config), got.Mine.Open) != "TE" {
 		t.Fatalf("mine %+v", got.Mine)
 	}
@@ -59,7 +59,7 @@ func TestCheckNamesTheSlotItEmpties(t *testing.T) {
 // Two for two is the builder's reach: no drop, both gains reckoned.
 func TestCheckTwoForTwo(t *testing.T) {
 	mine, theirs := deepAtBack(), deepAtReceiver()
-	got := Check(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{3, 4}, []int{6, 7})
+	got := pairCheck(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{3, 4}, []int{6, 7})
 	if got.Drop >= 0 || !positive(got.MyGain) || !positive(got.TheirGain) {
 		t.Fatalf("m-rb3+m-rb4 for t-wr4+t-wr5: %+v", got.Trade)
 	}
@@ -69,7 +69,7 @@ func TestCheckTwoForTwo(t *testing.T) {
 // lineup loses: the roster still needs the room.
 func TestCheckNamesTheDropOnALoss(t *testing.T) {
 	mine, theirs := deepAtBack(), deepAtReceiver()
-	got := Check(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{1}, []int{2, 11})
+	got := pairCheck(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{1}, []int{2, 11})
 	if got.MyGain >= 0 || got.Drop < 0 {
 		t.Fatalf("m-rb1 for t-rb2+t-rb3: %+v", got.Trade)
 	}
@@ -102,15 +102,15 @@ func TestCheckSaysWhenARosterHasNoRoom(t *testing.T) {
 	for _, c := range mine {
 		held[c.ID] = true
 	}
-	got := Check(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, []int{1}, []int{2, 11})
+	got := pairCheck(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, []int{1}, []int{2, 11})
 	if got.Mine.Room || got.Drop >= 0 || !got.Mine.Fills {
 		t.Fatalf("all held: %+v drop %d", got.Mine, got.Drop)
 	}
-	free := Check(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{1}, []int{2, 11})
+	free := pairCheck(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{1}, []int{2, 11})
 	if !free.Mine.Room || free.Drop < 0 {
 		t.Fatalf("none held: %+v drop %d", free.Mine, free.Drop)
 	}
-	back := Check(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{3, 4}, []int{6})
+	back := pairCheck(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{3, 4}, []int{6})
 	if !back.Theirs.Room || !back.Mine.Room {
 		t.Fatalf("two for one of theirs: %+v %+v", back.Mine, back.Theirs)
 	}

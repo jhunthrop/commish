@@ -89,6 +89,14 @@ func TestTradeCheckAgreesWithTheFinder(t *testing.T) {
 				t.Fatalf("%s: rest of season checked %v/%v, the finder %v/%v, acceptable %+v", team.Name,
 					got.Trade.MyRestOfSeason, got.Trade.TheirRestOfSeason, row.MyRestOfSeason, row.TheirRestOfSeason, got.Acceptable)
 			}
+			// Lane 287: both lineups' rest of season and why the finder lists
+			// it, the same on the check; every listed trade fills a weak spot.
+			if !sameFigure(got.Trade.MyLineupRestOfSeason, row.MyLineupRestOfSeason) || !sameFigure(got.Trade.TheirLineupRestOfSeason, row.TheirLineupRestOfSeason) ||
+				row.MyLineupRestOfSeason == nil || !sameSlot(got.Trade.Fills, row.Fills) || !sameSlot(got.Trade.TheirFills, row.TheirFills) ||
+				!sameSlot(got.Trade.Gives, row.Gives) || (row.Fills == nil && row.TheirFills == nil) {
+				t.Fatalf("%s: lineup rest %v/%v fills %v/%v gives %v, the finder %+v", team.Name, got.Trade.MyLineupRestOfSeason,
+					got.Trade.TheirLineupRestOfSeason, got.Trade.Fills, got.Trade.TheirFills, got.Trade.Gives, row)
+			}
 			checked++
 		}
 	}
@@ -222,3 +230,6 @@ func TestTradeCheckLeagueErrors(t *testing.T) {
 
 // sameFigure is two optional figures both present and equal.
 func sameFigure(a, b *float64) bool { return a != nil && b != nil && *a == *b }
+
+// sameSlot is whether two optional wire labels agree.
+func sameSlot[T ~string](a, b *T) bool { return (a == nil) == (b == nil) && (a == nil || *a == *b) }

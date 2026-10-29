@@ -499,12 +499,17 @@ const TradeCheckBasis = "The scoreboard is each lineup before and after the trad
 // What a Gain is sits under the heads (TradeGainBasis); a span past the
 // run's last week says its rate here once.
 func TradesBasis(b OrderBasis, weeks int, h Horizon) string {
-	listed := "Each team's best trade both lineups gain by, yours first. The other team decides. " + keptWords
+	listed := tradesListed + " " + keptWords
 	if b != RestOfSeason {
 		return listed
 	}
 	return listed + h.rateWords(h.Last-max(1, weeks)+1)
 }
+
+// tradesListed is the finder's rule in a sentence (Lane 287): the trades
+// for the member's weakest starting spots first, and none that fills no
+// weak spot on either side or costs either lineup.
+const tradesListed = "Each team's best trades, those for your weakest starting spot first. Every one fills a weak spot on one side or both, and neither lineup loses by it. The other team decides."
 
 // keptWords is Lane 103's rule (proposable) in one sentence.
 var keptWords = fmt.Sprintf("A player we rank first at his position goes only for %.1f a week or more, or to fill a spot.", KeepGain)
@@ -513,7 +518,7 @@ var keptWords = fmt.Sprintf("A player we rank first at his position goes only fo
 // B42): whose points, and the weeks they are a week over, "points over
 // replacement in each lineup, weeks 7 to 17".
 func TradeGainBasis(b OrderBasis, weeks int, h Horizon) string {
-	return "points over replacement in each lineup, " + tradeWeeks(b, weeks, h)
+	return "points over replacement in each lineup week by week, byes counted, " + tradeWeeks(b, weeks, h)
 }
 
 // tradeWeeks is the weeks a trade's figures cover, as the trade lines

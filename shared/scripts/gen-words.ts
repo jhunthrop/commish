@@ -59,6 +59,7 @@ const REFERENCE_MODULE = "web/src/lib/site/reference-words.ts";
 const STRENGTH_MODULE = "web/src/lib/run/strength-words.ts";
 const COMPANION_MODULE = "web/src/lib/companion/words.ts";
 const DELETE_MODULE = "web/src/lib/account/delete-words.ts";
+const SHEET_MODULE = "web/src/lib/sheet/words.ts";
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
@@ -88,7 +89,8 @@ const DELETE_MODULE = "web/src/lib/account/delete-words.ts";
  * one value at the order's clock (Lane 224, from Lane 220): the every-format table's rank head and
  * footnote, and the run's stamp on an in-season page that shows the run's rows, and how many of the
  * board's players one read of the order reaches; then the delete account's (Lane 237): the
- * page's words with what goes and what stays, and the account foot's verb. */
+ * page's words with what goes and what stays, and the account foot's verb; then the cheat sheet's
+ * (Lane 283, B266): the page's, the import panel's, the status line's and the print page's. */
 export const TABLES: readonly TableSource[] = [
   {
     name: "LeagueHome",
@@ -676,6 +678,30 @@ export const TABLES: readonly TableSource[] = [
     module: DELETE_MODULE,
     picks: ["ACCOUNT_DELETE_FOOT"],
     json: "shared/words/account-delete-foot.json",
+  },
+  {
+    name: "Sheet",
+    module: SHEET_MODULE,
+    picks: ["SHEET"],
+    json: "shared/words/sheet.json",
+  },
+  {
+    name: "SheetImport",
+    module: SHEET_MODULE,
+    picks: ["SHEET_IMPORT"],
+    json: "shared/words/sheet-import.json",
+  },
+  {
+    name: "SheetStatus",
+    module: SHEET_MODULE,
+    picks: ["SHEET_STATUS"],
+    json: "shared/words/sheet-status.json",
+  },
+  {
+    name: "SheetPrint",
+    module: "web/src/lib/sheet/print-words.ts",
+    picks: ["PRINT_WORDS"],
+    json: "shared/words/sheet-print.json",
   },
 ];
 export const OUTPUT = {

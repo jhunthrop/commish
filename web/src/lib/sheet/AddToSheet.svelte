@@ -6,6 +6,7 @@
 	import Verb from '#lib/ui/Verb.svelte';
 	import type { SheetPlayer } from './model.ts';
 	import { sheetStore } from './store.svelte.ts';
+	import { SHEET } from './words.ts';
 
 	interface Props {
 		player: SheetPlayer;
@@ -26,14 +27,14 @@
 <span class="add" aria-live="polite">
 	{#if variant === 'row'}
 		{#if added}
-			<Quiet size="sm" href={sheetHref}>On your sheet</Quiet>
+			<Quiet size="sm" href={sheetHref}>{SHEET.onYourSheet}</Quiet>
 		{:else}
-			<Quiet size="sm" onclick={() => sheetStore.add(player)}>Add to my sheet</Quiet>
+			<Quiet size="sm" onclick={() => sheetStore.add(player)}>{SHEET.addToSheet}</Quiet>
 		{/if}
 	{:else if added}
 		<Quiet href={sheetHref} size="lg" {fill}>{lastName(player.name)} is on your sheet</Quiet>
 	{:else}
-		<Verb size="lg" {fill} onclick={() => sheetStore.add(player)}>Add to my sheet</Verb>
+		<Verb size="lg" {fill} onclick={() => sheetStore.add(player)}>{SHEET.addToSheet}</Verb>
 	{/if}
 </span>
 

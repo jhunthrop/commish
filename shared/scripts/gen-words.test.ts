@@ -229,6 +229,10 @@ void test("the tables: the League home's, the box score's, then the shell's and 
       "Lobby",
       "DeleteAccount",
       "AccountDeleteFoot",
+      "Sheet",
+      "SheetImport",
+      "SheetStatus",
+      "SheetPrint",
     ],
   );
   assert.equal(new Set(TABLES.map((t) => t.json)).size, TABLES.length);
@@ -336,6 +340,19 @@ void test("the web's own words land in the JSON, the Swift and the Kotlin", asyn
   assert.equal(
     json("shared/words/player-read-figures.json").preseasonTiers,
     "Preseason tiers",
+  );
+  assert.equal(json("shared/words/sheet.json").defaultName, "My sheet");
+  assert.equal(
+    json("shared/words/sheet-import.json").pasteExample,
+    "1. Puka Nacua\n2. Ja'Marr Chase, WR",
+  );
+  assert.deepEqual(json("shared/words/sheet-status.json").functions, [
+    "savedAt",
+    "savedOn",
+  ]);
+  assert.equal(
+    json("shared/words/sheet-print.json").back,
+    "Back to your sheet",
   );
   const swift = outputs.get(OUTPUT.swift) ?? "";
   const kotlin = outputs.get(OUTPUT.kotlin) ?? "";

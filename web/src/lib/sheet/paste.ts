@@ -19,6 +19,7 @@ import type { Position } from '#lib/types/player.ts';
 import { decodeCsv, type CsvRead, type CsvSkip } from './csv.ts';
 import { SHEET_LIMITS } from './limits.ts';
 import { parsePosition, rowFor, type SheetPlayer, type SheetRow } from './model.ts';
+import { SHEET_IMPORT } from './words.ts';
 
 const LEADING_RANK = /^\s*\d+\s*[.)\-:]?\s+/;
 const SUFFIX = /\s+(jr|sr|ii|iii|iv|v)$/;
@@ -115,8 +116,7 @@ export function readList(text: string, index: NameIndex): CsvRead {
 		if (raw.trim() === '') return;
 		const match = matchLine(readListLine(raw), index);
 		if (typeof match === 'string') skipped.push({ line, reason: match });
-		else if (seen.has(match.id))
-			skipped.push({ line, reason: 'This player is already on an earlier line' });
+		else if (seen.has(match.id)) skipped.push({ line, reason: SHEET_IMPORT.earlier });
 		else if (rows.length >= SHEET_LIMITS.rows)
 			skipped.push({ line, reason: `A sheet holds at most ${SHEET_LIMITS.rows} players` });
 		else {

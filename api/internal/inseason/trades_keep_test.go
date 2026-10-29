@@ -41,8 +41,8 @@ func TestTradesDropTheTopPlayerForUnderAPoint(t *testing.T) {
 	config, theirs := twelveTeamPPR(t), deepAtReceiver()
 	second := deepAtBack()
 	top := set(second, "m-rb1", func(c Candidate) Candidate { c.Rank = 1; return c })
-	all := Trades(config, SeasonGames, Squad{Players: second}, Squad{Players: theirs}, "", 1000)
-	kept := Trades(config, SeasonGames, Squad{Players: top}, Squad{Players: theirs}, "", 1000)
+	all := pairTrades(config, SeasonGames, Squad{Players: second}, Squad{Players: theirs}, "", 1000)
+	kept := pairTrades(config, SeasonGames, Squad{Players: top}, Squad{Players: theirs}, "", 1000)
 	listed := map[string]bool{}
 	for _, tr := range kept {
 		listed[tradeWords(tr, top, theirs)] = true
@@ -77,7 +77,7 @@ func TestATradeNamesTheNeedItFills(t *testing.T) {
 		mine = set(mine, id, func(c Candidate) Candidate { return withTier(c, Out) })
 	}
 	slots := Slots(config)
-	got := Trades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000)
+	got := pairTrades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000)
 	found := false
 	for _, tr := range got {
 		receiver := false
@@ -96,7 +96,7 @@ func TestATradeNamesTheNeedItFills(t *testing.T) {
 	}
 	// The need keeps listed a trade of his top back the keep rule would drop.
 	top := set(mine, "m-rb1", func(c Candidate) Candidate { c.Rank = 1; return c })
-	needed := Trades(config, SeasonGames, Squad{Players: top}, Squad{Players: theirs}, "", 1000)
+	needed := pairTrades(config, SeasonGames, Squad{Players: top}, Squad{Players: theirs}, "", 1000)
 	for _, tr := range needed {
 		if !proposable(tr, top) {
 			t.Fatalf("%s listed against the rule", tradeWords(tr, top, theirs))
@@ -112,7 +112,7 @@ func TestANeedLeavesNoOtherSpotEmpty(t *testing.T) {
 	for _, id := range []string{"m-wr1", "m-wr2", "m-wr3", "m-wr4", "m-rb2", "m-rb3", "m-rb4", "m-rb5"} {
 		mine = set(mine, id, func(c Candidate) Candidate { return withTier(c, Out) })
 	}
-	s := newSearch(config, SeasonGames, Squad{Players: mine}, Squad{Players: deepAtReceiver()})
+	s := pairSearch(config, SeasonGames, Squad{Players: mine}, Squad{Players: deepAtReceiver()})
 	rb1, wr1 := indexOf(mine, "m-rb1"), indexOf(deepAtReceiver(), "t-wr1")
 	if got := s.need([]int{rb1}, -1, []int{wr1}); got != -1 {
 		t.Fatalf("need %d for a trade that empties the RB spot", got)
@@ -211,8 +211,8 @@ func TestTheGainLineNamesTheWeeksAtTheClock(t *testing.T) {
 		now   time.Time
 		want  string
 	}{
-		{"Thursday", false, fixtureNow, "points over replacement in each lineup, weeks 6 to 17"},
-		{"Tuesday", true, time.Date(2026, 10, 20, 12, 0, 0, 0, east), "points over replacement in each lineup, weeks 7 to 17"},
+		{"Thursday", false, fixtureNow, "points over replacement in each lineup week by week, byes counted, weeks 6 to 17"},
+		{"Tuesday", true, time.Date(2026, 10, 20, 12, 0, 0, 0, east), "points over replacement in each lineup week by week, byes counted, weeks 7 to 17"},
 	} {
 		f := restFixture(t)
 		f.league.Board.FromWeek, f.league.Snap.Week = 6, 6

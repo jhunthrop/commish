@@ -1,7 +1,7 @@
 package inseason
 
 import (
-	"math"
+	"slices"
 	"sort"
 
 	"github.com/jhunthrop/commish/api/internal/draft"
@@ -40,24 +40,40 @@ const GiveUpPerWeek = 1.0
 // fills that the trade fills (an index into Slots, -1 for none). MyRest
 // and TheirRest are each side's rest-of-season change (restOfSeason) over
 // the weeks the order covers, each side's drop counted against it.
+// MyGain and TheirGain are each best lineup's change a week over those
+// weeks, week by week with the byes (Lane 287). Fills and TheirFills are
+// the need of each side's the trade fills (TradeLeague.filled, an index
+// into Slots, -1 for none); Gives the position the member gives from his
+// surplus or where his bench covers the loss ("" for neither); Opens
+// whether the trade opens a need of the member's or deepens one
+// (TradeLeague.opens); MyWeek this week's Proj change
+// to the member's lineup, the order's tiebreak.
 type Trade struct {
-	Give      []int
-	Get       []int
-	Drop      int
-	DropFor   int
-	DropSlot  int
-	ForSlot   int
-	MyGain    float64
-	TheirGain float64
-	MyRest    float64
-	TheirRest float64
-	Need      int
+	Give       []int
+	Get        []int
+	Drop       int
+	DropFor    int
+	DropSlot   int
+	ForSlot    int
+	MyGain     float64
+	TheirGain  float64
+	MyRest     float64
+	TheirRest  float64
+	Need       int
+	Fills      int
+	TheirFills int
+	Gives      draft.Position
+	Opens      bool
+	MyWeek     float64
 }
 
 // tradeSide is one squad as the search reads it: its players, its
 // strength before the trade, the slots it fills, the players it may
 // trade, whether its holds count (the member's own), and who it may drop
 // (the rule Waivers reads too).
+// slots is its best lineup's points at each starting slot before the
+// trade and needs the slots that fall below the league's median there
+// (Lane 287).
 type tradeSide struct {
 	squad     Squad
 	players   []*Candidate
@@ -67,18 +83,56 @@ type tradeSide struct {
 	tradeable []int
 	own       bool
 	drops     dropRule
+	slots     []float64
+	needs     []Need
+	// flatBase is the rest-of-season fill's strength before the trade.
+	flatBase float64
+	// needPositions is the positions its needs' slots take.
+	needPositions map[draft.Position]bool
 }
 
-func newSide(f *filler, config []draft.SlotConfig, squad Squad, own bool) tradeSide {
+// tradeFill is the search's two fills: the rest-of-season fill with
+// nobody's week counted, which says which slots a roster fills and whom
+// it starts (the drop rule's), and the week-by-week fill whose points a
+// week are the lineup's strength (Lane 287).
+type tradeFill struct {
+	f *filler
+	w *weekFill
+}
+
+// strength is the lineup's points over replacement a week, week by week
+// with the byes, and how many slots it fills; the rest-of-season fill's
+// starters stay read for started.
+func (t tradeFill) strength(pool []*Candidate) (float64, int) {
+	week, _, filled := t.both(pool)
+	return week, filled
+}
+
+// both is strength with the rest-of-season fill's own figure a week
+// (flat), the one the drop rule ranks drops by.
+func (t tradeFill) both(pool []*Candidate) (week, flat float64, filled int) {
+	flat, filled = t.f.strength(pool)
+	return t.w.perWeek(pool), flat, filled
+}
+
+func newSide(f tradeFill, l TradeLeague, squad Squad, own bool) tradeSide {
 	var held map[string]bool
 	if own {
 		held = squad.Held
 	}
-	s := tradeSide{squad: squad, players: pointers(squad.Players), own: own, drops: newDropRule(config, squad, held)}
-	s.base, s.filled = f.strength(s.players)
-	s.baseFill = make([]bool, len(f.out))
-	for i, p := range f.out {
+	s := tradeSide{squad: squad, players: pointers(squad.Players), own: own, drops: newDropRule(l.Config, squad, held)}
+	s.base, s.flatBase, s.filled = f.both(s.players)
+	s.baseFill = make([]bool, len(f.f.out))
+	for i, p := range f.f.out {
 		s.baseFill[i] = p >= 0
+	}
+	s.slots = append([]float64(nil), f.w.slotPoints(s.players)...)
+	s.needs = l.Needs(TeamProfile{Slots: s.slots})
+	s.needPositions = map[draft.Position]bool{}
+	for _, n := range s.needs {
+		for _, p := range l.slots[n.Slot].Eligible {
+			s.needPositions[p] = true
+		}
 	}
 	for i, c := range squad.Players {
 		if skill(c.Position) && !c.InjuredReserve && !(own && squad.Held[c.ID]) {
@@ -115,17 +169,17 @@ func (c Change) stands() bool { return c.Fills && c.Room }
 // than it gives with no open spot and, unless always, only when it gains:
 // a drop never raises a lineup, so the finder refuses a trade with no gain
 // as it is.
-func (s tradeSide) change(f *filler, out []int, in []*Candidate, always bool) Change {
-	strength, filled := f.strength(f.swap(s.players, out, in...))
+func (s tradeSide) change(f tradeFill, out []int, in []*Candidate, always bool) Change {
+	strength, flat, filled := f.both(f.f.swap(s.players, out, in...))
 	c := Change{Gain: strength - s.base, Drop: -1, DropFor: -1, DropSlot: -1, ForSlot: -1, Fills: filled >= s.filled, Open: -1, Room: true}
 	if !c.Fills {
-		c.Open = s.emptied(f.out)
+		c.Open = s.emptied(f.f.out)
 		return c
 	}
-	if len(in) <= len(out) || s.squad.Open || (!always && !positive(c.Gain)) {
+	if len(in) <= len(out) || s.squad.Open || (!always && printedSign(c.Gain) <= 0) {
 		return c
 	}
-	drop, ok := s.withDrop(f, c.Gain, out, in)
+	drop, ok := s.withDrop(f, flat-s.flatBase, out, in)
 	c.Room = ok
 	if !ok {
 		return c
@@ -156,13 +210,17 @@ func (s tradeSide) emptied(fill []int) int {
 // gain. False for nobody. A player the rest-of-season fill after the
 // trade does not start changes no slot, so his gain is the trade's as it
 // is, gain; each player it starts is reckoned by a fill without him.
-func (s tradeSide) withDrop(f *filler, gain float64, out []int, in []*Candidate) (dropOption, bool) {
+//
+// The drops are ranked on the rest-of-season fill's figure (gain is the
+// trade's on it, before any drop), the week-by-week fill reckoned once for
+// the drop chosen (Lane 287 fix round: it is the search's dearest step).
+func (s tradeSide) withDrop(f tradeFill, gain float64, out []int, in []*Candidate) (dropOption, bool) {
 	counts := s.countsAfter(out, in)
 	taken := make([]Candidate, len(in))
 	for k, c := range in {
 		taken[k] = *c
 	}
-	f.strength(f.swap(s.players, out, in...))
+	f.f.strength(f.f.swap(s.players, out, in...))
 	var options []dropOption
 	var started []int
 	at := 0
@@ -170,7 +228,7 @@ func (s tradeSide) withDrop(f *filler, gain float64, out []int, in []*Candidate)
 		if contains(out, d) {
 			continue
 		}
-		starts := f.started(at)
+		starts := f.f.started(at)
 		at++
 		switch {
 		case !s.drops.allowed(d, in[0], counts):
@@ -181,12 +239,16 @@ func (s tradeSide) withDrop(f *filler, gain float64, out []int, in []*Candidate)
 		}
 	}
 	for _, d := range started {
-		strength, filled := f.strength(f.swap(s.players, withOne(out, d), in...))
+		flat, filled := f.f.strength(f.f.swap(s.players, withOne(out, d), in...))
 		if filled >= s.filled {
-			options = append(options, dropOption{at: d, gain: strength - s.base, spot: noSpot})
+			options = append(options, dropOption{at: d, gain: flat - s.flatBase, spot: noSpot})
 		}
 	}
-	return s.drops.recommend(options, out, taken)
+	best, ok := s.drops.recommend(options, out, taken)
+	if ok {
+		best.gain = f.w.perWeek(f.f.swap(s.players, withOne(out, best.at), in...)) - s.base
+	}
+	return best, ok
 }
 
 // countsAfter is the side's players a position after losing out and
@@ -258,37 +320,63 @@ func (s tradeSide) at(list []int, buf []*Candidate) []*Candidate {
 func (t Trade) CloseForThem() bool { return roundTenth(t.TheirGain) < CloseCall }
 
 // orderTrades puts the trades the other side gains from first and the
-// close calls for them after, each group by the member's gain, then by
-// theirs: the first trade a page shows is one the other team can accept.
+// close calls for them after; inside each, the trades that fill one of
+// the member's needs first (Lane 287), then by the member's rest-of-season
+// gain as a page prints it, this week's Proj change, then theirs: the
+// first trade a page shows is one the other team can accept and the one
+// that fills what the member's lineup lacks.
 func orderTrades(trades []Trade) {
-	sort.SliceStable(trades, func(i, j int) bool {
-		a, b := trades[i], trades[j]
-		if a.CloseForThem() != b.CloseForThem() {
-			return !a.CloseForThem()
+	// The printed figures are read once a trade: a search orders thousands.
+	type keyed struct {
+		trade Trade
+		close bool
+		gain  float64
+	}
+	keys := make([]keyed, len(trades))
+	for i, tr := range trades {
+		keys[i] = keyed{tr, tr.CloseForThem(), roundTenth(tr.MyGain)}
+	}
+	sort.SliceStable(keys, func(i, j int) bool {
+		a, b := keys[i], keys[j]
+		if a.close != b.close {
+			return !a.close
 		}
-		if a.MyGain != b.MyGain {
-			return a.MyGain > b.MyGain
+		if (a.trade.Fills >= 0) != (b.trade.Fills >= 0) {
+			return a.trade.Fills >= 0
 		}
-		return a.TheirGain > b.TheirGain
+		if a.gain != b.gain {
+			return a.gain > b.gain
+		}
+		if a.trade.MyWeek != b.trade.MyWeek {
+			return a.trade.MyWeek > b.trade.MyWeek
+		}
+		return a.trade.TheirGain > b.trade.TheirGain
 	})
+	for i, k := range keys {
+		trades[i] = k.trade
+	}
 }
 
-// tradeSearch is the two sides of one team's trades, with the buffer the
-// players taken in are read into and the member's lineup this week before
-// any trade (week, set on the first need asked).
+// tradeSearch is the two sides of one team's trades in the league, with
+// the buffer the players taken in are read into, the member's lineup this
+// week before any trade (week, set on the first need asked) and its Proj
+// total (myWeek), and the member's surplus (TradeLeague.Surplus).
 type tradeSearch struct {
-	f      *filler
-	config []draft.SlotConfig
-	me     tradeSide
-	them   tradeSide
-	buffer []*Candidate
-	week   *weekLineup
+	f       tradeFill
+	league  TradeLeague
+	config  []draft.SlotConfig
+	me      tradeSide
+	them    tradeSide
+	buffer  []*Candidate
+	week    *weekLineup
+	surplus []int
+	myWeek  float64
 }
 
-func newSearch(config []draft.SlotConfig, weeks int, mine, theirs Squad) *tradeSearch {
-	f := newFiller(Slots(config), weeks)
-	me := newSide(f, config, mine, true)
-	return &tradeSearch{f: f, config: config, me: me, them: newSide(f, config, theirs, false)}
+func newSearch(l TradeLeague, mine, theirs Squad) *tradeSearch {
+	f := tradeFill{f: newFiller(Slots(l.Config), l.Weeks()), w: l.fill()}
+	return &tradeSearch{f: f, league: l, config: l.Config, me: newSide(f, l, mine, true), them: newSide(f, l, theirs, false),
+		surplus: l.Surplus(mine.Players), myWeek: WeekProj(l.Config, mine.Players, mine.Starters)}
 }
 
 // need is the first starting spot of the member's lineup this week, set
@@ -297,6 +385,14 @@ func newSearch(config []draft.SlotConfig, weeks int, mine, theirs Squad) *tradeS
 // get. -1 for none, and -1 when the trade leaves empty a spot that was
 // filled, which fills no need.
 func (t *tradeSearch) need(give []int, drop int, get []int) int {
+	filled, _ := t.weekSpots(give, drop, get)
+	return filled
+}
+
+// weekSpots is need's spot, and whether the trade leaves empty a spot of
+// this week's lineup that someone who can play filled (Lane 287: the
+// finder never sends out the one player who can start there this week).
+func (t *tradeSearch) weekSpots(give []int, drop int, get []int) (int, bool) {
 	squad := t.me.squad
 	if t.week == nil {
 		base := weekOf(t.config, squad.Players, squad.Starters)
@@ -311,12 +407,12 @@ func (t *tradeSearch) need(give []int, drop int, get []int) int {
 	for i, idle := range t.week.idle {
 		switch {
 		case !idle && after.idle[i]:
-			return -1
+			return -1, true
 		case idle && !after.idle[i] && filled < 0:
 			filled = i
 		}
 	}
-	return filled
+	return filled, false
 }
 
 // candidatesOf is the players at the indexes, in a new slice.
@@ -373,65 +469,212 @@ func (t *tradeSearch) theirs(give, get []int, always bool) Change {
 	return t.them.change(t.f, get, t.buffer, always)
 }
 
-// Trades is §6.2's search between the member's squad and one other team's:
-// exact over every one-for-one and two-for-one pair both ways at the
-// skill positions, a trade kept when both lineups gain and both still
-// fill every slot, neither side giving up more rest of season than
-// Acceptable allows (Lane 269: an idea both would take), and proposable
-// (Lane 103). focus, when set, keeps
-// only trades holding that player (either side's id). The best limit trades in orderTrades' order.
-// Gains are a week's over the weeks the order covers.
-func Trades(config []draft.SlotConfig, weeks int, mine, theirs Squad, focus string, limit int) []Trade {
-	t := newSearch(config, weeks, mine, theirs)
-	me, them := t.me, t.them
-	var out []Trade
-	try := func(give, get []int) {
-		if !holdsFocus(mine.Players, theirs.Players, give, get, focus) {
-			return
-		}
-		my := t.mine(give, get, false)
-		if !my.stands() || !positive(my.Gain) {
-			return
-		}
-		their := t.theirs(give, get, false)
-		if !their.stands() || !positive(their.Gain) {
-			return
-		}
-		tr := t.tradeOf(give, get, my, their)
-		if !Acceptable(tr.MyRest, t.f.weeks) || !Acceptable(tr.TheirRest, t.f.weeks) {
-			return
-		}
-		tr.Need = t.need(give, tr.Drop, get)
-		if proposable(tr, mine.Players) {
-			out = append(out, tr)
-		}
-	}
-	for _, g := range me.tradeable {
-		for _, h := range them.tradeable {
-			try([]int{g}, []int{h})
-		}
-	}
-	for _, pair := range pairs(me.tradeable) {
-		for _, h := range them.tradeable {
-			try(pair, []int{h})
-		}
-	}
-	for _, g := range me.tradeable {
-		for _, pair := range pairs(them.tradeable) {
-			try([]int{g}, pair)
-		}
-	}
-	orderTrades(out)
-	if len(out) > limit {
-		out = out[:limit]
-	}
-	return out
+// Trades is §6.2's search between the member's squad and one other team's
+// in the league: exact over every one-for-one, two-for-one, one-for-two
+// and two-for-two at the skill positions (Lane 287), a trade kept when
+//   - the member's best lineup gains over the weeks left, byes counted;
+//   - both sides still fill every slot and have room for what they take;
+//   - neither side gives up more rest of season than Acceptable allows
+//     (Lane 269);
+//   - the other side takes it (sideTakes): its lineup gains, or the trade
+//     fills one of its needs and its lineup loses nothing;
+//   - it fills a need on at least one side, and opens or deepens no
+//     need of the member's (Lane 287);
+//   - it is proposable (Lane 103);
+//   - and it is not another kept trade with a player added that does not
+//     raise the member's gain (padded).
+//
+// focus, when set, keeps only trades holding that player (either side's
+// id). The best limit trades in orderTrades' order. Gains are a week's
+// over the weeks the league's order covers.
+func Trades(l TradeLeague, mine, theirs Squad, focus string, limit int) []Trade {
+	return Narrow(AllTrades(l, mine, theirs), mine, theirs, focus, limit)
 }
 
 // AllTrades is every trade Trades keeps between the two squads, in
 // orderTrades' order: the search a league read runs once (Service.finds).
-func AllTrades(config []draft.SlotConfig, weeks int, mine, theirs Squad) []Trade {
-	return Trades(config, weeks, mine, theirs, "", math.MaxInt)
+func AllTrades(l TradeLeague, mine, theirs Squad) []Trade {
+	t := newSearch(l, mine, theirs)
+	var out []Trade
+	try := func(give, get []int) {
+		if !t.couldFill(give, get) || !t.restPossible(give, get) {
+			return
+		}
+		my := t.mine(give, get, false)
+		if !my.stands() || printedSign(my.Gain) <= 0 {
+			return
+		}
+		// Their drop is looked for only where they could take the trade: a
+		// drop never raises a lineup, so one that falls already is refused,
+		// and one that holds even is reckoned again with its drop.
+		their := t.theirs(give, get, false)
+		if printedSign(their.Gain) < 0 {
+			return
+		}
+		if printedSign(their.Gain) == 0 {
+			their = t.theirs(give, get, true)
+		}
+		if !their.stands() {
+			return
+		}
+		tr := t.tradeOf(give, get, my, their)
+		if !Acceptable(tr.MyRest, l.Weeks()) || !sideTakes(tr.TheirRest, tr.TheirGain, tr.TheirFills, l.Weeks()) ||
+			(tr.Fills < 0 && tr.TheirFills < 0) || tr.Opens {
+			return
+		}
+		need, empties := t.weekSpots(give, tr.Drop, get)
+		tr.Need = need
+		if !empties && proposable(tr, mine.Players) {
+			tr.MyWeek = t.weekChange(tr)
+			out = append(out, tr)
+		}
+	}
+	for _, shape := range tradeShapes {
+		for _, give := range shape.give(t.me.tradeable) {
+			for _, get := range shape.get(t.them.tradeable) {
+				try(give, get)
+			}
+		}
+	}
+	out = withoutPadding(out)
+	orderTrades(out)
+	return out
+}
+
+// withoutPadding is trades less each one that holds another of them with
+// a player added on either side and gains the member no more as a page
+// prints it, nor is a close call where the other is not: the same idea
+// with a player along who changes nothing.
+func withoutPadding(trades []Trade) []Trade {
+	out := make([]Trade, 0, len(trades))
+	for i, tr := range trades {
+		padded := false
+		for j, smaller := range trades {
+			if i != j && pads(tr, smaller) {
+				padded = true
+				break
+			}
+		}
+		if !padded {
+			out = append(out, tr)
+		}
+	}
+	return out
+}
+
+// pads is whether tr is smaller with players added that gain the member
+// nothing.
+func pads(tr, smaller Trade) bool {
+	if len(smaller.Give)+len(smaller.Get) >= len(tr.Give)+len(tr.Get) || !subset(smaller.Give, tr.Give) || !subset(smaller.Get, tr.Get) {
+		return false
+	}
+	if smaller.CloseForThem() && !tr.CloseForThem() {
+		return false
+	}
+	return roundTenth(smaller.MyGain) >= roundTenth(tr.MyGain)
+}
+
+func subset(small, big []int) bool {
+	for _, p := range small {
+		if !slices.Contains(big, p) {
+			return false
+		}
+	}
+	return true
+}
+
+// tradeShape is one count of players a side: each side's lists from its
+// tradeable players.
+type tradeShape struct{ give, get func([]int) [][]int }
+
+// tradeShapes is the finder's reach: one or two players a side.
+var tradeShapes = []tradeShape{{singles, singles}, {pairs, singles}, {singles, pairs}, {pairs, pairs}}
+
+// singles is each of at alone.
+func singles(at []int) [][]int {
+	out := make([][]int, len(at))
+	for i, p := range at {
+		out[i] = []int{p}
+	}
+	return out
+}
+
+// sideTakes is whether a side takes a trade (Lane 287): it gives up no
+// more rest of season than Acceptable allows (Lane 269), and its lineup
+// gains, or the trade fills one of its needs (fills, -1 for none) and its
+// lineup loses nothing, as a page prints it.
+func sideTakes(rest, gain float64, fills, weeks int) bool {
+	if !Acceptable(rest, weeks) {
+		return false
+	}
+	if fills >= 0 {
+		return roundTenth(gain) >= 0
+	}
+	return positive(gain)
+}
+
+// couldFill is whether the trade could fill a need on either side: a slot
+// rises only when a player who can play there comes in, so a trade that
+// brings neither side a player at a position its needs take fills none
+// (the search's cheapest refusal).
+func (t *tradeSearch) couldFill(give, get []int) bool {
+	return t.me.wants(t.them.players, get) || t.them.wants(t.me.players, give)
+}
+
+// wants is whether any of players at in can play at one of the side's
+// needs.
+func (s tradeSide) wants(players []*Candidate, in []int) bool {
+	for _, p := range in {
+		if s.needPositions[players[p].Position] {
+			return true
+		}
+	}
+	return false
+}
+
+// restPossible is whether both sides could still take the trade on rest
+// of season: a drop only lowers a side's, so a trade either side refuses
+// before any drop is refused after one.
+func (t *tradeSearch) restPossible(give, get []int) bool {
+	t.buffer = t.them.at(get, t.buffer)
+	mine := t.me.restOfSeason(give, -1, t.buffer)
+	t.buffer = t.me.at(give, t.buffer)
+	theirs := t.them.restOfSeason(get, -1, t.buffer)
+	return roughlyAcceptable(mine, t.league.Weeks()) && roughlyAcceptable(theirs, t.league.Weeks())
+}
+
+// printedSign is the sign of a figure as a page prints it to the tenth,
+// the tenth read only near zero (as roughlyAcceptable).
+func printedSign(v float64) int {
+	switch {
+	case v >= 0.06:
+		return 1
+	case v <= -0.06:
+		return -1
+	case v > -0.04 && v < 0.04:
+		return 0
+	}
+	switch t := roundTenth(v); {
+	case t > 0:
+		return 1
+	case t < 0:
+		return -1
+	}
+	return 0
+}
+
+// roughlyAcceptable is Acceptable, the printed tenth read only near the
+// limit: a figure a tenth or more clear of it falls the same side however
+// it prints, and the search asks thousands of times a read.
+func roughlyAcceptable(rest float64, weeks int) bool {
+	limit := -GiveUp(weeks)
+	switch {
+	case rest >= limit+0.1:
+		return true
+	case rest < limit-0.1:
+		return false
+	}
+	return Acceptable(rest, weeks)
 }
 
 // Narrow is Trades' focus and limit applied to all, one search's trades in
@@ -458,14 +701,89 @@ func holdsFocus(mine, theirs []Candidate, give, get []int, focus string) bool {
 
 // tradeOf is the trade from each side's change: the member's drop, both
 // gains and both rest-of-season changes, each side's drop counted
-// against it.
+// against it, the need each side's lineup fills and what the member
+// gives.
 func (t *tradeSearch) tradeOf(give, get []int, my, their Change) Trade {
 	t.buffer = t.them.at(get, t.buffer)
 	myRest := t.me.restOfSeason(give, my.Drop, t.buffer)
 	t.buffer = t.me.at(give, t.buffer)
 	theirRest := t.them.restOfSeason(get, their.Drop, t.buffer)
-	return Trade{Give: give, Get: get, Drop: my.Drop, DropFor: my.DropFor, DropSlot: my.DropSlot, ForSlot: my.ForSlot,
+	tr := Trade{Give: give, Get: get, Drop: my.Drop, DropFor: my.DropFor, DropSlot: my.DropSlot, ForSlot: my.ForSlot,
 		MyGain: my.Gain, TheirGain: their.Gain, MyRest: myRest, TheirRest: theirRest, Need: -1}
+	mineAfter := t.slotsAfter(t.me, withDrop(give, my.Drop), t.them.at(get, t.buffer))
+	tr.Fills = t.league.filled(t.me.needs, t.me.slots, mineAfter)
+	tr.Gives = t.gives(give, mineAfter)
+	tr.Opens = t.league.opens(t.me.needs, t.league.Needs(TeamProfile{Slots: mineAfter}))
+	theirsAfter := t.slotsAfter(t.them, withDrop(get, their.Drop), t.me.at(give, t.buffer))
+	tr.TheirFills = t.league.filled(t.them.needs, t.them.slots, theirsAfter)
+	return tr
+}
+
+// opens is whether the trade leaves a need the side did not have (a slot
+// in after's needs not in before's), or one it had deeper by CloseCall a
+// week or more (Lane 287 fix round, HIGH-1): a trade never makes a hole
+// to fill another.
+func (l TradeLeague) opens(before, after []Need) bool {
+	least := CloseCall * float64(l.Weeks())
+	for _, n := range after {
+		at := slices.IndexFunc(before, func(b Need) bool { return b.Slot == n.Slot })
+		if at < 0 || roundTenth(n.Short-before[at].Short) >= least {
+			return true
+		}
+	}
+	return false
+}
+
+// withDrop is out with the drop (-1 for none) added, in a new slice.
+func withDrop(out []int, drop int) []int {
+	if drop < 0 {
+		return out
+	}
+	return append(append([]int(nil), out...), drop)
+}
+
+// slotsAfter is a side's best lineup's points at each slot after it
+// loses out and takes in, in a new slice.
+func (t *tradeSearch) slotsAfter(s tradeSide, out []int, in []*Candidate) []float64 {
+	return append([]float64(nil), t.f.w.slotPoints(t.f.f.swap(s.players, out, in...))...)
+}
+
+// gives is the position the member gives from (Lane 287): the first
+// player he gives who is surplus, or whose position's own slots stay at
+// the league's median or over after the trade (his bench covers the
+// loss); "" for none.
+func (t *tradeSearch) gives(give []int, after []float64) draft.Position {
+	for _, g := range give {
+		p := t.me.players[g].Position
+		if slices.Contains(t.surplus, g) || t.covered(p, after) {
+			return p
+		}
+	}
+	return ""
+}
+
+// covered is whether every slot only p takes holds the league's median
+// or over in after.
+func (t *tradeSearch) covered(p draft.Position, after []float64) bool {
+	own := false
+	for i, s := range t.league.slots {
+		if s.shared() || !s.accepts(p) {
+			continue
+		}
+		own = true
+		if after[i] < t.league.Median[i] {
+			return false
+		}
+	}
+	return own
+}
+
+// weekChange is this week's Proj change to the member's lineup from the
+// trade, each lineup set as the Lineup screen sets it.
+func (t *tradeSearch) weekChange(tr Trade) float64 {
+	squad := t.me.squad
+	after := Swapped(squad.Players, withDrop(tr.Give, tr.Drop), candidatesOf(t.them.squad.Players, tr.Get))
+	return WeekProj(t.config, after, squad.Starters) - t.myWeek
 }
 
 // Checked is one trade the member built, on the finder's reckoning: its
@@ -484,11 +802,12 @@ type Checked struct {
 // get (indexes into each squad), answered whatever its gains, with the
 // drop a full roster makes for more in than out. The gains are the
 // finder's own, so a trade the finder lists checks to its numbers.
-func Check(config []draft.SlotConfig, weeks int, mine, theirs Squad, give, get []int) Checked {
-	t := newSearch(config, weeks, mine, theirs)
+func Check(l TradeLeague, mine, theirs Squad, give, get []int) Checked {
+	t := newSearch(l, mine, theirs)
 	my, their := t.mine(give, get, true), t.theirs(give, get, true)
 	tr := t.tradeOf(give, get, my, their)
 	tr.Need = t.need(give, tr.Drop, get)
+	tr.MyWeek = t.weekChange(tr)
 	return Checked{Trade: tr, Mine: my, Theirs: their, MineBase: t.me.base, TheirsBase: t.them.base}
 }
 

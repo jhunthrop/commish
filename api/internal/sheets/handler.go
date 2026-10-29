@@ -228,7 +228,7 @@ func (h *Handler) updateRow(w http.ResponseWriter, r *http.Request) {
 const emptyReadSentence = "No player read, so your sheet is as it was."
 
 // badHeaderSentence refuses a CSV whose first line is not the header.
-const badHeaderSentence = "The first line must name rank, player_id, name and position"
+const badHeaderSentence = "The first row must name rank, player_id, name and position"
 
 // readImport reads the body as the sheet's CSV, or as a names list against
 // the board the sheet is built on. It answers the request itself when it

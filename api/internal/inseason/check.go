@@ -78,7 +78,7 @@ func (a *advisor) CheckTrade(in apitypes.TradeCheckInput) (apitypes.TradeCheck, 
 	if r != nil {
 		return apitypes.TradeCheck{}, r, true
 	}
-	checked := Check(a.config, a.weeks, a.squad(team, mine, true), a.squad(other, theirs, false), give, get)
+	checked := Check(a.tradeLeague(), a.squad(team, mine, true), a.squad(other, theirs, false), give, get)
 	week := a.tradeWeek(team, other, mine, theirs, checked.Trade)
 	h := a.header()
 	un := UncountedOf(a.settings, a.season.Carries)
@@ -250,7 +250,10 @@ func (a *advisor) tradeRow(mine, theirs []person, tr Trade, week tradeWeek) apit
 	row := apitypes.TradeRow{Give: lines(mine, tr.Give), Get: lines(theirs, tr.Get),
 		MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: tr.CloseForThem(),
 		MyProjChange: week.mine.change(), TheirProjChange: week.theirs.change(),
-		MyRestOfSeason: tenthOf(tr.MyRest), TheirRestOfSeason: tenthOf(tr.TheirRest)}
+		MyRestOfSeason: tenthOf(tr.MyRest), TheirRestOfSeason: tenthOf(tr.TheirRest),
+		MyLineupRestOfSeason: tenthOf(tr.MyGain * float64(a.weeks)), TheirLineupRestOfSeason: tenthOf(tr.TheirGain * float64(a.weeks)),
+		Fills: slotTypeOf[apitypes.TradeRowFills](a.slots, tr.Fills), TheirFills: slotTypeOf[apitypes.TradeRowTheirFills](a.slots, tr.TheirFills),
+		Gives: givesOf(tr.Gives)}
 	if tr.Drop >= 0 {
 		drop := mine[tr.Drop].line
 		row.Drop = &drop
@@ -268,6 +271,25 @@ func (a *advisor) tradeRow(mine, theirs []person, tr Trade, week tradeWeek) apit
 		row.Need = &need
 	}
 	return row
+}
+
+// slotTypeOf is a filled slot's type on the wire (Lane 287), nil for
+// none (-1).
+func slotTypeOf[T ~string](slots []Slot, slot int) *T {
+	if slot < 0 {
+		return nil
+	}
+	t := T(slots[slot].Type)
+	return &t
+}
+
+// givesOf is the position the member gives from on the wire, nil for none.
+func givesOf(p draft.Position) *apitypes.TradeRowGives {
+	if p == "" {
+		return nil
+	}
+	g := apitypes.TradeRowGives(p)
+	return &g
 }
 
 // tenthOf is a figure to the tenth, for an optional field on the wire.

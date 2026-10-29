@@ -131,7 +131,7 @@ func DecodeCSV(r io.Reader) ([]apitypes.SheetRowInput, []apitypes.ImportSkip, er
 			break
 		}
 		if errors.As(err, &parseErr) {
-			skipped = append(skipped, apitypes.ImportSkip{Line: line, Reason: "This line is not valid CSV"})
+			skipped = append(skipped, apitypes.ImportSkip{Line: line, Reason: "This row is not valid CSV"})
 			continue
 		}
 		if err != nil {
@@ -144,7 +144,7 @@ func DecodeCSV(r io.Reader) ([]apitypes.SheetRowInput, []apitypes.ImportSkip, er
 		case reason != "":
 			skipped = append(skipped, apitypes.ImportSkip{Line: line, Reason: reason})
 		case seen[rk.row.PlayerId]:
-			skipped = append(skipped, apitypes.ImportSkip{Line: line, Reason: "This player is already on an earlier line"})
+			skipped = append(skipped, apitypes.ImportSkip{Line: line, Reason: "This player is already on an earlier row"})
 		case len(keep) >= MaxRows:
 			skipped = append(skipped, apitypes.ImportSkip{Line: line, Reason: fmt.Sprintf("A sheet holds at most %d players", MaxRows)})
 		default:

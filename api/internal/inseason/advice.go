@@ -88,6 +88,52 @@ type advisor struct {
 	// routes answer it as ErrSearchStopped, never as no trades (rereview
 	// 66u F2).
 	searchErr error
+	// plays is each club's Plays mark over the order's span (Lane 287),
+	// empty when the schedule is not read; trades is the league as the
+	// trade finder reads it (tradeLeague), profiled once.
+	plays  map[string]uint32
+	trades *TradeLeague
+}
+
+// span is the weeks the order's figures cover: the rest of season's
+// through the league's horizon, or the preseason number's season.
+func (a *advisor) span() Span {
+	if a.basis != RestOfSeason {
+		return Span{First: 1, Last: SeasonGames}
+	}
+	return SpanOf(a.weeks, a.horizon.Last)
+}
+
+// playsOf is each club's Plays mark over the span, from the season's
+// schedule: none on the preseason number, whose figures are the season's.
+func playsOf(basis OrderBasis, games []boards.TeamWeek, span Span, now time.Time) map[string]uint32 {
+	out := map[string]uint32{}
+	if basis != RestOfSeason || len(games) == 0 {
+		return out
+	}
+	for team, weeks := range weeksToPlay(games, span.First, span.Last, now) {
+		out[team] = PlaysIn(weeks)
+	}
+	for _, g := range games {
+		if _, ok := out[g.Team]; !ok {
+			out[g.Team] = scheduleRead
+		}
+	}
+	return out
+}
+
+// tradeLeague is every roster of the league profiled for the trade finder
+// (Lane 287), the drafter's held by his tags.
+func (a *advisor) tradeLeague() TradeLeague {
+	if a.trades == nil {
+		squads := make([]Squad, 0, len(a.Snap.Teams))
+		for _, t := range a.Snap.Teams {
+			squads = append(squads, a.squad(t, a.active(t), t.RosterID == a.Me))
+		}
+		l := NewTradeLeague(a.config, a.span(), squads)
+		a.trades = &l
+	}
+	return *a.trades
 }
 
 // found is every trade the finder keeps with each other team, by roster
@@ -125,12 +171,13 @@ func (a *advisor) findAll(ctx context.Context) (map[int][]Trade, error) {
 		return out, nil
 	}
 	squad := a.squad(team, a.active(team), true)
+	league := a.tradeLeague()
 	for _, t := range a.Snap.Teams {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 		if t.RosterID != a.Me {
-			out[t.RosterID] = AllTrades(a.config, a.weeks, squad, a.squad(t, a.active(t), false))
+			out[t.RosterID] = AllTrades(league, squad, a.squad(t, a.active(t), false))
 		}
 	}
 	return out, nil
@@ -159,9 +206,12 @@ func newAdvisor(l League, data Data, projection boards.WeekProjection, held map[
 	if l.Board, rest, err = lives.At(l.Board, data.Games, horizon, now); err != nil {
 		return nil, fmt.Errorf("inseason: the board at the read's clock: %w", err)
 	}
-	return &advisor{rest: rest, League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, horizon: horizon, weeks: WeeksCovered(basis, firstWeek(l), horizon), pages: newPages(l.Board.Raw), now: now,
+	weeks := WeeksCovered(basis, firstWeek(l), horizon)
+	a := &advisor{rest: rest, League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, horizon: horizon, weeks: weeks, pages: newPages(l.Board.Raw), now: now,
 		gamesLeft: rest.Left, projection: projection, preset: preset, week: l.Snap.Week, data: data, platform: platform,
-		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now).WithPlatform(platform)}, nil
+		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now).WithPlatform(platform)}
+	a.plays = playsOf(basis, data.Games, a.span(), now)
+	return a, nil
 }
 
 // platformWeekOf is the league platform's points for its week, by board
@@ -318,7 +368,7 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	// His place among the players who play (PlayingRanks, Lane 128): the one
 	// position rank the line, the badge, the caption and the order's # say.
 	c := Candidate{ID: id, Position: position, Rank: a.playingRanks()[boardID], Tier: facts.Tier(),
-		Locked: facts.Locked, InjuredReserve: facts.InjuredReserve(), FreeLevel: a.levels().of(position)}
+		Locked: facts.Locked, InjuredReserve: facts.InjuredReserve(), FreeLevel: a.levels().of(position), Plays: a.plays[team]}
 	line := apitypes.PlayerLine{Player: lp, Held: boardID != "" && a.held[boardID], Facts: wireFacts(facts, thisWeek(a.Snap.Ref.Host, side, id, facts))}
 	// His game at the facts' clock as every screen says it (Lane 176).
 	line.GameState = lineGameState(line, a.now)
