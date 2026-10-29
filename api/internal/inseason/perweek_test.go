@@ -53,7 +53,7 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 		}
 	}
 	// Trades heads its gains "Gain a week", the line under them names the weeks (Lane 103).
-	if s := TradeGainBasis(RestOfSeason, 1, StandardHorizon); !strings.HasPrefix(s, "points over replacement in each lineup, ") {
+	if s := TradeGainBasis(RestOfSeason, 1, StandardHorizon); !strings.HasPrefix(s, "points over replacement in each lineup week by week, byes counted, ") {
 		t.Errorf("%q", s)
 	}
 }

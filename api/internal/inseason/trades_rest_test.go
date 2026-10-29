@@ -41,7 +41,7 @@ func TestIrvingForNacuaAndLoveIsDropped(t *testing.T) {
 	me, them := Squad{Players: mine}, Squad{Players: theirs}
 	give := []int{indexOf(mine, "m-irving")}
 	get := []int{indexOf(theirs, "t-nacua"), indexOf(theirs, "t-love")}
-	got := Check(config, SeasonGames, me, them, give, get)
+	got := pairCheck(config, SeasonGames, me, them, give, get)
 	if !positive(got.MyGain) || !positive(got.TheirGain) {
 		t.Fatalf("the shape lifts both lineups: mine %v, theirs %v", got.MyGain, got.TheirGain)
 	}
@@ -56,7 +56,7 @@ func TestIrvingForNacuaAndLoveIsDropped(t *testing.T) {
 	if !Acceptable(got.MyRest, SeasonGames) {
 		t.Fatalf("the member gains %v and reads as refusing it", got.MyRest)
 	}
-	for _, tr := range Trades(config, SeasonGames, me, them, "", 1000) {
+	for _, tr := range pairTrades(config, SeasonGames, me, them, "", 1000) {
 		if words := tradeWords(tr, mine, theirs); words == "m-irving for t-nacua+t-love" || words == "m-irving for t-love+t-nacua" {
 			t.Fatalf("the finder lists %s", words)
 		}
@@ -73,7 +73,7 @@ func TestABalancedTwoForOnePasses(t *testing.T) {
 	config := twelveTeamPPR(t)
 	mine, theirs := deepAtBack(), deepAtReceiver()
 	found := map[string]Trade{}
-	for _, tr := range Trades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
+	for _, tr := range pairTrades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
 		found[tradeWords(tr, mine, theirs)] = tr
 	}
 	tr, ok := found["m-rb3+m-wr2 for t-wr2"]
@@ -93,12 +93,12 @@ func TestTheFinderAsksBothSides(t *testing.T) {
 	config := twelveTeamPPR(t)
 	mine, theirs := deepAtBack(), deepAtReceiver()
 	me, them := Squad{Players: mine}, Squad{Players: theirs}
-	for _, tr := range Trades(config, SeasonGames, me, them, "", 1000) {
+	for _, tr := range pairTrades(config, SeasonGames, me, them, "", 1000) {
 		if tradeWords(tr, mine, theirs) == "m-rb3+m-rb4 for t-wr2" {
 			t.Fatalf("the finder lists m-rb3+m-rb4 for t-wr2: %+v", tr)
 		}
 	}
-	got := Check(config, SeasonGames, me, them, []int{3, 4}, []int{4})
+	got := pairCheck(config, SeasonGames, me, them, []int{3, 4}, []int{4})
 	if !positive(got.MyGain) || !positive(got.TheirGain) || roundTenth(got.MyRest) != -50 ||
 		Acceptable(got.MyRest, SeasonGames) || !Acceptable(got.TheirRest, SeasonGames) {
 		t.Fatalf("m-rb3+m-rb4 for t-wr2: %+v", got.Trade)
@@ -112,12 +112,15 @@ func TestTheTwoFiguresPartUnderReplacement(t *testing.T) {
 	config := twelveTeamPPR(t)
 	mine := deepAtBack()
 	theirs := set(deepAtReceiver(), "t-te", func(c Candidate) Candidate { c.Value = -5; return c })
-	got := Check(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{8}, []int{8})
+	// Their backup tight end under him, so t-te still starts on points.
+	theirs = set(theirs, "t-te2", func(c Candidate) Candidate { c.Value = -10; return c })
+	got := pairCheck(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{8}, []int{8})
 	// m-te (15) for t-te (-5): each starts at TE after the trade.
 	if roundTenth(got.TheirGain*SeasonGames) != 20 || roundTenth(got.TheirRest) != 15 {
 		t.Fatalf("theirs: lineup %v over the season, rest of season %v", got.TheirGain*SeasonGames, got.TheirRest)
 	}
-	if roundTenth(got.MyGain*SeasonGames) != -20 || roundTenth(got.MyRest) != -15 {
+	// Mine starts m-te2 (1) over t-te on points (Lane 287's best lineup).
+	if roundTenth(got.MyGain*SeasonGames) != -14 || roundTenth(got.MyRest) != -15 {
 		t.Fatalf("mine: lineup %v over the season, rest of season %v", got.MyGain*SeasonGames, got.MyRest)
 	}
 }
@@ -133,7 +136,7 @@ func TestTheWaiverLevelCountsTheBench(t *testing.T) {
 	theirs := set(deepAtReceiver(), "t-rb3", func(c Candidate) Candidate { c.Value = -8; return c })
 	// m-wr1 (80) for t-wr5 (85) and t-rb3.
 	give, get := []int{5}, []int{7, 11}
-	last := Check(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, give, get)
+	last := pairCheck(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, give, get)
 	if roundTenth(last.TheirRest) != -5 || !Acceptable(last.TheirRest, SeasonGames) {
 		t.Fatalf("on the last starter's level: %v", last.TheirRest)
 	}
@@ -146,12 +149,12 @@ func TestTheWaiverLevelCountsTheBench(t *testing.T) {
 		}
 		return out
 	}
-	free := Check(config, SeasonGames, Squad{Players: level(mine)}, Squad{Players: level(theirs)}, give, get)
+	free := pairCheck(config, SeasonGames, Squad{Players: level(mine)}, Squad{Players: level(theirs)}, give, get)
 	if roundTenth(free.TheirRest) != -27 || Acceptable(free.TheirRest, SeasonGames) {
 		t.Fatalf("on the waiver level: %v, want -27 and refused", free.TheirRest)
 	}
 	// m-rb4 (80) for t-wr5 and t-rb3: 110 in over the free back, 85 and 22 out.
-	backs := Check(config, SeasonGames, Squad{Players: level(mine)}, Squad{Players: level(theirs)}, []int{4}, get)
+	backs := pairCheck(config, SeasonGames, Squad{Players: level(mine)}, Squad{Players: level(theirs)}, []int{4}, get)
 	if roundTenth(backs.TheirRest) != 3 {
 		t.Fatalf("a back for a back: %v, want 3", backs.TheirRest)
 	}
@@ -174,11 +177,11 @@ func TestSuperflexCountsTheBackupQuarterback(t *testing.T) {
 	}
 	mine, theirs := qbs(deepAtBack()), qbs(deepAtReceiver())
 	// m-rb4 (80) for t-wr4 (95) and t-qb2 (2, so 42 over the free one).
-	got := Check(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{4}, []int{6, 13})
+	got := pairCheck(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{4}, []int{6, 13})
 	if roundTenth(got.TheirRest) != -57 || Acceptable(got.TheirRest, SeasonGames) {
 		t.Fatalf("their rest of season %v, want -57 and refused", got.TheirRest)
 	}
-	for _, tr := range Trades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
+	for _, tr := range pairTrades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
 		if !Acceptable(tr.MyRest, SeasonGames) || !Acceptable(tr.TheirRest, SeasonGames) {
 			t.Fatalf("the finder lists %s at %v and %v", tradeWords(tr, mine, theirs), tr.MyRest, tr.TheirRest)
 		}
@@ -190,7 +193,7 @@ func TestSuperflexCountsTheBackupQuarterback(t *testing.T) {
 func TestACostWithinTheTolerancePasses(t *testing.T) {
 	config := twelveTeamPPR(t)
 	mine, theirs := deepAtBack(), deepAtReceiver()
-	for _, tr := range Trades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
+	for _, tr := range pairTrades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
 		if tradeWords(tr, mine, theirs) != "m-rb3 for t-wr4" {
 			continue
 		}
@@ -226,7 +229,7 @@ func TestTheDropCountsAgainstItsSide(t *testing.T) {
 	theirs := deepAtReceiver()
 	held := map[string]bool{"m-wr4": true, "m-te2": true, "m-qb2": true}
 	drops := 0
-	for _, tr := range Trades(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, "", 1000) {
+	for _, tr := range pairTrades(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, "", 1000) {
 		in := 0.0
 		for _, h := range tr.Get {
 			in += theirs[h].Value
@@ -248,7 +251,7 @@ func TestTheDropCountsAgainstItsSide(t *testing.T) {
 		t.Fatal("no trade drops a player")
 	}
 	// The builder's drop counts the same: one for two into a full roster.
-	got := Check(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, []int{1}, []int{2, 11})
+	got := pairCheck(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, []int{1}, []int{2, 11})
 	if got.Drop < 0 {
 		t.Fatalf("m-rb1 for t-rb2+t-rb3 names no drop: %+v", got.Trade)
 	}

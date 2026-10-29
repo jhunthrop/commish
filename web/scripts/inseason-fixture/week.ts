@@ -84,8 +84,8 @@ export const KEEP_GAIN = 1;
  * TradeGainBasis), the one copy build.ts, project.ts and waivers-at.ts write. */
 export function tradesBases(weeks: number, h: Horizon): { basis: string; gain_basis: string } {
 	return {
-		basis: `Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for ${KEEP_GAIN.toFixed(1)} a week or more, or to fill a spot.${rateWords(h, spanFrom(weeks, h))}`,
-		gain_basis: `points over replacement in each lineup, ${weekSpan(weeks, h)}`
+		basis: `Each team's best trades, those for your weakest starting spot first. Every one fills a weak spot on one side or both, and neither lineup loses by it. The other team decides. A player we rank first at his position goes only for ${KEEP_GAIN.toFixed(1)} a week or more, or to fill a spot.${rateWords(h, spanFrom(weeks, h))}`,
+		gain_basis: `points over replacement in each lineup week by week, byes counted, ${weekSpan(weeks, h)}`
 	};
 }
 

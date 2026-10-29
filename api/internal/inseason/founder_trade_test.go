@@ -85,7 +85,7 @@ func TestTheFoundersTradeOnRealFigures(t *testing.T) {
 	mine, theirs := founderMine(), founderTheirs()
 	give := []int{indexOf(mine.Players, "4596448")}
 	get := []int{indexOf(theirs.Players, "4426515"), indexOf(theirs.Players, "4870808")}
-	got := Check(founderConfig, founderWeeks, mine, theirs, give, get)
+	got := pairCheck(founderConfig, founderWeeks, mine, theirs, give, get)
 	if roundTenth(got.MyGain) != 1.4 || roundTenth(got.TheirGain) != 1.8 {
 		t.Fatalf("the verdict: mine %.1f, theirs %.1f a week, want 1.4 and 1.8", got.MyGain, got.TheirGain)
 	}
@@ -98,12 +98,12 @@ func TestTheFoundersTradeOnRealFigures(t *testing.T) {
 	if got.Drop < 0 || mine.Players[got.Drop].ID != "4426386" {
 		t.Fatalf("the drop %d, want Roschon Johnson", got.Drop)
 	}
-	found := Trades(founderConfig, founderWeeks, mine, theirs, "", 1000)
+	found := pairTrades(founderConfig, founderWeeks, mine, theirs, "", 1000)
 	if len(found) == 0 {
 		t.Fatal("the finder lists nothing with them, so the test proves less")
 	}
 	for _, tr := range found {
-		if holds(mine.Players, tr.Give, "4596448") && holds(theirs.Players, tr.Get, "4426515") {
+		if len(tr.Give) == 1 && holds(mine.Players, tr.Give, "4596448") && holds(theirs.Players, tr.Get, "4426515") {
 			t.Fatalf("the finder lists Irving for Nacua: %+v", tr)
 		}
 		if !Acceptable(tr.MyRest, founderWeeks) || !Acceptable(tr.TheirRest, founderWeeks) {
