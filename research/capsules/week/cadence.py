@@ -13,8 +13,9 @@ rewrite only the reads whose week moved.
   (`status_rewrite_capped`, fix round 2), and a written read's attempts restart at one, so a success never
   spends the next change's tries. A capped read is asked again at the first pass of the next Central day.
 - The written read breaks a rule the writer holds reads to now (`RULE_STALE`, Lane 275 fix round 1: a read
-  written while the rules asked for the published projection names it, `rules.names_the_projection`), nightly
-  only and at most once a Central day, after every other reason; a rewrite that falls keeps the old read shown.
+  written while the rules asked for the published projection names it; Lane 286: every rule of the body alone,
+  `rules.body_rule_violations`, so a read that says "your roster" is written again), nightly only and at most
+  once a Central day, after every other reason; a rewrite that falls keeps the old read shown.
 
 The read stands through a move of the published projection (Lane 275, the founder 2026-10-28: "it's normal for
 the projection to change on fantasy sites without the read changing"). The read never states the projection
@@ -32,7 +33,7 @@ from datetime import date, datetime, timedelta
 from typing import Final
 
 from research.capsules.store import WRITTEN_SOURCE
-from research.capsules.week.rules import names_the_projection
+from research.capsules.week.rules import body_rule_violations
 from research.capsules.week.sheet import CENTRAL, WeekSheet
 from research.capsules.week.store import StoredWeekRead
 
@@ -95,10 +96,16 @@ def kept_read(before: StoredWeekRead, at: datetime) -> StoredWeekRead:
 
 
 def _rule_stale(stored: StoredWeekRead, now: datetime) -> bool:
-    """A written read the current rules refuse, not yet attempted on `now`'s Central day. The check is the rule
-    that changed (H4), on the stored body alone: the full validator would read today's sheet, whose forecast
-    and status have moved since the write, and refuse reads that were right when written."""
-    return stored.source == WRITTEN_SOURCE and attempts_today(stored, now) == 0 and names_the_projection(stored.body)
+    """A written read the current rules refuse, not yet attempted on `now`'s Central day. The check is every week
+    rule that judges the stored body alone (`rules.body_rule_violations`: H4's projection named, and Lane 286's
+    roster addressed, colon opener and rank stated twice among them): the full validator would read today's
+    sheet, whose forecast, status and cells have moved since the write, and refuse reads that were right when
+    written."""
+    return (
+        stored.source == WRITTEN_SOURCE
+        and attempts_today(stored, now) == 0
+        and bool(body_rule_violations(stored.body, stored.season))
+    )
 
 
 def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None, now: datetime, *, hourly: bool = False) -> str | None:

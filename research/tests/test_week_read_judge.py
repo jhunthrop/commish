@@ -5,6 +5,7 @@ refused by the judge with the phrase list switched off, not by the list alone.""
 
 import copy
 import json
+import re
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any, Self
@@ -135,9 +136,12 @@ def test_the_judge_refuses_each_phrasing_with_the_list_switched_off(
     phrase: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The writer's own path, the list never firing: the recorded verdict alone refuses the read. The
-    recorded text runs past the 40 to 95 band (WEEK_BAND), so the cap is lifted here as the list is."""
+    recorded text runs past the 40 to 95 band (WEEK_BAND), so the cap is lifted here as the list is, and it
+    keeps him "on your roster", so that rule is off too."""
     monkeypatch.setattr(rules, "start_advice_in", lambda sentence, name: None)
     monkeypatch.setattr(week_validate, "WEEK_BAND", (40, 100))
+    # The recorded text predates B282's rule on addressing the member's roster (Lane 286): off here as the list.
+    monkeypatch.setattr(rules, "_ADDRESSES_THE_MEMBER", re.compile(r"(?!)"))
     verdict = next(v for v in _verdicts() if v["phrase"] == phrase)
     text = judged_text(phrase)
     assert verdict["text"] == text

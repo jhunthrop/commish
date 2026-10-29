@@ -1,12 +1,15 @@
 """Lane 261, the writer bake-off's tallies: a read's outcome from the writer's attempts, the per-model sums,
 the shape-duplicate rate with its masks, and the two judges' agreement. No gateway and no store."""
 
+from typing import Final
+
 import pytest
 
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway_ledger import Usage
 from research.capsules.narrative import (
     CLUB_MARK,
+    NAME_SUFFIXES,
     NUMBER_MARK,
     PLAYER_MARK,
     ShapeMasks,
@@ -115,15 +118,57 @@ def test_p95_is_nearest_rank() -> None:
 
 
 def test_player_spellings_take_the_last_name_past_a_suffix() -> None:
-    # The first name too (Lane 265 fix round 1): a read that calls him "Puka" is the same shape.
+    # The first name too (Lane 265 fix round 1): a read that calls him "Puka" is the same shape. A suffixed
+    # name is spelled without its suffix; the masks take any suffix after a spelling (B276, Lane 286).
     assert set(player_spellings(["Marvin Harrison Jr.", "Puka Nacua"])) == {
-        "Marvin Harrison Jr.",
+        "Marvin Harrison",
         "Marvin",
         "Harrison",
         "Puka Nacua",
         "Puka",
         "Nacua",
     }
+
+
+@pytest.mark.parametrize("suffix", NAME_SUFFIXES)
+def test_a_suffix_the_boards_name_does_not_carry_still_masks_to_the_player(suffix: str) -> None:
+    """The Lane 286 review's L1: the board says "Kenneth Walker", the read "Kenneth Walker III"."""
+    masks = ShapeMasks.of(["Kenneth Walker"], club_spellings())
+    said = masks.shape(f"Kenneth Walker {suffix} drew 4 targets against the Rams, the most on the team.")
+    assert said == masks.shape("Walker drew 4 targets against the Rams, the most on the team.")
+
+
+_SUFFIXED: Final = ("Marvin Harrison Jr.", "Odell Beckham Jr.", "Kenneth Walker III")
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Marvin Harrison Jr. drew 9 targets against the Bills, the most on the team.",
+        "Harrison Jr. drew 9 targets against the Bills, the most on the team.",
+        "Harrison Jr drew 9 targets against the Bills, the most on the team.",
+        "Marvin Harrison drew 9 targets against the Bills, the most on the team.",
+        "Marvin drew 9 targets against the Bills, the most on the team.",
+        "Odell Beckham Jr. drew 11 targets against the Jets, the most on the team.",
+        "Beckham Jr. drew 11 targets against the Jets, the most on the team.",
+        "Odell Beckham drew 11 targets against the Jets, the most on the team.",
+        "Kenneth Walker III drew 4 targets against the Rams, the most on the team.",
+        "Walker III drew 4 targets against the Rams, the most on the team.",
+        "Kenneth Walker drew 4 targets against the Rams, the most on the team.",
+        "Kenneth drew 4 targets against the Rams, the most on the team.",
+    ],
+)
+def test_a_suffixed_name_masks_to_one_player_with_or_without_its_suffix(sentence: str) -> None:
+    """B276: two Jr. players and one III, each spelled with his suffix, without it, by his last name with it
+    and by his first name alone, all one shape."""
+    shape = ShapeMasks.of(_SUFFIXED, club_spellings()).shape(sentence)
+    expected = f"{PLAYER_MARK} drew {NUMBER_MARK} targets against the {CLUB_MARK} the most on the team"
+    assert shape == expected, sentence
+
+
+def test_a_suffixed_possessive_masks_to_the_player() -> None:
+    masks = ShapeMasks.of(_SUFFIXED, club_spellings())
+    assert masks.shape("Harrison Jr.'s role grows.") == masks.shape("Walker's role grows.")
 
 
 def test_a_shape_masks_names_clubs_and_numbers() -> None:
