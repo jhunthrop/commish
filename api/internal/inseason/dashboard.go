@@ -14,11 +14,35 @@ import (
 // at each starting spot, and the member's own start and sit record. Each
 // figure's sentence is here, the one place the page reads it from.
 
-// ProjectionGapBasis is what a game's projection_gap is. No win chance is
-// given: the published projection exists for this season alone, whose
-// outcomes are held out, so no spread for one is measured on a past season.
+// ProjectionGapBasis is what a game's projection_gap is where both sides
+// list their starters. No win chance is given: the published projection
+// exists for this season alone, whose outcomes are held out, so no spread
+// for one is measured on a past season.
 const ProjectionGapBasis = "Proj gap is your starters' published projection less your opponent's, " +
-	"not a win chance: we show none until one is measured on a past season."
+	gapNoChance
+
+// ProjectionGapBestLineupBasis is the sentence where the platform lists no
+// starters for the member's opponent (FFPC's opponent view): his figure is
+// the best lineup we pick from his roster (projection_best_lineup), not a
+// lineup he set.
+const ProjectionGapBestLineupBasis = "Proj gap is your starters' published projection less the best lineup " +
+	"we pick from your opponent's roster, as the platform lists no starters for them, " + gapNoChance
+
+// gapNoChance closes every Proj gap sentence.
+const gapNoChance = "not a win chance: we show none until one is measured on a past season."
+
+// gapBasisOf is the Proj gap's sentence for the member's game: the
+// best-lineup words where the opponent's figure is our pick from his
+// roster, else the plain one. The member's own side always lists his
+// starters (the platform's lineup page is read for him).
+func gapBasisOf(games []apitypes.ScoreboardGame, me int) string {
+	for _, g := range games {
+		if len(g.Sides) == 2 && g.Sides[0].RosterId == me && g.Sides[1].ProjectionBestLineup != nil && *g.Sides[1].ProjectionBestLineup {
+			return ProjectionGapBestLineupBasis
+		}
+	}
+	return ProjectionGapBasis
+}
 
 // powerWords is the power ranks' sentence: what they rank and over which
 // weeks (tradeWeeks).
@@ -31,8 +55,9 @@ const StartSitBasis = "Your start and sit: weeks your set lineup started the sam
 	"yours, on played weeks."
 
 // powerColumns is the starting spots the power panel ranks, in the order
-// it draws them. Kickers and defenses are left out: our order ranks
-// neither (the K/DEF ruling).
+// it draws them. Kickers and defenses are left out: the order lists them
+// by their ADP order alone (the K/DEF ruling), so a place "by our order"
+// would rank ADP, not a measure of ours.
 var powerColumns = []struct {
 	slot   draft.SlotType
 	column apitypes.LeaguePowerColumn

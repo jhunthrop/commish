@@ -5635,7 +5635,7 @@ type Scoreboard struct {
 	// Power every team's power rank, overall and at each starting spot (Lane 292); absent with fewer than two teams read and from an older answer
 	Power *LeaguePower `json:"power,omitempty"`
 
-	// ProjectionGapBasis what each game's projection_gap is, in one sentence the page prints once (Lane 292); absent from an older answer
+	// ProjectionGapBasis what each game's projection_gap is, in one sentence the page prints once (Lane 292), said for the drafter's game: where the platform lists no starters for the opponent (projection_best_lineup on that side, FFPC's opponent view) it says the opponent's figure is the best lineup we pick from his roster; absent from an older answer
 	ProjectionGapBasis *string `json:"projection_gap_basis,omitempty"`
 
 	// ProjectionReadAt when the week's published projection was captured, null with none

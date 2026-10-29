@@ -27,7 +27,9 @@
 				<tr class:me={row.me}>
 					<td class="tm">
 						<span class="tmw">
-							<TeamAvatar name={row.name} size={22} me={row.me} src={row.avatar} />
+							<span class="av"
+								><TeamAvatar name={row.name} size={22} me={row.me} src={row.avatar} /></span
+							>
 							<b>{row.name}</b>
 						</span>
 					</td>
@@ -118,6 +120,11 @@
 		min-width: 0;
 	}
 
+	.av {
+		display: inline-flex;
+		flex: none;
+	}
+
 	.tmw b {
 		font-size: var(--t-sm);
 		font-weight: 600;
@@ -146,15 +153,40 @@
 		line-height: 1.5;
 	}
 
+	/* In a hand the places take narrow columns and the team's name wraps to two lines with no
+	 * avatar, so a superflex league's seven columns leave each name readable (review M2). */
 	@media (max-width: 760px) {
 		th,
 		td {
-			padding: 0 4px;
+			padding: 0 3px;
+		}
+
+		tbody tr {
+			height: 40px;
 		}
 
 		.n {
-			width: 32px;
+			width: 26px;
 			font-size: var(--t-sm);
+		}
+
+		thead .n {
+			letter-spacing: 0;
+		}
+
+		.av {
+			display: none;
+		}
+
+		.tmw b {
+			display: -webkit-box;
+			-webkit-box-orient: vertical;
+			-webkit-line-clamp: 2;
+			line-clamp: 2;
+			white-space: normal;
+			line-height: 1.2;
+			font-size: var(--t-xs);
+			overflow-wrap: anywhere;
 		}
 
 		td.pw {

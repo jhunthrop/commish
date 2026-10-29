@@ -7,7 +7,11 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { LeagueSync } from '../api.ts';
 import type { LeagueRecord, Scoreboard } from '../inseason/api.ts';
-import { GAP_BASIS, POWER_BASIS } from '../../../../scripts/inseason-fixture/figures.ts';
+import {
+	GAP_BASIS,
+	GAP_BEST_LINEUP_BASIS,
+	POWER_BASIS
+} from '../../../../scripts/inseason-fixture/figures.ts';
 import { START_SIT_BASIS } from '../../../../scripts/inseason-fixture/record.ts';
 import { FIGURE_WORDS, POWER_HEADS, gapFigure, powerPanel, startSitRow } from './figures.ts';
 
@@ -116,6 +120,7 @@ void test('every figure word and sentence passes the copy guard', () => {
 		...Object.values(FIGURE_WORDS),
 		...Object.values(POWER_HEADS),
 		GAP_BASIS,
+		GAP_BEST_LINEUP_BASIS,
 		POWER_BASIS,
 		START_SIT_BASIS
 	].join(' ');
@@ -128,7 +133,13 @@ void test('the fixture’s sentences are the API’s, word for word (dashboard.g
 		new URL('../../../../../api/internal/inseason/dashboard.go', import.meta.url),
 		'utf8'
 	).replace(/" \+\n\s*"/g, '');
-	assert.ok(go.includes(GAP_BASIS), 'ProjectionGapBasis');
+	const closing = 'not a win chance: we show none until one is measured on a past season.';
+	assert.ok(go.includes(`gapNoChance = "${closing}"`), 'gapNoChance');
+	assert.ok(go.includes(GAP_BASIS.replace(closing, '" +\n\tgapNoChance')), 'ProjectionGapBasis');
+	assert.ok(
+		go.includes(GAP_BEST_LINEUP_BASIS.replace(closing, '" + gapNoChance')),
+		'ProjectionGapBestLineupBasis'
+	);
 	assert.ok(go.includes(START_SIT_BASIS), 'StartSitBasis');
 	assert.ok(go.includes(POWER_BASIS.replace('weeks 6 to 17', '%s')), 'powerWords, the weeks aside');
 });

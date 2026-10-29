@@ -17,6 +17,8 @@ import {
 	requireFixtureClock
 } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
+import { withSuperflex } from './inseason-fixture/figures.ts';
+import type { Scoreboard } from '../src/lib/league/inseason/api.ts';
 import { FIGURE_WORDS } from '../src/lib/league/home/figures.ts';
 
 const THEMES = ['light', 'dark'] as const;
@@ -35,6 +37,15 @@ await requireFixtureClock(API_ORIGIN);
 await mkdir(out, { recursive: true });
 
 const LEAGUES = [
+	// The Sleeper league's power answer as a superflex league's (review M2): seven places a row.
+	{
+		name: 'sleeper-superflex',
+		id: FIXTURE_IDS.league,
+		gap: true,
+		power: true,
+		record: false,
+		superflex: true
+	},
 	{ name: 'sleeper', id: FIXTURE_IDS.league, gap: true, power: true, record: false },
 	// The ESPN stand-in shows its Sunday afternoon: the member's game has kicked off, so no Proj gap.
 	{ name: 'espn', id: FIXTURE_IDS.espnDone, gap: false, power: true, record: true }
@@ -100,11 +111,39 @@ async function check(page: Page, where: string, expect: Expect): Promise<void> {
 	if (wide > 0) faults.push(`${where}: scrolls ${String(wide)} px sideways`);
 }
 
+/** The scoreboard answer's power turned into a superflex league's, on its way to the page. */
+async function superflexPower(page: Page): Promise<void> {
+	await page.route('**/leagues/attached/*/scoreboard', async (route) => {
+		const response = await route.fetch();
+		const envelope = (await response.json()) as { ok: boolean; data: Scoreboard };
+		const power = envelope.data.power;
+		const data =
+			power === undefined ? envelope.data : { ...envelope.data, power: withSuperflex(power) };
+		await route.fulfill({ response, json: { ...envelope, data } });
+	});
+}
+
+/** The narrowest room the power panel gives a team's name: a name squeezed under this reads as initials. */
+const MIN_NAME_PX = 90;
+
+async function nameRoom(page: Page, where: string): Promise<void> {
+	const widths = await page
+		.locator('[data-figure="power"] tbody td.tm')
+		.evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().width));
+	const least = Math.min(...widths);
+	if (widths.length > 0 && least < MIN_NAME_PX)
+		faults.push(`${where}: a team cell ${String(Math.round(least))} px wide`);
+	const heads = await page.locator('[data-figure="power"] thead th').count();
+	if (where.includes('superflex') && heads !== 8)
+		faults.push(`${where}: ${String(heads)} power heads, want team, Pwr and six spots`);
+}
+
 for (const league of LEAGUES) {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
 			const ctx = await context(theme, width);
 			const page = await ctx.newPage();
+			if ('superflex' in league) await superflexPower(page);
 			await page.goto(`${web}/league/${league.id}`);
 			const name = `${league.name}-${theme}-${String(width)}`;
 			try {
@@ -117,7 +156,10 @@ for (const league of LEAGUES) {
 			}
 			await page.evaluate(() => document.fonts.ready);
 			await page.waitForLoadState('networkidle');
-			if (!before) await check(page, name, league);
+			if (!before) {
+				await check(page, name, league);
+				await nameRoom(page, name);
+			}
 			await page.screenshot({ path: new URL(`${name}.png`, out).pathname, fullPage: true });
 			await ctx.close();
 		}

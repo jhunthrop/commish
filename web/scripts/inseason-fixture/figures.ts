@@ -12,6 +12,11 @@ import { roundTenth } from './tenths.ts';
 export const GAP_BASIS =
 	"Proj gap is your starters' published projection less your opponent's, not a win chance: we show none until one is measured on a past season.";
 
+/** dashboard.go ProjectionGapBestLineupBasis, word for word: the member's opponent lists no starters
+ * (FFPC's opponent view), so his figure is the best lineup we pick from his roster. */
+export const GAP_BEST_LINEUP_BASIS =
+	"Proj gap is your starters' published projection less the best lineup we pick from your opponent's roster, as the platform lists no starters for them, not a win chance: we show none until one is measured on a past season.";
+
 /** dashboard.go powerWords over the fixture's weeks (its horizon, weeks 6 to 17). */
 export const POWER_BASIS =
 	"Power ranks each team's best lineup by our order at each starting spot, 1 the strongest, weeks 6 to 17, byes counted. Kickers and defenses are not ranked.";
@@ -44,12 +49,32 @@ function powerOf(sync: LeagueSync): NonNullable<Scoreboard['power']> {
 	};
 }
 
+/** The power answer as a superflex league's (review M2), the SUPERFLEX column after the flex: the
+ * panel's widest shape, seven places a row. STAND-IN: the superflex places are a further turn. */
+export function withSuperflex(
+	power: NonNullable<Scoreboard['power']>
+): NonNullable<Scoreboard['power']> {
+	const n = power.teams.length;
+	return {
+		...power,
+		columns: [...power.columns, 'SUPERFLEX'],
+		teams: power.teams.map((t, i) => ({ ...t, ranks: [...t.ranks, ((i + 7) % n) + 1] }))
+	};
+}
+
 /** The scoreboard with the Lane 292 fields. */
 export function withFigures(board: Scoreboard, sync: LeagueSync): Scoreboard {
 	return {
 		...board,
 		games: board.games.map((g) => ({ ...g, projection_gap: gapOf(g.sides) })),
-		projection_gap_basis: GAP_BASIS,
+		projection_gap_basis: gapBasisOf(board.games, sync.me),
 		power: powerOf(sync)
 	};
+}
+
+/** dashboard.go gapBasisOf: the best-lineup words where the member's opponent's figure is our pick
+ * from his roster, else the plain ones. */
+function gapBasisOf(games: Scoreboard['games'], me: number): string {
+	const mine = games.find((g) => g.sides.length === 2 && g.sides[0]?.roster_id === me);
+	return mine?.sides[1]?.projection_best_lineup === true ? GAP_BEST_LINEUP_BASIS : GAP_BASIS;
 }

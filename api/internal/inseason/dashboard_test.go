@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"reflect"
 	"regexp"
 	"slices"
@@ -201,11 +202,89 @@ func TestLeagueRecordWithNoSetLineupHasNoStartSit(t *testing.T) {
 // The figures' sentences keep the site's words (shared/words/banned-words.json):
 // no betting or trading word, no dash or semicolon, never "our model".
 func TestFigureSentencesKeepTheSitesWords(t *testing.T) {
-	banned := regexp.MustCompile(`(?i)\b(markets?|prices?|priced|buy|buys|buying|sell|sells|selling|stock|hosts?|totals?|odds|bets?|spreads?|favou?red|model)\b|[—–;]`)
+	banned := bannedWords(t)
 	power := fmt.Sprintf(powerWords, "weeks 6 to 17")
-	for _, s := range []string{ProjectionGapBasis, power, StartSitBasis} {
+	for _, s := range []string{ProjectionGapBasis, ProjectionGapBestLineupBasis, power, StartSitBasis} {
 		if m := banned.FindString(s); m != "" {
 			t.Errorf("%q says %q", s, m)
 		}
+	}
+}
+
+// bannedWords is the site's banned list as one pattern, read from
+// shared/words/banned-words.json itself (review L5): its word groups (each
+// key a pattern), its marks, and "model", which no weekly figure's
+// sentence may claim.
+func bannedWords(t *testing.T) *regexp.Regexp {
+	t.Helper()
+	raw, err := os.ReadFile("../../../shared/words/banned-words.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var list struct {
+		BettingOnly   map[string]string `json:"bettingOnly"`
+		BettingShared map[string]string `json:"bettingShared"`
+		Trading       map[string]string `json:"trading"`
+		Platform      map[string]string `json:"platform"`
+		Marks         []string          `json:"marks"`
+	}
+	if err := json.Unmarshal(raw, &list); err != nil {
+		t.Fatal(err)
+	}
+	words := []string{"model"}
+	for _, group := range []map[string]string{list.BettingOnly, list.BettingShared, list.Trading, list.Platform} {
+		for pattern := range group {
+			words = append(words, pattern)
+		}
+	}
+	if len(words) < 10 || len(list.Marks) == 0 {
+		t.Fatalf("the banned list read %d words and %d marks", len(words), len(list.Marks))
+	}
+	marks := make([]string, len(list.Marks))
+	for i, m := range list.Marks {
+		marks[i] = regexp.QuoteMeta(m)
+	}
+	return regexp.MustCompile(`(?i)\b(` + strings.Join(words, "|") + `)\b|` + strings.Join(marks, "|"))
+}
+
+// Review M1: an FFPC opponent's side lists no starters, so his figure is
+// the best lineup we pick from his roster; the gap's sentence says so,
+// and the gap is still the two printed figures' difference.
+func TestTheGapSentenceNamesOurBestLineupForAnFFPCOpponent(t *testing.T) {
+	f, projection, me, them := ffpcWeekBeforeSunday(t)
+	rosterOf(&f, projection, them, false)
+	board := scoreboardOf(t, ffpcService(t, f, projection, ffpcFriday))
+	game, opp := sideOf(t, board, them)
+	if game.Sides[0].RosterId != me || !isTrue(opp.ProjectionBestLineup) {
+		t.Fatalf("the member's game %+v", game.Sides)
+	}
+	if board.ProjectionGapBasis == nil || *board.ProjectionGapBasis != ProjectionGapBestLineupBasis {
+		t.Errorf("gap basis %v, want the best-lineup words", board.ProjectionGapBasis)
+	}
+	if game.ProjectionGap == nil || game.Sides[0].Projection == nil ||
+		*game.ProjectionGap != roundTenth(*game.Sides[0].Projection-*opp.Projection) {
+		t.Errorf("gap %v for %+v", game.ProjectionGap, game.Sides)
+	}
+}
+
+// gapBasisOf follows the member's game alone: another game whose side is
+// a best lineup leaves the plain words.
+func TestTheGapSentenceFollowsTheMembersGame(t *testing.T) {
+	best := true
+	side := func(roster int, isBest bool) apitypes.ScoreboardSide {
+		s := apitypes.ScoreboardSide{RosterId: roster}
+		if isBest {
+			s.ProjectionBestLineup = &best
+		}
+		return s
+	}
+	mine := apitypes.ScoreboardGame{Sides: []apitypes.ScoreboardSide{side(1, false), side(2, false)}}
+	other := apitypes.ScoreboardGame{Sides: []apitypes.ScoreboardSide{side(3, false), side(4, true)}}
+	if got := gapBasisOf([]apitypes.ScoreboardGame{mine, other}, 1); got != ProjectionGapBasis {
+		t.Errorf("got %q", got)
+	}
+	ffpc := apitypes.ScoreboardGame{Sides: []apitypes.ScoreboardSide{side(1, false), side(2, true)}}
+	if got := gapBasisOf([]apitypes.ScoreboardGame{ffpc, other}, 1); got != ProjectionGapBestLineupBasis {
+		t.Errorf("got %q", got)
 	}
 }

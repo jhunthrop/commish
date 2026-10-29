@@ -76,7 +76,7 @@
 			],
 			"figure": {
 				"cell": "Proj gap −30.1",
-				"basis": "Proj gap is your starters' published projection less your opponent's, not a win chance: we show none until one is measured on a past season."
+				"basis": "Proj gap is your starters' published projection less the best lineup we pick from your opponent's roster, as the platform lists no starters for them, not a win chance: we show none until one is measured on a past season."
 			}
 		},
 		"2026-10-17T17-00-00Z": {
@@ -152,7 +152,7 @@
 			],
 			"figure": {
 				"cell": "Proj gap −30.1",
-				"basis": "Proj gap is your starters' published projection less your opponent's, not a win chance: we show none until one is measured on a past season."
+				"basis": "Proj gap is your starters' published projection less the best lineup we pick from your opponent's roster, as the platform lists no starters for them, not a win chance: we show none until one is measured on a past season."
 			}
 		},
 		"2026-10-18T18-56-00Z": {
@@ -768,6 +768,358 @@
 						10,
 						3,
 						8
+					]
+				}
+			],
+			"basis": "Power ranks each team's best lineup by our order at each starting spot, 1 the strongest, weeks 6 to 17, byes counted. Kickers and defenses are not ranked."
+		}
+	},
+	"superflex": {
+		"answer": {
+			"basis": "Power ranks each team's best lineup by our order at each starting spot, 1 the strongest, weeks 6 to 17, byes counted. Kickers and defenses are not ranked.",
+			"columns": [
+				"QB",
+				"RB",
+				"WR",
+				"TE",
+				"FLEX",
+				"SUPERFLEX"
+			],
+			"teams": [
+				{
+					"roster_id": 10,
+					"rank": 1,
+					"ranks": [
+						1,
+						6,
+						11,
+						4,
+						9,
+						8
+					]
+				},
+				{
+					"roster_id": 12,
+					"rank": 2,
+					"ranks": [
+						2,
+						7,
+						12,
+						5,
+						10,
+						9
+					]
+				},
+				{
+					"roster_id": 3,
+					"rank": 3,
+					"ranks": [
+						3,
+						8,
+						1,
+						6,
+						11,
+						10
+					]
+				},
+				{
+					"roster_id": 6,
+					"rank": 4,
+					"ranks": [
+						4,
+						9,
+						2,
+						7,
+						12,
+						11
+					]
+				},
+				{
+					"roster_id": 4,
+					"rank": 5,
+					"ranks": [
+						5,
+						10,
+						3,
+						8,
+						1,
+						12
+					]
+				},
+				{
+					"roster_id": 9,
+					"rank": 6,
+					"ranks": [
+						6,
+						11,
+						4,
+						9,
+						2,
+						1
+					]
+				},
+				{
+					"roster_id": 11,
+					"rank": 7,
+					"ranks": [
+						7,
+						12,
+						5,
+						10,
+						3,
+						2
+					]
+				},
+				{
+					"roster_id": 2,
+					"rank": 8,
+					"ranks": [
+						8,
+						1,
+						6,
+						11,
+						4,
+						3
+					]
+				},
+				{
+					"roster_id": 5,
+					"rank": 9,
+					"ranks": [
+						9,
+						2,
+						7,
+						12,
+						5,
+						4
+					]
+				},
+				{
+					"roster_id": 8,
+					"rank": 10,
+					"ranks": [
+						10,
+						3,
+						8,
+						1,
+						6,
+						5
+					]
+				},
+				{
+					"roster_id": 7,
+					"rank": 11,
+					"ranks": [
+						11,
+						4,
+						9,
+						2,
+						7,
+						6
+					]
+				},
+				{
+					"roster_id": 1,
+					"rank": 12,
+					"ranks": [
+						12,
+						5,
+						10,
+						3,
+						8,
+						7
+					]
+				}
+			]
+		},
+		"panel": {
+			"heads": [
+				"QB",
+				"RB",
+				"WR",
+				"TE",
+				"FLEX",
+				"SFLX"
+			],
+			"rows": [
+				{
+					"rosterId": 10,
+					"name": "Muttdogs",
+					"avatar": null,
+					"me": false,
+					"rank": 1,
+					"ranks": [
+						1,
+						6,
+						11,
+						4,
+						9,
+						8
+					]
+				},
+				{
+					"rosterId": 12,
+					"name": "Nacua Matata",
+					"avatar": null,
+					"me": false,
+					"rank": 2,
+					"ranks": [
+						2,
+						7,
+						12,
+						5,
+						10,
+						9
+					]
+				},
+				{
+					"rosterId": 3,
+					"name": "Keeper? I Hardly Know Her",
+					"avatar": null,
+					"me": false,
+					"rank": 3,
+					"ranks": [
+						3,
+						8,
+						1,
+						6,
+						11,
+						10
+					]
+				},
+				{
+					"rosterId": 6,
+					"name": "Bower Rangers",
+					"avatar": null,
+					"me": false,
+					"rank": 4,
+					"ranks": [
+						4,
+						9,
+						2,
+						7,
+						12,
+						11
+					]
+				},
+				{
+					"rosterId": 4,
+					"name": "Dad Runners",
+					"avatar": null,
+					"me": false,
+					"rank": 5,
+					"ranks": [
+						5,
+						10,
+						3,
+						8,
+						1,
+						12
+					]
+				},
+				{
+					"rosterId": 9,
+					"name": "Aaron Donald Dependent",
+					"avatar": null,
+					"me": false,
+					"rank": 6,
+					"ranks": [
+						6,
+						11,
+						4,
+						9,
+						2,
+						1
+					]
+				},
+				{
+					"rosterId": 11,
+					"name": "OnlyFannins",
+					"avatar": null,
+					"me": false,
+					"rank": 7,
+					"ranks": [
+						7,
+						12,
+						5,
+						10,
+						3,
+						2
+					]
+				},
+				{
+					"rosterId": 2,
+					"name": "Carried by QJs",
+					"avatar": null,
+					"me": false,
+					"rank": 8,
+					"ranks": [
+						8,
+						1,
+						6,
+						11,
+						4,
+						3
+					]
+				},
+				{
+					"rosterId": 5,
+					"name": "Ball Snatchers",
+					"avatar": null,
+					"me": false,
+					"rank": 9,
+					"ranks": [
+						9,
+						2,
+						7,
+						12,
+						5,
+						4
+					]
+				},
+				{
+					"rosterId": 8,
+					"name": "Max_Jensen10",
+					"avatar": null,
+					"me": false,
+					"rank": 10,
+					"ranks": [
+						10,
+						3,
+						8,
+						1,
+						6,
+						5
+					]
+				},
+				{
+					"rosterId": 7,
+					"name": "thatmattkelley",
+					"avatar": null,
+					"me": false,
+					"rank": 11,
+					"ranks": [
+						11,
+						4,
+						9,
+						2,
+						7,
+						6
+					]
+				},
+				{
+					"rosterId": 1,
+					"name": "McConkey Kong Country",
+					"avatar": null,
+					"me": true,
+					"rank": 12,
+					"ranks": [
+						12,
+						5,
+						10,
+						3,
+						8,
+						7
 					]
 				}
 			],

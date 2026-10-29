@@ -12,9 +12,8 @@ import (
 // summed as printed, and the game's state read from its starters'
 // kickoffs. The drafter's game comes first, the rest in the host's order.
 func (a *advisor) Scoreboard() apitypes.Scoreboard {
-	gapBasis := ProjectionGapBasis
 	out := apitypes.Scoreboard{Week: a.Snap.Week, ReadAt: a.Snap.ReadAt, ProjectionReadAt: a.projectionReadAt(),
-		ProjectionScoring: projectionScoring(a.settings, a.preset), Games: []apitypes.ScoreboardGame{}, ProjectionGapBasis: &gapBasis}
+		ProjectionScoring: projectionScoring(a.settings, a.preset), Games: []apitypes.ScoreboardGame{}}
 	var mine []apitypes.ScoreboardGame
 	for _, sides := range a.pairings() {
 		g := a.scoreboardGame(sides)
@@ -25,6 +24,8 @@ func (a *advisor) Scoreboard() apitypes.Scoreboard {
 		out.Games = append(out.Games, g)
 	}
 	out.Games = append(mine, out.Games...)
+	gapBasis := gapBasisOf(out.Games, a.Me)
+	out.ProjectionGapBasis = &gapBasis
 	return out
 }
 

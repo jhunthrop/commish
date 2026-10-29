@@ -4426,7 +4426,7 @@ export interface components {
 			projection_scoring: components['schemas']['ProjectionScoring'];
 			/** @description the drafter's game first, then the rest in the host's order */
 			games: components['schemas']['ScoreboardGame'][];
-			/** @description what each game's projection_gap is, in one sentence the page prints once (Lane 292); absent from an older answer */
+			/** @description what each game's projection_gap is, in one sentence the page prints once (Lane 292), said for the drafter's game: where the platform lists no starters for the opponent (projection_best_lineup on that side, FFPC's opponent view) it says the opponent's figure is the best lineup we pick from his roster; absent from an older answer */
 			projection_gap_basis?: string;
 			/** @description every team's power rank, overall and at each starting spot (Lane 292); absent with fewer than two teams read and from an older answer */
 			power?: components['schemas']['LeaguePower'];
