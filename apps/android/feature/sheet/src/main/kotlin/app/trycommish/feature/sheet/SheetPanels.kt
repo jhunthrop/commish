@@ -133,7 +133,7 @@ internal fun SheetImportPanel(
         when (val importing = ui.importing) {
             is SheetImport.Done -> {
                 ImportResult(importing.words)
-                Verb(SheetWords.done, onClick = actions.finishImport)
+                Verb(importing.words.verb, onClick = actions.finishImport)
             }
             else -> {
                 Label(SheetWords.fileLabel)

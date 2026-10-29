@@ -2,8 +2,10 @@ package sheets
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -45,6 +47,11 @@ type sheetParity struct {
 			Reason string `json:"reason"`
 		} `json:"skipped"`
 	} `json:"limitList"`
+	Refusals []struct {
+		Text  string          `json:"text"`
+		CSV   bool            `json:"csv"`
+		Error json.RawMessage `json:"error"`
+	} `json:"refusals"`
 	Lists []struct {
 		Text    string   `json:"text"`
 		CSV     bool     `json:"csv"`
@@ -88,13 +95,8 @@ func TestReadListStopsAtTheLimitAsTheWebDoes(t *testing.T) {
 	}
 }
 
-// The API reads a pasted names list as the web does (Lane 270): the same
-// players in the same order and the same sentence for each line skipped.
-func TestReadListReadsTheWebsLists(t *testing.T) {
-	parity := readParity(t)
-	if len(parity.ListBoard) == 0 || len(parity.Lists) == 0 {
-		t.Fatal("the parity file holds no lists")
-	}
+// parityBoard is the board the parity file's lists are read against.
+func parityBoard(parity sheetParity) *boards.Raw {
 	raw := &boards.Raw{}
 	for _, p := range parity.ListBoard {
 		position := draft.Position(p.Position)
@@ -107,6 +109,55 @@ func TestReadListReadsTheWebsLists(t *testing.T) {
 		}
 		raw.Players = append(raw.Players, boards.Player{ID: p.ID, Name: p.Name, Position: position, Team: team})
 	}
+	return raw
+}
+
+// The import refuses a body that reads to no player with the error the
+// phones are held to (Lane 297): its code, both sentences, and each line
+// skipped with its reason, an empty list when no line said why.
+func TestImportRefusesTheParityBodiesWithTheirSkippedLines(t *testing.T) {
+	parity := readParity(t)
+	if len(parity.Refusals) == 0 {
+		t.Fatal("the parity file holds no refusals")
+	}
+	for i, c := range parity.Refusals {
+		contentType := "text/plain"
+		if c.CSV {
+			contentType = "text/csv"
+		}
+		code, body := postImportRaw(t, &recorder{}, &fixedBoards{raw: parityBoard(parity)}, contentType, c.Text)
+		var got struct {
+			Error json.RawMessage `json:"error"`
+		}
+		if err := json.Unmarshal(body, &got); err != nil {
+			t.Fatal(err)
+		}
+		if code != http.StatusBadRequest || !sameJSON(t, got.Error, c.Error) {
+			t.Errorf("refusal %d: %d %s, the parity file says %s", i, code, got.Error, c.Error)
+		}
+	}
+}
+
+func sameJSON(t *testing.T, a, b json.RawMessage) bool {
+	t.Helper()
+	var x, y any
+	if err := json.Unmarshal(a, &x); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(b, &y); err != nil {
+		t.Fatal(err)
+	}
+	return reflect.DeepEqual(x, y)
+}
+
+// The API reads a pasted names list as the web does (Lane 270): the same
+// players in the same order and the same sentence for each line skipped.
+func TestReadListReadsTheWebsLists(t *testing.T) {
+	parity := readParity(t)
+	if len(parity.ListBoard) == 0 || len(parity.Lists) == 0 {
+		t.Fatal("the parity file holds no lists")
+	}
+	raw := parityBoard(parity)
 	for i, c := range parity.Lists {
 		if looksLikeCSV(c.Text) != c.CSV {
 			t.Errorf("list %d: looksLikeCSV = %v, web says %v", i, !c.CSV, c.CSV)

@@ -904,7 +904,8 @@ paths:
         A body whose first line does not name player_id is read as a names list instead, one player a line in
         the drafter's order ("1. Puka Nacua", "Ja'Marr Chase, WR", "Bills D/ST"), matched against the board of the
         sheet's format: a name is taken only when it is unmistakable, and each line not taken is skipped with its
-        reason. A body that reads to no player is refused with 400 and the sheet is left as it was.
+        reason. A body that reads to no player is refused with 400 and the sheet is left as it was; the 400's error
+        carries the skipped lines with their reasons (skipped).
       security: [{ session: [] }, { device: [] }]
       requestBody:
         required: true
@@ -3142,6 +3143,13 @@ components:
           type: object
           additionalProperties: { type: string }
         feature: { $ref: "#/components/schemas/Feature" }
+        skipped:
+          type: array
+          items: { $ref: "#/components/schemas/ImportSkip" }
+          description: >-
+            The import's 400 for a body that read to no player (Lane 297, B281): each line skipped with its reason, the
+            same rows as a 200 import's skipped, empty when the body held no line to read. Absent from every other error
+            and from an older answer.
     PageMeta:
       type: object
       required: [page, per_page, total]

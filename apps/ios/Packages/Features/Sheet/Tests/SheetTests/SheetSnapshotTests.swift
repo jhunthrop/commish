@@ -70,9 +70,12 @@ struct SheetSnapshotTests {
             viewModel.openImport()
             viewModel.pasted = try pasted()
         case .refused:
-            // A list of names the account reads no player from: the stub refuses it as the API does.
+            // A list of names the account reads no player from: the stub refuses it as the API does, each
+            // row with its reason (the parity file's refusal with rows, Lane 297).
+            let refusal = try #require(SheetParity.load().refusals.first { !$0.error.skipped.isEmpty })
+            await stub.set(importAnswer: nil, refusal: refusal.refused)
             viewModel.openImport()
-            viewModel.pasted = "Gibbs\nJahmyr"
+            viewModel.pasted = refusal.text
             await viewModel.importText(viewModel.pasted)
         }
         return viewModel
@@ -102,7 +105,9 @@ struct SheetSnapshotTests {
         }
         #expect(words.read == "0 players read")
         #expect(words.kept == SheetStub.emptyRead)
-        #expect(words.shape == SheetWords.listShape)
+        #expect(words.lines.count == 3)
+        #expect(words.shape == nil, "the rows say why")
+        #expect(words.verb == SheetWords.fixList)
         #expect(refused.model?.players == 8, "the sheet is as it was")
         let empty = try await Self.viewModel(.empty)
         #expect(empty.preview.count == 5)

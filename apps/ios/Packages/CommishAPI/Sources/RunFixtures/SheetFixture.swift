@@ -78,6 +78,34 @@ public struct SheetParity: Decodable, Sendable {
         public let skipped: [FileRead.Skip]
     }
 
+    /// The import's 400 for a body that reads to no player (Lane 297), which the API's handler is held to:
+    /// the body, whether it is a CSV, and the error with each line skipped and why, none when no line said
+    /// why.
+    public struct Refusal: Decodable, Sendable {
+        public struct Answer: Decodable, Sendable {
+            public struct Fields: Decodable, Sendable {
+                public let body: String
+            }
+
+            public let code: String
+            public let message: String
+            public let fields: Fields
+            public let skipped: [FileRead.Skip]
+        }
+
+        public let text: String
+        public let csv: Bool
+        public let error: Answer
+
+        /// The refusal as the client throws it.
+        public var refused: SheetImportRefused {
+            SheetImportRefused(
+                sentence: error.fields.body,
+                skipped: error.skipped.map { Components.Schemas.ImportSkip(line: $0.line, reason: $0.reason) }
+            )
+        }
+    }
+
     public let defaultName: String
     public let limits: Limits
     public let rows: [Row]
@@ -90,6 +118,7 @@ public struct SheetParity: Decodable, Sendable {
     public let statuses: [Status]
     public let reads: [FileRead]
     public let lists: [ListRead]
+    public let refusals: [Refusal]
 
     public static func load() throws -> SheetParity {
         let file = RunFixture.fixtures.appendingPathComponent("parity/sheet.json")
@@ -159,7 +188,7 @@ public actor SheetStub: SheetsAPI {
     private var offline = false
     private var changedElsewhere = false
     private var importAnswer: SheetImportAnswer?
-    private var importRefusal: APIError?
+    private var importRefusal: (any Error)?
     private var exportFile = ("My sheet.csv", Data())
     private var refusesToken = false
 
@@ -175,7 +204,7 @@ public actor SheetStub: SheetsAPI {
         self.changedElsewhere = changedElsewhere
     }
 
-    public func set(importAnswer: SheetImportAnswer?, refusal: APIError? = nil) {
+    public func set(importAnswer: SheetImportAnswer?, refusal: (any Error)? = nil) {
         self.importAnswer = importAnswer
         importRefusal = refusal
     }
@@ -266,7 +295,7 @@ public actor SheetStub: SheetsAPI {
     public static let emptyRead = "No player read, so your sheet is as it was."
 
     /// The answer set, else the refusal set; an answer of no player is refused as the API refuses it (400,
-    /// code invalid, the body's sentence) and the sheet is left as it was.
+    /// code invalid, the body's sentence, the answer's skipped lines) and the sheet is left as it was.
     public func importSheet(id: String, body: SheetImportBody) async throws -> SheetImportResult {
         try reach()
         imports.append(body)
@@ -274,7 +303,7 @@ public actor SheetStub: SheetsAPI {
             throw importRefusal
         }
         guard let answer = importAnswer, answer.imported > 0 else {
-            throw APIError.envelope(code: "invalid", message: Self.emptyRead)
+            throw SheetImportRefused(sentence: Self.emptyRead, skipped: importAnswer?.skipped ?? [])
         }
         let sheet = sheetDetail(answer.rows, id: id, stamp: SheetClock.now.addingTimeInterval(5))
         detail = sheet

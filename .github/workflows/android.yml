@@ -133,8 +133,9 @@ jobs:
             echo "GOOGLE_SERVICES_JSON is not a repository secret: this build has no push."
           fi
 
+      # :api:test is the plain JVM client module's test task, which testDebugUnitTest does not reach (Lane 297).
       - name: Lint, unit tests, snapshots, debug build
-        run: ./gradlew ktlintCheck lint testDebugUnitTest verifyPaparazziDebug assembleDebug --continue
+        run: ./gradlew ktlintCheck lint :api:test testDebugUnitTest verifyPaparazziDebug assembleDebug --continue
 
       - name: Keep the reports and the snapshot diffs
         if: failure()
