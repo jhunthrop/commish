@@ -710,7 +710,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Replaces the rows from a CSV in the export's columns (rank, player_id, name, position, team, tier, tags, note). rank and player_id and name and position are required. tags holds up to four tags separated by commas, bars or semicolons, and a header named tag is read as tags. Rows are ordered by rank. A body whose first line does not name player_id is read as a names list instead, one player a line in the drafter's order ("1. Puka Nacua", "Ja'Marr Chase, WR", "Bills D/ST"), matched against the board of the sheet's format: a name is taken only when it is unmistakable, and each line not taken is skipped with its reason. A body that reads to no player is refused with 400 and the sheet is left as it was. */
+		/** Replaces the rows from a CSV in the export's columns (rank, player_id, name, position, team, tier, tags, note). rank and player_id and name and position are required. tags holds up to four tags separated by commas, bars or semicolons, and a header named tag is read as tags. Rows are ordered by rank. A body whose first line does not name player_id is read as a names list instead, one player a line in the drafter's order ("1. Puka Nacua", "Ja'Marr Chase, WR", "Bills D/ST"), matched against the board of the sheet's format: a name is taken only when it is unmistakable, and each line not taken is skipped with its reason. A body that reads to no player is refused with 400 and the sheet is left as it was; the 400's error carries the skipped lines with their reasons (skipped). */
 		post: operations['importSheet'];
 		delete?: never;
 		options?: never;
@@ -2016,6 +2016,8 @@ export interface components {
 			message: string;
 			fields?: Record<string, string>;
 			feature?: components['schemas']['Feature'];
+			/** @description The import's 400 for a body that read to no player (Lane 297, B281): each line skipped with its reason, the same rows as a 200 import's skipped, empty when the body held no line to read. Absent from every other error and from an older answer. */
+			skipped?: components['schemas']['ImportSkip'][];
 		};
 		PageMeta: {
 			page: number;

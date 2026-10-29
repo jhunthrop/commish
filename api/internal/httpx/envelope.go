@@ -99,9 +99,25 @@ func WriteNotFound(w http.ResponseWriter, r *http.Request) {
 	WriteError(w, r, http.StatusNotFound, CodeNotFound, "Nothing here by that id", nil)
 }
 
+// invalidMessage is the sentence of every 400 with fields at fault.
+const invalidMessage = "Some of that did not check out"
+
 // WriteInvalid answers 400 with the fields at fault.
 func WriteInvalid(w http.ResponseWriter, r *http.Request, fields map[string]string) {
-	WriteError(w, r, http.StatusBadRequest, CodeInvalid, "Some of that did not check out", fields)
+	WriteError(w, r, http.StatusBadRequest, CodeInvalid, invalidMessage, fields)
+}
+
+// WriteInvalidSkipped answers 400 with the fields at fault and the lines
+// an import skipped, each with its reason (an empty list is sent as one).
+func WriteInvalidSkipped(w http.ResponseWriter, r *http.Request, fields map[string]string, skipped []apitypes.ImportSkip) {
+	if skipped == nil {
+		skipped = []apitypes.ImportSkip{}
+	}
+	body := &apitypes.ErrorBody{Code: CodeInvalid, Message: invalidMessage, Skipped: &skipped}
+	if len(fields) > 0 {
+		body.Fields = &fields
+	}
+	write(w, http.StatusBadRequest, apitypes.Envelope{Ok: false, Error: body, RequestId: RequestIDFrom(r.Context())})
 }
 
 // WriteInternal logs err with the request id and answers 500 without

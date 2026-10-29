@@ -762,6 +762,45 @@
 			"skipped": []
 		}
 	],
+	"refusals": [
+		{
+			"text": "1. Puka Nacua\n\nMichael Thomas\nLos Angeles D/ST",
+			"csv": false,
+			"error": {
+				"code": "invalid",
+				"message": "Some of that did not check out",
+				"fields": {
+					"body": "No player read, so your sheet is as it was."
+				},
+				"skipped": [
+					{
+						"line": 1,
+						"reason": "No player on our board has this name"
+					},
+					{
+						"line": 3,
+						"reason": "Two players share this name. Add his position after a comma"
+					},
+					{
+						"line": 4,
+						"reason": "Two clubs share this city. Write the club, like LAR"
+					}
+				]
+			}
+		},
+		{
+			"text": "rank,player_id,name,position\n",
+			"csv": true,
+			"error": {
+				"code": "invalid",
+				"message": "Some of that did not check out",
+				"fields": {
+					"body": "No player read, so your sheet is as it was."
+				},
+				"skipped": []
+			}
+		}
+	],
 	"limitBoard": [
 		{
 			"id": "lim-0",

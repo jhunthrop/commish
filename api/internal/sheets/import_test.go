@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -42,13 +43,18 @@ func (r *recorder) ReplaceRows(_ context.Context, _, _ uuid.UUID, rows []apitype
 	return apitypes.SheetDetail{Format: r.format}, nil
 }
 
+// fixedBoards loads raw, else the paste tests' board.
 type fixedBoards struct {
 	loaded []boards.Format
+	raw    *boards.Raw
 	err    error
 }
 
 func (f *fixedBoards) Load(_ context.Context, format boards.Format) (*boards.Raw, error) {
 	f.loaded = append(f.loaded, format)
+	if f.raw != nil {
+		return f.raw, f.err
+	}
 	return board(), f.err
 }
 
@@ -59,11 +65,15 @@ type importAnswer struct {
 		Skipped  []apitypes.ImportSkip `json:"skipped"`
 	} `json:"data"`
 	Error struct {
-		Fields map[string]string `json:"fields"`
+		Message string                 `json:"message"`
+		Fields  map[string]string      `json:"fields"`
+		Skipped *[]apitypes.ImportSkip `json:"skipped"`
 	} `json:"error"`
 }
 
-func postImport(t *testing.T, repo *recorder, loader *fixedBoards, contentType, body string) (int, importAnswer) {
+// postImportRaw posts body to the import and returns the status and the
+// answer's bytes.
+func postImportRaw(t *testing.T, repo *recorder, loader *fixedBoards, contentType, body string) (int, []byte) {
 	t.Helper()
 	h := &Handler{Store: repo, Boards: loader, Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	req := httptest.NewRequest(http.MethodPost, "/sheets/"+uuid.NewString()+"/import", strings.NewReader(body))
@@ -72,11 +82,17 @@ func postImport(t *testing.T, repo *recorder, loader *fixedBoards, contentType, 
 	req = req.WithContext(auth.WithAccount(req.Context(), auth.Account{ID: uuid.New()}))
 	rec := httptest.NewRecorder()
 	h.importCSV(rec, req)
+	return rec.Code, rec.Body.Bytes()
+}
+
+func postImport(t *testing.T, repo *recorder, loader *fixedBoards, contentType, body string) (int, importAnswer) {
+	t.Helper()
+	code, raw := postImportRaw(t, repo, loader, contentType, body)
 	var out importAnswer
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+	if err := json.Unmarshal(raw, &out); err != nil {
 		t.Fatal(err)
 	}
-	return rec.Code, out
+	return code, out
 }
 
 func TestImportReadsANamesListAgainstTheSheetsBoard(t *testing.T) {
@@ -116,6 +132,35 @@ func TestImportRefusesAReadOfNoOneAndLeavesTheSheet(t *testing.T) {
 	}
 }
 
+func TestImportRefusalOfANamesListCarriesEachLineAndItsReason(t *testing.T) {
+	repo := &recorder{}
+	code, out := postImport(t, repo, &fixedBoards{}, "text/plain", "1. Nobody Real\n\nSomeone Else")
+	want := []apitypes.ImportSkip{{Line: 1, Reason: reasonNoPlayer}, {Line: 3, Reason: reasonNoPlayer}}
+	if code != http.StatusBadRequest || out.Error.Fields["body"] != emptyReadSentence || out.Error.Message != "Some of that did not check out" {
+		t.Fatalf("%d %+v", code, out)
+	}
+	if out.Error.Skipped == nil || !slices.Equal(*out.Error.Skipped, want) {
+		t.Fatalf("skipped %+v, want %+v", out.Error.Skipped, want)
+	}
+	if len(repo.replaced) != 0 {
+		t.Fatalf("the sheet was written: %+v", repo.replaced)
+	}
+}
+
+func TestImportRefusalOfACSVWithNoRowsCarriesAnEmptyList(t *testing.T) {
+	code, out := postImport(t, &recorder{}, &fixedBoards{}, "text/csv", "rank,player_id,name,position\n")
+	if code != http.StatusBadRequest || out.Error.Skipped == nil || len(*out.Error.Skipped) != 0 {
+		t.Fatalf("%d %+v", code, out)
+	}
+}
+
+func TestImportRefusalOfACSVOfBadLinesCarriesThem(t *testing.T) {
+	code, out := postImport(t, &recorder{}, &fixedBoards{}, "text/csv", "rank,player_id,name,position\nx,a,B,QB\n")
+	if code != http.StatusBadRequest || out.Error.Skipped == nil || len(*out.Error.Skipped) != 1 || (*out.Error.Skipped)[0].Line != 2 {
+		t.Fatalf("%d %+v", code, out.Error.Skipped)
+	}
+}
+
 func TestImportOfACSVNeedsNoBoard(t *testing.T) {
 	repo := &recorder{}
 	loader := &fixedBoards{}
@@ -129,7 +174,7 @@ func TestImportOfAHeaderWithoutPlayerIDKeepsTheHeaderSentence(t *testing.T) {
 	for _, body := range []string{"rank,id,name,position\n1,a,B,QB", "Rank, Name, Position\n1,B,QB"} {
 		repo := &recorder{}
 		code, out := postImport(t, repo, &fixedBoards{}, "text/csv", body)
-		if code != http.StatusBadRequest || out.Error.Fields["body"] != badHeaderSentence || len(repo.replaced) != 0 {
+		if code != http.StatusBadRequest || out.Error.Fields["body"] != badHeaderSentence || out.Error.Skipped != nil || len(repo.replaced) != 0 {
 			t.Errorf("%q: %d %+v", body, code, out)
 		}
 	}
