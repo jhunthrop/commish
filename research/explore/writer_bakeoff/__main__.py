@@ -3,10 +3,12 @@
 `--voices on|off` (Lane 266) sets the week read's writer voices (`capsules.week.voices.VOICES_ON`) for the
 whole run, so one run is one arm; each read records the voice its player is assigned either way. `--reminder
 off` (Lane 282) takes the voice reminder out of the corrections for the run, the week read as it stood before
-Lane 282. `--retry-model` is the retry writer (Lane 276), production's setting by default and `none` for no
+Lane 282. `--angles on|off` (Lane 300) sets the week's angles (`capsules.week.angles.ANGLES_ON`) for the run,
+the sheet, the prompt and the checks with them or main's; each read records its sheet's angles and which generic
+facts bite. `--retry-model` is the retry writer (Lane 276), production's setting by default and `none` for no
 retry writer.
 
-`--url` is the lane's copy (a `lane261_`, `lane282_` or `lane286_` database on the local 5433 server, refused
+`--url` is the lane's copy (a `lane261_`, `lane282_`, `lane286_` or `lane300_` database on the local 5433 server, refused
 otherwise). `--at` moves the instant later than the newest board (never earlier), within its board week.
 `--limit N` writes only the first N sheets in board order (the smoke run). `--budget` is the hard stop in dollars across
 every call. The key is read from the environment or `--env-file`, never printed.
@@ -28,7 +30,8 @@ import httpx
 from research.capsules.config import CAPSULE_MODEL, writer_settings
 from research.capsules.gateway import GatewayClient
 from research.capsules.run_budget import RunBudget
-from research.capsules.week import prompt, voices
+from research.capsules.week import angles, prompt, voices
+from research.capsules.week.bites import depth_bites, rank_bites, weather_bites
 from research.db.engine import make_engine
 from research.db.url import sqlalchemy_url
 from research.explore.writer_bakeoff.results import build_results
@@ -48,7 +51,7 @@ from research.nightly.week_reads import worst_read_usd
 
 LOG = logging.getLogger("lane261")
 DEEPSEEK: Final = "deepseek/deepseek-v4.1-flash"
-SCRATCH_PREFIXES: Final = ("lane261_", "lane282_", "lane286_")
+SCRATCH_PREFIXES: Final = ("lane261_", "lane282_", "lane286_", "lane300_")
 NO_RETRY: Final = "none"
 DEFAULT_ENV_FILE: Final = Path("/Users/jh/code/fantasy/.env.local")
 JUDGE_PROMPT_TOKENS: Final = 1_000
@@ -69,6 +72,7 @@ def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--second-judge", default=DEEPSEEK)
     parser.add_argument("--voices", choices=("on", "off"), default="on" if voices.VOICES_ON else "off")
     parser.add_argument("--reminder", choices=("on", "off"), default="on")
+    parser.add_argument("--angles", choices=("on", "off"), default="on" if angles.ANGLES_ON else "off")
     parser.add_argument("--retry-model", default=None, help="the retry writer (default: production's; none: off)")
     return parser.parse_args(argv)
 
@@ -89,6 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parse(argv)
     check_scratch_url(args.url, SCRATCH_PREFIXES)
     setattr(voices, "VOICES_ON", args.voices == "on")  # noqa: B010 (a Final switch, set for this run's arm)
+    setattr(angles, "ANGLES_ON", args.angles == "on")  # noqa: B010 (a Final switch, set for this run's arm)
     if args.reminder == "off":
         setattr(prompt, "voice_reminder", _no_reminder)  # noqa: B010 (the arm before Lane 282, for this run)
     engine = make_engine(sqlalchemy_url(args.url))
@@ -127,12 +132,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         "newest_board_at": board_at.isoformat(),
         "voices": args.voices,
         "reminder": args.reminder,
+        "angles": args.angles,
         "retry_model": retry_model,
     }  # fmt: skip
     results = build_results(night, lanes, rejudged, run)
     by_id = {s.player_id: s for s in sheets}
     for read in results["reads"]:
-        read["voice"] = voices.voice_for(by_id[read["player_id"]].season, read["player_id"]).key
+        sheet = by_id[read["player_id"]]
+        read["voice"] = voices.voice_for(sheet.season, read["player_id"]).key
+        read["position"] = sheet.position
+        read["angles"] = [{"key": a.key, "text": a.text, "score": a.score} for a in sheet.angles]
+        read["bites"] = {
+            "weather": weather_bites(sheet),
+            "rank": rank_bites(sheet.allowed),
+            "depth": depth_bites(sheet),
+        }
     args.out.write_text(json.dumps(results, indent=1, default=str))
     LOG.warning("results at %s", args.out)
     return 0
