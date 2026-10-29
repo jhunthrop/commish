@@ -5,18 +5,22 @@
  * no grade: the two lineups' change is the whole answer. */
 import { fixed } from '#lib/format/number.ts';
 import { listWords } from '#lib/format/list.ts';
+import { shortDay, weekdayTime } from '#lib/format/clock.ts';
 import { onReserve, type BoxRow } from '../box/box.ts';
 import { stripMark } from '../box/strip.ts';
-import {
-	finderRows,
-	gainWord,
-	offerText,
-	refusalWords,
-	shortSide,
-	TRADES,
-	worthProposing
-} from '../box/trades.ts';
-import type { PlayerLine, TradeCheck, TradeCheckInput, TradeRow, TradeTeam } from './api.ts';
+import { gainWord, offerText, refusalWords, shortSide, TRADES } from '../box/trades.ts';
+import type { LeagueHost } from '../api.ts';
+import { hostWords } from '../names.ts';
+import { tradeKey } from './state.ts';
+import type {
+	PlayerLine,
+	TradeCheck,
+	TradeCheckInput,
+	TradeEmptyReason,
+	TradeOffer,
+	TradeRow,
+	TradeTeam
+} from './api.ts';
 import { GAIN_DECIMALS, gainAmount, perGameWords, teamAside } from './words.ts';
 
 /** The most players a side holds: the finder's reach. */
@@ -179,6 +183,39 @@ export interface Preset {
 	deal: string;
 	/** Each lineup's gain a week, in the card's one line: "+5.7 yours, +0.7 theirs". */
 	gains: string;
+	/** What it fills of the member's lineup, on the card's second line after the deal: "Fills your WR";
+	 * null when it fills none of his, or the answer does not say (an older API). */
+	fills: string | null;
+}
+
+/** The slot a trade fills (Lane 287's fills) as a card names it: "Fills your WR", "Fills your flex";
+ * null for none or an older answer. */
+export function fillsWords(fills: TradeRow['fills']): string | null {
+	if (fills === null || fills === undefined) return null;
+	const slot =
+		fills === 'FLEX' ? TRADES.flexSlot : fills === 'SUPERFLEX' ? TRADES.superflexSlot : fills;
+	return `${TRADES.fillsYour} ${slot}`;
+}
+
+/** A team's first trade (the finder's best with it: the API's order inside a team is the contract,
+ * Lane 287) ranked against another's by the API's own keys (inseason trades.go orderTrades): one the
+ * other team gains from before a close call for them, then one that fills a member's slot, then the
+ * member's gain as a page prints it. The API lists the teams in the standings' order and ranks no team
+ * over another, so ties keep that order (Lane 290, B289: never the member's gain alone). */
+function teamRank(a: TradeRow, b: TradeRow): number {
+	const fills = (row: TradeRow): number => Number(row.fills !== null && row.fills !== undefined);
+	const printed = (gain: number): number => Number(fixed(gain, GAIN_DECIMALS));
+	return (
+		Number(a.close_for_them) - Number(b.close_for_them) ||
+		fills(b) - fills(a) ||
+		printed(b.my_gain) - printed(a.my_gain)
+	);
+}
+
+/** Whether a trade is one worth proposing: one the other team gains from that gains the member's
+ * lineup (the strip's rule, trades.ts worthProposing). */
+function worth(row: TradeRow): boolean {
+	return !row.close_for_them && row.my_gain > 0;
 }
 
 /** How many ideas the row shows before its "N more" (Lane 268): the best three. */
@@ -189,52 +226,162 @@ export function moreWords(hidden: number): string {
 	return `${String(hidden)} more`;
 }
 
-/** Our ideas: the finder's best trade with each team, in the finder's order (the trades the other
- * team gains from first, each by your gain), each one whose players can all be ticked. The lead is
- * our best trade (worthProposing's first), so Best and the opening team agree (review L1). */
+/** Our ideas: the finder's best trade with each team (its first, in the API's order), the teams by
+ * teamRank, each one whose players can all be ticked. The lead, marked Best, is the first idea of the
+ * team ranked first when it is worth proposing, so Best and the opening team agree (review L1). */
 export function presetsFrom(teams: readonly TradeTeam[]): Preset[] {
-	const proposed = worthProposing(teams)[0]?.key ?? null;
-	const loadable = finderRows(teams, false).flatMap((entry) => {
-		const picks = builtFrom(entry.team, entry.row);
-		return picks === null ? [] : [{ ...entry, picks }];
+	const loadable = teams
+		.flatMap((team) => {
+			const row = team.trades[0];
+			const picks = row === undefined ? null : builtFrom(team, row);
+			return row === undefined || picks === null
+				? []
+				: [{ key: tradeKey(team.roster_id, row), team, row, picks }];
+		})
+		.sort((a, b) => teamRank(a.row, b.row));
+	return loadable.map((entry, i) => {
+		const lead = i === 0 && worth(entry.row);
+		return {
+			key: entry.key,
+			team: entry.team,
+			row: entry.row,
+			picks: entry.picks,
+			lead,
+			mark: lead ? stripMark(i, loadable.length) : null,
+			deal: `${shortSide(entry.row.give)} for ${shortSide(entry.row.get)}`,
+			gains: `${gainWord(entry.row.my_gain)} ${ANALYZER_LINES.yours}, ${gainWord(entry.row.their_gain)} ${ANALYZER_LINES.theirs}`,
+			fills: fillsWords(entry.row.fills)
+		};
 	});
-	return loadable.map((entry, i) => ({
-		key: entry.key,
-		team: entry.team,
-		row: entry.row,
-		picks: entry.picks,
-		lead: entry.key === proposed,
-		mark: entry.key === proposed ? stripMark(i, loadable.length) : null,
-		deal: `${shortSide(entry.row.give)} for ${shortSide(entry.row.get)}`,
-		gains: `${gainWord(entry.row.my_gain)} ${ANALYZER_LINES.yours}, ${gainWord(entry.row.their_gain)} ${ANALYZER_LINES.theirs}`
-	}));
 }
 
-/** A team in the ideas row the finder lists no trade with (B271): every idea it found with them, they
- * would not take (Lane 269), so its place says so rather than leaving the team out. */
+/** A team in the ideas row the finder lists no trade with (B271): its place says why rather than
+ * leaving the team out. */
 export interface NoIdea {
 	key: string;
 	team: TradeTeam;
-	/** "No idea they would take." */
+	/** "No idea they would take.", "They need what you need.", by the API's reason. */
 	note: string;
+}
+
+/** The line in an empty team's place by the API's empty_reason (Lane 290, B283); an answer without
+ * one (an older API) keeps the line every empty team had. */
+const EMPTY_NOTES: Readonly<Record<TradeEmptyReason, string>> = {
+	dropped: TRADES.noIdea,
+	same_need: TRADES.sameNeed,
+	no_need: TRADES.noNeed,
+	nothing: TRADES.nothingFound
+};
+
+export function emptyNote(team: Pick<TradeTeam, 'empty_reason'>): string {
+	return team.empty_reason === undefined ? TRADES.noIdea : EMPTY_NOTES[team.empty_reason];
 }
 
 /** The teams with no idea, after the ideas, in the answer's order. */
 export function noIdeasFrom(teams: readonly TradeTeam[]): NoIdea[] {
 	return teams
 		.filter((team) => team.trades.length === 0)
-		.map((team) => ({ key: `none:${String(team.roster_id)}`, team, note: TRADES.noIdea }));
+		.map((team) => ({ key: `none:${String(team.roster_id)}`, team, note: emptyNote(team) }));
 }
 
-/** One place in the ideas row: an idea to load, or a team's line with none. */
-export type IdeaPlace = { kind: 'idea'; preset: Preset } | { kind: 'none'; none: NoIdea };
+/** A trade offered to the member on the host (Lane 279), a preset at the head of the ideas row: its
+ * label ("Offered to you"), the team, give for get, when it lapses, and the picks one tap loads; an
+ * offer the builder cannot hold (more than two a side, a kicker or a defense) loads nothing and says
+ * where to answer it. We never answer an offer: the member accepts it on the host. */
+export interface OfferPreset {
+	key: string;
+	team: TradeTeam;
+	label: string;
+	/** "Rodgers for Waddle", with the host's drop when it names one: "Rodgers for Waddle, drop Dart". */
+	deal: string;
+	/** "Ends Fri 3:00 pm"; null where the host states none. */
+	expires: string | null;
+	/** The ticks it loads; null on one the builder cannot hold. */
+	picks: Picks | null;
+	/** "Answer it on Sleeper." on one the builder cannot hold, else null. */
+	note: string | null;
+}
 
-/** The ideas row's places: our ideas best first, then each team with none (B271). */
-export function ideaPlaces(presets: readonly Preset[], none: readonly NoIdea[]): IdeaPlace[] {
+/** The most days ahead an expiry names by its weekday; one further names its date. */
+const WEEKDAY_DAYS = 6;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** When an offer lapses, on the page's clock (its head names the zone once, as the rows' kickoffs
+ * are): "Ends Fri 3:00 pm", "Ends Nov 8" a week or more out. */
+function expiryWords(iso: string, now: number, zone: string): string {
+	const near = Date.parse(iso) - now < WEEKDAY_DAYS * DAY_MS;
+	return `${TRADES.expires} ${near ? weekdayTime(iso, zone) : shortDay(iso, zone)}`;
+}
+
+/** An offer's side by last names, "Nothing" (or "nothing" after "for") for a side naming no player. */
+function offerSide(side: readonly PlayerLine[], first = true): string {
+	if (side.length > 0) return shortSide(side);
+	return first ? TRADES.noPlayer : TRADES.noPlayer.toLowerCase();
+}
+
+/** The host's offers as presets, newest first as the API sends them; an offer naming a team or a
+ * player the answer does not hold is left out (the API keeps only offers on the rosters it read). */
+export function offerPresets(
+	offers: readonly TradeOffer[],
+	answer: { teams: readonly TradeTeam[]; roster: readonly PlayerLine[] },
+	host: LeagueHost,
+	now: number,
+	zone: string
+): OfferPreset[] {
+	return offers.flatMap((offer): OfferPreset[] => {
+		const team = answer.teams.find((t) => t.roster_id === offer.roster_id);
+		if (team === undefined) return [];
+		const find = (lines: readonly PlayerLine[], ids: readonly string[]): PlayerLine[] =>
+			ids.flatMap((id) => lines.filter((l) => l.player.host_id === id));
+		const give = find(answer.roster, offer.give);
+		const get = find(team.roster, offer.get);
+		const drop = find(answer.roster, offer.drop);
+		if (give.length !== offer.give.length || get.length !== offer.get.length) return [];
+		const holds = (side: readonly PlayerLine[]): boolean =>
+			side.length > 0 && side.length <= MAX_A_SIDE && side.every(pickable);
+		const loadable = holds(give) && holds(get);
+		const dropped =
+			drop.length === 0 ? '' : `, ${TRADES.sideDrop.toLowerCase()} ${shortSide(drop)}`;
+		return [
+			{
+				key: `offer:${offer.host_offer_id}`,
+				team,
+				label: offer.label,
+				deal: `${offerSide(give)} for ${offerSide(get, false)}${dropped}`,
+				expires: offer.expires_at === null ? null : expiryWords(offer.expires_at, now, zone),
+				picks: loadable
+					? { team: team.roster_id, give: [...offer.give], get: [...offer.get] }
+					: null,
+				note: loadable ? null : `${TRADES.answerOn} ${hostWords(host)}.`
+			}
+		];
+	});
+}
+
+/** One place in the ideas row: a host's offer, an idea to load, or a team's line with none. */
+export type IdeaPlace =
+	| { kind: 'offer'; offer: OfferPreset }
+	| { kind: 'idea'; preset: Preset }
+	| { kind: 'none'; none: NoIdea };
+
+/** The ideas row's places: the host's offers first (Lane 290), then our ideas best first, then each
+ * team with none (B271). */
+export function ideaPlaces(
+	presets: readonly Preset[],
+	none: readonly NoIdea[],
+	offers: readonly OfferPreset[] = []
+): IdeaPlace[] {
 	return [
+		...offers.map((offer): IdeaPlace => ({ kind: 'offer', offer })),
 		...presets.map((preset): IdeaPlace => ({ kind: 'idea', preset })),
 		...none.map((entry): IdeaPlace => ({ kind: 'none', none: entry }))
 	];
+}
+
+/** A place's key in the row. */
+export function placeKey(place: IdeaPlace): string {
+	if (place.kind === 'offer') return place.offer.key;
+	return place.kind === 'idea' ? place.preset.key : place.none.key;
 }
 
 /** The picks the screen opens with: the team of our best trade and nothing ticked, so the member's

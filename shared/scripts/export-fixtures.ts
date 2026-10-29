@@ -20,6 +20,7 @@ import type {
 	WaiverAdvice
 } from '../../web/src/lib/league/inseason/api.ts';
 import { worthProposing } from '../../web/src/lib/league/box/trades.ts';
+import { TRADE_NEEDS_COOKIE } from '../../web/scripts/inseason-fixture/trade-fills.ts';
 
 const SCRIPT = 'shared/scripts/export-fixtures.ts';
 const FIXTURES = 'shared/fixtures';
@@ -28,6 +29,8 @@ const SERVE = 'web/scripts/inseason-fixture/serve.ts';
 const FROZEN_CLOCK = join(REPOSITORY, 'shared/scripts/frozen-clock.ts');
 /** The cookie the fixture API reads the FFPC stand-in of the recorded league by. */
 const FFPC_COOKIE = 'fixture_platform=ffpc';
+/** The FFPC stand-in with the trade finder's newer fields asked for (trade-fills.ts, Lane 290). */
+export const NEEDS_COOKIE = `${FFPC_COOKIE}; ${TRADE_NEEDS_COOKIE}`;
 /** The cookie the fixture API reads the recorded Sleeper league's Sunday afternoon by, as the web's
  * Sunday shots do (serve.ts SUNDAY_WEEK): its noon games under way, their points so far stated. */
 const SUNDAY_COOKIE = 'fixture_week=sunday';
@@ -212,6 +215,29 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 		}
 	];
 	const checked = new Set([source.clocks.week, source.clocks.sunday]);
+	// The finder's newer fields (Lane 290): its rows' fills and lineup rest of season, each empty team's
+	// reason and the host's offers, as the fixture serves them only when asked (trade-fills.ts), and the
+	// check of the strip's first trade with them; at the week's clock, beside the recorded shape.
+	const needs = (clock: string, name: string): FixtureFile[] => {
+		const finder: FixtureFile = {
+			file: `trades-${id}-needs-${clockPart(clock)}.json`,
+			route: `GET /leagues/attached/${id}/trades`,
+			clock,
+			about: `the trade finder with each idea's fills, each empty team's reason and the host's offers, ${name}`,
+			cookie: NEEDS_COOKIE
+		};
+		return [
+			finder,
+			{
+				file: `trade-check-${id}-needs-${clockPart(clock)}-1.json`,
+				route: `POST /leagues/attached/${id}/trades/check`,
+				clock,
+				about: `the check of the strip's trade 1 with each lineup's rest of season, ${name}`,
+				check: { trades: finder.file, index: 0 },
+				cookie: NEEDS_COOKIE
+			}
+		];
+	};
 	const orders = (clock: string, name: string): FixtureFile[] => orderFiles(clock, name);
 	const atClock = (clock: string, name: string): FixtureFile[] => [
 		scoreboard(clock, name),
@@ -222,6 +248,7 @@ export function fixturePlan(source: FixtureSource): { clock: string; files: Fixt
 		waivers(id, clock, name),
 		trades(clock, name),
 		...(checked.has(clock) ? checks(clock, name) : []),
+		...(clock === week ? needs(clock, name) : []),
 		...(sheetClocks.has(clock) ? SHEET_PLAYER_IDS.map((board) => player(clock, name, board)) : []),
 		...(clock === week
 			? PUBLIC_SHEET_PLAYER_IDS.map((board) => publicPlayer(clock, name, board))

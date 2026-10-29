@@ -76,6 +76,7 @@ import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-orde
 import { tradeChecker } from './trade-check.ts';
 import { acceptedTrades, checkWithRest } from './trade-rest.ts';
 import { proposedTrades } from './trade-needs.ts';
+import { checkWithNeeds, needsAsked, tradesWithNeeds } from './trade-fills.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
 import { servedWaivers } from './run-lines.ts';
 import { FIXTURE_DEVICES } from './devices.ts';
@@ -603,6 +604,15 @@ function tradesHolding(player: string | null): TradeAdvice {
 	};
 }
 
+/** The trades as a request asks for them: with the finder's newer fields under the fixture_trades
+ * cookie (trade-fills.ts, Lane 290), else as recorded. */
+function tradesAsked(cookie: string | undefined, player: string | null): TradeAdvice {
+	const answer = platformed(tradesHolding(player), platformNow());
+	return needsAsked(cookie)
+		? tradesWithNeeds(answer, weeksCovered(fromWeekNow(), HORIZON), readAt())
+		: answer;
+}
+
 /** The recorded league's finals its platform scored once its Sunday has come (platform-games.ts,
  * Lane 111): the Avg, Last and GP of every answer about the league count them. */
 const platformNow = (): ReturnType<typeof platformGames> =>
@@ -1102,6 +1112,8 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	if (CHECK.test(url.pathname) && req.method === 'POST') {
 		const checked = tradeCheck((await bodyOf(req)) as TradeCheckInput);
 		if (typeof checked === 'string') send(req, res, HTTP.unprocessable, checked, 'invalid');
+		else if (needsAsked(req.headers.cookie))
+			send(req, res, HTTP.ok, checkWithNeeds(checked, weeksCovered(fromWeekNow(), HORIZON)));
 		else send(req, res, HTTP.ok, checked);
 		return;
 	}
@@ -1214,7 +1226,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			waivers: isEspn(id ?? '')
 				? espnWaivers(url.searchParams.get('position'))
 				: platformed(waiversAt(url.searchParams.get('position')), platformNow()),
-			trades: platformed(tradesHolding(url.searchParams.get('player')), platformNow())
+			trades: tradesAsked(req.headers.cookie, url.searchParams.get('player'))
 		} as const;
 		send(req, res, HTTP.ok, { ...bodies[route as keyof typeof bodies], read_at: readAt() });
 		return;

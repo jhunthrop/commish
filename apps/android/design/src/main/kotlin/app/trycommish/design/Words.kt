@@ -485,6 +485,15 @@ object Words {
         const val bothGiveUp = "Both sides give up more rest of season than they get."
         const val restBasis = "Rest of season: points over the waiver level, weeks left."
         const val noIdea = "No idea they would take."
+        const val sameNeed = "They need what you need."
+        const val noNeed = "Nothing they need from you."
+        const val nothingFound = "No idea with this team."
+        const val fillsYour = "Fills your"
+        const val flexSlot = "flex"
+        const val superflexSlot = "superflex"
+        const val expires = "Ends"
+        const val noPlayer = "Nothing"
+        const val answerOn = "Answer it on"
     }
 
     object TradePicker {

@@ -68,6 +68,7 @@ import {
 	copiedWords,
 	holdingAt,
 	TRADES_OUTPUT,
+	needsAt,
 	tradesAt,
 	wordCases
 } from './trades-parity.ts';
@@ -604,9 +605,20 @@ export async function renderTrades(host: LeagueSync['host']): Promise<string> {
 			instantOf(CHECK_CLOCKS[0]),
 			ZONE
 		),
-		builder: builderAt(weekAdvice, firstCheck, me, instantOf(CHECK_CLOCKS[0]), ZONE)
+		builder: builderAt(weekAdvice, firstCheck, me, instantOf(CHECK_CLOCKS[0]), ZONE),
+		needs: await needsOf(host, me)
 	};
 	return `${JSON.stringify(trades, null, '\t')}\n`;
+}
+
+/** The Trades with the finder's newer fields at the week's clock (Lane 290): the answer and the check
+ * the fixture serves when asked for them (export-fixtures.ts needs). */
+async function needsOf(host: LeagueSync['host'], me: string): Promise<unknown> {
+	const clock = CHECK_CLOCKS[0];
+	const advice = await answer<TradeAdvice>(`trades-${LEAGUE}-needs-${clock}.json`);
+	const check = await answer<TradeCheck>(`trade-check-${LEAGUE}-needs-${clock}-1.json`);
+	const team = worthProposing(advice.teams)[0]?.team.name ?? '';
+	return needsAt(advice, check, host, me, team, instantOf(clock), ZONE);
 }
 
 export async function generate(): Promise<Outputs> {

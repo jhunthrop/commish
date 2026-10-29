@@ -22,6 +22,9 @@ export type WaiverRow = Schemas['WaiverRow'];
 export type TradeAdvice = Schemas['TradeAdvice'];
 export type TradeTeam = Schemas['TradeTeam'];
 export type TradeRow = Schemas['TradeRow'];
+export type TradeOffer = Schemas['TradeOffer'];
+/** Why the finder lists no trade with a team (Lane 290, B283). */
+export type TradeEmptyReason = NonNullable<TradeTeam['empty_reason']>;
 export type TradeCheck = Schemas['TradeCheck'];
 export type TradeAcceptable = Schemas['TradeAcceptable'];
 export type TradeCheckInput = Schemas['TradeCheckInput'];

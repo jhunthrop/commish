@@ -10,6 +10,11 @@
 //   a bar, the answer line naming the lineups' change; the taps from the page to that verdict are
 //   counted; a preset's one tap ticks its players and is pressed; Share copies the trade in our words;
 //   the footer says the keep rule; and the page's copy passes the one guard (copy-scan.ts).
+// Then with the finder's newer fields (the fixture_trades=needs cookie, trade-fills.ts, Lane 290): the
+//   host's offers head the row ("Offered to you", the loadable one with its expiry, the other saying
+//   where to answer it), every idea's second line says what it fills, each empty team says why (all
+//   four reasons), the member's rows still in sight, one tap on the offer loads its team and ticks, and
+//   the verdict answers it, its rest-of-season cells the players' with the basis within its lines.
 // Against the built site and the fixture API (scripts/inseason-fixture/serve.ts) on the fixture
 // week's clock:
 //
@@ -20,6 +25,8 @@ import { copyFault, watchData } from './copy-scan.ts';
 import { STRIP } from '../src/lib/league/box/strip.ts';
 import { TRADES } from '../src/lib/league/box/trades.ts';
 import { ANALYZER_LINES } from '../src/lib/league/inseason/builder.ts';
+import { BASIS_BUDGET, basisLines } from './basis-lines.ts';
+import { TRADE_NEEDS_COOKIE } from './inseason-fixture/trade-fills.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { fixtureApiClock, installFixtureApiClock } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
@@ -129,13 +136,131 @@ async function verdict(page: Page): Promise<void> {
 const CHECK_ROUTE = '**/trades/check';
 const HOLD_MS = 1500;
 
-/** Holds every trade check for HOLD_MS before it goes on. */
+/** Holds every trade check for HOLD_MS before it goes on. A check still held when the route is taken
+ * away or the page moves on has gone on already, or with its page: nothing is left to continue. */
 async function holdChecks(page: Page): Promise<void> {
 	await page.route(CHECK_ROUTE, async (route) => {
 		await new Promise((done) => setTimeout(done, HOLD_MS));
-		await route.continue();
+		await route.continue().catch((error: unknown) => {
+			if (!(error instanceof Error && error.message.includes('already handled'))) throw error;
+		});
 	});
 }
+
+/** Every empty team's line the needs fixture draws, one for each reason (trade-fills.ts EMPTIED). */
+const EMPTY_LINES = [TRADES.noIdea, TRADES.sameNeed, TRADES.noNeed, TRADES.nothingFound];
+const FILLS_LINE = /^Fills your (QB|RB|WR|TE|flex|superflex)$/;
+const OFFER_LABEL = 'Offered to you';
+
+/** The ideas row in its order once every place shows: each place's kind and words. */
+async function rowPlaces(page: Page) {
+	return page.evaluate(() =>
+		[
+			...document.querySelectorAll<HTMLElement>('main .ideas li > .idea, main .ideas li > .no-idea')
+		].map((el) => ({
+			offer: el.classList.contains('offer'),
+			button: el.tagName === 'BUTTON',
+			mark: el.querySelector('.mark')?.textContent.trim() ?? '',
+			top: el.querySelector<HTMLElement>('.top')?.innerText.trim() ?? '',
+			deal: el.querySelector('.deal')?.textContent.trim() ?? '',
+			fills: el.querySelector('.fills')?.textContent.trim() ?? null,
+			fact: el.querySelector('.fact')?.textContent.trim() ?? ''
+		}))
+	);
+}
+
+/** The pass with the finder's newer fields (Lane 290), on a page already signed in. */
+async function needsPass(page: Page, where: string, theme: string, width: number): Promise<void> {
+	const [name, value] = TRADE_NEEDS_COOKIE.split('=') as [string, string];
+	await page.context().addCookies([{ name, value, domain: 'localhost', path: '/' }]);
+	await page.goto(`${web}/league/${FIXTURE_IDS.league}/trades`, { waitUntil: 'networkidle' });
+	await page.getByText(OFFER_LABEL).first().waitFor({ timeout: READY_TIMEOUT_MS });
+	await page.evaluate(() => document.fonts.ready);
+	const window = ROW_WINDOWS[width as keyof typeof ROW_WINDOWS];
+	await page.setViewportSize({ width, height: window.height });
+	const yours = await rowsInSight(page, true);
+	check(
+		yours.seen >= window.rows,
+		`${where} needs: ${String(yours.seen)} rows in sight, want ${String(window.rows)}`
+	);
+	await page.screenshot({
+		path: new URL(`trades-${theme}-${String(width)}-needs-open-window.png`, out).pathname
+	});
+	await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+	const head = await rowPlaces(page);
+	check(
+		head[0]?.offer === true && head[0].button && head[0].mark === OFFER_LABEL,
+		`${where} needs: the row opens on ${head[0]?.top ?? 'nothing'}, not the loadable offer`
+	);
+	check(
+		/^Ends \w{3} \d{1,2}:\d{2} [ap]m$/.test(head[0]?.fact ?? ''),
+		`${where} needs: the offer's expiry reads "${head[0]?.fact ?? ''}"`
+	);
+	await page.locator('main .ideas .more').click();
+	const places = await rowPlaces(page);
+	const offers = places.filter((p) => p.offer);
+	const ideas = places.filter((p) => !p.offer && p.button);
+	const empty = places.filter((p) => !p.offer && !p.button);
+	check(
+		offers.length === 2 && offers.some((o) => !o.button && /^Answer it on \w+\.$/.test(o.fact)),
+		`${where} needs: offers ${offers.map((o) => `${o.top} ${o.deal} ${o.fact}`).join(' | ')}`
+	);
+	check(
+		ideas.length > 0 && ideas.every((i) => FILLS_LINE.test(i.fills ?? '')),
+		`${where} needs: fills lines ${ideas.map((i) => i.fills ?? 'none').join(' | ')}`
+	);
+	check(
+		ideas[0]?.mark.toLowerCase() === STRIP.best.toLowerCase(),
+		`${where} needs: the first idea after the offers is not Best`
+	);
+	check(
+		EMPTY_LINES.every((line) => empty.some((e) => e.deal === line)),
+		`${where} needs: empty lines ${empty.map((e) => e.deal).join(' | ')}`
+	);
+	const cut = await cutText(page);
+	check(cut.length === 0, `${where} needs: cut text ${cut.join(' | ')}`);
+	const banned = await copyFault(page, OWN_WORDS, 'main');
+	check(banned === null, `${where} needs: says ${banned ?? ''}`);
+	await shoot(page, `trades-${theme}-${String(width)}-needs-all.png`, width);
+
+	// One tap on the offer loads its team and its ticks, and the verdict answers it like any idea.
+	await page.locator('main .idea.offer').first().click();
+	await verdict(page);
+	await waitLive(page);
+	const loaded = await seen(page);
+	check(
+		loaded.team.startsWith('Muttdogs') && loaded.ticked === 3,
+		`${where} needs: the offer loaded ${loaded.team} with ${String(loaded.ticked)} ticked`
+	);
+	check(
+		(await page.locator('main .idea.offer').first().getAttribute('aria-pressed')) === 'true',
+		`${where} needs: the loaded offer is not pressed`
+	);
+	check(
+		loaded.rest.length === 2 && loaded.rest.every((r) => /^[+−]\d+\.\d/.test(r)),
+		`${where} needs: rest of season cells ${loaded.rest.join(' | ')}`
+	);
+	check(
+		loaded.basis.includes(TRADES.restBasis),
+		`${where} needs: the basis leaves out what rest of season is`
+	);
+	const lines = await basisLines(page);
+	const budget = BASIS_BUDGET[width === 390 ? 390 : 1440] ?? 8;
+	check(
+		lines <= budget,
+		`${where} needs: the basis runs ${String(lines)} lines of ${String(budget)}`
+	);
+	needsSaid.push(
+		`${where}: needs, basis ${String(lines)} lines, offer ${loaded.line} | ${loaded.rest.join(' | ')}`
+	);
+	await page.screenshot({
+		path: new URL(`trades-${theme}-${String(width)}-needs-offer-window.png`, out).pathname
+	});
+	await shoot(page, `trades-${theme}-${String(width)}-needs-offer.png`, width);
+}
+
+/** What the needs pass read, printed with the counts. */
+const needsSaid: string[] = [];
 
 /** Whether Propose (the drawn verb is a link) and Share (enabled) act now. */
 async function verbs(page: Page): Promise<{ propose: boolean; share: boolean }> {
@@ -502,11 +627,12 @@ for (const theme of THEMES) {
 			path: new URL(`trades-${theme}-${String(width)}-refused-window.png`, out).pathname
 		});
 		await shoot(page, `trades-${theme}-${String(width)}-refused.png`, width);
+		await needsPass(page, where, theme, width);
 		await ctx.close();
 	}
 }
 await browser.close();
-process.stdout.write(`${counts.join('\n')}\n${taps.join('\n')}\n`);
+process.stdout.write(`${counts.join('\n')}\n${taps.join('\n')}\n${needsSaid.join('\n')}\n`);
 if (failures.length > 0) {
 	process.stderr.write(`${failures.join('\n')}\n`);
 	process.exit(1);

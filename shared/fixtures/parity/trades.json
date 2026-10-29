@@ -12966,7 +12966,8 @@
 						"mark": "Best",
 						"gains": "+5.3 yours, +1.1 theirs",
 						"deal": "Rodgers for Waddle and Strong",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -12976,7 +12977,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.7 theirs",
 						"deal": "Mahomes for Burden and Stevenson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -12986,7 +12988,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.5 theirs",
 						"deal": "Rodgers for Croskey-Merritt and Otton",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -12996,7 +12999,8 @@
 						"mark": null,
 						"gains": "+2.7 yours, +0.6 theirs",
 						"deal": "Love for Tucker and Lloyd",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -13006,7 +13010,8 @@
 						"mark": null,
 						"gains": "+1.8 yours, +0.5 theirs",
 						"deal": "Williams and Rodgers for Wilson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -13016,7 +13021,8 @@
 						"mark": null,
 						"gains": "+1.7 yours, +0.8 theirs",
 						"deal": "Chase for Irving and Worthy",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -13026,7 +13032,8 @@
 						"mark": null,
 						"gains": "+0.6 yours, +0.6 theirs",
 						"deal": "Odunze for Bateman and Doubs",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -13036,7 +13043,8 @@
 						"mark": null,
 						"gains": "+0.3 yours, +0.6 theirs",
 						"deal": "Odunze for Coker and Lemon",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -13046,7 +13054,8 @@
 						"mark": null,
 						"gains": "+0.1 yours, +0.7 theirs",
 						"deal": "LaPorta for Washington and Henry",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -13056,7 +13065,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -13066,7 +13076,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					}
 				]
 			}
@@ -26033,7 +26044,8 @@
 						"mark": "Best",
 						"gains": "+5.3 yours, +1.1 theirs",
 						"deal": "Rodgers for Waddle and Strong",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -26043,7 +26055,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.7 theirs",
 						"deal": "Mahomes for Burden and Stevenson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -26053,7 +26066,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.5 theirs",
 						"deal": "Rodgers for Croskey-Merritt and Otton",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -26063,7 +26077,8 @@
 						"mark": null,
 						"gains": "+2.7 yours, +0.6 theirs",
 						"deal": "Love for Tucker and Lloyd",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -26073,7 +26088,8 @@
 						"mark": null,
 						"gains": "+1.8 yours, +0.5 theirs",
 						"deal": "Williams and Rodgers for Wilson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -26083,7 +26099,8 @@
 						"mark": null,
 						"gains": "+1.7 yours, +0.8 theirs",
 						"deal": "Chase for Irving and Worthy",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -26093,7 +26110,8 @@
 						"mark": null,
 						"gains": "+0.6 yours, +0.6 theirs",
 						"deal": "Odunze for Bateman and Doubs",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -26103,7 +26121,8 @@
 						"mark": null,
 						"gains": "+0.3 yours, +0.6 theirs",
 						"deal": "Odunze for Coker and Lemon",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -26113,7 +26132,8 @@
 						"mark": null,
 						"gains": "+0.1 yours, +0.7 theirs",
 						"deal": "LaPorta for Washington and Henry",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -26123,7 +26143,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -26133,7 +26154,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					}
 				]
 			}
@@ -38560,7 +38582,8 @@
 						"mark": "Best",
 						"gains": "+5.3 yours, +1.1 theirs",
 						"deal": "Rodgers for Waddle and Strong",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -38570,7 +38593,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.7 theirs",
 						"deal": "Mahomes for Burden and Stevenson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -38580,7 +38604,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.5 theirs",
 						"deal": "Rodgers for Croskey-Merritt and Otton",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -38590,7 +38615,8 @@
 						"mark": null,
 						"gains": "+2.7 yours, +0.6 theirs",
 						"deal": "Love for Tucker and Lloyd",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -38600,7 +38626,8 @@
 						"mark": null,
 						"gains": "+1.8 yours, +0.5 theirs",
 						"deal": "Williams and Rodgers for Wilson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -38610,7 +38637,8 @@
 						"mark": null,
 						"gains": "+1.7 yours, +0.8 theirs",
 						"deal": "Chase for Irving and Worthy",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -38620,7 +38648,8 @@
 						"mark": null,
 						"gains": "+0.6 yours, +0.6 theirs",
 						"deal": "Odunze for Bateman and Doubs",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -38630,7 +38659,8 @@
 						"mark": null,
 						"gains": "+0.3 yours, +0.6 theirs",
 						"deal": "Odunze for Coker and Lemon",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -38640,7 +38670,8 @@
 						"mark": null,
 						"gains": "+0.1 yours, +0.7 theirs",
 						"deal": "LaPorta for Washington and Henry",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -38650,7 +38681,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -38660,7 +38692,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					}
 				]
 			}
@@ -50913,7 +50946,8 @@
 						"mark": "Best",
 						"gains": "+5.3 yours, +1.1 theirs",
 						"deal": "Rodgers for Waddle and Strong",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -50923,7 +50957,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.7 theirs",
 						"deal": "Mahomes for Burden and Stevenson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -50933,7 +50968,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.5 theirs",
 						"deal": "Rodgers for Croskey-Merritt and Otton",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -50943,7 +50979,8 @@
 						"mark": null,
 						"gains": "+2.7 yours, +0.6 theirs",
 						"deal": "Love for Tucker and Lloyd",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -50953,7 +50990,8 @@
 						"mark": null,
 						"gains": "+1.8 yours, +0.5 theirs",
 						"deal": "Williams and Rodgers for Wilson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -50963,7 +51001,8 @@
 						"mark": null,
 						"gains": "+1.7 yours, +0.8 theirs",
 						"deal": "Chase for Irving and Worthy",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -50973,7 +51012,8 @@
 						"mark": null,
 						"gains": "+0.6 yours, +0.6 theirs",
 						"deal": "Odunze for Bateman and Doubs",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -50983,7 +51023,8 @@
 						"mark": null,
 						"gains": "+0.3 yours, +0.6 theirs",
 						"deal": "Odunze for Coker and Lemon",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -50993,7 +51034,8 @@
 						"mark": null,
 						"gains": "+0.1 yours, +0.7 theirs",
 						"deal": "LaPorta for Washington and Henry",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -51003,7 +51045,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -51013,7 +51056,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					}
 				]
 			}
@@ -62860,7 +62904,8 @@
 						"mark": "Best",
 						"gains": "+5.3 yours, +1.1 theirs",
 						"deal": "Rodgers for Waddle and Strong",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -62870,7 +62915,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.7 theirs",
 						"deal": "Mahomes for Burden and Stevenson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -62880,7 +62926,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.5 theirs",
 						"deal": "Rodgers for Croskey-Merritt and Otton",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -62890,7 +62937,8 @@
 						"mark": null,
 						"gains": "+2.7 yours, +0.6 theirs",
 						"deal": "Love for Tucker and Lloyd",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -62900,7 +62948,8 @@
 						"mark": null,
 						"gains": "+1.8 yours, +0.5 theirs",
 						"deal": "Williams and Rodgers for Wilson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -62910,7 +62959,8 @@
 						"mark": null,
 						"gains": "+1.7 yours, +0.8 theirs",
 						"deal": "Chase for Irving and Worthy",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -62920,7 +62970,8 @@
 						"mark": null,
 						"gains": "+0.6 yours, +0.6 theirs",
 						"deal": "Odunze for Bateman and Doubs",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -62930,7 +62981,8 @@
 						"mark": null,
 						"gains": "+0.3 yours, +0.6 theirs",
 						"deal": "Odunze for Coker and Lemon",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -62940,7 +62992,8 @@
 						"mark": null,
 						"gains": "+0.5 yours, +0.3 theirs",
 						"deal": "Love for Samuel and Hall",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -62950,7 +63003,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -62960,7 +63014,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					}
 				]
 			}
@@ -74807,7 +74862,8 @@
 						"mark": "Best",
 						"gains": "+5.3 yours, +1.1 theirs",
 						"deal": "Rodgers for Waddle and Strong",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -74817,7 +74873,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.7 theirs",
 						"deal": "Mahomes for Burden and Stevenson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -74827,7 +74884,8 @@
 						"mark": null,
 						"gains": "+4.6 yours, +0.5 theirs",
 						"deal": "Rodgers for Croskey-Merritt and Otton",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -74837,7 +74895,8 @@
 						"mark": null,
 						"gains": "+2.7 yours, +0.6 theirs",
 						"deal": "Love for Tucker and Lloyd",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -74847,7 +74906,8 @@
 						"mark": null,
 						"gains": "+1.8 yours, +0.5 theirs",
 						"deal": "Williams and Rodgers for Wilson",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -74857,7 +74917,8 @@
 						"mark": null,
 						"gains": "+1.7 yours, +0.8 theirs",
 						"deal": "Chase for Irving and Worthy",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -74867,7 +74928,8 @@
 						"mark": null,
 						"gains": "+0.6 yours, +0.6 theirs",
 						"deal": "Odunze for Bateman and Doubs",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -74877,7 +74939,8 @@
 						"mark": null,
 						"gains": "+0.3 yours, +0.6 theirs",
 						"deal": "Odunze for Coker and Lemon",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "idea",
@@ -74887,7 +74950,8 @@
 						"mark": null,
 						"gains": "+0.5 yours, +0.3 theirs",
 						"deal": "Love for Samuel and Hall",
-						"note": null
+						"note": null,
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -74897,7 +74961,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					},
 					{
 						"kind": "none",
@@ -74907,7 +74972,8 @@
 						"mark": null,
 						"gains": null,
 						"deal": null,
-						"note": "No idea they would take."
+						"note": "No idea they would take.",
+						"fills": null
 					}
 				]
 			}
@@ -78958,5 +79024,257 @@
 				"refuses": false
 			}
 		}
+	},
+	"needs": {
+		"clock": "2026-10-17T17:00:00.000Z",
+		"offers": [
+			{
+				"key": "offer:fixture-offer-1",
+				"label": "Offered to you",
+				"rosterId": 10,
+				"team": "Muttdogs",
+				"deal": "Mahomes for Kittle and Burrow",
+				"expires": "Ends Mon 11:56 am",
+				"picks": {
+					"team": 10,
+					"give": [
+						"4046"
+					],
+					"get": [
+						"4217",
+						"6770"
+					]
+				},
+				"note": null
+			},
+			{
+				"key": "offer:fixture-offer-2",
+				"label": "Offered to you",
+				"rosterId": 6,
+				"team": "Bower Rangers",
+				"deal": "Texans and Vikings for Tucker",
+				"expires": null,
+				"picks": null,
+				"note": "Answer it on FFPC."
+			}
+		],
+		"ideas": {
+			"head": "Our ideas, by team",
+			"places": [
+				{
+					"kind": "idea",
+					"key": "8:96>7526+8116",
+					"rosterId": 8,
+					"team": "Max_Jensen10",
+					"mark": "Best",
+					"gains": "+5.3 yours, +1.1 theirs",
+					"deal": "Rodgers for Waddle and Strong",
+					"note": null,
+					"fills": "Fills your WR"
+				},
+				{
+					"kind": "idea",
+					"key": "4:4046>12519+7611",
+					"rosterId": 4,
+					"team": "Dad Runners",
+					"mark": null,
+					"gains": "+4.6 yours, +0.7 theirs",
+					"deal": "Mahomes for Burden and Stevenson",
+					"note": null,
+					"fills": "Fills your WR"
+				},
+				{
+					"kind": "idea",
+					"key": "7:96>12533+8111",
+					"rosterId": 7,
+					"team": "thatmattkelley",
+					"mark": null,
+					"gains": "+4.6 yours, +0.5 theirs",
+					"deal": "Rodgers for Croskey-Merritt and Otton",
+					"note": null,
+					"fills": "Fills your RB"
+				},
+				{
+					"kind": "idea",
+					"key": "6:13287>10213+11581",
+					"rosterId": 6,
+					"team": "Bower Rangers",
+					"mark": null,
+					"gains": "+2.7 yours, +0.6 theirs",
+					"deal": "Love for Tucker and Lloyd",
+					"note": null,
+					"fills": "Fills your WR"
+				},
+				{
+					"kind": "idea",
+					"key": "5:13301+96>11435",
+					"rosterId": 5,
+					"team": "Ball Snatchers",
+					"mark": null,
+					"gains": "+1.8 yours, +0.5 theirs",
+					"deal": "Williams and Rodgers for Wilson",
+					"note": null,
+					"fills": "Fills your RB"
+				},
+				{
+					"kind": "idea",
+					"key": "10:7564>11584+11624",
+					"rosterId": 10,
+					"team": "Muttdogs",
+					"mark": null,
+					"gains": "+1.7 yours, +0.8 theirs",
+					"deal": "Chase for Irving and Worthy",
+					"note": null,
+					"fills": "Fills your RB"
+				},
+				{
+					"kind": "idea",
+					"key": "9:11620>11646+13294",
+					"rosterId": 9,
+					"team": "Aaron Donald Dependent",
+					"mark": null,
+					"gains": "+0.3 yours, +0.6 theirs",
+					"deal": "Odunze for Coker and Lemon",
+					"note": null,
+					"fills": "Fills your WR"
+				},
+				{
+					"kind": "none",
+					"key": "none:2",
+					"rosterId": 2,
+					"team": "Carried by QJs",
+					"mark": null,
+					"gains": null,
+					"deal": null,
+					"note": "No idea they would take.",
+					"fills": null
+				},
+				{
+					"kind": "none",
+					"key": "none:3",
+					"rosterId": 3,
+					"team": "Keeper? I Hardly Know Her",
+					"mark": null,
+					"gains": null,
+					"deal": null,
+					"note": "No idea with this team.",
+					"fills": null
+				},
+				{
+					"kind": "none",
+					"key": "none:11",
+					"rosterId": 11,
+					"team": "OnlyFannins",
+					"mark": null,
+					"gains": null,
+					"deal": null,
+					"note": "They need what you need.",
+					"fills": null
+				},
+				{
+					"kind": "none",
+					"key": "none:12",
+					"rosterId": 12,
+					"team": "Nacua Matata",
+					"mark": null,
+					"gains": null,
+					"deal": null,
+					"note": "Nothing they need from you.",
+					"fills": null
+				}
+			]
+		},
+		"empty": [
+			{
+				"rosterId": 2,
+				"reason": "dropped",
+				"note": "No idea they would take."
+			},
+			{
+				"rosterId": 3,
+				"reason": "nothing",
+				"note": "No idea with this team."
+			},
+			{
+				"rosterId": 11,
+				"reason": "same_need",
+				"note": "They need what you need."
+			},
+			{
+				"rosterId": 12,
+				"reason": "no_need",
+				"note": "Nothing they need from you."
+			}
+		],
+		"reasons": {
+			"dropped": "No idea they would take.",
+			"same_need": "They need what you need.",
+			"no_need": "Nothing they need from you.",
+			"nothing": "No idea with this team.",
+			"absent": "No idea they would take."
+		},
+		"fills": {
+			"QB": "Fills your QB",
+			"RB": "Fills your RB",
+			"WR": "Fills your WR",
+			"TE": "Fills your TE",
+			"FLEX": "Fills your flex",
+			"SUPERFLEX": "Fills your superflex"
+		},
+		"check": {
+			"clock": "2026-10-17T17:00:00.000Z",
+			"heads": {
+				"week": "This week, Proj",
+				"gain": "Gain a week",
+				"room": "Room",
+				"to": "to",
+				"rest": "Rest of season",
+				"refuses": "Would not take it"
+			},
+			"yours": {
+				"label": "You",
+				"name": "McConkey Kong Country",
+				"figures": {
+					"projBefore": "--",
+					"projAfter": "--",
+					"projChange": "--",
+					"projTone": "even",
+					"seasonBefore": "2.0",
+					"seasonAfter": "7.3",
+					"seasonChange": "+5.3",
+					"seasonTone": "gain"
+				},
+				"room": "Drop Dart",
+				"rest": {
+					"text": "+9.6",
+					"tone": "gain",
+					"refuses": false
+				}
+			},
+			"theirs": {
+				"label": "With",
+				"name": "Max_Jensen10",
+				"figures": {
+					"projBefore": "--",
+					"projAfter": "--",
+					"projChange": "--",
+					"projTone": "even",
+					"seasonBefore": "3.5",
+					"seasonAfter": "4.6",
+					"seasonChange": "+1.1",
+					"seasonTone": "gain"
+				},
+				"room": "Has room",
+				"rest": {
+					"text": "−9.6",
+					"tone": "loss",
+					"refuses": false
+				}
+			},
+			"sentence": "Both lineups gain: yours 5.3 points over replacement a week, theirs 1.1. You give Aaron Rodgers (10.8 a game) for Jaylen Waddle (13.6 a game) and Pierre Strong. You drop Jaxson Dart to make room.",
+			"basis": "The scoreboard is each lineup before and after the trade.",
+			"restBasis": "Rest of season is what the players a side gets score over the best free agent at their position, less the same for those it gives and drops, weeks 6 to 17. A side takes a trade that costs it 12.0 or less."
+		},
+		"builderBasis": "Each team's best trade both lineups gain by, yours first. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot. Rest of season: points over the waiver level, weeks left. A game is our order's points a game. Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Avg and Last are our stats, which omit two-point, missed kick, fumble recovery and safety. How the order has done"
 	}
 }

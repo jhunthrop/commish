@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { BoxRow } from '../box/box.ts';
-import type { PlayerLine, TradeCheck, TradeRow, TradeTeam } from './api.ts';
+import { TRADES } from '../box/trades.ts';
+import type { PlayerLine, TradeCheck, TradeOffer, TradeRow, TradeTeam } from './api.ts';
 import {
 	ANALYZER_LINES,
 	BAR_FLOOR,
@@ -14,6 +15,9 @@ import {
 	checkInput,
 	checkWords,
 	countWords,
+	emptyNote,
+	fillsWords,
+	offerPresets,
 	fillsBoth,
 	gainBars,
 	ideaPlaces,
@@ -482,5 +486,148 @@ void test('a team the finder lists no trade with keeps its place in the ideas ro
 	assert.deepEqual(
 		ideaPlaces(presetsFrom([quiet]), noIdeasFrom([quiet])).map((p) => p.kind),
 		['none']
+	);
+});
+
+void test("each team's ideas keep the API's order, the teams ranked by their first idea, fills first (Lane 290, B289)", () => {
+	// Inside a team the first idea is the API's, even with a higher gain after it.
+	const filling = row({ my_gain: 1.2, their_gain: 0.4, close_for_them: false, fills: 'WR' });
+	const richer = row({
+		get: [line('Davante Adams', 'WR')],
+		my_gain: 3.4,
+		their_gain: 0.2,
+		close_for_them: false,
+		fills: null
+	});
+	const rangers = team(9, 'Bower Rangers', [filling, richer]);
+	// A team whose first idea fills nothing of the member's ranks after one that fills, whatever its
+	// gain; a close call for them after both.
+	const muttdogs = team(4, 'Muttdogs', [
+		row({ my_gain: 2.5, their_gain: 0.6, close_for_them: false, fills: null })
+	]);
+	const close = team(2, 'Ball Snatchers', [
+		row({ my_gain: 5, their_gain: 0.1, close_for_them: true, fills: 'RB' })
+	]);
+	const presets = presetsFrom([close, muttdogs, rangers]);
+	assert.deepEqual(
+		presets.map((p) => [p.team.name, p.deal, p.mark, p.fills]),
+		[
+			['Bower Rangers', 'Williams for Collins', 'Best', 'Fills your WR'],
+			['Muttdogs', 'Williams for Collins', null, null],
+			['Ball Snatchers', 'Williams for Collins', null, 'Fills your RB']
+		]
+	);
+	assert.deepEqual(openingPicks(presets).team, 9);
+	// An older answer (no fills): the teams by their first idea's gain to the tenth, ties in the
+	// answer's (standings') order.
+	const older = (name: string, id: number, gain: number): TradeTeam =>
+		team(id, name, [row({ my_gain: gain, their_gain: 0.5, close_for_them: false })]);
+	assert.deepEqual(
+		presetsFrom([older('A', 1, 1.04), older('B', 2, 1.4), older('C', 3, 1.01)]).map(
+			(p) => p.team.name
+		),
+		['B', 'A', 'C']
+	);
+});
+
+void test("an idea's second line says what it fills of the member's lineup, nothing on an older answer", () => {
+	assert.equal(fillsWords('WR'), 'Fills your WR');
+	assert.equal(fillsWords('QB'), 'Fills your QB');
+	assert.equal(fillsWords('FLEX'), 'Fills your flex');
+	assert.equal(fillsWords('SUPERFLEX'), 'Fills your superflex');
+	assert.equal(fillsWords(null), null);
+	assert.equal(fillsWords(undefined), null);
+});
+
+void test('an empty team says why by the API reason, the old line when the answer gives none (B283)', () => {
+	assert.equal(emptyNote({ empty_reason: 'dropped' }), 'No idea they would take.');
+	assert.equal(emptyNote({ empty_reason: 'same_need' }), 'They need what you need.');
+	assert.equal(emptyNote({ empty_reason: 'no_need' }), 'Nothing they need from you.');
+	assert.equal(emptyNote({ empty_reason: 'nothing' }), 'No idea with this team.');
+	assert.equal(emptyNote({}), TRADES.noIdea);
+	const same = { ...team(7, 'Carried by QJs', []), empty_reason: 'same_need' as const };
+	assert.deepEqual(
+		noIdeasFrom([same]).map((n) => n.note),
+		['They need what you need.']
+	);
+});
+
+/** A host offer from Muttdogs (roster 4): the member's Williams for their Collins. */
+const offer = (over: Partial<TradeOffer> = {}): TradeOffer => ({
+	label: 'Offered to you',
+	roster_id: 4,
+	name: 'Muttdogs',
+	give: ['h-Kyren Williams'],
+	get: ['h-Nico Collins'],
+	drop: [],
+	host_offer_id: 'p-1',
+	expires_at: '2026-10-17T20:00:00.000Z',
+	read_at: '2026-10-16T12:00:00.000Z',
+	...over
+});
+
+void test("the host's offers head the ideas row and one tap loads the ticks and the team (Lane 290)", () => {
+	const roster = [line('Kyren Williams'), line('Jaxson Dart', 'QB'), line('Harrison Butker', 'K')];
+	const muttdogs = {
+		...team(4, 'Muttdogs', [row({ close_for_them: false })]),
+		roster: [line('Nico Collins', 'WR')]
+	};
+	const answer = { teams: [muttdogs], roster };
+	const now = Date.parse('2026-10-16T12:00:00.000Z');
+	const zone = 'America/Chicago';
+	const made = offerPresets([offer()], answer, 'sleeper', now, zone).at(0);
+	assert.ok(made);
+	assert.deepEqual(made, {
+		key: 'offer:p-1',
+		team: muttdogs,
+		label: 'Offered to you',
+		deal: 'Williams for Collins',
+		expires: 'Ends Sat 3:00 pm',
+		picks: { team: 4, give: ['h-Kyren Williams'], get: ['h-Nico Collins'] },
+		note: null
+	});
+	// No expiry where the host states none; the host's drop named; a week out, the date.
+	const yahoo = offerPresets(
+		[offer({ expires_at: null, drop: ['h-Jaxson Dart'] })],
+		answer,
+		'yahoo',
+		now,
+		zone
+	).at(0);
+	assert.ok(yahoo);
+	assert.equal(yahoo.expires, null);
+	assert.equal(yahoo.deal, 'Williams for Collins, drop Dart');
+	const far = offerPresets(
+		[offer({ expires_at: '2026-10-30T20:00:00.000Z' })],
+		answer,
+		'espn',
+		now,
+		zone
+	);
+	assert.match(far[0]?.expires ?? '', /^Ends Oct 30$/);
+	// One the builder cannot hold (a kicker) loads nothing and says where to answer it.
+	const kicker = offerPresets(
+		[offer({ give: ['h-Harrison Butker'] })],
+		answer,
+		'espn',
+		now,
+		zone
+	).at(0);
+	assert.ok(kicker);
+	assert.equal(kicker.picks, null);
+	assert.equal(kicker.note, 'Answer it on ESPN.');
+	// A one-sided offer (Lane 279) says the side that names no player, and loads nothing.
+	const oneSided = offerPresets([offer({ give: [] })], answer, 'mfl', now, zone).at(0);
+	assert.ok(oneSided);
+	assert.equal(oneSided.deal, 'Nothing for Collins');
+	assert.equal(oneSided.picks, null);
+	// A team or a player the answer does not hold leaves the offer out.
+	assert.deepEqual(offerPresets([offer({ roster_id: 99 })], answer, 'espn', now, zone), []);
+	assert.deepEqual(offerPresets([offer({ get: ['h-Nobody'] })], answer, 'espn', now, zone), []);
+	// At the row's head, before our ideas and the empty teams.
+	const places = ideaPlaces(presetsFrom([muttdogs]), noIdeasFrom([team(7, 'Quiet', [])]), [made]);
+	assert.deepEqual(
+		places.map((p) => p.kind),
+		['offer', 'idea', 'none']
 	);
 });

@@ -14,7 +14,7 @@
 	} from '../box/trades.ts';
 	import TradeBuilder from './TradeBuilder.svelte';
 	import type { TradeAdvice, TradeCheck, TradeCheckInput, TradeRow, TradeTeam } from './api.ts';
-	import { BUILDER_LINES, openingPicks, presetsFrom, type Picks } from './builder.ts';
+	import { BUILDER_LINES, offerPresets, openingPicks, presetsFrom, type Picks } from './builder.ts';
 	import { page } from '$app/state';
 	import { boxRow, type BoxRow } from '../box/box.ts';
 	import type { ScreenOffer } from '#lib/player/shelf-state.ts';
@@ -59,6 +59,9 @@
 	const BASIS_ID = 'trades-basis';
 
 	const presets = $derived(presetsFrom(advice.teams));
+	/** The host's offers to the member, at the head of the ideas row (Lane 279, Lane 290); none on an
+	 * older answer. */
+	const offers = $derived(offerPresets(advice.offers ?? [], advice, host, now, memberZone()));
 
 	/** The picks the builder opens with, a count that makes it again for each opening a verb asks for,
 	 * and whether it takes the focus (not on the page's own load). */
@@ -161,6 +164,7 @@
 		{host}
 		moves={advice.moves}
 		{presets}
+		{offers}
 		start={building.picks}
 		focus={building.focus}
 		basis={advice.check_basis}

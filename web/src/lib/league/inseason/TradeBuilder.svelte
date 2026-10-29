@@ -43,6 +43,7 @@
 		ideaPlaces,
 		moreWords,
 		noIdeasFrom,
+		placeKey,
 		pickPrompt,
 		pickable,
 		proposable,
@@ -51,6 +52,7 @@
 		teamChoice,
 		toggle,
 		type Answered,
+		type OfferPreset,
 		type Picks,
 		type Preset
 	} from './builder.ts';
@@ -82,6 +84,8 @@
 		moves: TradeMoves;
 		/** Our ideas, best first: each loads its trade into the ticks. */
 		presets: readonly Preset[];
+		/** The host's offers to the member, at the head of the row: each loads like an idea. */
+		offers: readonly OfferPreset[];
 		/** The picks it opens with: the best idea's team alone, or a player the member asked for. */
 		start: Picks;
 		/** Whether it takes the focus as it opens: when a verb elsewhere opened it, not on the page's load. */
@@ -110,6 +114,7 @@
 		host,
 		moves,
 		presets,
+		offers,
 		start,
 		focus,
 		basis,
@@ -137,8 +142,9 @@
 	let drawn = $state<'give' | 'get'>('give');
 	/** Whether the ideas row shows every idea, or the best IDEAS_SHOWN and its "N more". */
 	let allIdeas = $state(false);
-	/** Our ideas, then each team the finder lists none with, its line in its place (B271). */
-	const places = $derived(ideaPlaces(presets, noIdeasFrom(teams)));
+	/** The host's offers, our ideas, then each team the finder lists none with, its line in its place
+	 * (B271, Lane 290). */
+	const places = $derived(ideaPlaces(presets, noIdeasFrom(teams), offers));
 	const shownIdeas = $derived(allIdeas ? places : places.slice(0, IDEAS_SHOWN));
 	/** The ideas' list, so "N more" hands the focus to the first idea it shows. */
 	let ideaList = $state<HTMLUListElement | null>(null);
@@ -228,10 +234,10 @@
 		void ask();
 	}
 
-	/** One tap loads an idea into the ticks; the member changes it freely from there. */
-	function load(preset: Preset): void {
-		if (preset.picks.team !== picks.team) answered = null;
-		picks = preset.picks;
+	/** One tap loads an idea or an offer into the ticks; the member changes it freely from there. */
+	function load(next: Picks): void {
+		if (next.team !== picks.team) answered = null;
+		picks = next;
 		void ask();
 	}
 
@@ -323,8 +329,45 @@
 		<div class="ideas" role="group" aria-label={ANALYZER_LINES.ideas}>
 			<span class="ideas-head">{ANALYZER_LINES.ideas}</span>
 			<ul id={IDEAS_ID} class:all={allIdeas} bind:this={ideaList}>
-				{#each shownIdeas as place (place.kind === 'idea' ? place.preset.key : place.none.key)}
-					{#if place.kind === 'none'}
+				{#each shownIdeas as place (placeKey(place))}
+					{#if place.kind === 'offer'}
+						{@const offer = place.offer}
+						<!-- A trade offered to the member on the host: its label and the team, then give for get
+						     and when it lapses; one tap loads it, and the verdict answers it as any idea. One
+						     the builder cannot hold says where to answer it in place of the expiry. -->
+						<li>
+							{#if offer.picks}
+								{@const offered = offer.picks}
+								<button
+									type="button"
+									class="idea offer"
+									aria-pressed={samePicks(picks, offered)}
+									onclick={() => load(offered)}
+								>
+									<span class="top"
+										><b class="mark">{offer.label}</b><span class="with"
+											>{TRADES.with} {offer.team.name}</span
+										></span
+									><span class="second"
+										><span class="deal">{offer.deal}</span>{#if offer.expires}<span class="fact"
+												>{offer.expires}</span
+											>{/if}</span
+									>
+								</button>
+							{:else}
+								<span class="no-idea offer" tabindex="-1"
+									><span class="top"
+										><b class="mark">{offer.label}</b><span class="with"
+											>{TRADES.with} {offer.team.name}</span
+										></span
+									><span class="second"
+										><span class="deal">{offer.deal}</span><span class="fact">{offer.note}</span
+										></span
+									></span
+								>
+							{/if}
+						</li>
+					{:else if place.kind === 'none'}
 						<!-- A team the finder lists no trade with: its line in its place, nothing to load. -->
 						<li>
 							<span class="no-idea" tabindex="-1"
@@ -340,13 +383,17 @@
 								type="button"
 								class="idea"
 								aria-pressed={samePicks(picks, preset.picks)}
-								onclick={() => load(preset)}
+								onclick={() => load(preset.picks)}
 							>
 								<span class="top"
 									>{#if preset.mark}<b class="mark">{preset.mark}</b>{/if}<span class="with"
 										>{TRADES.with} {preset.team.name}</span
 									><span class="gains">{preset.gains}</span></span
-								><span class="deal">{preset.deal}</span>
+								><span class="second"
+									><span class="deal">{preset.deal}</span>{#if preset.fills}<span class="fills"
+											>{preset.fills}</span
+										>{/if}</span
+								>
 							</button>
 						</li>
 					{/if}
@@ -608,6 +655,30 @@
 	.deal {
 		font-weight: 600;
 		overflow-wrap: anywhere;
+	}
+
+	/* An idea's second line: the deal, then what it fills of the member's lineup at the line's end, as
+	   the first line ends on the gains; a long one wraps, never cut. */
+	.second {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		column-gap: 6px;
+	}
+
+	.fills {
+		margin-left: auto;
+		font-size: var(--t-xs);
+		font-weight: 600;
+		color: var(--gain-ink);
+	}
+
+	/* An offer's fact at the second line's end: when it lapses, or where to answer it. */
+	.fact {
+		margin-left: auto;
+		font-size: var(--t-xs);
+		font-variant-numeric: tabular-nums;
+		color: var(--ink-2);
 	}
 
 	.with {
