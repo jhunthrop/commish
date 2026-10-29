@@ -1,12 +1,12 @@
 // Screenshots of the Waivers screen's position panel (Lane 291) against the fixture API on the
-// fixture week's clock and the built site, light and dark at 1280 by 800 and 390 by 844: the first
+// fixture week's clock and the built site, light and dark at 1280 by 800 and 390 by 844, light at 1024 by 768: the first
 // screen, then a card open on its ranked list (the member's players, then the free agents with the
 // table's Beats and Add), then the This week figures. Checks: nothing scrolls sideways, the copy
-// passes the one guard (copy-scan.ts), at 1280 by 800 the panel and the strip leave at least six of
-// the table's rows whole on the first screen, on a phone the panel closed is one row of cards, every
-// card says its rank out of the league's teams, an open card lists free agents each with the verb the
-// table's row draws for him, and the toggle changes the cards' figures. PANEL=off shoots the page
-// before the panel (the lane's before shots) and checks only the first two.
+// passes the one guard (copy-scan.ts), at 1280 by 800 the panel beside the strip leaves the five
+// table rows the page showed before it (coordinator's ruling 2026-10-29), on a phone the panel
+// closed is one row of cards, every card says its rank out of the league's teams, an open card lists
+// free agents each with the table's Add, and the toggle changes the cards' figures. PANEL=off shoots
+// the page before the panel (the lane's before shots) and checks only the first two.
 //
 //   node scripts/waiver-panel-shots.ts [web origin] [out dir, from scripts/]
 // with the site built against PUBLIC_API_URL at the fixture API (API_ORIGIN, default 8799), started
@@ -25,7 +25,7 @@ import {
 } from './inseason-fixture/clock.ts';
 
 type Theme = 'light' | 'dark';
-type Width = 1280 | 390;
+type Width = 1280 | 1024 | 390;
 const web = process.argv[2] ?? 'http://localhost:4196';
 const API_ORIGIN = process.env.API_ORIGIN ?? 'http://localhost:8799';
 const panelOn = process.env.PANEL !== 'off';
@@ -33,12 +33,14 @@ const out = new URL(process.argv[3] ?? '../screenshots/waiver-panel/', import.me
 const SHOTS: readonly (readonly [Theme, Width])[] = [
 	['light', 1280],
 	['dark', 1280],
+	['light', 1024],
 	['light', 390],
 	['dark', 390]
 ];
-const HEIGHTS = { 1280: 800, 390: 844 } as const;
-/** The table rows the first screen at a desk must show whole beneath the panel and the strip. */
-const DESK_ROWS = 6;
+const HEIGHTS = { 1280: 800, 1024: 768, 390: 844 } as const;
+/** The table rows the first screen at a desk showed before the panel, and must still show whole with
+ * the panel beside the strip (the six once asked for was never true: five before the panel). */
+const DESK_ROWS = 5;
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const LEAGUE = `/league/${FIXTURE_IDS.league}`;

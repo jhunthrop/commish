@@ -11,6 +11,10 @@ import { beatsPlace, beatsWord, poolRows, shortName, WAIVERS, type PoolRow } fro
 type WaiverPositionCard = components['schemas']['WaiverPositionCard'];
 type WaiverStanding = components['schemas']['WaiverStanding'];
 
+/** The widths at which the panel sits beside the pickups strip in one band (coordinator's ruling,
+ * 2026-10-29): 1024 and up. Narrower, it is its own row under the strip. */
+export const BAND_QUERY = '(min-width: 1024px)';
+
 /** The figures the panel reads: the rest of the season (the default) or this week's Proj. */
 export type PanelMode = 'season' | 'week';
 

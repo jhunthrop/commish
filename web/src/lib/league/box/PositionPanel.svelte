@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import StripAction from '#lib/ui/StripAction.svelte';
@@ -26,9 +27,12 @@
 		now: number;
 		/** The table's Add for a free agent's row: the screen's one verb rule. */
 		onadd: (row: WaiverRow) => void;
+		/** At a desk, the pickups strip the panel sits beside in one band (coordinator's ruling,
+		 * 2026-10-29): the strip takes its cards' width, the cards the rest, the open list under both. */
+		beside?: Snippet;
 	}
 
-	let { advice, zone, now, onadd }: Props = $props();
+	let { advice, zone, now, onadd, beside }: Props = $props();
 
 	let mode = $state<PanelMode>('season');
 	let open = $state<string | null>(null);
@@ -43,47 +47,51 @@
 </script>
 
 {#if cards.length > 0}
-	<section class="panel" data-panel="positions" aria-label={PANEL.label}>
-		<div class="row">
-			<div class="head">
-				<span class="label">{PANEL.label}</span>
-				{#if week}
-					<ChipGroup label={PANEL.label}>
-						<Chip size="sm" pressed={mode === 'season'} onclick={() => (mode = 'season')}
-							>{PANEL.season}</Chip
-						>
-						<Chip size="sm" pressed={mode === 'week'} onclick={() => (mode = 'week')}
-							>{PANEL.week}</Chip
-						>
-					</ChipGroup>
-				{:else}<span class="basis">{PANEL.season}</span>{/if}
+	<div class="positions" class:band={beside !== undefined} data-panel="positions">
+		{#if beside}<div class="beside">{@render beside()}</div>{/if}
+		<section class="panel" aria-label={PANEL.label}>
+			<div class="row">
+				<div class="head">
+					<span class="label">{PANEL.label}</span>
+					{#if week}
+						<ChipGroup label={PANEL.label}>
+							<Chip size="sm" pressed={mode === 'season'} onclick={() => (mode = 'season')}
+								>{PANEL.season}</Chip
+							>
+							<Chip size="sm" pressed={mode === 'week'} onclick={() => (mode = 'week')}
+								>{PANEL.week}</Chip
+							>
+						</ChipGroup>
+					{:else}<span class="basis">{PANEL.season}</span>{/if}
+				</div>
+				<ul class="cards">
+					{#each cards as card (card.key)}
+						<li data-card={card.key} class:on={open === card.key}>
+							<button
+								type="button"
+								class="card-head"
+								aria-expanded={open === card.key}
+								aria-controls={listId}
+								onclick={() => toggle(card)}
+							>
+								<span class="top"
+									><b class="pos">{card.word}</b><span class="rank">{card.place}</span></span
+								>
+								<span class="figs"
+									><b class="figure">{card.figure}</b>{#if card.need}<span class="need"
+											>{PANEL.need}</span
+										>{/if}</span
+								>
+								{#if card.standing !== null}<span class="median">{card.median} {PANEL.median}</span
+									>{/if}
+							</button>
+						</li>
+					{/each}
+				</ul>
 			</div>
-			<ul class="cards">
-				{#each cards as card (card.key)}
-					<li data-card={card.key} class:on={open === card.key}>
-						<button
-							type="button"
-							class="card-head"
-							aria-expanded={open === card.key}
-							aria-controls={listId}
-							onclick={() => toggle(card)}
-						>
-							<span class="top"
-								><b class="pos">{card.word}</b><span class="rank">{card.place}</span
-								>{#if card.need}<span class="need">{PANEL.need}</span>{/if}</span
-							>
-							<span class="figs"
-								><b class="figure">{card.figure}</b>{#if card.standing !== null}<span class="median"
-										>{card.median} {PANEL.median}</span
-									>{/if}</span
-							>
-						</button>
-					</li>
-				{/each}
-			</ul>
-		</div>
+		</section>
 		{#if opened}
-			<div class="list" id={listId} data-list={opened.key}>
+			<div class="list" id={listId} data-list={opened.key} role="region" aria-label={opened.rank}>
 				<p class="list-head">
 					<b>{opened.rank}</b>
 					<span>{panelExplain(mode, [opened])}</span>
@@ -133,15 +141,92 @@
 				</ol>
 			</div>
 		{/if}
-	</section>
+	</div>
+{:else if beside}
+	{@render beside()}
 {/if}
 
 <style>
-	.panel {
+	.positions {
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-2);
 		min-width: 0;
+	}
+
+	.panel {
+		min-width: 0;
+	}
+
+	/* At a desk, one band: the strip at its cards' width, the cards in the rest, as many to a row as
+	   fit, the label and the toggle over them; the open list under both, the band's width. */
+	.positions.band {
+		display: grid;
+		grid-template-columns: minmax(min-content, 47rem) minmax(20rem, 1fr);
+		align-items: start;
+		gap: var(--s-3) var(--s-5);
+	}
+
+	.band > .beside {
+		grid-column: 1;
+		min-width: 0;
+	}
+
+	/* On a narrow desk the strip's card words wrap rather than squeeze the cards out of the band. */
+	.band > .beside :global(.pickup .text) {
+		white-space: normal;
+	}
+
+	.band > .panel {
+		grid-column: 2;
+	}
+
+	.band > .list {
+		grid-column: 1 / -1;
+	}
+
+	.band .row {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 6px;
+	}
+
+	.band .head {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	/* A narrow desk (1024 to 1279): the strip keeps its cards, so the panel's column is narrow; the
+	   label sits over the toggle and the toggle's chips stack, as on a phone. */
+	@media (max-width: 1279px) {
+		.band .head {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+
+		.band .head :global([role='group']) {
+			flex-direction: column;
+			border-radius: var(--r-md);
+		}
+
+		.band .head :global([role='group'] button) {
+			border-radius: calc(var(--r-md) - 2px);
+		}
+	}
+
+	.band .cards {
+		grid-auto-flow: row;
+		gap: 6px;
+		grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+	}
+
+	.band .card-head {
+		padding: 3px var(--s-2);
+	}
+
+	.band .top,
+	.band .figs {
+		overflow: hidden;
 	}
 
 	.row {
@@ -197,7 +282,8 @@
 	.card-head {
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
+		gap: 0;
+		line-height: 1.25;
 		width: 100%;
 		padding: 6px var(--s-3);
 		border: 0;
@@ -249,6 +335,7 @@
 		font-size: var(--t-xs);
 		color: var(--ink-3);
 		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
 	}
 
 	.list {
