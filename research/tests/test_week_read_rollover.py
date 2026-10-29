@@ -26,6 +26,7 @@ from research.capsules.gateway import GatewayClient
 from research.capsules.gateway_ledger import ModelPrice
 from research.capsules.narrative import ShapeMasks
 from research.capsules.store import WRITTEN_SOURCE
+from research.capsules.week.cadence import central_day
 from research.capsules.week.collect import board_week
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.rollover import NIGHTS, ReadsDue, Rollover, next_nightly, night_of, reads_due, rollover
@@ -622,3 +623,101 @@ def test_a_retry_model_listed_with_no_price_turns_the_retry_writer_off_with_one_
     assert "budget $2.50" in record.summary  # dollars, never calls
     warnings = [line for line in lines if "RETRY_WRITER_MODEL" in line]
     assert len(warnings) == 1 and "carries with no price" in warnings[0]
+
+
+# THE HELD REWRITES' ROUNDS AND THE DRY PASS (Lane 293).
+
+# A read written while the rules asked for the published projection, addressing the member: rule-stale since Lane 286.
+_STALE_READ = "The published projection of 11.2 points keeps him on your bench. Hold him until Sunday."
+
+
+def _stale_puka(engine: Engine) -> StoredWeekRead:
+    """The roll-over's reads, then Puka Nacua's body replaced by a rule-stale one, as on 2026-10-29."""
+    key = (starter().player_id, _BOARD_WEEK)
+    with engine.begin() as conn:
+        upsert_week_read(conn, replace(_reads(engine)[key], body=_STALE_READ))
+    return _reads(engine)[key]
+
+
+def test_a_rule_stale_rewrite_that_falls_is_asked_again_within_the_nightly_and_written(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The 2026-10-29 nightly: 404 rule-stale rewrites in one round, the 153 that fell held over the old reads and
+    never asked again within the pass. The next round asks a held rewrite under its own reason."""
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    _stale_puka(engine)
+    asked: list[str] = []
+    night = _PASS + timedelta(days=1)
+    record = _step(engine, monkeypatch, [starter(), questionable()], _Writer(fail_first=MAX_CALLS_PER_READ, asked=asked),
+                   at=night)  # fmt: skip
+    puka = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert (puka.source, puka.body, puka.reason) == (WRITTEN_SOURCE, STARTER_READ, "rule")
+    assert "1 reads due (rule 1)" in record.summary and "2 rounds" in record.summary
+    assert "(1 held over the written read)" in record.summary and "every due read written" in record.summary
+    assert record.status == "ran" and all("Puka Nacua" in who for who in asked)
+
+
+def test_a_rule_stale_rewrite_that_falls_every_round_keeps_the_old_read_and_is_named(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    stale = _stale_puka(engine)
+    writer = _Writer(fail_first=MAX_CALLS_PER_READ * week_reads.ROLLOVER_ROUNDS)
+    record = _step(engine, monkeypatch, [starter(), questionable()], writer, at=_PASS + timedelta(days=1))
+    kept = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert (kept.source, kept.body, kept.written_at) == (WRITTEN_SOURCE, _STALE_READ, stale.written_at)
+    assert kept.attempts == 1 + week_reads.ROLLOVER_ROUNDS  # its write, then a fall a round
+    assert f"{week_reads.ROLLOVER_ROUNDS} rounds" in record.summary
+    assert f"({week_reads.ROLLOVER_ROUNDS} held over the written read)" in record.summary
+    assert record.status == week_reads.PARTIAL and record.summary.endswith("next pass:\n  Puka Nacua")
+
+
+def _row(source: str, *, attempts: int = 1, day: date = date(2026, 10, 16)) -> StoredWeekRead:
+    sheet = starter()
+    return StoredWeekRead(
+        sheet.player_id, _SEASON, sheet.week, source, STARTER_READ, "m/x", _PASS, None, {}, 18.4, None, "first",
+        "start", day, attempts,
+    )  # fmt: skip
+
+
+def test_the_next_round_asks_every_due_read_that_did_not_land_and_stand() -> None:
+    sheet, key, today = starter(), (starter().player_id, starter().week), central_day(_PASS)
+    due = [(sheet, "rule")]
+    spend = week_reads.WeekReadSpend()
+    assert week_reads.asked_again(due, {key: _row(FACTS_SOURCE)}, spend, _PASS) == [(sheet, "unwritten")]
+    assert week_reads.asked_again(due, {}, spend, _PASS) == [(sheet, "unwritten")]
+    held = _row(WRITTEN_SOURCE, attempts=2, day=today)
+    assert week_reads.asked_again(due, {key: held}, spend, _PASS) == due
+    # A status rewrite whose day's falls are spent (`cadence.STATUS_REWRITES_A_DAY`) waits for the next day.
+    spent = _row(WRITTEN_SOURCE, attempts=1 + 3, day=today)
+    assert week_reads.asked_again([(sheet, "status")], {key: spent}, spend, _PASS) == []
+    assert week_reads.asked_again([(sheet, "status")], {key: held}, spend, _PASS) == [(sheet, "status")]
+    spend.written_reads.add(key)
+    assert week_reads.asked_again(due, {key: held}, spend, _PASS) == []
+    spend.written_reads.clear()
+    spend.superseded.add(key)  # another pass replaced the row meanwhile: left to the cadence
+    assert week_reads.asked_again(due, {key: held}, spend, _PASS) == []
+
+
+def test_the_dry_pass_says_what_it_would_ask_and_asks_and_writes_nothing(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    _stale_puka(engine)
+    before = _reads(engine)
+    monkeypatch.setattr(week_reads, "NIGHTLY_BUDGET_USD", week_reads.worst_read_usd(_PRICE) + 0.0001)
+    lines: list[str] = []
+    facts: Callable[..., tuple[()]] = lambda _conn, _now: ()  # noqa: E731 - the facts pass the stubs ignore
+    night = _PASS + timedelta(days=1)
+    record = week_reads.dry_week_read_step(engine, night, lines.append, facts, _PRICE)  # type: ignore[arg-type]
+    assert record.status == week_reads.DRY and _reads(engine) == before
+    assert "nothing asked or written; 1 reads due (rule 1), at least 1 admitted under $0.00" in record.summary
+    assert record.summary.endswith("in the order asked:\n  Puka Nacua (rule)") and lines == [
+        f"week-reads dry: {record.summary}"
+    ]
+
+
+def test_a_pass_admits_reads_at_their_worst_case_until_the_budget_cannot_take_another() -> None:
+    assert week_reads.admitted_at_worst(268, 2.50, 0.0033) == 268  # noqa: PLR2004 - the 2026-10-29 scratch night
+    assert week_reads.admitted_at_worst(10, 0.01, 0.0033) == 3  # noqa: PLR2004
+    assert week_reads.admitted_at_worst(5, 0.0, 0.0) == 5  # noqa: PLR2004 - no list price: nothing to hold them

@@ -57,7 +57,7 @@ from research.nightly.r2 import run_store
 from research.nightly.run import STEPS, RunDeps, RunOptions, run_nightly
 from research.nightly.run_store import RunStore
 from research.nightly.schema_gate import schema_gate
-from research.nightly.week_reads import run_week_read_step
+from research.nightly.week_reads import dry_price, dry_week_read_step, run_week_read_step
 from research.pipeline.commands import now_ms
 from research.pipeline.http import LiveFetcher
 from research.web_contract import contract_dir
@@ -157,10 +157,16 @@ def _contract(args: argparse.Namespace) -> int:
 
 
 def _week_reads(args: argparse.Namespace) -> int:
-    """The week-ahead read pass alone, on its own facts pass at now (`--hourly`: the hourly pass's terms)."""
+    """The week-ahead read pass alone, on its own facts pass at now or `--at` (`--hourly`: the hourly pass's
+    terms; `--dry`: what it would ask, nothing asked or written, Lane 293)."""
     engine = make_engine(database_url_from_env(DATABASE_VARIABLE))
+    now = now_ms() if args.at is None else datetime.fromisoformat(args.at)
     try:
-        record = run_week_read_step(engine, now_ms(), _line, night_facts(engine), hourly=args.hourly)
+        if args.dry:
+            price = dry_price(os.environ)
+            record = dry_week_read_step(engine, now, _line, night_facts(engine), price, hourly=args.hourly)
+        else:
+            record = run_week_read_step(engine, now, _line, night_facts(engine), hourly=args.hourly)
     finally:
         engine.dispose()
     _line(f"{record.name}: {record.status}, {record.summary}")
@@ -192,6 +198,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     contract.add_argument("--run-id", required=True)
     week_reads = commands.add_parser("week-reads", help="write every board player's week-ahead read that is due now")
     week_reads.add_argument("--hourly", action="store_true", help="only the reads a status or projection moved")
+    week_reads.add_argument("--dry", action="store_true", help="say what the pass would ask; ask and write nothing")
+    week_reads.add_argument("--at", default=None, help="the instant the pass runs as of (ISO, development)")
     args = parser.parse_args(argv)
     configure_logging(logging.WARNING)
     commands_by_name = {
