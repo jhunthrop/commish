@@ -133,12 +133,14 @@ def demote_shared_keeping(  # noqa: PLR0913 - the pass's parts
             week_order = [*order, *sorted(pid for pid in reads if pid not in order)]
             for player_id, _ in week_demotions(shared_week_sentences(reads, masks), week_order):
                 read = reads[player_id]
+                sheet = by_id.get((player_id, week))
                 earlier = _restorable(read, kept.get((player_id, week)), reads, masks)
                 if earlier is not None:
-                    row = kept_read(earlier, at)
+                    # Only a status rewrite's demotion counts toward the day's status cap (Lane 293 review, H1).
+                    moved = sheet is None or earlier.status != sheet.status.status
+                    row = kept_read(earlier, at, status_fall=moved)
                     restored.add((player_id, week))
                 else:
-                    sheet = by_id.get((player_id, week))
                     block = stored_facts_block(read) if sheet is None else render_week_facts_block(sheet)
                     row = _demoted(read, block, at)
                     demoted.add((player_id, week))

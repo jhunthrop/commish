@@ -26,6 +26,7 @@ from research.capsules.gateway import GatewayClient
 from research.capsules.gateway_ledger import ModelPrice
 from research.capsules.narrative import ShapeMasks
 from research.capsules.store import WRITTEN_SOURCE
+from research.capsules.week.cadence import central_day, status_rewrite_capped
 from research.capsules.week.collect import board_week
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.rollover import NIGHTS, ReadsDue, Rollover, next_nightly, night_of, reads_due, rollover
@@ -38,6 +39,7 @@ from research.db.url import sqlalchemy_url
 from research.nightly import week_reads
 from research.nightly.reads.schedule import ClubWeek, Game, GameState
 from research.nightly.steps import StepRecord
+from research.nightly.week_read_demotion import demote_shared_keeping
 from research.parity import databases
 from research.tests.test_week_read_rules import STARTER_READ
 from research.tests.test_week_read_store import _QUESTIONABLE_READ
@@ -622,3 +624,185 @@ def test_a_retry_model_listed_with_no_price_turns_the_retry_writer_off_with_one_
     assert "budget $2.50" in record.summary  # dollars, never calls
     warnings = [line for line in lines if "RETRY_WRITER_MODEL" in line]
     assert len(warnings) == 1 and "carries with no price" in warnings[0]
+
+
+# THE HELD REWRITES' ROUNDS AND THE DRY PASS (Lane 293).
+
+# A read written while the rules asked for the published projection, addressing the member: rule-stale since Lane 286.
+_STALE_READ = "The published projection of 11.2 points keeps him on your bench. Hold him until Sunday."
+
+
+def _stale_puka(engine: Engine) -> StoredWeekRead:
+    """The roll-over's reads, then Puka Nacua's body replaced by a rule-stale one, as on 2026-10-29."""
+    key = (starter().player_id, _BOARD_WEEK)
+    with engine.begin() as conn:
+        upsert_week_read(conn, replace(_reads(engine)[key], body=_STALE_READ))
+    return _reads(engine)[key]
+
+
+def test_a_rule_stale_rewrite_that_falls_is_asked_again_within_the_nightly_and_written(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The 2026-10-29 nightly: 404 rule-stale rewrites in one round, the 153 that fell held over the old reads and
+    never asked again within the pass. The next round asks a held rewrite under its own reason."""
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    _stale_puka(engine)
+    asked: list[str] = []
+    night = _PASS + timedelta(days=1)
+    record = _step(engine, monkeypatch, [starter(), questionable()], _Writer(fail_first=MAX_CALLS_PER_READ, asked=asked),
+                   at=night)  # fmt: skip
+    puka = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert (puka.source, puka.body, puka.reason) == (WRITTEN_SOURCE, STARTER_READ, "rule")
+    assert "1 reads due (rule 1)" in record.summary and "2 rounds" in record.summary
+    # The review's M2: held is counted a read at the pass's end, its asks apart.
+    assert "(0 held over the written read)" in record.summary and "2 rounds (1 asks held over a" in record.summary
+    assert record.status == "ran" and all("Puka Nacua" in who for who in asked)
+    assert "every due read written" in record.summary
+
+
+def _on(sheets: Sequence[WeekSheet], at: datetime) -> list[WeekSheet]:
+    """The sheets as a pass at `at` reads them, stamped at its instant (the review's M3: a fall is counted on the
+    sheet's Central day, so a test of the day's cap puts the sheets on the pass's day)."""
+    return [replace(sheet, written_at=at) for sheet in sheets]
+
+
+# A nightly at 00:30 CDT on Sunday 18 October, and that day's 10:30 CDT hourly pass.
+_NIGHT = datetime(2026, 10, 18, 5, 30, tzinfo=UTC)
+_MORNING = datetime(2026, 10, 18, 15, 30, tzinfo=UTC)
+
+
+def test_a_rule_stale_rewrite_that_falls_every_round_keeps_the_old_read_and_is_named(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    stale = _stale_puka(engine)
+    writer = _Writer(fail_first=MAX_CALLS_PER_READ * week_reads.ROLLOVER_ROUNDS)
+    record = _step(engine, monkeypatch, _on([starter(), questionable()], _NIGHT), writer, at=_NIGHT)
+    kept = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert (kept.source, kept.body, kept.written_at) == (WRITTEN_SOURCE, _STALE_READ, stale.written_at)
+    # The review's H1: the day marked attempted, no status fall counted.
+    assert (kept.attempt_day, kept.attempts) == (central_day(_NIGHT), 1)
+    assert f"{week_reads.ROLLOVER_ROUNDS} rounds ({week_reads.ROLLOVER_ROUNDS} asks held" in record.summary
+    assert "(1 held over the written read)" in record.summary
+    assert record.status == week_reads.PARTIAL and record.summary.endswith("next pass:\n  Puka Nacua")
+
+
+def test_a_rule_stale_night_never_takes_a_status_rewrite_later_that_day(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review's H1: three rule-stale falls at 00:30 CT, then his status moves; the 10:30 CT pass rewrites it."""
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    _stale_puka(engine)
+    lost = _Writer(fail_first=MAX_CALLS_PER_READ * week_reads.ROLLOVER_ROUNDS)
+    _step(engine, monkeypatch, _on([starter(), questionable()], _NIGHT), lost, at=_NIGHT)
+    moved = _on([replace(starter(), status=Status("questionable", REPORT)), questionable()], _MORNING)
+    hour = _step(engine, monkeypatch, moved, _Writer(), hourly=True, at=_MORNING)
+    puka = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert "1 reads due (status 1)" in hour.summary and "every due read written" in hour.summary
+    assert (puka.status, puka.body, puka.reason) == ("questionable", STARTER_READ, "status")
+
+
+def test_a_later_round_never_asks_a_read_another_pass_wrote_between_rounds(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review's M1: Puka's rule-stale rewrite falls in round 1; before round 2 an hourly pass writes his read
+    from newer facts. Round 2 leaves it standing and asks him no more."""
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    stale = _stale_puka(engine)
+    hourly = replace(stale, body=STARTER_READ, written_at=_NIGHT + timedelta(minutes=30), reason="status")
+    real = demote_shared_keeping
+
+    def demote_then_hourly(*args: Any, **kwargs: Any) -> Any:
+        demotion = real(*args, **kwargs)
+        with engine.begin() as conn:
+            upsert_week_read(conn, hourly)
+        return demotion
+
+    monkeypatch.setattr(week_reads, "demote_shared_keeping", demote_then_hourly)
+    asked: list[str] = []
+    writer = _Writer(fail_first=MAX_CALLS_PER_READ * week_reads.ROLLOVER_ROUNDS, asked=asked)
+    record = _step(engine, monkeypatch, _on([starter(), questionable()], _NIGHT), writer, at=_NIGHT)
+    stood = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert len(asked) == MAX_CALLS_PER_READ and "1 rounds" in record.summary
+    assert (stood.body, stood.written_at) == (STARTER_READ, hourly.written_at)
+
+
+def _row(source: str, *, attempts: int = 1, day: date = date(2026, 10, 16)) -> StoredWeekRead:
+    sheet = starter()
+    return StoredWeekRead(
+        sheet.player_id, _SEASON, sheet.week, source, STARTER_READ, "m/x", _PASS, None, {}, 18.4, None, "first",
+        "start", day, attempts,
+    )  # fmt: skip
+
+
+def test_the_next_round_asks_every_due_read_that_did_not_land_and_stand() -> None:
+    sheet, key, today = starter(), (starter().player_id, starter().week), central_day(_PASS)
+    due = [(sheet, "rule")]
+    spend = week_reads.WeekReadSpend()
+
+    def again(reads: dict[tuple[str, int], StoredWeekRead], asked: Sequence[tuple[WeekSheet, str]] = due) -> object:
+        return week_reads.asked_again(asked, reads, spend, reads)  # the rows as the pass started from them
+
+    facts = _row(FACTS_SOURCE)
+    assert again({key: facts}) == [(sheet, "unwritten")] and again({}) == [(sheet, "unwritten")]
+    held = _row(WRITTEN_SOURCE, attempts=2, day=today)
+    assert again({key: held}) == due
+    # A status rewrite the pass has lost twice is left for the day's last hourly retry (Lane 293 fix round 1).
+    twice = _row(WRITTEN_SOURCE, attempts=1 + 2, day=today)
+    assert again({key: twice}, [(sheet, "status")]) == [] and not status_rewrite_capped(twice, _PASS)
+    assert again({key: held}, [(sheet, "status")]) == [(sheet, "status")]
+    spend.written_reads.add(key)
+    assert again({key: held}) == []
+    spend.written_reads.clear()
+    # The review's M1: a row another pass wrote since this one left it (or started from it) is the cadence's.
+    hourly = replace(held, written_at=_PASS + timedelta(hours=1))
+    assert week_reads.asked_again(due, {key: hourly}, spend, {key: held}) == []
+    assert week_reads.asked_again(due, {key: hourly}, spend, {}) == []  # a first read an hourly pass wrote
+    spend.stood[key] = week_reads.row_stamp(hourly)  # this pass's own row: asked again
+    assert week_reads.asked_again(due, {key: hourly}, spend, {key: held}) == due
+
+
+def test_the_dry_pass_says_what_it_would_ask_and_asks_and_writes_nothing(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    _stale_puka(engine)
+    before = _reads(engine)
+    monkeypatch.setattr(week_reads, "NIGHTLY_BUDGET_USD", week_reads.worst_read_usd(_PRICE) + 0.0001)
+    lines: list[str] = []
+    facts: Callable[..., tuple[()]] = lambda _conn, _now: ()  # noqa: E731 - the facts pass the stubs ignore
+    night = _PASS + timedelta(days=1)
+    record = week_reads.dry_week_read_step(engine, night, lines.append, facts, _PRICE)  # type: ignore[arg-type]
+    assert record.status == week_reads.DRY and _reads(engine) == before
+    assert "nothing asked or written; 1 reads due (rule 1), at least 1 admitted under $0.00" in record.summary
+    assert record.summary.endswith("in the order asked:\n  Puka Nacua (rule)") and lines == [
+        f"week-reads dry: {record.summary}"
+    ]
+
+
+def test_a_pass_admits_reads_at_their_worst_case_until_the_budget_cannot_take_another() -> None:
+    assert week_reads.admitted_at_worst(268, 2.50, 0.0033) == 268  # noqa: PLR2004 - the 2026-10-29 scratch night
+    assert week_reads.admitted_at_worst(10, 0.01, 0.0033) == 3  # noqa: PLR2004
+    assert week_reads.admitted_at_worst(5, 0.0, 0.0) == 5  # noqa: PLR2004 - no list price: nothing to hold them
+
+
+def test_a_nightly_status_rewrite_is_asked_twice_and_leaves_the_day_one_hourly_retry(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Lane 293 fix round 1: the nightly's rounds ask a status rewrite at most twice, so a rewrite both rounds lose
+    keeps the written read with one of the day's three status falls left; the next hourly pass asks it, and once
+    that one falls too the day's cap holds every later pass (the review's M3: the sheets on the pass's day)."""
+    _step(engine, monkeypatch, [starter(), questionable()], _Writer())
+    moved = [replace(starter(), status=Status("questionable", REPORT)), questionable()]
+    asked: list[str] = []
+    failing = _Writer(fail_first=MAX_CALLS_PER_READ * 9, asked=asked)
+    record = _step(engine, monkeypatch, _on(moved, _NIGHT), failing, at=_NIGHT)
+    held = _reads(engine)[(starter().player_id, _BOARD_WEEK)]
+    assert len(asked) == 2 * MAX_CALLS_PER_READ and "2 rounds" in record.summary
+    assert held.status != "questionable" and held.attempts == 1 + 2 and not status_rewrite_capped(held, _NIGHT)
+    _step(engine, monkeypatch, _on(moved, _MORNING), failing, hourly=True, at=_MORNING)
+    assert len(asked) == 3 * MAX_CALLS_PER_READ
+    assert status_rewrite_capped(_reads(engine)[(starter().player_id, _BOARD_WEEK)], _MORNING)
+    later = _MORNING + timedelta(hours=1)
+    capped = _step(engine, monkeypatch, _on(moved, later), _Writer(asked=asked), hourly=True, at=later)
+    assert len(asked) == 3 * MAX_CALLS_PER_READ and "0 reads due" in capped.summary
