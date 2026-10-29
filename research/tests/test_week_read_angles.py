@@ -439,3 +439,32 @@ def test_the_depth_line_says_the_move_and_the_fact_rule_takes_it() -> None:
         "before, and Arizona comes to town. Start him."
     )
     assert not any("depth chart" in v for v in validate_week_read(read, sheet, call="start").violations)
+
+
+_SNAP_TREND = Angle(
+    "snap_trend",
+    "Offensive snaps lately: 61% of the Rams' offensive snaps over his last three games, against 94% in his games "
+    "before them.",
+    (AngleFigure(61.0, Measure.SNAPS), AngleFigure(94.0, Measure.SNAPS)),
+    (),
+    2.5,
+    Basis(3, 120, "snaps"),
+)
+
+
+@pytest.mark.usefixtures("angles_on")
+@pytest.mark.parametrize(
+    "honest",
+    [
+        # A depth place among his club's receivers is Lane 299's, never a place among ranked peers.
+        "He is listed first among Rams receivers this week.",
+        # A trend's second figure, its measure named once in the sentence.
+        "Puka Nacua played 61% of the Rams' offensive snaps over his last three games, down from 94% before.",
+        # The angle's place said by its ordinal, and its group by its last words.
+        "Puka Nacua draws 32% of the Rams' targets, 3rd among the receivers we rank.",
+    ],
+)
+def test_an_honest_paraphrase_of_an_angle_is_not_refused(honest: str) -> None:
+    sheet = replace(_angled(), angles=(_TARGETS, _SNAP_TREND))
+    result = validate_week_read(f"{honest} Start him in week 6 of 2026 against Arizona.", sheet, call="start")
+    assert not any("angle" in v or "among his peers" in v for v in result.violations), result.violations

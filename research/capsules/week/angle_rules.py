@@ -43,7 +43,16 @@ _PERCENT_AFTER: Final = re.compile(r"^(?:%|\s+percent\b)", re.IGNORECASE)
 _PLACE: Final = re.compile(
     r"\b(?:the\s+)?((?:\d+(?:st|nd|rd|th)-|second-|third-)?(?:highest|lowest|deepest|shortest))\b", re.IGNORECASE
 )
-_ORDINAL_AMONG: Final = re.compile(r"\b(\d+(?:st|nd|rd|th)|first|second|third)\s+among\b", re.IGNORECASE)
+# "6th among the receivers we rank": a digit ordinal among his ranked peers (a word ordinal among his club's backs,
+# "first among Colts backs", is his place on the depth chart, Lane 299's to judge).
+_ORDINAL_AMONG: Final = re.compile(r"\b(\d+(?:st|nd|rd|th))\s+among\b(?=[^.]*\bwe\s+rank\b)", re.IGNORECASE)
+# "the most among the receivers we rank": the plain words for a high or low end, among his ranked peers.
+_END_AMONG: Final = re.compile(r"\bthe\s+(most|fewest|least)\b(?=[^.]*\bamong\b[^.]*\bwe\s+rank\b)", re.IGNORECASE)
+_END_SYNONYMS: Final = {
+    "most": ("highest", "deepest"),
+    "fewest": ("lowest", "shortest"),
+    "least": ("lowest", "shortest"),
+}
 _AMONG_RANKED: Final = re.compile(r"\bamong\s+(?:all\s+)?(?:the\s+)?([a-z][a-z ]*?)\s+we\s+rank\b", re.IGNORECASE)
 # What makes a superlative a place among peers, not a plain word ("his highest game" is his own figure's).
 _PEERS: Final = re.compile(r"\bamong\b|\bwe rank\b|\bof the week\b|\bin the league\b|\bon our board\b", re.IGNORECASE)
@@ -77,7 +86,8 @@ _SAY_ITS_MEASURE: Final = (
 
 
 def _figure_violation(raw: str, value: float, before: str, after: str, sheet: WeekSheet) -> str | None:
-    """Why one stated figure misnames an angle's figure, or None."""
+    """Why one stated figure misnames an angle's figure, or None. Its measure is named in its clause, or, with
+    no other measure in its clause, anywhere in its sentence ("61% of the snaps lately, down from 94% before")."""
     figures = _figures(sheet)
     percent = raw.endswith("%") or bool(_PERCENT_AFTER.match(after))
     if percent:
@@ -94,7 +104,8 @@ def _figure_violation(raw: str, value: float, before: str, after: str, sheet: We
             shares = [f for f in figures if f.percent and f.value == value]
             return None if not shares else f'states "{raw}", an angle\'s share, as a count'
     named = _named(_clause(before, after))
-    if any(f.measure in named for f in matching):
+    measures = {f.measure for f in matching}
+    if named & measures or (not named - measures and _named(before + after) & measures):
         return None
     said = ", ".join(sorted(named)) or "no measure"
     return f'names "{raw}" as {said}, where the angle that states it measures {matching[0].measure}'
@@ -129,6 +140,14 @@ def _remedy(sheet: WeekSheet) -> str:
     return "Say his place among his peers only as his angles do: " + "; ".join(f'"{p}"' for p in said) + "."
 
 
+def _group_stated(said: str, groups: set[str]) -> bool:
+    """Whether "among the <said> we rank" is an angle's group, its position said in full or by its last words
+    ("receivers" for "wide receivers")."""
+    said = said.lower().strip()
+    stated = (g.removeprefix("among the ").removesuffix(" we rank") for g in groups)
+    return any(g == said or g.endswith(f" {said}") for g in stated)
+
+
 def place_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
     """Each place among his peers no angle on the sheet states, in its words and its group."""
     words, groups = _stated_places(sheet)
@@ -137,10 +156,13 @@ def place_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
         bad = [
             m.group(0) for m in _PLACE.finditer(s) if _PEERS.search(s[m.end() :]) and m.group(1).lower() not in words
         ]
-        bad += [m.group(0) for m in _ORDINAL_AMONG.finditer(s)]
         bad += [
-            m.group(0) for m in _AMONG_RANKED.finditer(s) if f"among the {m.group(1).lower()} we rank" not in groups
+            m.group(0)
+            for m in _ORDINAL_AMONG.finditer(s)
+            if not {f"{m.group(1).lower()}-highest", f"{m.group(1).lower()}-deepest"} & words
         ]
+        bad += [m.group(0) for m in _END_AMONG.finditer(s) if not set(_END_SYNONYMS[m.group(1).lower()]) & words]
+        bad += [m.group(0) for m in _AMONG_RANKED.finditer(s) if not _group_stated(m.group(1), groups)]
         if bad:
             quoted = ", ".join(f'"{b}"' for b in dict.fromkeys(bad))
             out.append(_violation(f"places him among his peers as no angle does ({quoted})", s, _remedy(sheet)))

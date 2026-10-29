@@ -70,11 +70,12 @@ def _game_line(sheet: WeekSheet) -> str:
 
 
 def _report(sheet: WeekSheet) -> str:
-    """The injury report as the sheet names it. On a sheet with angles (Lane 300, fix round 1) this week's report is
-    "this week's game status report": an angle-led read names no week before it, so the report's "week 8's" was the
-    first week named and went without its season (11 of the angles arm's falls in pair d)."""
+    """The injury report as the sheet names it. With the angles on (Lane 300, fix rounds 1 and 2) this week's
+    report is "this week's game status report": the angles' sheet drops the generic lines that named the season
+    first, so the report's "week 8's" was the first week a read named and went without its season (11 of the
+    angles arm's falls in pair d, 9 in pair f on the sheets the minimum score left with no angle)."""
     words = report_words(sheet.status, sheet.written_at, sheet.game)
-    if angles_on() and sheet.angles and sheet.game is not None and sheet.game.week == sheet.week:
+    if angles_on() and sheet.game is not None and sheet.game.week == sheet.week:
         return words.replace(f"week {sheet.week}'s game status report", "this week's game status report")
     return words
 
