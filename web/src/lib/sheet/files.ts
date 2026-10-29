@@ -1,6 +1,7 @@
 /** Getting a sheet into and out of the browser as a file. */
 import { CSV_MAX_BYTES, csvFileName, encodeCsv } from './csv.ts';
 import type { Sheet } from './model.ts';
+import { SHEET_IMPORT } from './words.ts';
 
 /** Hands the sheet to the browser as a CSV download. */
 export function downloadCsv(sheet: Sheet): void {
@@ -20,6 +21,6 @@ export class FileTooLargeError extends Error {}
 
 /** A chosen file's text, refused past the API's limit so a file that works here works there. */
 export async function readCsvFile(file: File): Promise<string> {
-	if (file.size > CSV_MAX_BYTES) throw new FileTooLargeError('That file is over 1 MB');
+	if (file.size > CSV_MAX_BYTES) throw new FileTooLargeError(SHEET_IMPORT.tooLarge);
 	return file.text();
 }

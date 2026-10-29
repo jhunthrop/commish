@@ -10,7 +10,8 @@
  * in rank order, each skipped line's reason), which the phone reads before it sends a file. Written by export-parity.ts
  * beside the others. */
 import { CsvHeaderError, decodeCsv, encodeCsv } from '../../web/src/lib/sheet/csv.ts';
-import { DEFAULT_SHEET_NAME, SHEET_LIMITS } from '../../web/src/lib/sheet/limits.ts';
+import { SHEET_LIMITS } from '../../web/src/lib/sheet/limits.ts';
+import { SHEET } from '../../web/src/lib/sheet/words.ts';
 import type { SheetPlayer, SheetRow } from '../../web/src/lib/sheet/model.ts';
 import { looksLikeCsv, nameIndex, readList } from '../../web/src/lib/sheet/paste.ts';
 import { statusWords, type StatusFacts } from '../../web/src/lib/sheet/status.ts';
@@ -240,7 +241,7 @@ function readOf(text: string): {
 export function renderSheet(about: string): string {
 	const sheet = {
 		about,
-		defaultName: DEFAULT_SHEET_NAME,
+		defaultName: SHEET.defaultName,
 		limits: SHEET_LIMITS,
 		rows: SHEET_ROWS,
 		csv: encodeCsv(SHEET_ROWS),

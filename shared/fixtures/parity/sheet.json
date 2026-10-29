@@ -353,7 +353,7 @@
 	"reads": [
 		{
 			"text": "1. Puka Nacua\n2. Ja'Marr Chase, WR",
-			"header": "The first line must name rank, player_id, name and position",
+			"header": "The first row must name rank, player_id, name and position",
 			"ids": [],
 			"skipped": []
 		},
@@ -365,7 +365,7 @@
 		},
 		{
 			"text": "name,team\nJa'Marr Chase,CIN\n",
-			"header": "The first line must name rank, player_id, name and position",
+			"header": "The first row must name rank, player_id, name and position",
 			"ids": [],
 			"skipped": []
 		},
@@ -395,7 +395,7 @@
 			"skipped": [
 				{
 					"line": 4,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				},
 				{
 					"line": 5,
@@ -452,7 +452,7 @@
 				},
 				{
 					"line": 7,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				},
 				{
 					"line": 8,
@@ -468,7 +468,7 @@
 				},
 				{
 					"line": 12,
-					"reason": "This line is not valid CSV"
+					"reason": "This row is not valid CSV"
 				}
 			]
 		}
@@ -606,7 +606,7 @@
 			"skipped": [
 				{
 					"line": 7,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				}
 			]
 		},
@@ -637,7 +637,7 @@
 			"skipped": [
 				{
 					"line": 2,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				}
 			]
 		},
@@ -653,15 +653,15 @@
 			"skipped": [
 				{
 					"line": 2,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				},
 				{
 					"line": 4,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				},
 				{
 					"line": 5,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				},
 				{
 					"line": 6,
@@ -699,11 +699,11 @@
 			"skipped": [
 				{
 					"line": 3,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				},
 				{
 					"line": 5,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				}
 			]
 		},
@@ -716,11 +716,11 @@
 			"skipped": [
 				{
 					"line": 2,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				},
 				{
 					"line": 3,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				}
 			]
 		},
@@ -741,11 +741,11 @@
 				},
 				{
 					"line": 7,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				},
 				{
 					"line": 9,
-					"reason": "This player is already on an earlier line"
+					"reason": "This player is already on an earlier row"
 				}
 			]
 		},

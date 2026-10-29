@@ -16,6 +16,7 @@
 	import type { SheetRow } from './model.ts';
 	import { sheetStore } from './store.svelte.ts';
 	import { FIXED_TAGS, ownTags, sameTag, tagLabel, tagTone } from './tags.ts';
+	import { SHEET } from './words.ts';
 
 	/**
 	 * The board's sheet rail: the top of your sheet with faces, filtered by a tag when you pick
@@ -69,9 +70,9 @@
 	}
 </script>
 
-<Panel as="aside" label="Your sheet">
+<Panel as="aside" label={SHEET.yourSheet}>
 	<h3 class="head">
-		<span>Your sheet</span>{#if aside}<Label>{aside}</Label>{/if}
+		<span>{SHEET.yourSheet}</span>{#if aside}<Label>{aside}</Label>{/if}
 	</h3>
 	{#if sheetStore.loaded && rows.length === 0}
 		<p class="none">No one yet</p>
@@ -99,7 +100,7 @@
 	</ol>
 	{#if tagsInUse.length > 0 || hasNotes}
 		<div class="tags">
-			<ChipGroup label="Show" variant="loose">
+			<ChipGroup label={SHEET.show} variant="loose">
 				{#each tagsInUse as tag (tag)}
 					<Chip
 						size="sm"
@@ -109,8 +110,11 @@
 					>
 				{/each}
 				{#if hasNotes}
-					<Chip size="sm" label="Show Notes" pressed={filter === NOTES} onclick={() => pick(NOTES)}
-						>Notes</Chip
+					<Chip
+						size="sm"
+						label={SHEET.showNotes}
+						pressed={filter === NOTES}
+						onclick={() => pick(NOTES)}>{SHEET.notes}</Chip
 					>
 				{/if}
 			</ChipGroup>

@@ -6,8 +6,8 @@ package app.trycommish.core.sheet
  * position in any order and case, a bad row is skipped with its reason, and the players kept are counted.
  * The import sends nothing the web's panel would not let replace a sheet: a file whose header cannot be
  * used is refused with its sentence, and one that reads no player with what it skipped. A list of names is not
- * read here: the API reads it (Lane 278). The web's reasons
- * say "line" where the phone says "row" (SheetWords).
+ * read here: the API reads it (Lane 278). The reasons with no slot are the generated Words.SheetImport's,
+ * which say "row" on the web, the API and the phone (Lane 283).
  */
 object SheetCsv {
     /** The header could not be used: the web's (and the API's) sentence. */

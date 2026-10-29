@@ -12,6 +12,7 @@
 	import type { SheetRow } from './model.ts';
 	import { nameIndex, readPaste, type NameIndex } from './paste.ts';
 	import type { SheetStore } from './store.svelte.ts';
+	import { SHEET_IMPORT } from './words.ts';
 
 	interface Props {
 		store: SheetStore;
@@ -23,7 +24,6 @@
 
 	/** How many skipped lines the preview names before it counts the rest. */
 	const SKIPS_SHOWN = 12;
-	const PASTE_EXAMPLE = "1. Puka Nacua\n2. Ja'Marr Chase, WR";
 
 	let pasted = $state('');
 	let read = $state.raw<CsvRead | null>(null);
@@ -40,7 +40,7 @@
 				board.flatMap((player) => (player.headshot ? [[player.id, player.headshot]] : []))
 			);
 		} catch {
-			problem = 'Our board did not load, so a list of names cannot be read yet';
+			problem = SHEET_IMPORT.boardNotLoaded;
 		}
 	}
 
@@ -54,14 +54,14 @@
 		try {
 			const result = run();
 			if (result === 'needs-board') {
-				problem = 'Our board is still loading';
+				problem = SHEET_IMPORT.boardLoading;
 				return false;
 			}
 			read = { ...result, rows: withFaces(result.rows) };
 			return true;
 		} catch (error) {
 			read = null;
-			problem = error instanceof CsvHeaderError ? error.message : 'That file does not read as CSV';
+			problem = error instanceof CsvHeaderError ? error.message : SHEET_IMPORT.unreadable;
 			return false;
 		}
 	}
@@ -73,7 +73,7 @@
 			return settle(() => decodeCsv(text));
 		} catch (error) {
 			read = null;
-			problem = error instanceof Error ? error.message : 'That file did not open';
+			problem = error instanceof Error ? error.message : SHEET_IMPORT.didNotOpen;
 			return false;
 		}
 	}
@@ -93,29 +93,29 @@
 		onclose();
 	}
 
-	const verb = $derived(store.sheet.rows.length > 0 ? 'Replace my sheet' : 'Use this sheet');
+	const verb = $derived(store.sheet.rows.length > 0 ? SHEET_IMPORT.replace : SHEET_IMPORT.use);
 </script>
 
-<Panel as="section" label="Import">
+<Panel as="section" label={SHEET_IMPORT.head}>
 	<div class="import">
 		<div class="sources">
 			<div class="file">
-				<Label>A CSV file</Label>
+				<Label>{SHEET_IMPORT.fileLabel}</Label>
 				<FilePick
-					label="Choose a CSV"
+					label={SHEET_IMPORT.chooseFile}
 					accept=".csv,text/csv"
-					empty="No file chosen"
+					empty={SHEET_IMPORT.noFile}
 					onpick={onFile}
 				/>
 			</div>
 			<Field
-				label="Or paste a CSV or a list of names, one per line"
+				label={SHEET_IMPORT.pasteLabel}
 				multiline
 				mono
 				rows={6}
 				bind:value={pasted}
 				oninput={(text: string) => void onPaste(text)}
-				placeholder={PASTE_EXAMPLE}
+				placeholder={SHEET_IMPORT.pasteExample}
 			/>
 		</div>
 		{#if problem}<p class="problem" role="alert">{problem}</p>{/if}
@@ -137,7 +137,7 @@
 		{/if}
 		<div class="actions">
 			<Verb onclick={use} disabled={!read || read.rows.length === 0}>{verb}</Verb>
-			<Quiet onclick={onclose}>Cancel</Quiet>
+			<Quiet onclick={onclose}>{SHEET_IMPORT.cancel}</Quiet>
 		</div>
 	</div>
 </Panel>

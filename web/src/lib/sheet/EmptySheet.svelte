@@ -10,6 +10,7 @@
 	import type { OurBoardState } from './our-board.svelte.ts';
 	import { FORMAT_LABELS } from './format.ts';
 	import type { BoardFormat } from './model.ts';
+	import { SHEET } from './words.ts';
 
 	/**
 	 * A sheet with no one on it: the first players "Start from our board" would put on it, with
@@ -41,13 +42,13 @@
 	);
 </script>
 
-<Panel as="section" label="Start your sheet">
+<Panel as="section" label={SHEET.startHead}>
 	<div class="start">
 		<div class="preview">
 			{#if boardState === 'none'}
 				<p class="gone">Our {FORMAT_LABELS[format]} board is not out yet</p>
 			{:else if boardState === 'failed'}
-				<p class="gone">Our board did not load. Try again in a moment</p>
+				<p class="gone">{SHEET.boardFailed}</p>
 			{:else}
 				<Label>Our {FORMAT_LABELS[format]} board, best first</Label>
 			{/if}
@@ -72,10 +73,10 @@
 		<div class="verbs">
 			<!-- With no board for this format, importing is the one thing left to do. -->
 			{#if boardState === 'none'}
-				<Verb size="lg" onclick={onimport}>Import a sheet</Verb>
+				<Verb size="lg" onclick={onimport}>{SHEET.importSheet}</Verb>
 			{:else}
-				<Verb size="lg" disabled={starting} onclick={onstart}>Start from our board</Verb>
-				<Quiet size="lg" onclick={onimport}>Import a sheet</Quiet>
+				<Verb size="lg" disabled={starting} onclick={onstart}>{SHEET.start}</Verb>
+				<Quiet size="lg" onclick={onimport}>{SHEET.importSheet}</Quiet>
 			{/if}
 			{#if problem}<p class="problem" role="alert">{problem}</p>{/if}
 		</div>

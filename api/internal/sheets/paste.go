@@ -35,7 +35,7 @@ const (
 
 	reasonNoPlayer    = "No player on our board has this name"
 	reasonTwoPlayers  = "Two players share this name. Add his position after a comma"
-	reasonRepeat      = "This player is already on an earlier line"
+	reasonRepeat      = "This player is already on an earlier row"
 	reasonSharedCity  = "Two clubs share this city. Write the club, like %s"
 	reasonSheetIsFull = "A sheet holds at most %d players"
 )

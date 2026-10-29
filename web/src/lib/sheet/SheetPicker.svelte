@@ -6,6 +6,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import { FORMAT_LABELS } from './format.ts';
 	import type { SheetStore } from './store.svelte.ts';
+	import { SHEET } from './words.ts';
 
 	/** Your sheets: the account's (open, start, delete) and any saved in this browser that are not
 	 * on the account yet (open, signed out). */
@@ -30,7 +31,7 @@
 	}
 </script>
 
-<Panel as="section" label="Your sheets">
+<Panel as="section" label={SHEET.yourSheets}>
 	<ul>
 		{#each store.sheets as sheet (sheet.id)}
 			<li class:current={sheet.id === current}>
@@ -40,13 +41,15 @@
 				</span>
 				<span class="tools">
 					{#if sheet.id !== current}
-						<Quiet size="sm" onclick={() => void open(sheet.id)}>Open</Quiet>
+						<Quiet size="sm" onclick={() => void open(sheet.id)}>{SHEET.openSheet}</Quiet>
 					{/if}
 					{#if confirming === sheet.id}
-						<Quiet size="sm" onclick={() => void store.deleteSheet(sheet.id)}>Delete it</Quiet>
-						<Quiet size="sm" onclick={() => (confirming = null)}>Keep it</Quiet>
+						<Quiet size="sm" onclick={() => void store.deleteSheet(sheet.id)}
+							>{SHEET.deleteIt}</Quiet
+						>
+						<Quiet size="sm" onclick={() => (confirming = null)}>{SHEET.keepIt}</Quiet>
 					{:else}
-						<Quiet size="sm" onclick={() => (confirming = sheet.id)}>Delete</Quiet>
+						<Quiet size="sm" onclick={() => (confirming = sheet.id)}>{SHEET.deleteSheet}</Quiet>
 					{/if}
 				</span>
 			</li>
@@ -66,7 +69,7 @@
 							onclick={() => {
 								store.openShelved(index);
 								onclose();
-							}}>Open</Quiet
+							}}>{SHEET.openSheet}</Quiet
 						>
 					</span>
 				{/if}
@@ -75,9 +78,9 @@
 	</ul>
 	<div class="foot">
 		{#if store.signedIn}
-			<Quiet size="sm" onclick={() => void startNew()}>New sheet</Quiet>
+			<Quiet size="sm" onclick={() => void startNew()}>{SHEET.newSheet}</Quiet>
 		{/if}
-		<Quiet size="sm" onclick={onclose}>Done</Quiet>
+		<Quiet size="sm" onclick={onclose}>{SHEET.done}</Quiet>
 	</div>
 </Panel>
 

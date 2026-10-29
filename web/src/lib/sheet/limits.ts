@@ -21,6 +21,3 @@ export const SHEET_LIMITS = {
 export function characterCount(text: string): number {
 	return Array.from(text).length;
 }
-
-/** The name a sheet starts with. */
-export const DEFAULT_SHEET_NAME = 'My sheet';

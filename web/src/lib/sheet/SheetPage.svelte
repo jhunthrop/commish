@@ -14,7 +14,7 @@
 	import type { HeadMarkup } from '#lib/site/head.ts';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { sectionHref } from '#lib/ui/nav.ts';
+	import { MOCK_VERB, sectionHref } from '#lib/ui/nav.ts';
 	import { POSITIONS, type Position } from '#lib/types/player.ts';
 	import { fileDirectory } from './directory.ts';
 	import EmptySheet from './EmptySheet.svelte';
@@ -29,6 +29,8 @@
 	import { statusWords } from './status.ts';
 	import { sheetStore as store } from './store.svelte.ts';
 	import { FIXED_TAGS, ownTags, sameTag, tagLabel } from './tags.ts';
+	import { PRINT_WORDS } from './print-words.ts';
+	import { SHEET } from './words.ts';
 
 	interface Props {
 		/** The rail's week item, named at build in season (server/build-week.ts, Lane 143, B126). */
@@ -121,7 +123,7 @@
 			}
 			store.replace(board.slice(0, SHEET_LIMITS.rows).map(rowFor), format);
 		} catch {
-			boardProblem = 'Our board did not load. Try again in a moment';
+			boardProblem = SHEET.boardFailed;
 		} finally {
 			starting = false;
 		}
@@ -143,7 +145,7 @@
 		if (isTyping(event.target) || !store.canUndo) return;
 		event.preventDefault();
 		store.undo();
-		announcement = 'Undone';
+		announcement = SHEET.undone;
 	}
 
 	function pickTag(value: string): void {
@@ -163,18 +165,18 @@
 
 {#snippet sheetTools()}
 	{#if store.signedIn || store.stored.shelf.length > 0}
-		<Quiet size="sm" onclick={() => togglePanel('sheets')}>Your sheets</Quiet>
+		<Quiet size="sm" onclick={() => togglePanel('sheets')}>{SHEET.yourSheets}</Quiet>
 	{/if}
 	{#if rows.length > 0}
-		<Quiet size="sm" onclick={() => togglePanel('import')}>Import</Quiet>
-		<Quiet size="sm" onclick={() => downloadCsv(sheet)}>Export CSV</Quiet>
-		<Quiet size="sm" href={resolve('/sheet/print')}>Print</Quiet>
+		<Quiet size="sm" onclick={() => togglePanel('import')}>{SHEET.importTool}</Quiet>
+		<Quiet size="sm" onclick={() => downloadCsv(sheet)}>{SHEET.exportTool}</Quiet>
+		<Quiet size="sm" href={resolve('/sheet/print')}>{PRINT_WORDS.print}</Quiet>
 	{/if}
 {/snippet}
 
 <Shell
-	head={{ title: 'Your cheat sheet', markup: head }}
-	title="Cheat sheet"
+	head={{ title: SHEET.headTitle, markup: head }}
+	title={SHEET.title}
 	active="sheet"
 	{weekLabel}
 >
@@ -182,15 +184,15 @@
 		<Search
 			placeholder={rows.length > 0
 				? `Search your ${plural(rows.length, 'player')}`
-				: 'Search your sheet'}
-			label="Search your sheet"
+				: SHEET.searchSheet}
+			label={SHEET.searchSheet}
 			bind:value={query}
 		/>
 	{/snippet}
 	{#snippet tail()}
 		<!-- One solid verb per viewport: an open panel carries its own. -->
 		{#if rows.length > 0 && panel === null}
-			<Verb href={mockHref}>Start a mock draft</Verb>
+			<Verb href={mockHref}>{MOCK_VERB}</Verb>
 		{/if}
 	{/snippet}
 
@@ -199,7 +201,7 @@
 			<div class="title">
 				{#if renaming}
 					<Field
-						label="Sheet name"
+						label={SHEET.sheetName}
 						hideLabel
 						value={sheet.name}
 						maxlength={SHEET_LIMITS.sheetName}
@@ -226,14 +228,15 @@
 				 phone the sheet's own tools fold into More, so the bar is one line. -->
 			<div class="tools">
 				{#if !store.signedIn}
-					<Quiet size="sm" href={store.signInUrl(resolve('/sheet'))}>Save it to your account</Quiet>
+					<Quiet size="sm" href={store.signInUrl(resolve('/sheet'))}>{SHEET.saveToAccount}</Quiet>
 				{/if}
 				<span class="spread">{@render sheetTools()}</span>
-				{#if store.canUndo}<Quiet size="sm" key={undoKey} onclick={() => store.undo()}>Undo</Quiet
+				{#if store.canUndo}<Quiet size="sm" key={undoKey} onclick={() => store.undo()}
+						>{SHEET.undo}</Quiet
 					>{/if}
 				{#if hasSheetTools}
 					<span class="folded"
-						><Menu label="More" id="sheet-tools">{@render sheetTools()}</Menu></span
+						><Menu label={SHEET.more} id="sheet-tools">{@render sheetTools()}</Menu></span
 					>
 				{/if}
 			</div>
@@ -244,7 +247,7 @@
 				{#each store.notices as notice, index (index)}
 					<li>
 						<span>{notice}</span>
-						<Quiet size="sm" onclick={() => store.dismissNotice(index)}>Got it</Quiet>
+						<Quiet size="sm" onclick={() => store.dismissNotice(index)}>{SHEET.gotIt}</Quiet>
 					</li>
 				{/each}
 			</ul>
@@ -270,14 +273,14 @@
 
 		{#if rows.length > 0}
 			<div class="filters">
-				<ChipGroup label="Position">
-					<Chip pressed={position === null} onclick={() => (position = null)}>All</Chip>
+				<ChipGroup label={SHEET.position}>
+					<Chip pressed={position === null} onclick={() => (position = null)}>{SHEET.all}</Chip>
 					{#each positionsHere as p (p)}
 						<Chip pressed={position === p} onclick={() => (position = p)}>{p}</Chip>
 					{/each}
 				</ChipGroup>
 				{#if tagsHere.length > 0 || hasNotes}
-					<ChipGroup label="Tags" variant="loose">
+					<ChipGroup label={SHEET.tags} variant="loose">
 						{#each tagsHere as tag (tag)}
 							<Chip
 								size="sm"
@@ -289,9 +292,9 @@
 						{#if hasNotes}
 							<Chip
 								size="sm"
-								label="Show Notes"
+								label={SHEET.showNotes}
 								pressed={tagFilter === NOTES}
-								onclick={() => pickTag(NOTES)}>Notes</Chip
+								onclick={() => pickTag(NOTES)}>{SHEET.notes}</Chip
 							>
 						{/if}
 					</ChipGroup>

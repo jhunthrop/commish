@@ -160,7 +160,7 @@ extension APIClient: SheetsAPI {
     }
 
     /// The API's refusal in its own words: an invalid request's sentence for the field it names (a CSV
-    /// whose first line is not the sheet's: "The first line must name rank, player_id, name and
+    /// whose first line is not the sheet's: "The first row must name rank, player_id, name and
     /// position"), else the envelope's sentence.
     static func refusal(_ envelope: Components.Schemas.Envelope) -> APIError {
         guard let error = envelope.error?.value1 else {

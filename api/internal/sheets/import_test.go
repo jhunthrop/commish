@@ -148,7 +148,7 @@ func TestImportOfAMissingSheetIs404OnBothPaths(t *testing.T) {
 func TestImportOfACSVWithAShortHeaderKeepsItsSentence(t *testing.T) {
 	repo := &recorder{}
 	code, out := postImport(t, repo, &fixedBoards{}, "text/csv", "player_id,name\nA,B\n")
-	if code != http.StatusBadRequest || !strings.HasPrefix(out.Error.Fields["body"], "The first line must name") || len(repo.replaced) != 0 {
+	if code != http.StatusBadRequest || !strings.HasPrefix(out.Error.Fields["body"], "The first row must name") || len(repo.replaced) != 0 {
 		t.Fatalf("%d %+v", code, out)
 	}
 }
