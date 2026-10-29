@@ -176,7 +176,7 @@ private suspend fun SheetViewModel.send(body: SheetImportBody) {
                     save = SheetSave.Idle,
                     pasted = "",
                     chosen = null,
-                    importing = SheetImport.Done(words(result)),
+                    importing = SheetImport.Done(words(result, body.list)),
                 ).shown(result.sheet, deps.clock.now(), false)
         }
         keep()
@@ -188,7 +188,8 @@ private suspend fun SheetViewModel.send(body: SheetImportBody) {
         return
     } catch (e: ApiFailure) {
         val said = SheetViewModel.reason(e)
-        val importing = if (e.code == READ_NOTHING) SheetImport.Done(refused(said, e.skipped.orEmpty())) else SheetImport.Open(said)
+        val readNothing = e.code == READ_NOTHING
+        val importing = if (readNothing) SheetImport.Done(refused(said, e.skipped.orEmpty(), body.list)) else SheetImport.Open(said)
         update { it.copy(importing = importing) }
     } catch (
         @Suppress("TooGenericExceptionCaught") e: Exception,
@@ -199,16 +200,23 @@ private suspend fun SheetViewModel.send(body: SheetImportBody) {
 }
 
 /** The account's answer, its reasons said with the phone's word for a line ([SheetWords.rowWords]). */
-private fun words(result: SheetImportResult): SheetImportWords =
-    SheetImportWords.of(result.imported, result.skipped.map { SheetCsv.Skip(it.line, SheetWords.rowWords(it.reason)) }, null)
+private fun words(
+    result: SheetImportResult,
+    list: String?,
+): SheetImportWords =
+    SheetImportWords.of(result.imported, result.skipped.map { SheetCsv.Skip(it.line, SheetWords.rowWords(it.reason)) }, null, list)
+
+/** The pasted list a body carries, null for a CSV. */
+private val SheetImportBody.list: String? get() = (this as? SheetImportBody.Names)?.text
 
 /** The account's refusal of a body that read to no player, in its own sentence (the sheet is as it was), with
  * each line it skipped and why, said as a CSV import's are; an older API sends none. */
 private fun refused(
     sentence: String,
     skipped: List<ImportSkip>,
+    list: String?,
 ): SheetImportWords =
-    SheetImportWords.of(0, skipped.map { SheetCsv.Skip(it.line, SheetWords.rowWords(it.reason)) }, SheetWords.rowWords(sentence))
+    SheetImportWords.of(0, skipped.map { SheetCsv.Skip(it.line, SheetWords.rowWords(it.reason)) }, SheetWords.rowWords(sentence), list)
 
 /** After an import that did not land: the sheet made for it taken off, else the account's sheet read again,
  * so the phone shows what the account holds (a failed delete leaves the made sheet shown, as it is). */

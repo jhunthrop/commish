@@ -78,6 +78,9 @@ export const SHEET_IMPORT = {
 	/** The phones' verb under an import that read no player: back to the paste box, the text kept to fix
 	 * (Lane 297). The web reads in the browser and never sends such a list. */
 	fixList: 'Fix the list',
+	/** The phones' line under a CSV that read no player and skipped no row: its header and nothing under it,
+	 * said in place of a list's shape (Lane 297 review, M2). */
+	headerOnly: 'The file has a header and no players',
 	unreadable: 'That file does not read as CSV',
 	didNotOpen: 'That file did not open',
 	tooLarge: 'That file is over 1 MB',
