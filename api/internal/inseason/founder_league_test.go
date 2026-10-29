@@ -115,14 +115,15 @@ func TestTheFoundersLeague(t *testing.T) {
 }
 
 // founderEmpty is why each of the recorded read's eight teams has no idea
-// (Lane 287's report, fix round): Roar, Stroke and RayRay need receivers
-// as he does; 3 Putt Par and The usal suspect need nothing; Fayettenam,
-// JerkinGoff and Whats my name need a quarterback he cannot spare, so
-// their ideas are dropped. Every other team lists one ("").
+// (Lane 287's report, fix round): 3 Putt Par and The usal suspect need
+// nothing; Fayettenam, JerkinGoff and Whats my name need a quarterback he
+// cannot spare, so their ideas are dropped; Roar, Stroke and RayRay need
+// receivers as he does, but the search found ideas that gained him and
+// refused them, which is the cause it names (Lane 290 review M4). Every
+// other team lists one ("").
 var founderEmpty = map[int]EmptyReason{
-	1: EmptySameNeed, 9: EmptySameNeed, 12: EmptySameNeed,
 	2: EmptyNoNeed, 6: EmptyNoNeed,
-	7: EmptyDropped, 10: EmptyDropped, 11: EmptyDropped,
+	1: EmptyDropped, 7: EmptyDropped, 9: EmptyDropped, 10: EmptyDropped, 11: EmptyDropped, 12: EmptyDropped,
 }
 
 // openedSlot is a starting slot the trade leaves short of the median team

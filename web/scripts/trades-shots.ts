@@ -196,13 +196,20 @@ async function needsPass(page: Page, where: string, theme: string, width: number
 		/^Ends \w{3} \d{1,2}:\d{2} [ap]m$/.test(head[0]?.fact ?? ''),
 		`${where} needs: the offer's expiry reads "${head[0]?.fact ?? ''}"`
 	);
+	// Best stays in sight, second, however many offers are pending (review M2).
+	check(
+		head[1]?.offer === false && head[1].mark.toLowerCase() === STRIP.best.toLowerCase(),
+		`${where} needs: the second card is ${head[1]?.top ?? 'nothing'}, not Best`
+	);
 	await page.locator('main .ideas .more').click();
 	const places = await rowPlaces(page);
 	const offers = places.filter((p) => p.offer);
 	const ideas = places.filter((p) => !p.offer && p.button);
 	const empty = places.filter((p) => !p.offer && !p.button);
 	check(
-		offers.length === 2 && offers.some((o) => !o.button && /^Answer it on \w+\.$/.test(o.fact)),
+		offers.length === 3 &&
+			offers.filter((o) => !o.button && /^Answer it on \w+\.$/.test(o.fact)).length === 2 &&
+			offers.some((o) => o.deal === TRADES.offRoster),
 		`${where} needs: offers ${offers.map((o) => `${o.top} ${o.deal} ${o.fact}`).join(' | ')}`
 	);
 	check(

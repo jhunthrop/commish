@@ -485,12 +485,13 @@ public enum Words {
         public static let noIdea = "No idea they would take."
         public static let sameNeed = "They need what you need."
         public static let noNeed = "Nothing they need from you."
-        public static let nothingFound = "No idea with this team."
+        public static let nothingFound = "No idea between you."
         public static let fillsYour = "Fills your"
         public static let flexSlot = "flex"
         public static let superflexSlot = "superflex"
         public static let expires = "Ends"
         public static let noPlayer = "Nothing"
+        public static let offRoster = "With an IR or taxi player"
         public static let answerOn = "Answer it on"
     }
 

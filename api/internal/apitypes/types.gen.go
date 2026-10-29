@@ -6141,7 +6141,7 @@ type TradeSideTotals struct {
 
 // TradeTeam defines model for TradeTeam.
 type TradeTeam struct {
-	// EmptyReason why trades is empty (Lane 290, B283), absent when it lists a trade: same_need when every position their needs take is one the drafter's needs take too, no_need when they have no slot short of the median team, dropped when the search found trades the drafter's lineup gains from but none they would take or that fills a need without opening one, nothing when the search found none (or, with a player asked for, none holding him). The needs are read first: they say why a team takes nothing
+	// EmptyReason why trades is empty (Lane 290, B283), absent when it lists a trade; the first that holds, in this order: no_need when they have no slot short of the median team; dropped when the search found trades the drafter's lineup gains from but none they would take or that fills a need without opening one (the search's own record of the cause); same_need when every position their needs take is one the drafter's needs take too and nothing gained him; nothing when the search found none (or, with a player asked for, none holding him)
 	EmptyReason *TradeTeamEmptyReason `json:"empty_reason,omitempty"`
 	Name        string                `json:"name"`
 
@@ -6158,7 +6158,7 @@ type TradeTeam struct {
 	Trades []TradeRow `json:"trades"`
 }
 
-// TradeTeamEmptyReason why trades is empty (Lane 290, B283), absent when it lists a trade: same_need when every position their needs take is one the drafter's needs take too, no_need when they have no slot short of the median team, dropped when the search found trades the drafter's lineup gains from but none they would take or that fills a need without opening one, nothing when the search found none (or, with a player asked for, none holding him). The needs are read first: they say why a team takes nothing
+// TradeTeamEmptyReason why trades is empty (Lane 290, B283), absent when it lists a trade; the first that holds, in this order: no_need when they have no slot short of the median team; dropped when the search found trades the drafter's lineup gains from but none they would take or that fills a need without opening one (the search's own record of the cause); same_need when every position their needs take is one the drafter's needs take too and nothing gained him; nothing when the search found none (or, with a player asked for, none holding him)
 type TradeTeamEmptyReason string
 
 // TradeTotals defines model for TradeTotals.

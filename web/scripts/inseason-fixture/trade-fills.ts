@@ -5,8 +5,9 @@
 //     gain a week times the weeks the order covers);
 //   - each team with no listed trade, its empty_reason (Lane 290, B283), with two more teams emptied so
 //     the row shows every reason a team can have;
-//   - two pending offers from the host (Lane 279): one the builder can hold, with its expiry, and one
-//     it cannot (the member's defense for their receiver; the builder takes QB, RB, WR and TE only).
+//   - three pending offers from the host (Lane 279): one the builder can hold, with its expiry, one it
+//     cannot (the member's defense for their receiver; the builder takes QB, RB, WR and TE only), and
+//     one naming a taxi squad player the rosters here do not draw (Lane 290 review H1).
 // STAND-IN, named in the lane's report: fills is the position of the first player the member gets and
 // their_fills that of the first he gives, never the search's need; the reasons are set by roster, not
 // read from any search. Only the shapes are meant to hold.
@@ -38,6 +39,8 @@ export const EMPTIED: Readonly<Record<number, TradeEmptyReason>> = {
 /** The team whose second listed trade is offered to the member, and the team asking for his defense. */
 export const OFFER_FROM = 10;
 export const TOO_BIG_FROM = 6;
+/** The host id of a member's player the rosters do not draw (a taxi squad player), on the third offer. */
+export const TAXI_STAND_IN = 'fixture-taxi-1';
 /** How long after the read the loadable offer lapses: two days. */
 const OFFER_LAPSES_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -105,6 +108,11 @@ function offersOf(advice: TradeAdvice, readAt: string): TradeOffer[] {
 						null
 					)
 				]
+			: []),
+		// A player on the member's taxi squad, whom the API keeps on the offer and the rosters here
+		// leave out (Lane 290 review H1): an id no roster line holds.
+		...(big && bigGet
+			? [offer(big, 'fixture-offer-3', [TAXI_STAND_IN], [bigGet.player.host_id], null)]
 			: [])
 	];
 }

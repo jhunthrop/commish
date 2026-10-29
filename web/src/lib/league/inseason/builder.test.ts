@@ -543,8 +543,9 @@ void test('an empty team says why by the API reason, the old line when the answe
 	assert.equal(emptyNote({ empty_reason: 'dropped' }), 'No idea they would take.');
 	assert.equal(emptyNote({ empty_reason: 'same_need' }), 'They need what you need.');
 	assert.equal(emptyNote({ empty_reason: 'no_need' }), 'Nothing they need from you.');
-	assert.equal(emptyNote({ empty_reason: 'nothing' }), 'No idea with this team.');
+	assert.equal(emptyNote({ empty_reason: 'nothing' }), 'No idea between you.');
 	assert.equal(emptyNote({}), TRADES.noIdea);
+	assert.equal(emptyNote({ empty_reason: null }), TRADES.noIdea);
 	const same = { ...team(7, 'Carried by QJs', []), empty_reason: 'same_need' as const };
 	assert.deepEqual(
 		noIdeasFrom([same]).map((n) => n.note),
@@ -597,6 +598,10 @@ void test("the host's offers head the ideas row and one tap loads the ticks and 
 	assert.ok(yahoo);
 	assert.equal(yahoo.expires, null);
 	assert.equal(yahoo.deal, 'Williams for Collins, drop Dart');
+	// The check cannot be told the host's drop (it picks its own), so an offer that requires one is
+	// answered on the host, never loaded into a verdict for another trade (review M1).
+	assert.equal(yahoo.picks, null);
+	assert.equal(yahoo.note, 'Answer it on Yahoo.');
 	const far = offerPresets(
 		[offer({ expires_at: '2026-10-30T20:00:00.000Z' })],
 		answer,
@@ -621,13 +626,38 @@ void test("the host's offers head the ideas row and one tap loads the ticks and 
 	assert.ok(oneSided);
 	assert.equal(oneSided.deal, 'Nothing for Collins');
 	assert.equal(oneSided.picks, null);
-	// A team or a player the answer does not hold leaves the offer out.
+	// A player the rosters here do not draw (injured reserve or taxi: the API keeps him on the offer)
+	// keeps the offer, said and answered on the host (review H1); so does a drop of one.
+	for (const unseen of [offer({ get: ['h-On IR'] }), offer({ drop: ['h-On Taxi'] })]) {
+		const shown = offerPresets([unseen], answer, 'espn', now, zone).at(0);
+		assert.ok(shown);
+		assert.equal(shown.deal, 'With an IR or taxi player');
+		assert.equal(shown.picks, null);
+		assert.equal(shown.note, 'Answer it on ESPN.');
+	}
+	// Only a team the answer does not hold leaves the offer out.
 	assert.deepEqual(offerPresets([offer({ roster_id: 99 })], answer, 'espn', now, zone), []);
-	assert.deepEqual(offerPresets([offer({ get: ['h-Nobody'] })], answer, 'espn', now, zone), []);
+	// An offer whose expiry has passed at the page's clock goes, as it lapses with the page open
+	// (review L2); one still to come stays.
+	const lapses = offer({ expires_at: '2026-10-16T13:00:00.000Z' });
+	assert.equal(offerPresets([lapses], answer, 'espn', now, zone).length, 1);
+	assert.equal(
+		offerPresets([lapses], answer, 'espn', Date.parse('2026-10-16T13:00:00.000Z'), zone).length,
+		0
+	);
 	// At the row's head, before our ideas and the empty teams.
 	const places = ideaPlaces(presetsFrom([muttdogs]), noIdeasFrom([team(7, 'Quiet', [])]), [made]);
 	assert.deepEqual(
 		places.map((p) => p.kind),
 		['offer', 'idea', 'none']
 	);
+	// However many offers are pending, the three cards in sight hold the newest offer and Best, the
+	// other offers after Best (review M2).
+	const rangers = team(9, 'Bower Rangers', [row({ my_gain: 1, close_for_them: false })]);
+	const many = ideaPlaces(presetsFrom([muttdogs, rangers]), [], [made, made, made]);
+	assert.deepEqual(
+		many.map((p) => (p.kind === 'idea' ? `idea ${p.preset.team.name}` : p.kind)),
+		['offer', 'idea Muttdogs', 'offer', 'offer', 'idea Bower Rangers']
+	);
+	assert.equal(many[1]?.kind === 'idea' && many[1].preset.mark, 'Best');
 });

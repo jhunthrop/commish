@@ -577,17 +577,20 @@ func Find(l TradeLeague, mine, theirs Squad) Found {
 	return Found{Trades: out, Empty: t.emptyReason(gained)}
 }
 
-// emptyReason is why a search kept no trade: the other side's needs first
-// (none, or only what the member needs too), since they say why the side
-// takes nothing; then whether any trade gained the member's lineup.
+// emptyReason is why a search kept no trade: no need of theirs first,
+// since a side with none takes nothing it does not gain from; then
+// whether any trade gained the member's lineup and was refused, which is
+// the search's own record of the cause (Lane 290 review M4: it wins over
+// a shared need, which is only a likely cause); then a need they share
+// with the member, where nothing gained him; else nothing found.
 func (t *tradeSearch) emptyReason(gained bool) EmptyReason {
 	switch {
 	case len(t.them.needs) == 0:
 		return EmptyNoNeed
-	case t.sameNeeds():
-		return EmptySameNeed
 	case gained:
 		return EmptyDropped
+	case t.sameNeeds():
+		return EmptySameNeed
 	}
 	return EmptyNothing
 }

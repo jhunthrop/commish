@@ -138,8 +138,8 @@ func emptied(team []Candidate) []Candidate {
 }
 
 // Lane 290 (B283): a team the finder lists no trade with says why, from
-// the search's own reading: no need of theirs, only the member's own
-// need, ideas that gained him and were dropped, or nothing found. Each
+// the search's own reading: no need of theirs, ideas that gained him and
+// were dropped, only the member's own need, or nothing found. Each
 // case is one change from the median league, and each reason fails when
 // its branch of emptyReason is taken out.
 func TestTheEmptyReasons(t *testing.T) {
@@ -152,7 +152,11 @@ func TestTheEmptyReasons(t *testing.T) {
 		want          EmptyReason
 	}{
 		{"they need nothing", leagueTeam(0, 5), leagueTeam(1, 5), EmptyNoNeed},
-		{"they need the receiver he needs", short(leagueTeam(0, 5), "t0-wr2"), short(leagueTeam(1, 5), "t1-wr2"), EmptySameNeed},
+		// They need the receiver he needs, and the search refused ideas that gained him: the refusal
+		// it recorded is the cause named (review M4), not the shared need.
+		{"they need what he needs, his ideas refused", short(leagueTeam(0, 5), "t0-wr2"), short(leagueTeam(1, 5), "t1-wr2"), EmptyDropped},
+		// Both need every slot and nothing of theirs gains him: the shared need.
+		{"they need what he needs, nothing gains him", emptied(leagueTeam(0, 5)), emptied(leagueTeam(1, 5)), EmptySameNeed},
 		{"his ideas open his own back", short(leagueTeam(0, 5), "t0-wr2"), short(leagueTeam(1, 5), "t1-rb2"), EmptyDropped},
 		{"no idea gains him", leagueTeam(0, 5), emptied(leagueTeam(1, 5)), EmptyNothing},
 	} {

@@ -79056,6 +79056,16 @@
 				"expires": null,
 				"picks": null,
 				"note": "Answer it on FFPC."
+			},
+			{
+				"key": "offer:fixture-offer-3",
+				"label": "Offered to you",
+				"rosterId": 6,
+				"team": "Bower Rangers",
+				"deal": "With an IR or taxi player",
+				"expires": null,
+				"picks": null,
+				"note": "Answer it on FFPC."
 			}
 		],
 		"ideas": {
@@ -79157,7 +79167,7 @@
 					"mark": null,
 					"gains": null,
 					"deal": null,
-					"note": "No idea with this team.",
+					"note": "No idea between you.",
 					"fills": null
 				},
 				{
@@ -79193,7 +79203,7 @@
 			{
 				"rosterId": 3,
 				"reason": "nothing",
-				"note": "No idea with this team."
+				"note": "No idea between you."
 			},
 			{
 				"rosterId": 11,
@@ -79210,7 +79220,7 @@
 			"dropped": "No idea they would take.",
 			"same_need": "They need what you need.",
 			"no_need": "Nothing they need from you.",
-			"nothing": "No idea with this team.",
+			"nothing": "No idea between you.",
 			"absent": "No idea they would take."
 		},
 		"fills": {

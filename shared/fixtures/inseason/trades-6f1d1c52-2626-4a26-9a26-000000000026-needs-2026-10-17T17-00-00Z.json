@@ -12697,6 +12697,21 @@
 				"host_offer_id": "fixture-offer-2",
 				"expires_at": null,
 				"read_at": "2026-10-17T16:56:00.000Z"
+			},
+			{
+				"label": "Offered to you",
+				"roster_id": 6,
+				"name": "Bower Rangers",
+				"give": [
+					"fixture-taxi-1"
+				],
+				"get": [
+					"10213"
+				],
+				"drop": [],
+				"host_offer_id": "fixture-offer-3",
+				"expires_at": null,
+				"read_at": "2026-10-17T16:56:00.000Z"
 			}
 		],
 		"basis_note_list": "two-point, missed kick, fumble recovery and safety"

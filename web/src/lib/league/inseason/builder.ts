@@ -8,10 +8,17 @@ import { listWords } from '#lib/format/list.ts';
 import { shortDay, weekdayTime } from '#lib/format/clock.ts';
 import { onReserve, type BoxRow } from '../box/box.ts';
 import { stripMark } from '../box/strip.ts';
-import { gainWord, offerText, refusalWords, shortSide, TRADES } from '../box/trades.ts';
+import {
+	finderRows,
+	gainWord,
+	offerText,
+	refusalWords,
+	shortSide,
+	TRADES,
+	worthProposing
+} from '../box/trades.ts';
 import type { LeagueHost } from '../api.ts';
 import { hostWords } from '../names.ts';
-import { tradeKey } from './state.ts';
 import type {
 	PlayerLine,
 	TradeCheck,
@@ -197,27 +204,6 @@ export function fillsWords(fills: TradeRow['fills']): string | null {
 	return `${TRADES.fillsYour} ${slot}`;
 }
 
-/** A team's first trade (the finder's best with it: the API's order inside a team is the contract,
- * Lane 287) ranked against another's by the API's own keys (inseason trades.go orderTrades): one the
- * other team gains from before a close call for them, then one that fills a member's slot, then the
- * member's gain as a page prints it. The API lists the teams in the standings' order and ranks no team
- * over another, so ties keep that order (Lane 290, B289: never the member's gain alone). */
-function teamRank(a: TradeRow, b: TradeRow): number {
-	const fills = (row: TradeRow): number => Number(row.fills !== null && row.fills !== undefined);
-	const printed = (gain: number): number => Number(fixed(gain, GAIN_DECIMALS));
-	return (
-		Number(a.close_for_them) - Number(b.close_for_them) ||
-		fills(b) - fills(a) ||
-		printed(b.my_gain) - printed(a.my_gain)
-	);
-}
-
-/** Whether a trade is one worth proposing: one the other team gains from that gains the member's
- * lineup (the strip's rule, trades.ts worthProposing). */
-function worth(row: TradeRow): boolean {
-	return !row.close_for_them && row.my_gain > 0;
-}
-
 /** How many ideas the row shows before its "N more" (Lane 268): the best three. */
 export const IDEAS_SHOWN = 3;
 
@@ -226,21 +212,18 @@ export function moreWords(hidden: number): string {
 	return `${String(hidden)} more`;
 }
 
-/** Our ideas: the finder's best trade with each team (its first, in the API's order), the teams by
- * teamRank, each one whose players can all be ticked. The lead, marked Best, is the first idea of the
- * team ranked first when it is worth proposing, so Best and the opening team agree (review L1). */
+/** Our ideas: the finder's best trade with each team (its first, in the API's order), the teams in
+ * the finder's one order (trades.ts tradeRank), each one whose players can all be ticked. The lead,
+ * marked Best, is our best trade (worthProposing's first, the strip's and the checks' too), so Best,
+ * the opening team and the strip agree (review L1, Lane 290 review M3). */
 export function presetsFrom(teams: readonly TradeTeam[]): Preset[] {
-	const loadable = teams
-		.flatMap((team) => {
-			const row = team.trades[0];
-			const picks = row === undefined ? null : builtFrom(team, row);
-			return row === undefined || picks === null
-				? []
-				: [{ key: tradeKey(team.roster_id, row), team, row, picks }];
-		})
-		.sort((a, b) => teamRank(a.row, b.row));
+	const proposed = worthProposing(teams)[0]?.key ?? null;
+	const loadable = finderRows(teams, false).flatMap((entry) => {
+		const picks = builtFrom(entry.team, entry.row);
+		return picks === null ? [] : [{ ...entry, picks }];
+	});
 	return loadable.map((entry, i) => {
-		const lead = i === 0 && worth(entry.row);
+		const lead = entry.key === proposed;
 		return {
 			key: entry.key,
 			team: entry.team,
@@ -273,8 +256,10 @@ const EMPTY_NOTES: Readonly<Record<TradeEmptyReason, string>> = {
 	nothing: TRADES.nothingFound
 };
 
-export function emptyNote(team: Pick<TradeTeam, 'empty_reason'>): string {
-	return team.empty_reason === undefined ? TRADES.noIdea : EMPTY_NOTES[team.empty_reason];
+export function emptyNote(team: { empty_reason?: TradeEmptyReason | null }): string {
+	return team.empty_reason === undefined || team.empty_reason === null
+		? TRADES.noIdea
+		: EMPTY_NOTES[team.empty_reason];
 }
 
 /** The teams with no idea, after the ideas, in the answer's order. */
@@ -285,9 +270,12 @@ export function noIdeasFrom(teams: readonly TradeTeam[]): NoIdea[] {
 }
 
 /** A trade offered to the member on the host (Lane 279), a preset at the head of the ideas row: its
- * label ("Offered to you"), the team, give for get, when it lapses, and the picks one tap loads; an
- * offer the builder cannot hold (more than two a side, a kicker or a defense) loads nothing and says
- * where to answer it. We never answer an offer: the member accepts it on the host. */
+ * label ("Offered to you"), the team, give for get, when it lapses, and the picks one tap loads. An
+ * offer the builder cannot hold loads nothing and says where to answer it (Lane 290 review H1, M1):
+ * more than two a side, a kicker or a defense, a side naming no player, a player the rosters here do
+ * not draw (injured reserve, taxi), or a drop the host requires, which the check cannot be told (it
+ * picks its own drop, so its verdict would answer another trade). We never answer an offer: the
+ * member accepts it on the host. */
 export interface OfferPreset {
 	key: string;
 	team: TradeTeam;
@@ -319,8 +307,9 @@ function offerSide(side: readonly PlayerLine[], first = true): string {
 	return first ? TRADES.noPlayer : TRADES.noPlayer.toLowerCase();
 }
 
-/** The host's offers as presets, newest first as the API sends them; an offer naming a team or a
- * player the answer does not hold is left out (the API keeps only offers on the rosters it read). */
+/** The host's offers as presets, newest first as the API sends them, each one whose host expiry is
+ * still to come at now (the page's clock, read again with each answer: an offer lapsing while the page
+ * is open goes, review L2); only an offer whose team the answer does not hold is left out. */
 export function offerPresets(
 	offers: readonly TradeOffer[],
 	answer: { teams: readonly TradeTeam[]; roster: readonly PlayerLine[] },
@@ -331,15 +320,19 @@ export function offerPresets(
 	return offers.flatMap((offer): OfferPreset[] => {
 		const team = answer.teams.find((t) => t.roster_id === offer.roster_id);
 		if (team === undefined) return [];
+		if (offer.expires_at !== null && Date.parse(offer.expires_at) <= now) return [];
 		const find = (lines: readonly PlayerLine[], ids: readonly string[]): PlayerLine[] =>
 			ids.flatMap((id) => lines.filter((l) => l.player.host_id === id));
 		const give = find(answer.roster, offer.give);
 		const get = find(team.roster, offer.get);
 		const drop = find(answer.roster, offer.drop);
-		if (give.length !== offer.give.length || get.length !== offer.get.length) return [];
+		const drawn =
+			give.length === offer.give.length &&
+			get.length === offer.get.length &&
+			drop.length === offer.drop.length;
 		const holds = (side: readonly PlayerLine[]): boolean =>
 			side.length > 0 && side.length <= MAX_A_SIDE && side.every(pickable);
-		const loadable = holds(give) && holds(get);
+		const loadable = drawn && offer.drop.length === 0 && holds(give) && holds(get);
 		const dropped =
 			drop.length === 0 ? '' : `, ${TRADES.sideDrop.toLowerCase()} ${shortSide(drop)}`;
 		return [
@@ -347,7 +340,9 @@ export function offerPresets(
 				key: `offer:${offer.host_offer_id}`,
 				team,
 				label: offer.label,
-				deal: `${offerSide(give)} for ${offerSide(get, false)}${dropped}`,
+				deal: drawn
+					? `${offerSide(give)} for ${offerSide(get, false)}${dropped}`
+					: TRADES.offRoster,
 				expires: offer.expires_at === null ? null : expiryWords(offer.expires_at, now, zone),
 				picks: loadable
 					? { team: team.roster_id, give: [...offer.give], get: [...offer.get] }
@@ -364,16 +359,22 @@ export type IdeaPlace =
 	| { kind: 'idea'; preset: Preset }
 	| { kind: 'none'; none: NoIdea };
 
-/** The ideas row's places: the host's offers first (Lane 290), then our ideas best first, then each
- * team with none (B271). */
+/** The ideas row's places (Lane 290 review M2): the host's newest offer heads the row, then our first
+ * idea (Best), then the host's other offers, then our other ideas, then each team with none (B271). So
+ * the three cards in sight before "N more" always hold the newest offer and Best however many offers
+ * are pending, and the order does not move when the rest are shown. */
 export function ideaPlaces(
 	presets: readonly Preset[],
 	none: readonly NoIdea[],
 	offers: readonly OfferPreset[] = []
 ): IdeaPlace[] {
+	const offer = (o: OfferPreset): IdeaPlace => ({ kind: 'offer', offer: o });
+	const idea = (preset: Preset): IdeaPlace => ({ kind: 'idea', preset });
 	return [
-		...offers.map((offer): IdeaPlace => ({ kind: 'offer', offer })),
-		...presets.map((preset): IdeaPlace => ({ kind: 'idea', preset })),
+		...offers.slice(0, 1).map(offer),
+		...presets.slice(0, 1).map(idea),
+		...offers.slice(1).map(offer),
+		...presets.slice(1).map(idea),
 		...none.map((entry): IdeaPlace => ({ kind: 'none', none: entry }))
 	];
 }

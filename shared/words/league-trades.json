@@ -44,12 +44,13 @@
 	"noIdea": "No idea they would take.",
 	"sameNeed": "They need what you need.",
 	"noNeed": "Nothing they need from you.",
-	"nothingFound": "No idea with this team.",
+	"nothingFound": "No idea between you.",
 	"fillsYour": "Fills your",
 	"flexSlot": "flex",
 	"superflexSlot": "superflex",
 	"expires": "Ends",
 	"noPlayer": "Nothing",
+	"offRoster": "With an IR or taxi player",
 	"answerOn": "Answer it on",
 	"functions": []
 }

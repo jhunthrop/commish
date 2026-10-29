@@ -487,12 +487,13 @@ object Words {
         const val noIdea = "No idea they would take."
         const val sameNeed = "They need what you need."
         const val noNeed = "Nothing they need from you."
-        const val nothingFound = "No idea with this team."
+        const val nothingFound = "No idea between you."
         const val fillsYour = "Fills your"
         const val flexSlot = "flex"
         const val superflexSlot = "superflex"
         const val expires = "Ends"
         const val noPlayer = "Nothing"
+        const val offRoster = "With an IR or taxi player"
         const val answerOn = "Answer it on"
     }
 
