@@ -80,6 +80,8 @@ import { proposedTrades } from './trade-needs.ts';
 import { checkWithNeeds, needsAsked, tradesWithNeeds } from './trade-fills.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
 import { servedWaivers } from './run-lines.ts';
+import { withPositions, type PanelInputs } from './positions.ts';
+import type { Projection } from './week-projection.ts';
 import { FIXTURE_DEVICES } from './devices.ts';
 import { finalWords, rateWords, titleWeekHorizon, weeksCovered, withRuleList } from './week.ts';
 import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
@@ -262,6 +264,18 @@ const boards = new Map<string, unknown>(
 		RECORDED_BOARDS.map(async (format) => [format, await load<unknown>(boardFile(format))] as const)
 	)
 );
+/** The position panel's stand-in inputs (positions.ts): the board's points by id, the week's Proj. */
+const panelInputs = await (async (): Promise<Omit<PanelInputs, 'weeks'>> => {
+	const recorded = boards.get('ppr') as {
+		players: { id: string; position: string; points: number | null; vor: number | null }[];
+	};
+	const projection = await load<Projection>('projection');
+	return {
+		sync: recordedSync,
+		board: new Map(recorded.players.map((p) => [p.id, p])),
+		proj: (id) => projection.players[id]?.ppr ?? null
+	};
+})();
 /** The league read with its playoffs through the horizon's last week. */
 const sync: LeagueSync =
 	recordedSync.terms.playoff_weeks === null ||
@@ -574,15 +588,21 @@ const waiversNow = (): WaiverAdvice => {
 	// bye in the week the page addresses (Lane 108, B81): week 7's once turned, so a starter whose
 	// club sits week 7 reads "Starter, bye" (Lane 115, B90).
 	const restated = restatedBeats(ordered, turnedNow() ? turnedLineup(lineupNow()) : lineupNow());
-	return seasonTaken ? seasonTakenWaivers(restated) : restated;
+	// The position panel over the page's own rows (positions.ts, Lane 291).
+	return withPositions(seasonTaken ? seasonTakenWaivers(restated) : restated, {
+		...panelInputs,
+		weeks: weeksCovered(fromWeekNow(), HORIZON)
+	});
 };
 
 function waiversAt(position: string | null): WaiverAdvice {
 	const answer = waiversNow();
 	if (position === null) return answer;
 	const at = (row: WaiverRow): boolean => row.add.player.position === position;
+	// A narrowed page carries no panel (waiver_positions.go).
+	const page: WaiverAdvice = { ...answer, positions: undefined };
 	return {
-		...answer,
+		...page,
 		rows: answer.rows.filter(at),
 		pickups: answer.pickups.filter(at),
 		stash: (answer.stash ?? []).filter(at)

@@ -402,6 +402,9 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 			line.Slug = a.pages.of(bp.Name, a.Board.PositionRanks[boardID] > 0)
 		}
 		line.RestOfSeasonPerGame = RestOfSeasonPerGame(a.Board, bp, a.gamesLeft)
+		if points := a.restOfSeasonPoints(bp); points != nil {
+			c.Points, c.HasPoints = *points, true
+		}
 	}
 	if v, ok := a.Board.Values[boardID]; ok {
 		c.Value, c.HasValue = v, true
@@ -927,7 +930,7 @@ func (a *advisor) waiverRun(position draft.Position) (waiverRun, bool) {
 // Pickups is the Waivers strip's chosen set alone: what the front door's
 // pickup chip reads, by the one pickup rule (the full page's own strip).
 func (a *advisor) Pickups() ([]apitypes.WaiverRow, bool) {
-	out, ok := a.Waivers("", "")
+	out, _, ok := a.waiverAnswer("", "")
 	if !ok {
 		return nil, false
 	}
@@ -937,12 +940,29 @@ func (a *advisor) Pickups() ([]apitypes.WaiverRow, bool) {
 // Waivers is the waiver page (§5). asked, a board id or "", is a player a
 // link named (?player=): his row is kept past the page's cut, so the order's
 // add for a free player deep in the pool lands on him (review 66j N2). The
-// page's pickup order is decided over the full page's rows and its own (pageOrder).
+// page's pickup order is decided over the full page's rows and its own
+// (pageOrder). The full page carries the position panel (Lane 291).
 func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.WaiverAdvice, bool) {
+	out, run, ok := a.waiverAnswer(position, asked)
+	if ok && position == "" {
+		out.Positions = a.waiverPositions(run, out)
+	}
+	return out, ok
+}
+
+// waiverAnswer is the waiver page without its panel, and the run it is
+// read from.
+func (a *advisor) waiverAnswer(position draft.Position, asked string) (apitypes.WaiverAdvice, waiverRun, bool) {
 	run, ok := a.waiverRun(position)
 	if !ok {
-		return apitypes.WaiverAdvice{}, false
+		return apitypes.WaiverAdvice{}, run, false
 	}
+	out, ok := a.waiverPageOf(run, position, asked)
+	return out, run, ok
+}
+
+// waiverPageOf is the waiver page from its run.
+func (a *advisor) waiverPageOf(run waiverRun, position draft.Position, asked string) (apitypes.WaiverAdvice, bool) {
 	shown := pageMoves(run.moves, run.pool, asked, MaxWaiverRows)
 	// Each drop's place in the rest-of-season lineup, for the strip's Beats (B81).
 	places := seasonPlacesOf(run.moves, run.mine)

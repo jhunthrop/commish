@@ -28,6 +28,11 @@ type Candidate struct {
 	// when HasValue.
 	Value    float64
 	HasValue bool
+	// Points is his rest-of-season points over his club's games left (the
+	// order's key), valid when HasPoints: what the Waivers position panel
+	// counts at his position (Lane 291).
+	Points    float64
+	HasPoints bool
 	// PerGame is his points a game so far under the league's scoring,
 	// valid when HasPerGame.
 	PerGame    float64
