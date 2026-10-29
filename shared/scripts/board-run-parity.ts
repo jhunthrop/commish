@@ -9,13 +9,21 @@
  * export-parity.ts beside the other screens' parity. */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { captureShort } from "../../web/src/lib/format/designation.ts";
+import {
+  captureShort,
+  newerCapture,
+  type CaptureStamp,
+} from "../../web/src/lib/format/designation.ts";
 import { byeLine } from "../../web/src/lib/format/bye.ts";
 import { carriesGap } from "../../web/src/lib/format/gap.ts";
 import { fixed, plural } from "../../web/src/lib/format/number.ts";
 import { adpDrafts } from "../../web/src/lib/run/adp-drafts.ts";
 import { boardBasis } from "../../web/src/lib/run/board-basis.ts";
 import { heldOut, withStatuses } from "../../web/src/lib/run/board-status.ts";
+import {
+  LIVE_ORDER_WORDS,
+  omittedFromRun,
+} from "../../web/src/lib/run/live-order.ts";
 import {
   POSITION_NAMES,
   positionsIn,
@@ -261,8 +269,125 @@ async function runCase(run: BoardRun): Promise<unknown> {
   };
 }
 
+const HOUR_MS = 60 * 60 * 1000;
+
+function shifted(iso: string, hours: number): string {
+  return new Date(Date.parse(iso) + hours * HOUR_MS).toISOString();
+}
+
+/** The in-season run's manifest, its first format's board and its capture. */
+async function inSeasonRun(): Promise<{
+  board: ReturnType<typeof splitBoard>;
+  capture: Designations | null;
+}> {
+  const run = BOARD_RUNS[1];
+  const { runId } = latestPointerSchema.parse(
+    await json(`${run.fixture}/runs/latest.json`),
+  );
+  const manifest = manifestSchema.parse({
+    sources: [],
+    ...((await json(`${run.fixture}/runs/${runId}/manifest.json`)) as object),
+  });
+  const format = manifest.formats[0];
+  if (format === undefined)
+    throw new Error(`${run.fixture} carries no format.`);
+  const board = splitBoard(
+    boardSchema.parse(
+      await json(`${run.fixture}/runs/${runId}/boards/${format.id}.json`),
+    ),
+  );
+  return { board, capture: await designationsOf(run, manifest) };
+}
+
+/** The Board's status stamp at the order's clock (Lane 280, B257, designation.ts newerCapture), over
+ * the in-season run's capture: the run's alone, a live order whose capture was read after it, within
+ * hours of the clock (checked, and unchecked), and one read before it. Each says the chosen capture in captureShort's words. */
+function liveStamps(designations: Designations): unknown[] {
+  const run = BOARD_RUNS[1];
+  const capture: CaptureStamp = {
+    readAt: designations.readAt,
+    checkedAt: designations.checkedAt,
+  };
+  const last = capture.checkedAt ?? capture.readAt;
+  const cases: { name: string; live: CaptureStamp | null }[] = [
+    { name: "run-only", live: null },
+    {
+      name: "live-newer",
+      live: { readAt: shifted(run.now, -5), checkedAt: shifted(run.now, -1) },
+    },
+    {
+      name: "live-newer-unchecked",
+      live: { readAt: shifted(run.now, -3), checkedAt: null },
+    },
+    {
+      name: "live-newer-earlier-day",
+      live: { readAt: shifted(run.now, -30), checkedAt: shifted(run.now, -26) },
+    },
+    {
+      name: "live-older",
+      live: { readAt: shifted(last, -30), checkedAt: shifted(last, -6) },
+    },
+  ];
+  return cases.map(({ name, live }) => {
+    const chosen = newerCapture(capture, live) ?? capture;
+    return {
+      name,
+      now: run.now,
+      run: capture,
+      live,
+      chosen: chosen === live ? "live" : "run",
+      text: captureShort(chosen, Date.parse(run.now), ZONE),
+    };
+  });
+}
+
+/** The run's players an answer omits (Lane 280, B257, live-order.ts omittedFromRun and
+ * LIVE_ORDER_WORDS.fromRunLine), over the in-season run's rows: an uncut answer that returns them
+ * all, one that leaves two out (drawn from the run, counted once), and a cut one (its limit's, none
+ * counted). */
+function fromRunCases(board: ReturnType<typeof splitBoard>): unknown[] {
+  const runIds = board.rows.map((row) => row.id);
+  type Answer = Parameters<typeof omittedFromRun>[1];
+  const answer = (ids: string[], total: number): Answer =>
+    ({
+      rows: ids.map((id) => ({ line: { player: { board_id: id } } })),
+      total,
+    }) as unknown as Answer;
+  const cases = [
+    { name: "uncut-whole", answerIds: runIds, cut: false },
+    {
+      name: "uncut-omits",
+      answerIds: runIds.filter((_, i) => i !== 1 && i !== 3),
+      cut: false,
+    },
+    { name: "cut", answerIds: runIds.slice(0, 2), cut: true },
+  ];
+  return cases.map(({ name, answerIds, cut }) => {
+    const total = cut ? 40 : answerIds.length;
+    const omitted = omittedFromRun(runIds, answer(answerIds, total));
+    return {
+      name,
+      runIds,
+      answerIds,
+      total,
+      omitted,
+      line: LIVE_ORDER_WORDS.fromRunLine(omitted.length),
+    };
+  });
+}
+
 export async function renderBoardRun(about: string): Promise<string> {
   const runs = [];
   for (const run of BOARD_RUNS) runs.push(await runCase(run));
-  return `${JSON.stringify({ about, zone: ZONE, runs }, null, "\t")}\n`;
+  const inSeason = await inSeasonRun();
+  if (inSeason.capture === null)
+    throw new Error(`${BOARD_RUNS[1].fixture} carries no capture.`);
+  const body = {
+    about,
+    zone: ZONE,
+    runs,
+    liveStamps: liveStamps(inSeason.capture),
+    fromRun: fromRunCases(inSeason.board),
+  };
+  return `${JSON.stringify(body, null, "\t")}\n`;
 }

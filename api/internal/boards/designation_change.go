@@ -6,6 +6,20 @@ import (
 	"time"
 )
 
+// PairRead is one read of the capture pairs after a mark.
+type PairRead struct {
+	Pairs []DesignationPair
+	// Cut is a read that reached MaxPairCaptures: the captures after
+	// CutAt are left for the next read, so a mark taken from this read
+	// goes no further than CutAt (re-review L-e, Lane 285).
+	Cut bool
+	// CutAt is the newest capture read when Cut, readable or not.
+	CutAt time.Time
+	// Read is the captures after since that were read; Left is the ones
+	// after CutAt left unread (Cut only).
+	Read, Left int
+}
+
 // DesignationPair is two consecutive injury captures that read, of one
 // source: what the provider listed at NewerAt and what it listed just
 // before, so a change in a player's status reads as the difference (Lane
@@ -18,11 +32,12 @@ type DesignationPair struct {
 	OlderAt time.Time
 }
 
-// maxPairCaptures bounds the captures after since one pair read takes: a
+// MaxPairCaptures bounds the captures after since one pair read takes: a
 // capture is stored only when the list changed, at most four an hour on a
 // game day (Lane 263's quarter-hour status captures), so a day's catch-up
-// is about a hundred; the bound is a guard, not the window.
-const maxPairCaptures = 500
+// is about a hundred; the bound is a guard, not the window. A read it
+// cuts takes the oldest after since and says so (PairRead.Cut).
+const MaxPairCaptures = 500
 
 // DesignationPairs is every consecutive pair of readable captures of the
 // source Designations reads (the by-date list, else the roster sweep)
@@ -34,37 +49,47 @@ const maxPairCaptures = 500
 // (review H2). A source with fewer than two readable captures gives way
 // to the next, so the first by-date capture never silences the producer
 // (re-review N7).
-func (s *PGSource) DesignationPairs(ctx context.Context, since time.Time) ([]DesignationPair, error) {
+func (s *PGSource) DesignationPairs(ctx context.Context, since time.Time) (PairRead, error) {
 	for _, source := range []string{injuriesByDate, injuriesRosterWide} {
-		captures, err := s.pairCaptures(ctx, source, since)
+		captures, out, err := s.pairCaptures(ctx, source, since)
 		if err != nil {
-			return nil, err
+			return PairRead{}, err
 		}
 		read := readable(captures)
 		if len(read) < 2 {
 			continue
 		}
-		return pairsOf(source, read, since), nil
+		out.Pairs = pairsOf(source, read, since)
+		return out, nil
 	}
-	return nil, nil
+	return PairRead{}, nil
 }
 
 // pairCaptures is the source's captures after since, newest first, and
 // the few at or before it that pair with the oldest and that the floor
-// reads it against; with no since, the newest maxPairCaptures.
-func (s *PGSource) pairCaptures(ctx context.Context, source string, since time.Time) ([]capture, error) {
+// reads it against, and the read's count and cut; with no since, the
+// newest MaxPairCaptures.
+func (s *PGSource) pairCaptures(ctx context.Context, source string, since time.Time) ([]capture, PairRead, error) {
 	if since.IsZero() {
-		return s.captures(ctx, source, maxPairCaptures, time.Time{})
+		captures, err := s.captures(ctx, source, MaxPairCaptures, time.Time{})
+		return captures, PairRead{Read: len(captures)}, err
 	}
-	recent, err := s.capturesAfter(ctx, source, maxPairCaptures, since)
+	recent, err := s.capturesAfter(ctx, source, MaxPairCaptures, since)
 	if err != nil {
-		return nil, err
+		return nil, PairRead{}, err
+	}
+	out := PairRead{Read: len(recent)}
+	if len(recent) == MaxPairCaptures {
+		out.Cut, out.CutAt = true, recent[0].at.UTC()
+		if out.Left, err = s.capturesAfterCount(ctx, source, out.CutAt); err != nil {
+			return nil, PairRead{}, err
+		}
 	}
 	before, err := s.captures(ctx, source, capturesTried+1, since)
 	if err != nil {
-		return nil, err
+		return nil, PairRead{}, err
 	}
-	return append(recent, before...), nil
+	return append(recent, before...), out, nil
 }
 
 // NewestCaptureAt is when the newest injury capture of either source was

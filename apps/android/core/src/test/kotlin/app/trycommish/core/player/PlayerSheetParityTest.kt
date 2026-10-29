@@ -2,6 +2,7 @@ package app.trycommish.core.player
 
 import app.trycommish.api.CommishJson
 import app.trycommish.api.decodeEnvelope
+import app.trycommish.api.models.PlayerWeekRead
 import app.trycommish.api.models.RunDesignations
 import app.trycommish.api.models.RunManifestAnswer
 import app.trycommish.api.models.RunReadsDue
@@ -99,6 +100,32 @@ class PlayerSheetParityTest {
                 }
             val read = SheetParity.readOf(test.getValue("read"))
             assertEquals(shownOf(test.getValue("shown").jsonObject), shown(WeekReads.shown(read, card)), test.string("name"))
+        }
+    }
+
+    @Test
+    fun `the newer of the run's and the live read is shown as the web shows it`() {
+        val cases = SheetParity.cases("liveRead")
+        assertTrue(cases.size >= 5)
+        cases.forEach { test ->
+            val name = test.string("name")
+            val run = test.obj("run")?.let(SheetParity::readOf)
+            val live =
+                test.obj("live")?.let { CommishJson.decodeFromJsonElement(PlayerWeekRead.serializer(), it) }
+            val answered = test.getValue("answered").jsonPrimitive.booleanOrNull == true
+            val shown = WeekReads.newest(run, if (answered) live else null)
+            val want = test.obj("shown")?.let(SheetParity::readOf)
+            assertEquals(want?.body, shown?.body, name)
+            assertEquals(want?.caption, shown?.caption, name)
+            assertEquals(want?.writtenAt, shown?.writtenAt, name)
+            assertEquals(want?.status, shown?.status, name)
+            assertEquals(want?.call, shown?.call, name)
+            assertEquals(want?.projection?.toDouble(), shown?.projection?.toDouble(), name)
+            // The Proj change tile measures from the shown read's figure: a live read quoting none quotes none.
+            if (shown != null && live != null && shown.writtenAt == live.writtenAt) {
+                val quoted = shown.projection?.let { QuotedProjection.Points(it.toDouble()) } ?: QuotedProjection.None
+                assertEquals(quoted, QuotedProjection.of(shown), name)
+            }
         }
     }
 

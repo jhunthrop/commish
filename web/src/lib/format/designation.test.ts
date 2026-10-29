@@ -8,8 +8,8 @@ import {
 	CAPTURE_BEHIND_MS,
 	captureLine,
 	captureShort,
-	designationMark,
 	designationWord,
+	newerCapture,
 	rankWord,
 	seasonLongLine,
 	seasonLongMark,
@@ -83,7 +83,6 @@ void test('past 36 hours the basis says how old the statuses are, and they stay 
 });
 
 void test('the marks', () => {
-	assert.equal(designationMark('doubtful', CHECKED, CENTRAL), 'Doubtful as of Fri 9:05 am');
 	assert.equal(
 		seasonLongMark({ status: 'injured_reserve', since: CHECKED }, CENTRAL),
 		'IR since Oct 16'
@@ -97,9 +96,15 @@ void test('the marks', () => {
 	);
 });
 
-void test('the short capture for a board basis says the read, and how old past a day and a half', () => {
+void test('the short capture for a board basis says the read, the hour on the member’s own day, and how old past a day and a half', () => {
 	const capture = { readAt: LISTED, checkedAt: CHECKED };
-	assert.equal(captureShort(capture, SOON, CENTRAL), 'Status read Oct 16.');
+	assert.equal(captureShort(capture, SOON, CENTRAL), 'Status read today 9:05 am CT.');
+	const nextDay = Date.parse(CHECKED) + 20 * 60 * 60 * 1000;
+	assert.equal(
+		captureShort(capture, nextDay, CENTRAL),
+		'Status read Oct 16.',
+		'an earlier day keeps its date'
+	);
 	assert.equal(
 		captureShort({ readAt: LISTED, checkedAt: null }, SOON, CENTRAL),
 		'Status as of Oct 12, over 36 hours ago.'
@@ -116,4 +121,19 @@ void test('no line carries an em-dash or a semicolon', () => {
 		captureLine({ readAt: LISTED, checkedAt: null }, SOON + CAPTURE_BEHIND_MS, CENTRAL)
 	];
 	for (const line of lines) assert.doesNotMatch(line, bannedPattern(), line);
+});
+
+void test('the board dates its statuses by the newer of the run’s capture and the live order’s (Lane 280)', () => {
+	const run = { readAt: LISTED, checkedAt: null };
+	const live = { readAt: LISTED, checkedAt: CHECKED };
+	assert.equal(newerCapture(run, null), run, 'run only');
+	assert.equal(newerCapture(null, live), live, 'live only');
+	assert.equal(newerCapture(null, null), null);
+	assert.equal(newerCapture(run, live), live, 'live newer');
+	assert.equal(newerCapture(live, run), live, 'live older: the run’s stands');
+	assert.equal(newerCapture(live, { ...live }), live, 'a tie keeps the run’s');
+	assert.equal(
+		captureShort(newerCapture(run, live) ?? run, SOON, CENTRAL),
+		'Status read today 9:05 am CT.'
+	);
 });

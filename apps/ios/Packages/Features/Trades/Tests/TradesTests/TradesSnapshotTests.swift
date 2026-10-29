@@ -28,7 +28,7 @@ struct TradesSnapshotTests {
     static let zone = TimeZone(identifier: "America/Chicago")!
     static let host = Components.Schemas.LeagueHost(value1: .ffpc)
     static let me = TradeMe(name: "McConkey Kong Country", aside: "1-4, 11th of 12")
-    static let best = "8:96>12481+8116"
+    static let best = "8:96>7526+8116"
     static let rodgers = "8439"
 
     enum Scene: String, CaseIterable, Sendable {

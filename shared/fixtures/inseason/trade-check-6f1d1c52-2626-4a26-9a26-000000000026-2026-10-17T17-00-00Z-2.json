@@ -327,7 +327,9 @@
 			"my_proj_change": 12.4,
 			"their_proj_change": -9.3,
 			"drop_reason": null,
-			"need": null
+			"need": null,
+			"my_rest_of_season": 1.2,
+			"their_rest_of_season": -1.2
 		},
 		"fills": {
 			"yours": true,
@@ -353,6 +355,11 @@
 		},
 		"host_trades_url": "https://sleeper.com/leagues/1382163311038038016/team",
 		"host_note": null,
+		"acceptable": {
+			"yours": true,
+			"theirs": true
+		},
+		"rest_of_season_basis": "Rest of season is what the players a side gets score over the best free agent at their position, less the same for those it gives and drops, weeks 6 to 17. A side takes a trade that costs it 12.0 or less.",
 		"basis_note_list": "two-point, missed kick, fumble recovery and safety"
 	},
 	"error": null

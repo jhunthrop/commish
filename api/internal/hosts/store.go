@@ -81,7 +81,17 @@ type Connection struct {
 
 // Store reads and writes app.host_connections, every query scoped by
 // account and host.
-type Store struct{ Pool *pgxpool.Pool }
+type Store struct {
+	Pool *pgxpool.Pool
+	// OnDelete runs inside a disconnect's transaction, after the row is
+	// deleted: what was kept with the session goes in the same commit
+	// (leaguesync.RetireHostOffers, the member's host offers, Lane 285).
+	// Nil runs nothing; a hook's error rolls the disconnect back.
+	OnDelete DeleteHook
+}
+
+// DeleteHook is work a disconnect does in its own transaction.
+type DeleteHook func(ctx context.Context, tx pgx.Tx, accountID uuid.UUID, host string) error
 
 const connColumns = `id, account_id, host, status, last_signin_at, created_at, last_read_at, proven, consent_version,
 	wrapped_key, session_ct, signin_ct, key_version`
@@ -179,14 +189,26 @@ func (s *Store) List(ctx context.Context, accountID uuid.UUID) ([]Connection, er
 }
 
 // Delete removes the account's connection: the sign-in and the session
-// go with the row.
+// go with the row, and OnDelete's work commits with it.
 func (s *Store) Delete(ctx context.Context, accountID uuid.UUID, host string) error {
-	tag, err := s.Pool.Exec(ctx, `delete from app.host_connections where account_id = $1 and host = $2`, accountID, host)
+	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `delete from app.host_connections where account_id = $1 and host = $2`, accountID, host)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrNotConnected
+		}
+		if s.OnDelete == nil {
+			return nil
+		}
+		return s.OnDelete(ctx, tx, accountID, host)
+	})
+	if errors.Is(err, ErrNotConnected) {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("hosts: delete connection: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotConnected
 	}
 	return nil
 }

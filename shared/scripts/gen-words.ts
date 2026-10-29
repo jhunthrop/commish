@@ -243,6 +243,12 @@ export const TABLES: readonly TableSource[] = [
     json: "shared/words/designation-rank.json",
   },
   {
+    name: "Capture",
+    module: DESIGNATION_MODULE,
+    picks: ["CAPTURE_WORDS"],
+    json: "shared/words/capture.json",
+  },
+  {
     name: "Figure",
     module: "web/src/lib/format/figure-words.ts",
     picks: ["FIGURE"],

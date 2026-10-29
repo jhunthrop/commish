@@ -82,12 +82,11 @@
 	/** His game's state for the read: the row's, the rule the verb and the week tile follow, else the
 	 * card's own at the same clock where the shelf opened on no row (Lane 158). */
 	const readState = $derived(row === null ? (live?.projection.state ?? null) : game);
+	/** The run's read until the card answers, then the newer of it and the live one (Lane 284). */
+	const weekRead = $derived(live === null ? (built?.weekRead ?? null) : live.read);
 	const read = $derived(
-		built?.weekRead
-			? shownWeekRead(
-					built.weekRead,
-					live === null ? null : { ...live.projection, state: readState }
-				)
+		weekRead
+			? shownWeekRead(weekRead, live === null ? null : { ...live.projection, state: readState })
 			: null
 	);
 	const basis = $derived(

@@ -92,6 +92,13 @@ public enum LiveOrder {
         answer.total > answer.rows.count
     }
 
+    /// live-order.ts omittedFromRun (Lane 280, B257): the run's players, in the run's order, an uncut
+    /// answer does not return, drawn from the run and counted once; none on a cut answer, whose limit
+    /// omits them.
+    public static func omittedFromRun(_ runIds: [String], returned: Set<String>, cut: Bool) -> [String] {
+        cut ? [] : runIds.filter { !returned.contains($0) }
+    }
+
     /// Every row with its place, in the order's order, or nil when the answer does not place one of
     /// them: the screen then keeps the run's rows, never a table half one board and half the other
     /// (placedRows).

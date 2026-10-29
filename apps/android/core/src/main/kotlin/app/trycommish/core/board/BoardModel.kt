@@ -127,15 +127,10 @@ data class BoardModel(
                 }
             // A kicker's or a defense's view says the capture only when one of its rows is listed.
             val listed = !draftOrder || view.sections.any { section -> section.rows.any { it.status != null } }
-            val capture =
-                read.designations?.takeIf { listed }?.let {
-                    BoardWords.capture(
-                        asOf = instantOrNull(it.readAt) ?: now,
-                        checkedAt = instantOrNull(it.checkedAt),
-                        now = now,
-                        zone = zone,
-                    )
-                }
+            val runCapture = read.designations?.let { CaptureStamp(instantOrNull(it.readAt) ?: now, instantOrNull(it.checkedAt)) }
+            // At the order's clock the statuses are the order's: the status column is as of the newer capture.
+            val stamp = CaptureStamp.newer(runCapture, order?.takeIf { view.atClock }?.capture)
+            val capture = stamp?.takeIf { listed }?.let { BoardWords.capture(it, now, zone) }
             val run = said + listOfNotNull(capture)
             val lead = order?.takeIf { view.atClock }?.lead(format.teams, zone)
             val basis =
@@ -143,7 +138,10 @@ data class BoardModel(
                     run
                 } else {
                     LiveOrder.basis(run, BoardBasis.ourBoard(format, manifest.season), lead, LiveOrderWords.runStamp(format, zone)) +
-                        listOfNotNull(view.reach?.let { (shown, total) -> LiveOrderWords.reach(shown, total) })
+                        listOfNotNull(
+                            view.reach?.let { (shown, total) -> LiveOrderWords.reach(shown, total) },
+                            LiveOrderWords.fromRun(view.fromRun),
+                        )
                 }
             val present = (board.rows.map { it.position.value } + board.market.map { it.position.value }).toSet()
             return BoardModel(
@@ -187,6 +185,8 @@ private class ViewRows(
     val carriesGap: Boolean,
     val atClock: Boolean = false,
     val reach: Pair<Int, Int>? = null,
+    /** The view's run players an uncut order omits, drawn from the run (Lane 280, B257). */
+    val fromRun: Int = 0,
 )
 
 /** The order's places for a board of `teams`, every row it returned by board id, placed or not, and
@@ -206,9 +206,10 @@ private class ClockPlaces(
  * position's as one run with no tiers, then the view's players it does not place, in the run's order with
  * no figure: those on a season-long list and those the order returns with no figure (a player put on a
  * list after the nightly, Lane 243, B251), each with the word of the order's own row's status, else the
- * run's, else "--", as the Rankings draw him. The rows its read does not reach are not drawn, so no row
- * of the run's clock stands among them, and the count is said only when the answer is truly cut. Null
- * where the read places none of the view's rows. */
+ * run's, else "--", as the Rankings draw him. On a cut answer the rows its read does not reach are not
+ * drawn, so no row of the run's clock stands among them, and the count is said; on an uncut one a run
+ * player the order omits is drawn from the run with the run's status and counted once (Lane 280, B257).
+ * Null where the read places none of the view's rows. */
 private fun atClock(
     drawn: List<Placed<RunBoardRow>>,
     position: BoardPosition?,
@@ -219,15 +220,15 @@ private fun atClock(
     val reached = drawn.map { it.row }.filter { it.id in clock.places }
     val placed = LiveOrder.placed(reached, { it.id }, clock.places)?.takeIf { it.isNotEmpty() } ?: return null
     val rows = placed.map { cells.placed(it.row, PlacedFigures.of(it.row).at(it.place, clock.teams), clock.said(it.row.id)) }
+    val ordered = BoardOrder.withStatuses(drawn, statuses).map { it.row }
+    val omitted = LiveOrder.omittedFromRun(ordered.map { it.id }, clock.rows.keys, clock.cut).toSet()
     val listed =
-        BoardOrder
-            .withStatuses(drawn, statuses)
-            .map { it.row }
-            .filter { it.id !in clock.places && (BoardOrder.heldOut(it.id, statuses) || it.id in clock.rows) }
+        ordered
+            .filter { it.id !in clock.places && (BoardOrder.heldOut(it.id, statuses) || it.id in clock.rows || it.id in omitted) }
             .map { row -> cells.listed(row, clock.said(row.id) ?: cells.held(row.id)) }
     val shown = rows.size + listed.size
     val reach = (shown to drawn.size).takeIf { clock.cut && shown < drawn.size }
-    return ViewRows(clockSections(rows, listed, position), carriesGap = false, atClock = true, reach = reach)
+    return ViewRows(clockSections(rows, listed, position), carriesGap = false, atClock = true, reach = reach, fromRun = omitted.size)
 }
 
 /** A view's sections at the order's clock: All as one run, the order's rows then the rows it does not

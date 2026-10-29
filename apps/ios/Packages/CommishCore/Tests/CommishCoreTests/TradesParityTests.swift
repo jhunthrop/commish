@@ -87,6 +87,23 @@ struct TradesParityTests {
         }
     }
 
+    /// B271: each team the finder lists no trade with keeps its place, said, as the web's ideas row draws
+    /// it (its places of kind none, in order).
+    @Test(arguments: StartParityTests.clocks)
+    func everyTeamWithNoIdeaIsTheWebs(clock: String) throws {
+        let web = try Self.web(clock)
+        let model = try Self.model(clock)
+        let none = web.ideas.places.filter { $0.kind == "none" }
+        #expect(model.noIdeas.map(\.id) == none.map(\.rosterId), "\(clock)")
+        #expect(model.noIdeas.map(\.team) == none.map(\.team), "\(clock)")
+        #expect(model.noIdeas.allSatisfy { $0.note == Words.Trades.noIdea })
+        #expect(none.allSatisfy { $0.note == Words.Trades.noIdea })
+    }
+
+    @Test func theFixtureDropsEveryIdeaWithATeam() throws {
+        #expect(try !Self.model(Fixtures.week).noIdeas.isEmpty)
+    }
+
     @Test func theLineUnderAPressedVerbIsTheWebs() {
         #expect(TradesWords.copied(true, platform: "FFPC").words == Self.parity.copied.done)
         #expect(TradesWords.copied(false, platform: "FFPC").words == Self.parity.copied.failed)
@@ -226,6 +243,20 @@ struct TradesParity: Decodable {
         let reason: String?
         let finder: Finder
         let basis: Basis
+        let ideas: Ideas
+    }
+
+    /// The builder-first screen's ideas row (Lane 277): each place an idea or a team with none.
+    struct Ideas: Decodable {
+        let head: String
+        let places: [Place]
+    }
+
+    struct Place: Decodable {
+        let kind: String
+        let rosterId: Int
+        let team: String
+        let note: String?
     }
 
     struct Figures: Decodable, Equatable {
@@ -244,8 +275,11 @@ struct TradesParity: Decodable {
         let name: String
         let figures: Figures
         let room: String
+        /// Its rest-of-season cell (Lane 277).
+        let rest: Rest
 
         init(_ side: TradeBugSide) {
+            rest = Rest(side.rest)
             label = side.label
             name = side.name
             let figures = side.figures
@@ -256,6 +290,19 @@ struct TradesParity: Decodable {
                 seasonTone: figures.seasonTone.rawValue
             )
             room = side.room
+        }
+    }
+
+    /// trades.ts RestFigure as the parity file writes it.
+    struct Rest: Decodable, Equatable {
+        let text: String
+        let tone: String
+        let refuses: Bool
+
+        init(_ rest: TradeRest) {
+            text = rest.text
+            tone = rest.tone.rawValue
+            refuses = rest.refuses
         }
     }
 
@@ -271,11 +318,11 @@ struct TradesParity: Decodable {
             let room = TradeChecks.room(check)
             yours = Side(TradeBugSide(
                 me: true, name: me, totals: check.totals.yours, gain: trade.myGain, projChange: trade.myProjChange,
-                room: room.yours
+                room: room.yours, rest: TradeRest.of(check, mine: true)
             ))
             theirs = Side(TradeBugSide(
                 me: false, name: team, totals: check.totals.theirs, gain: trade.theirGain,
-                projChange: trade.theirProjChange, room: room.theirs
+                projChange: trade.theirProjChange, room: room.theirs, rest: TradeRest.of(check, mine: false)
             ))
             sentence = TradeChecks.words(check)
             basis = check.basis

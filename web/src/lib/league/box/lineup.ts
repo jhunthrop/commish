@@ -77,7 +77,7 @@ export const LINEUP = {
 	set: 'Your lineup is set',
 	sit: 'Sit',
 	/** The strip's link to the order's record (Lane 99, B62): it says where it goes. */
-	pastWeeks: 'Past weeks of our order, on Our record',
+	pastWeeks: 'Past weeks of our order',
 	copied: 'Copied.',
 	setItOn: 'Set it on',
 	copyFailed: 'This browser would not copy it.',

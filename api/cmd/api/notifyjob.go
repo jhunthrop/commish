@@ -23,7 +23,8 @@ const notifyJob = "notify"
 
 // The job's time inside api-notify's 90 s task timeout (api.yml): the
 // catch-up stops at 20 s, so a slow one never starves the drain (re-review
-// N17; a cut catch-up does not move its mark and resumes next minute);
+// N17; a cut catch-up does not move its mark and resumes next minute
+// after the last account it finished, Lane 285);
 // the drain claims for 45 s and sends nothing past 80 s from the
 // run's start, releasing what it did not try, so the task is never killed
 // mid-send.

@@ -10,12 +10,14 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/season"
 )
 
@@ -156,21 +158,41 @@ func (s *PGSource) newestCapture(ctx context.Context, source string) (out map[st
 // captures is the source's newest n captures, newest first, each parsed,
 // at or before before when it is set.
 func (s *PGSource) captures(ctx context.Context, source string, n int, before time.Time) ([]capture, error) {
-	return s.capturesWhere(ctx, source, n, "($4::timestamptz is null or captured_at <= $4)", before)
+	return s.capturesWhere(ctx, source, n, "($4::timestamptz is null or captured_at <= $4)", "desc", before)
 }
 
-// capturesAfter is the source's captures stored after after, newest
-// first, at most n.
+// capturesAfter is the source's oldest n captures stored after after,
+// newest first: a read the bound cuts keeps the captures next after the
+// mark, so the mark can stop at the newest one read and the next read
+// picks up from there (re-review L-e, Lane 285).
 func (s *PGSource) capturesAfter(ctx context.Context, source string, n int, after time.Time) ([]capture, error) {
-	return s.capturesWhere(ctx, source, n, "captured_at > $4", after)
+	out, err := s.capturesWhere(ctx, source, n, "captured_at > $4", "asc", after)
+	slices.Reverse(out)
+	return out, err
 }
 
-// capturesWhere is the source's newest n captures meeting bound (on $4,
-// at; the zero time is null), newest first, each parsed.
-func (s *PGSource) capturesWhere(ctx context.Context, source string, n int, bound string, at time.Time) ([]capture, error) {
+// capturesAfterCount is how many of the source's captures are stored
+// after after.
+func (s *PGSource) capturesAfterCount(ctx context.Context, source string, after time.Time) (int, error) {
+	var n int
+	err := s.Pool.QueryRow(ctx, `select count(*) from `+s.table("capture_snapshots")+` where source = $1 and captured_at > $2`,
+		source, after).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("boards: count injury captures %s: %w", source, err)
+	}
+	return n, nil
+}
+
+// capturesWhere is n of the source's captures meeting bound (on $4, at;
+// the zero time is null), the newest n or with order "asc" the oldest,
+// in that order, each parsed.
+func (s *PGSource) capturesWhere(ctx context.Context, source string, n int, bound, order string, at time.Time) ([]capture, error) {
+	if order != "asc" && order != "desc" {
+		return nil, fmt.Errorf("boards: capture order %q", order)
+	}
 	query := `select case when octet_length(payload::text) <= $2 then payload end, captured_at
 		from ` + s.table("capture_snapshots") + ` where source = $1 and ` + bound + `
-		order by captured_at desc limit $3`
+		order by captured_at ` + order + ` limit $3`
 	var param any
 	if !at.IsZero() {
 		param = at
@@ -520,6 +542,24 @@ func Newest(designations map[string]Designation) time.Time {
 		}
 	}
 	return at
+}
+
+// StatusRead is the capture the designations come from, nil with none:
+// its stamp (Newest), its feed and the capture job's last check. The
+// board route and the order both say it (Lane 280, B257).
+func StatusRead(designations map[string]Designation) *apitypes.StatusRead {
+	if len(designations) == 0 {
+		return nil
+	}
+	read := &apitypes.StatusRead{AsOf: Newest(designations)}
+	for _, d := range designations {
+		// One capture: every designation carries its source and its check.
+		read.Source = d.Source
+		if d.CheckedAt != nil && (read.CheckedAt == nil || d.CheckedAt.After(*read.CheckedAt)) {
+			read.CheckedAt = d.CheckedAt
+		}
+	}
+	return read
 }
 
 // WithSince is the designations with each one's run start as Listed, and

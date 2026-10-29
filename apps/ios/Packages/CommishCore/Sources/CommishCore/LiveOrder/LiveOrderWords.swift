@@ -37,6 +37,12 @@ public enum LiveOrderWords {
         "The first \(shown) of the \(total) players on our board, in our order."
     }
 
+    /// live-order.ts LIVE_ORDER_WORDS.fromRunLine (Lane 280, B257): the run's players an uncut order
+    /// omits, counted once, "2 players from our board, not in our order right now."; nil with none.
+    public static func fromRun(_ count: Int) -> String? {
+        count > 0 ? "\(Formatting.plural(count, "player", "players")) \(Words.LiveOrder.fromRun)." : nil
+    }
+
     /// formats-words.ts FORMATS_RANK.unranked: under the table when a format's rank cell reads "--".
     public static func unranked(_ labels: [String]) -> String {
         let one = labels.count == 1

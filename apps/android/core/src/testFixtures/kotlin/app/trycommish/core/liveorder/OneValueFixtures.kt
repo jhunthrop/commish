@@ -6,6 +6,7 @@ import app.trycommish.api.models.DesignationStatus
 import app.trycommish.api.models.InjuryDesignation
 import app.trycommish.api.models.OrderRow
 import app.trycommish.api.models.PlayerWeek
+import app.trycommish.api.models.StatusRead
 import app.trycommish.core.player.PlayerWeekReads
 import app.trycommish.core.rankings.OrderQuery
 import app.trycommish.core.rankings.RankingsFixtures
@@ -66,6 +67,16 @@ object OneValueFixture {
         val moved = others.take(at) + listOf(designated(him, DesignationStatus.injured_reserve)) + others.drop(at)
         val numbered = moved.mapIndexed { index, row -> row.copy(rank = index + 1, overallRank = index + 1) }
         return OrderAtClock(order.body, order.answer.copy(rows = numbered), order.landed)
+    }
+
+    /** The whole read, still uncut, that no longer returns one player the run holds, its statuses read from
+     * the hourly capture checked at [STATUS_READ], after the run's (Lane 280, B257): the Board draws him from
+     * the run, counts him once and dates its status column by the order's capture. */
+    fun omitting(id: String): OrderAtClock {
+        val order = order()
+        val rows = order.answer.rows.filter { it.line.player.boardId != id }
+        val read = StatusRead(asOf = "2026-10-18T15:00:00Z", checkedAt = STATUS_READ, source = "fixture")
+        return OrderAtClock(order.body, order.answer.copy(rows = rows, total = rows.size, statusRead = read), order.landed)
     }
 
     /** The whole read with one player's row holding no figure (a player with no projection), with the
@@ -154,7 +165,7 @@ class StubOrderSearch(
                 }
             } ?: all
         val answer =
-            data + mapOf("rows" to JsonArray(searched.take(query.limit)), "total" to JsonPrimitive(searched.size))
+            data + mapOf("rows" to JsonArray(searched.drop(query.offset).take(query.limit)), "total" to JsonPrimitive(searched.size))
         return JsonObject(envelope + mapOf("data" to JsonObject(answer))).toString()
     }
 

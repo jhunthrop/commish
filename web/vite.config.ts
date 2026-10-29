@@ -24,11 +24,12 @@ const BOARD_PARTS =
  * setup, the report and the pass draw), the account, the pass and the live
  * draft companion, the connected hosts (FFPC, Yahoo, ESPN), the request API client and the sheet's
  * store. A nightly page never loads any of it with the page; the sheet arrives on a reader's first
- * intent, the rest only on the pages that call the API. The league's held places and their forgetting
- * (context/held.ts, forget.ts) ride here too: the league pages, the account and its delete page load
+ * intent, the rest only on the pages that call the API. The league's held places, their marks' words and
+ * their forgetting (context/held.ts, held-marks.ts, ui/HeldMark, forget.ts) ride here too (the marks named since Lane
+ * 284: the old pattern missed it, so every page carried the marks' words): the league pages, the account and its delete page load
  * them, and the shell only ever imports the held places on demand (Lane 233). */
 const USER_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|FactStrip|facts|TeamPanel|PickStrip|StillThereCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\.|[\\/]src[\\/]lib[\\/]run[\\/]market\.|[\\/]src[\\/]lib[\\/]context[\\/](held|forget)\./;
+	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|FactStrip|facts|TeamPanel|PickStrip|StillThereCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys|HeldMark)\.|[\\/]src[\\/]lib[\\/]run[\\/]market\.|[\\/]src[\\/]lib[\\/]context[\\/](held|held-marks|forget)\./;
 /** What the player, club and compare pages draw and the others never do: a player's line, the
  * crumb, the outcome bar, the tier mates, the capsule and a fact. One file for those pages. */
 const PLAYER_PARTS =

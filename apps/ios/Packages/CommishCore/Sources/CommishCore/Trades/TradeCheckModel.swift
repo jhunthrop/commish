@@ -37,6 +37,30 @@ public struct TradeFigures: Equatable, Sendable {
     }
 }
 
+/// A side's rest-of-season cell (trades.ts restFigure, Lane 277): its change over the weeks the check
+/// covers, toned, and whether that side would not take the trade. Before an answer the none mark; on an
+/// answer without the figure (an older API) empty, never a figure we did not read.
+public struct TradeRest: Equatable, Sendable {
+    public let text: String
+    public let tone: Tone
+    public let refuses: Bool
+
+    static let none = TradeRest(text: Words.Box.none, tone: .even, refuses: false)
+
+    static func of(_ check: TradeCheck?, mine: Bool) -> TradeRest {
+        guard let check else {
+            return none
+        }
+        let trade = check.trade.value1
+        guard let rest = mine ? trade.myRestOfSeason : trade.theirRestOfSeason else {
+            return TradeRest(text: "", tone: .even, refuses: false)
+        }
+        let acceptable = check.acceptable?.value1
+        let takes = mine ? acceptable?.yours : acceptable?.theirs
+        return TradeRest(text: TradesWords.gain(rest), tone: TradesWords.tone(rest), refuses: takes == false)
+    }
+}
+
 /// One half of the scoreboard: You or With, the team, its figures and its room.
 public struct TradeBugSide: Equatable, Sendable {
     public let label: String
@@ -45,10 +69,14 @@ public struct TradeBugSide: Equatable, Sendable {
     public let mine: Bool
     public let figures: TradeFigures
     public let room: String
+    /// Its rest of season (Lane 277).
+    public let rest: TradeRest
 
     init(
-        me: Bool, name: String, totals: TradeSideTotals?, gain: Double?, projChange: Double?, room: String
+        me: Bool, name: String, totals: TradeSideTotals?, gain: Double?, projChange: Double?, room: String,
+        rest: TradeRest
     ) {
+        self.rest = rest
         label = me ? Words.Trades.yourSide : Words.Trades.theirSide
         self.name = name
         initials = Initials.of(name)
@@ -174,8 +202,30 @@ enum TradeChecks {
         return " You give \(side(row.give)) for \(side(row.get))."
     }
 
-    /// builder.ts checkWords: a roster the trade leaves short, a roster with no one to drop, else each
-    /// lineup's change, the players with their points a game, and the drop.
+    /// trades.ts refusalWords (Lane 277): the answer line's lead when a side would not take the trade on
+    /// its rest of season, nil when both would or the answer does not say (an older API).
+    static func refusal(_ check: TradeCheck) -> String? {
+        guard let acceptable = check.acceptable?.value1 else {
+            return nil
+        }
+        if !acceptable.yours, !acceptable.theirs {
+            return Words.Trades.bothGiveUp
+        }
+        if !acceptable.theirs {
+            return Words.Trades.theyGiveUp
+        }
+        return acceptable.yours ? nil : Words.Trades.youGiveUp
+    }
+
+    /// builder.ts fillsBoth: a trade both rosters can make.
+    static func fillsBoth(_ check: TradeCheck) -> Bool {
+        let fills = check.fills
+        return fills.yours && fills.theirs && fills.yoursRoom && fills.theirsRoom
+    }
+
+    /// builder.ts checkWords: a roster the trade leaves short, a roster with no one to drop, then a side
+    /// that would not take it in place of the lineups' change, else each lineup's change; the players
+    /// with their points a game, and the drop.
     static func words(_ check: TradeCheck) -> String {
         let fills = check.fills
         let trade = check.trade.value1
@@ -193,6 +243,6 @@ enum TradeChecks {
         }
         let reason = trade.dropReason.map { " \($0)" } ?? ""
         let drop = trade.drop.map { " You drop \($0.value1.player.name) to make room.\(reason)" } ?? ""
-        return "\(change(trade))\(players(trade))\(drop)"
+        return "\(refusal(check) ?? change(trade))\(players(trade))\(drop)"
     }
 }

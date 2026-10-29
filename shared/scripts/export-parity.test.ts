@@ -316,7 +316,7 @@ void test("the Trades at every clock: each row's offer in the web's words, the s
 		clocks: Record<string, { finder: { every: { mine: Row[] } }; basis: { closed: string } }>;
 		checks: Record<string, { yours: { figures: { projBefore: string } }; sentence: string }[]>;
 		copied: { done: string };
-		words: { checks: { sentence: string }[]; under: string };
+		words: { checks: { sentence: string; cells: unknown }[]; under: string };
 		holding: { rows: { key: string }[]; unheld: { decision: string } | null };
 		builder: { yours: { rows: { pick: string }[] }; pin: string };
 	};
@@ -335,9 +335,10 @@ void test("the Trades at every clock: each row's offer in the web's words, the s
 	assert.equal(sunday.length, 2);
 	assert.ok(sunday.every((c) => c.yours.figures.projBefore === '--'));
 	assert.equal(parity.copied.done, "Copied. Propose it on FFPC's trade page.");
-	// Every checkWords branch, the under 0.1 gain, a holding read and the builder (fix round 1).
+	// Every checkWords branch, the under 0.1 gain, a holding read and the builder (fix round 1); since
+	// Lane 277 a case may share a sentence when its rest-of-season cells differ.
 	assert.equal(
-		new Set(parity.words.checks.map((c) => c.sentence)).size,
+		new Set(parity.words.checks.map((c) => JSON.stringify([c.sentence, c.cells]))).size,
 		parity.words.checks.length
 	);
 	assert.match(parity.words.under, /gains under 0\.1 points/);
@@ -347,7 +348,7 @@ void test("the Trades at every clock: each row's offer in the web's words, the s
 		['on', 'drop'].map((pick) => parity.builder.yours.rows.some((r) => r.pick === pick)),
 		[true, true]
 	);
-	assert.equal(parity.builder.pin, '+5.7 a week for your lineup, +0.7 for theirs');
+	assert.equal(parity.builder.pin, '+5.3 a week for your lineup, +1.1 for theirs');
 });
 
 void test("the Account's words: who, the free season's plan, each league's row, each device's line (Lane 198)", async () => {

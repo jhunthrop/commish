@@ -49,6 +49,33 @@ public struct BoardCover: Equatable, Sendable {
     }
 }
 
+/// The capture a board's statuses come from (designation.ts CaptureStamp): when its list last
+/// changed, and the capture job's last check of it, nil when none is recorded.
+public struct CaptureStamp: Equatable, Sendable {
+    public let asOf: Date
+    public let checkedAt: Date?
+
+    public init(asOf: Date, checkedAt: Date?) {
+        self.asOf = asOf
+        self.checkedAt = checkedAt
+    }
+
+    /// When it was last known to stand: its check, else its list's change.
+    var last: Date {
+        checkedAt ?? asOf
+    }
+
+    /// designation.ts newerCapture (Lane 280, B257): the stamp a board's status column is as of, the
+    /// newer of the run's capture and the live order's, the run's on a tie, either alone without the
+    /// other. Held to board-run.json's liveStamps.
+    public static func newer(run: CaptureStamp?, live: CaptureStamp?) -> CaptureStamp? {
+        guard let run, let live else {
+            return live ?? run
+        }
+        return live.last > run.last ? live : run
+    }
+}
+
 /// The board's words as the web's season pages say them (season-words.ts boardWords, ported and held to
 /// shared/fixtures/parity/board.json): the bar's word, the document's title, the heading and the one
 /// verb. In season the board is the rest of the season where the run ranks it, and the verb follows the
@@ -75,13 +102,24 @@ public struct BoardWords: Equatable, Sendable {
 
     /// The capture the statuses come from in the few words a board's basis has room for
     /// (designation.ts captureShort): "Status read Oct 16.", "as of" its last change with no check,
-    /// and past a day and a half how old it is.
+    /// the hour on the member's own day ("Status read today 9:15 am CT."), and past a day and a half
+    /// how old it is.
     public static func capture(asOf: Date, checkedAt: Date?, now: Date, zone: TimeZone) -> String {
         let last = checkedAt ?? asOf
-        let when = checkedAt.map { "read \(Formatting.shortDay($0, zone: zone))" }
-            ?? "as of \(Formatting.shortDay(asOf, zone: zone))"
-        let old = now.timeIntervalSince(last) > captureBehind ? ", over 36 hours ago" : ""
-        return "Status \(when)\(old)."
+        // On the member's own day the hour tells this hour's capture from last night's (Lane 280).
+        let day = { (date: Date) in
+            Formatting.sameDay(date, now, zone: zone)
+                ? "\(Words.Capture.today) \(Formatting.timeOfDay(date, zone: zone)) \(Formatting.zoneShort(zone))"
+                : Formatting.shortDay(date, zone: zone)
+        }
+        let when = checkedAt.map { "\(Words.Capture.read) \(day($0))" } ?? "\(Words.Capture.asOf) \(day(asOf))"
+        let old = now.timeIntervalSince(last) > captureBehind ? ", \(Words.Capture.old)" : ""
+        return "\(Words.Capture.status) \(when)\(old)."
+    }
+
+    /// The capture's words for a stamp (capture above).
+    public static func capture(_ stamp: CaptureStamp, now: Date, zone: TimeZone) -> String {
+        capture(asOf: stamp.asOf, checkedAt: stamp.checkedAt, now: now, zone: zone)
     }
 
     /// designation.ts CAPTURE_BEHIND_MS: past it the capture says how old it is.

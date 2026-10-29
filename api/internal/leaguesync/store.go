@@ -164,15 +164,26 @@ func (s *Store) Get(ctx context.Context, accountID, id uuid.UUID) (Link, error) 
 
 // Detach marks the account's link detached. The row and the saved league
 // it made stay, so the detach can be undone (Restore) and mocks saved
-// from the league keep their settings.
+// from the league keep their settings. The link's host offers are retired
+// in the same transaction (Lane 285, B278): a restore answers none until
+// its next good read.
 func (s *Store) Detach(ctx context.Context, accountID, id uuid.UUID) error {
-	tag, err := s.Pool.Exec(ctx, `update app.league_links set detached_at = now()
-		where id = $1 and account_id = $2 and detached_at is null`, id, accountID)
+	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `update app.league_links set detached_at = now()
+			where id = $1 and account_id = $2 and detached_at is null`, id, accountID)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrLinkNotFound
+		}
+		return retireOffers(ctx, tx, []uuid.UUID{id})
+	})
+	if errors.Is(err, ErrLinkNotFound) {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("leaguesync: detach %s: %w", id, err)
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrLinkNotFound
 	}
 	return nil
 }

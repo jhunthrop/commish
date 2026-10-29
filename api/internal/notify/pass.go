@@ -18,8 +18,9 @@ type DrainRunner interface {
 
 // Pass is one notify run: the catch-up on its own deadline, then the
 // drain, so a slow catch-up never starves the drain of every other push
-// (re-review N17). A catch-up cut at its deadline does not move its mark
-// and resumes at the next run; its failure is logged and the drain runs.
+// (re-review N17). A catch-up cut at its deadline does not move its mark:
+// it keeps the last account it finished and the next run resumes after
+// it (Lane 285); its failure is logged and the drain runs.
 type Pass struct {
 	CatchUp       CatchUpRunner
 	Drain         DrainRunner

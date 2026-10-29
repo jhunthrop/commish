@@ -74,41 +74,6 @@ export function monthDay(iso: string, zone: string = memberZone()): string {
 	return made.format(new Date(iso));
 }
 
-/** The NFL's clock, which a screen's times need not name. */
-const EASTERN = 'Eastern Time';
-
-/** The member's zone said once on a screen, "Times are in Central Time.", null on the Eastern clock. */
-export function zoneLine(zone: string = memberZone()): string | null {
-	const name = zoneName(zone);
-	return name === EASTERN ? null : `Times are in ${name}.`;
-}
-
-/** The weekday-month-day-and-time format for a zone, made once per zone. */
-const dayTimeFormats = new Map<string, Intl.DateTimeFormat>();
-
-function dayTimeFormat(zone: string): Intl.DateTimeFormat {
-	const known = dayTimeFormats.get(zone);
-	if (known) return known;
-	const made = new Intl.DateTimeFormat('en-US', {
-		weekday: 'long',
-		month: 'long',
-		day: 'numeric',
-		hour: 'numeric',
-		minute: '2-digit',
-		timeZone: zone
-	});
-	dayTimeFormats.set(zone, made);
-	return made;
-}
-
-/** "Sunday, October 25 at 7:00 pm": a day further off than this week, on the member's clock. */
-export function dayAndTime(iso: string, zone: string = memberZone()): string {
-	const parts = dayTimeFormat(zone).formatToParts(new Date(iso));
-	const part = (type: Intl.DateTimeFormatPartTypes): string =>
-		parts.find((p) => p.type === type)?.value ?? '';
-	return `${part('weekday')}, ${part('month')} ${part('day')} at ${part('hour')}:${part('minute')} ${part('dayPeriod').toLowerCase()}`;
-}
-
 /** The short month-and-day format for a zone, made once per zone. */
 const shortDayFormats = new Map<string, Intl.DateTimeFormat>();
 

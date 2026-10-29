@@ -17,6 +17,8 @@ data class OrderQuery(
     val search: String?,
     val limit: Int,
     val byesLast: Boolean = true,
+    /** The view's rows skipped before this page's first (Lane 280), 0 for the top. */
+    val offset: Int = 0,
 ) {
     /** The read's route with its query, the cache key of its answer (path.ts orderPath with no league). */
     val route: String
@@ -27,6 +29,7 @@ data class OrderQuery(
                     position?.let { "position=${it.name}" },
                     search?.let { "q=${encoded(it)}" },
                     "byes=last".takeIf { byesLast },
+                    "offset=$offset".takeIf { offset > 0 },
                 )
             return "/order?${parts.joinToString("&")}"
         }
@@ -70,8 +73,13 @@ class ApiRankingsReads(
     override suspend fun order(query: OrderQuery): String =
         transport
             .leagueSync()
-            .order(query.position?.name, query.search, query.limit, if (query.byesLast) BYES_LAST else null)
-            .bodyText()
+            .order(
+                position = query.position?.name,
+                q = query.search,
+                limit = query.limit,
+                byes = if (query.byesLast) BYES_LAST else null,
+                offset = query.offset.takeIf { it > 0 },
+            ).bodyText()
 
     override suspend fun weekOrder(position: WeekPosition): String = transport.leagueSync().weekOrder(position.name).bodyText()
 

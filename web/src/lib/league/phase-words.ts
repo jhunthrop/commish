@@ -3,17 +3,54 @@
  * account's leagues differ, the league page's draft line and final standing, and the league page's
  * one matchup line. Every instant on the member's own clock. Pure, so every sentence is tested. */
 import {
-	dayAndTime,
 	memberZone,
 	sameDay,
 	shortDay,
 	timeOfDay,
-	weekdayTime
+	weekdayTime,
+	zoneName
 } from '#lib/format/clock.ts';
 import type { ContextLeague } from '#lib/context/words.ts';
 import { MOCK_VERB, type LeagueScreen } from '#lib/ui/nav.ts';
 import type { LeagueStanding } from './api.ts';
 import { placeWords, recordWords } from './model.ts';
+
+/** The NFL's clock, which a screen's times need not name. */
+const EASTERN = 'Eastern Time';
+
+/** The member's zone said once on a screen, "Times are in Central Time.", null on the Eastern clock: the
+ * league screens' line, kept out of format/clock.ts, which every page loads (Lane 284). */
+export function zoneLine(zone: string = memberZone()): string | null {
+	const name = zoneName(zone);
+	return name === EASTERN ? null : `Times are in ${name}.`;
+}
+
+/** The weekday-month-day-and-time format for a zone, made once per zone. */
+const dayTimeFormats = new Map<string, Intl.DateTimeFormat>();
+
+function dayTimeFormat(zone: string): Intl.DateTimeFormat {
+	const known = dayTimeFormats.get(zone);
+	if (known) return known;
+	const made = new Intl.DateTimeFormat('en-US', {
+		weekday: 'long',
+		month: 'long',
+		day: 'numeric',
+		hour: 'numeric',
+		minute: '2-digit',
+		timeZone: zone
+	});
+	dayTimeFormats.set(zone, made);
+	return made;
+}
+
+/** "Sunday, October 25 at 7:00 pm": a day further off than this week, on the member's clock. Here,
+ * not in format/clock.ts, which every page loads: only the league page says a draft day (Lane 284). */
+export function dayAndTime(iso: string, zone: string = memberZone()): string {
+	const parts = dayTimeFormat(zone).formatToParts(new Date(iso));
+	const part = (type: Intl.DateTimeFormatPartTypes): string =>
+		parts.find((p) => p.type === type)?.value ?? '';
+	return `${part('weekday')}, ${part('month')} ${part('day')} at ${part('hour')}:${part('minute')} ${part('dayPeriod').toLowerCase()}`;
+}
 
 /** The follow page's line above the form, naming the screen the rail item leads to once a league
  * is followed. */

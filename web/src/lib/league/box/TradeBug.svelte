@@ -1,19 +1,22 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import TeamAvatar from './TeamAvatar.svelte';
-	import { TRADES, type BugFigures } from './trades.ts';
+	import { TRADES, type BugFigures, type RestFigure } from './trades.ts';
 
 	/** The trade builder's verdict (Lane 66g; box-score rows since Lane 268): one row per side, its
 	 * name in body weight, then this week's Proj and the rest-of-season gain a week, each before to
 	 * after with the change, a bar of its gain against the other side's (Lane 260), and its room; the
-	 * verb beside the rows. Each row has room for one more cell after Room (the value cell Lane 269's
-	 * answer brings): a head and a cell, the table's auto columns take it. */
+	 * verb beside the rows. Since Lane 277 a Rest of season cell after the gain: the side's change in
+	 * points over the waiver level over the weeks the check covers (the API gives the change alone, no
+	 * before or after), and "Would not take it" beside a side that would refuse. */
 	interface Side {
 		name: string;
 		figures: BugFigures;
 		room: string;
 		/** The side's gain as a share of the longer one, 0 to 1 (gainBars). */
 		bar: number;
+		/** Its rest of season (restFigure). */
+		rest: RestFigure;
 	}
 
 	interface Props {
@@ -25,9 +28,11 @@
 		gainHead: string;
 		/** The head over the sides' names, for a screen reader: "Team". */
 		teamHead: string;
+		/** The head over each side's rest of season (TRADES.restHead). */
+		restHead: string;
 	}
 
-	let { yours, theirs, verb, gainHead, teamHead }: Props = $props();
+	let { yours, theirs, verb, gainHead, teamHead, restHead }: Props = $props();
 </script>
 
 {#snippet row(side: Side, mine: boolean)}
@@ -56,6 +61,12 @@
 				></span
 			></td
 		>
+		<td class="fig rest"
+			><span class="figs"
+				>{#if side.rest.text !== ''}<em class={side.rest.tone}>{side.rest.text}</em
+					>{/if}{#if side.rest.refuses}<span class="refuses">{TRADES.wouldNotTake}</span>{/if}</span
+			></td
+		>
 		<td class="room">{side.room}</td>
 	</tr>
 {/snippet}
@@ -67,6 +78,7 @@
 				<th scope="col"><span class="vh">{teamHead}</span></th>
 				<th scope="col">{TRADES.weekHead}</th>
 				<th scope="col">{gainHead}</th>
+				<th scope="col" class="rest-head">{restHead}</th>
 				<th scope="col" class="room">{TRADES.room}</th>
 			</tr>
 		</thead>
@@ -228,6 +240,19 @@
 		}
 	}
 
+	/* A side that would not take the trade: said beside its change, in the loss ink. */
+	.refuses {
+		font-family: var(--font-ui);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		color: var(--loss-ink);
+	}
+
+	/* A rest of season with no figure is the none mark, quiet as the other cells' before an answer. */
+	.rest em.even {
+		background: none;
+	}
+
 	.room {
 		font-size: var(--t-sm);
 		font-weight: 600;
@@ -273,13 +298,26 @@
 			display: none;
 		}
 
+		/* The pinned line under the rows says who would not take it; the cell keeps its figure. */
+		.refuses {
+			display: none;
+		}
+
+		/* The rest-of-season head in two short lines, so its cell takes the figure's width. */
+		thead th.rest-head {
+			white-space: normal;
+			width: 3.5em;
+			line-height: 1.15;
+			height: auto;
+		}
+
 		.bar {
-			width: 28px;
+			width: 20px;
 		}
 
 		th,
 		td {
-			padding-right: var(--s-2);
+			padding-right: 6px;
 		}
 
 		/* The team's name whole, on a second line where it is long, never cut. */
@@ -311,7 +349,7 @@
 		}
 
 		.figs {
-			gap: 4px;
+			gap: 3px;
 		}
 
 		i,
@@ -320,6 +358,7 @@
 		}
 
 		em {
+			padding: 0 3px;
 			font-size: var(--t-xs);
 		}
 	}

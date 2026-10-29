@@ -171,10 +171,17 @@ def room(budget: RunBudget, worst: float) -> Callable[[], bool]:
     return lambda: budget.max_usd is None or budget.spent_usd + worst <= budget.max_usd
 
 
-def write_all(
-    gateway: GatewayClient, sheets: Sequence[WeekSheet], models: Sequence[str], judge: str, worst: float
+def write_all(  # noqa: PLR0913 - the run's parts
+    gateway: GatewayClient,
+    sheets: Sequence[WeekSheet],
+    models: Sequence[str],
+    judge: str,
+    worst: float,
+    *,
+    retry_model: str | None = None,
 ) -> dict[str, Lane]:
-    """Every sheet by every writer, interleaved in board order on the gateway's rolling pool."""
+    """Every sheet by every writer, interleaved in board order on the gateway's rolling pool, each read the
+    writer's asks could not write asked once more of `retry_model` as production asks it (Lane 276)."""
     lanes = {model: Lane(model) for model in models}
     items = [(sheet, model) for sheet in sheets for model in models]
     budget = gateway.budget
@@ -186,7 +193,7 @@ def write_all(
 
         def work(scoped: GatewayClient) -> tuple[WeekReadResult, float]:
             began = time.monotonic()
-            result = write_week_read(sheet, scoped.with_model(model), avoid, taken, judge)
+            result = write_week_read(sheet, scoped.with_model(model), avoid, taken, judge, retry_model=retry_model)
             return result, time.monotonic() - began
 
         return work
