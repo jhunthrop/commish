@@ -25,7 +25,7 @@ from research.model.jsmath import js_round
 # game-facts.ts): a lower one is not on the page.
 PRECIPITATION_NAMED_FROM: Final = 20
 # The weather cell prints no figure for a roof (indoors, a retractable roof).
-_ROOFED: Final = frozenset({"dome", "retractable"})
+ROOFED: Final = frozenset({"dome", "retractable"})
 
 
 def named_chance(w: Weather) -> float | None:
@@ -63,7 +63,7 @@ def _game_cells(sheet: WeekSheet) -> set[float]:
     if sheet.expected is not None:
         out |= {page_tenth(sheet.expected.club_points), page_tenth(sheet.expected.opponent_points)}
     w = sheet.weather
-    if w is not None and w.roof not in _ROOFED:
+    if w is not None and w.roof not in ROOFED:
         out |= {js_round(v) for v in (w.temperature_f, w.wind_mph) if v is not None}
         chance = named_chance(w)
         if chance is not None:
