@@ -21,7 +21,7 @@ Each read takes only what was stamped at or before the instant:
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any, Final, cast
 
@@ -29,8 +29,11 @@ from sqlalchemy import Connection, text
 
 from research.capsules.page_figures import expected_score, page_tenth, projection_tenth
 from research.capsules.sweep import Subject
+from research.capsules.week.angles import AnglePlayer, angles_on, board_angles
 from research.capsules.week.rollover import Rollover, projection_held, published_from_week, rollover
 from research.capsules.week.sheet import (
+    CANNOT_PLAY,
+    STATUS_WORDS,
     Allowed,
     BoardPlace,
     DepthPlace,
@@ -44,6 +47,7 @@ from research.capsules.week.sheet import (
     WeekSheet,
 )
 from research.capsules.week.store import StoredWeekRead
+from research.capsules.week.usage_reads import UsageWeek, depth_changes, usage_by_player
 from research.db.schema.provider import GAME_TO_PLAY
 from research.model.domain import Position
 from research.nightly.build.page_club import call_for
@@ -349,6 +353,10 @@ class WeekFacts:
     board_week: int
     # Whether the board week's reads are written on a pass at `as_of` (Lane 256, `rollover`).
     rollover: Rollover
+    # Every player's weeks of usage and the depth-chart moves by universe id, read while the angles are on
+    # (Lane 300).
+    usage: Mapping[str, tuple[UsageWeek, ...]] = field(default_factory=dict)
+    depth_moves: Mapping[str, tuple[float, datetime]] = field(default_factory=dict)
 
 
 def _status(read: StatusRead | None, player_id: str, at: datetime | None, checked: datetime | None) -> Status:
@@ -403,6 +411,8 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         stamp,
         the_board_week,
         rollover(the_board_week, context.games, states, published_from, held, as_of),
+        usage_by_player(conn, season, as_of) if angles_on() else {},
+        depth_changes(conn, season, as_of) if angles_on() else {},
     )
 
 
@@ -494,7 +504,13 @@ def week_sheet(
         board=facts.boards.get(identity.id),
         last_read=last_read_of(stored.get((subject.universe_id, cw.week))),
         lines_at=facts.lines_at,
+        depth_moved_from=_moved_from(facts, subject.universe_id),
     )
+
+
+def _moved_from(facts: WeekFacts, player_id: str) -> float | None:
+    move = facts.depth_moves.get(player_id)
+    return None if move is None else move[0]
 
 
 def _figures(facts: WeekFacts, key: tuple[int, str], kickoff: datetime) -> TeamWeekRead | None:
@@ -504,6 +520,30 @@ def _figures(facts: WeekFacts, key: tuple[int, str], kickoff: datetime) -> TeamW
 def collect_week_sheets(
     facts: WeekFacts, subjects: Sequence[Subject], stored: Mapping[tuple[str, int], StoredWeekRead]
 ) -> list[WeekSheet]:
-    """Every subject's sheet that reads, in the subjects' (board) order."""
-    sheets = (week_sheet(facts, subject, stored) for subject in subjects)
-    return [sheet for sheet in sheets if sheet is not None]
+    """Every subject's sheet that reads, in the subjects' (board) order, with his angles while they are on
+    (Lane 300): every board player's candidates scored against his position's peers on the board."""
+    pairs = [(subject, sheet) for subject in subjects if (sheet := week_sheet(facts, subject, stored)) is not None]
+    if not angles_on():
+        return [sheet for _, sheet in pairs]
+    players = [angle_player(facts, subject, sheet) for subject, sheet in pairs]
+    clubs = {s.team: s.expected.club_points for _, s in pairs if s.expected is not None and not s.bye}
+    angles = board_angles(players, clubs, facts.board_week)
+    return [replace(sheet, angles=angles.get(sheet.player_id, ()) if sheet.can_play else ()) for _, sheet in pairs]
+
+
+def angle_player(facts: WeekFacts, subject: Subject, sheet: WeekSheet) -> AnglePlayer:
+    """A board player as the angles read him: his usage, his games' points, the weeks he missed, and whether
+    the injury report rules him out this week."""
+    log = facts.blocks[subject.facts.identity.id]["log"]
+    status = sheet.status.status
+    out = STATUS_WORDS.get(status) if status in CANNOT_PLAY and not sheet.status.returning_this_week else None
+    return AnglePlayer(
+        sheet.player_id,
+        sheet.name,
+        sheet.position,
+        sheet.team,
+        facts.usage.get(sheet.player_id, ()),
+        tuple((int(row["week"]), float(row["points"])) for row in log if row["status"] == "played"),
+        sheet.missed,
+        out,
+    )

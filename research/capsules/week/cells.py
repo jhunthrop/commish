@@ -89,8 +89,13 @@ def cell_figures(sheet: WeekSheet) -> frozenset[float]:
 
 def quotable_figures(sheet: WeekSheet) -> frozenset[float]:
     """The cells' figures a read may quote: every cell but the published projection and its change, which the
-    card's Wk cell carries alone (Lane 275)."""
-    return frozenset(_game_cells(sheet) | _season_cells(sheet))
+    card's Wk cell carries alone (Lane 275), and every figure his angles state (Lane 300): the angle's sentence
+    on the sheet is its basis, checked to the figure like a cell's."""
+    return frozenset(_game_cells(sheet) | _season_cells(sheet) | _angle_figures(sheet))
+
+
+def _angle_figures(sheet: WeekSheet) -> set[float]:
+    return {page_tenth(figure) for angle in sheet.angles for figure in angle.figures}
 
 
 # A figure's name, right after it or right before it (Lane 100 review M1, Lane 117 B80): every cell the card

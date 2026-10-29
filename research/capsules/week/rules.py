@@ -51,6 +51,9 @@ MIN_SENTENCES: Final = 3
 MAX_SENTENCES: Final = 5
 # The figures a read states at most (Lane 100, B44): the cells above it carry his numbers.
 MAX_FIGURES: Final = 3
+# A read built on its angles (Lane 300) may state one figure more: an angle's share and the one it is set
+# against are two figures, and the angles are in no cell, so the cap on retelling the cells is not what they spend.
+ANGLE_FIGURES: Final = 1
 # The writer's own call for its read, one word (H2): what it tells a manager who has him to do this week.
 START: Final = "start"
 CALLS: Final = (START, "sit", "hold", "none")
@@ -258,12 +261,18 @@ def _cell_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
                 )
             )
     count = sum(len(stated_figures(s, sheet.season)) for s in sentences)
-    if count > MAX_FIGURES:
+    cap = max_figures(sheet)
+    if count > cap:
         out.append(
-            f"The read states {count} figures. The cells above it carry his numbers: state at most {MAX_FIGURES}, "
+            f"The read states {count} figures. The cells above it carry his numbers: state at most {cap}, "
             "and say in words what the cells cannot, why his figure is what it is and what to do this week."
         )
     return out
+
+
+def max_figures(sheet: WeekSheet) -> int:
+    """The figures a read may state: `MAX_FIGURES`, and `ANGLE_FIGURES` more on a sheet with angles (Lane 300)."""
+    return MAX_FIGURES + (ANGLE_FIGURES if sheet.angles else 0)
 
 
 def _paragraph_violation(text: str) -> list[str]:

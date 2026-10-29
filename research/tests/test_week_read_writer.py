@@ -37,6 +37,7 @@ from research.capsules.week.prompt import (
     parse_week_answer,
     week_correction,
     week_prompt,
+    week_rules,
 )
 from research.capsules.week.render import render_week_sheet
 from research.capsules.week.sheet import Status, WeekSheet
@@ -350,7 +351,7 @@ def worst_correction(sheet: WeekSheet) -> tuple[str, str]:
     broken = [long_read, _BROKEN, STARTER_READ.replace("18.4 points", "18.7 points"), "Buy him. Buy him now.", _FORM]
     ledger = notes_of([(text, validate_week_read(text, sheet).violations) for text in broken])
     avoid = tuple(f"{_AVOIDED} ({n})" for n in range(CAPSULE_CONFIG.repetition.max_quoted_sentences))
-    return WEEK_RULES, week_correction(sheet, long_read, ledger, avoid)
+    return week_rules(), week_correction(sheet, long_read, ledger, avoid)
 
 
 def test_the_worst_prompt_bound_holds_the_heaviest_correction_with_its_margin() -> None:

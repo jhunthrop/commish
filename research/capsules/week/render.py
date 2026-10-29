@@ -16,6 +16,8 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.render_depth import slot_word
 from research.capsules.render_season import week_list
 from research.capsules.render_words import IN_OUR_RECORDS, ordinal, week_of
+from research.capsules.week.angles import angles_on
+from research.capsules.week.bites import depth_bites, rank_bites, weather_bites
 from research.capsules.week.cells import named_chance
 from research.capsules.week.rank_words import rank_words
 from research.capsules.week.report_day import report_words
@@ -204,8 +206,36 @@ def _board_line(sheet: WeekSheet) -> str | None:
     return f"Our preseason order, set before the season{_as_of(b.published_at)}: {place}. {say}"
 
 
+ANGLES_HEAD: Final = "What sets his week apart, the most unusual first (build the read on these, in this order):"
+NO_ANGLE: Final = (
+    "What sets his week apart: no usage fact of his stands out this week. Build the read on his status, his game "
+    "and his season."
+)
+
+
+def _angles_lines(sheet: WeekSheet) -> list[str]:
+    """His angles (Lane 300), one to a line, for a player who can play this week."""
+    if not sheet.can_play:
+        return []
+    if not sheet.angles:
+        return [NO_ANGLE]
+    return [ANGLES_HEAD, *(f"{n}. {angle.text}" for n, angle in enumerate(sheet.angles, start=1))]
+
+
+def _biting(sheet: WeekSheet) -> list[str | None]:
+    """The generic facts that bite this week (`bites`), with his angles: the sheet under the angles."""
+    return [
+        *_angles_lines(sheet),
+        _weather_line(sheet) if weather_bites(sheet) else None,
+        _allowed_line(sheet) if rank_bites(sheet.allowed) else None,
+        _depth_line(sheet) if depth_bites(sheet) else None,
+    ]
+
+
 def render_week_sheet(sheet: WeekSheet) -> str:
-    """The week's facts as the writer reads them, one fact to a line, each with its read."""
+    """The week's facts as the writer reads them, one fact to a line, each with its read: with the angles on
+    (Lane 300), his angles first after his status, and the weather, the opponent's rank and the depth chart only
+    where they bite; the expected score only as an angle."""
     this_week = week_of(sheet.week, sheet.season)
     reach = (
         f"no week's games are {IN_OUR_RECORDS} yet"
@@ -219,10 +249,11 @@ def render_week_sheet(sheet: WeekSheet) -> str:
         _game_line(sheet),
         _status_line(sheet),
         _projection_line(sheet),
-        _expected_line(sheet),
-        _weather_line(sheet),
-        _allowed_line(sheet),
-        _depth_line(sheet),
+        *(
+            _biting(sheet)
+            if angles_on()
+            else (_expected_line(sheet), _weather_line(sheet), _allowed_line(sheet), _depth_line(sheet))
+        ),
         _season_line(sheet),
         _board_line(sheet),
     ]

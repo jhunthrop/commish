@@ -220,4 +220,5 @@ def _field_value(name: str, raw: Any) -> Any:
 
 def sheet_from_json(raw: Json) -> WeekSheet:
     """The recorded fixture's sheet, read back."""
-    return WeekSheet(**{f.name: _field_value(f.name, raw[f.name]) for f in fields(WeekSheet)})
+    # A field recorded before it existed (Lane 300's angles) keeps its default.
+    return WeekSheet(**{f.name: _field_value(f.name, raw[f.name]) for f in fields(WeekSheet) if f.name in raw})
