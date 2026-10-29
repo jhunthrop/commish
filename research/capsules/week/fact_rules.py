@@ -1,8 +1,9 @@
 """THE WEEK READ'S FACT RULES (Lane 299): a claim the sheet holds a fact for says that fact, not a nearby one.
 
 The founder, 2026-10-29: "they need to be accurate." The writer's rules trace every figure to a cell and every
-name to the sheet, but a traced figure or name can still be tied to the wrong fact. The live week 8 audit found
-two such classes the validator let through, each closed here against the sheet:
+name to the sheet, but a traced figure or name can still be tied to the wrong fact, or go false after the write.
+The live week 8 audit found these, each closed here against the sheet (and two more the cadence alone holds a
+stored read to, `standing_violations`: an undated Opp rank and his points a game as tonight's cells print them):
 
 - His place on the depth chart. A place said of him ("he sits fourth among Titans backs", "Seattle lists him
   second", "his second job behind Jacory Croskey-Merritt") is the sheet's (`DepthPlace.slot`), and a teammate he
@@ -10,6 +11,8 @@ two such classes the validator let through, each closed here against the sheet:
 - A game's figure tied to its week. "1.6 PPR points, back in week 4 of 2026 at New Orleans" is refused when the
   sheet's week 4 line is 1.2 points against Miami: a figure tied to a week is that week's game, and a club named
   with it is that game's opponent; a week the sheet's newest games do not include has no figure to state.
+- The kickoff forecast. A degrees, mph or chance figure, or a kind of weather the read says will come, is the
+  weather cell's (`weather_violations`); a denied kind ("no rain") is no claim, and thunderstorms carry rain.
 
 Both judge the text against the sheet, never the body alone, so a stored read that breaks them is not
 `cadence.RULE_STALE`: the cadence holds a stored read to them against tonight's sheet (`cadence.FACT_STALE`), so
@@ -49,7 +52,7 @@ def _place_patterns(sheet: WeekSheet) -> tuple[re.Pattern[str], ...]:
     his = r"(?:\b[Hh]is|" + "|".join(rf"\b{n}(?:'|\u2019)s" for n in _his_names(sheet)) + r")"
     return (
         re.compile(rf"{him}{_GAP}({_ORDINAL}){_PLACE_AFTER}"),
-        re.compile(rf"{his}(?:\s+[a-z]+)?\s+({_ORDINAL})(?:\s+|-)(?:job|role|spot|string|place|look)\b"),
+        re.compile(rf"{his}(?:\s+[a-z]+)?\s+({_ORDINAL})(?:\s+|-)(?:job|role|spot|string|place)\b"),
         re.compile(rf"{his}\s+(?:spot|place|role)\s+(?:running|listed|sitting)\s+({_ORDINAL}){_PLACE_AFTER}"),
     )
 
@@ -191,11 +194,23 @@ def week_figure_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[s
 _DEGREES: Final = re.compile(r"\b(\d+)\s*(?:degrees|°)", re.IGNORECASE)
 _MPH: Final = re.compile(r"\b(\d+)(?:\s+|-)mph\b", re.IGNORECASE)
 _CHANCE: Final = re.compile(r"\b(\d+)(?:%|\s+percent)\s+chance\b", re.IGNORECASE)
+# Each kind the forecast names (`nws.grid.PRECIPITATION_KINDS`) and the words a read says it in; freezing rain is
+# ice, never rain.
 _KINDS: Final = (
     ("thunderstorms", re.compile(r"\bthunder(?:storms?)?\b|\bstorms?\b", re.IGNORECASE)),
-    ("rain", re.compile(r"\brain(?:y|fall|s)?\b|\bshowers?\b", re.IGNORECASE)),
+    ("rain", re.compile(r"(?<!freezing )\brain(?:y|fall|s)?\b|\bshowers?\b", re.IGNORECASE)),
     ("snow", re.compile(r"\bsnow(?:y|fall|s)?\b", re.IGNORECASE)),
+    ("ice", re.compile(r"\bice\b|\bicy\b|\bsleet\b|\bfreezing rain\b", re.IGNORECASE)),
 )
+# The kinds a named kind carries with it: a thunderstorm forecast rains (the Lane 299 review's L1).
+_IMPLIED: Final = {"thunderstorms": frozenset({"thunderstorms", "rain"})}
+# A kind denied is no claim: "no rain in the forecast", "without snow", "not a storm" (within three words).
+_NEGATED: Final = re.compile(r"\b(?:no|without|not)\b(?:\W+\w+){0,2}\W*$", re.IGNORECASE)
+
+
+def _claimed(pattern: re.Pattern[str], sentence: str) -> bool:
+    """Whether a sentence says a kind of weather will come: a match with no denial within three words before it."""
+    return any(not _NEGATED.search(sentence[: m.start()]) for m in pattern.finditer(sentence))
 
 
 def _forecast_cells(sheet: WeekSheet) -> tuple[float | None, float | None, float | None, str | None]:
@@ -222,7 +237,8 @@ def weather_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
             *(("% chance", float(m.group(1)), chance) for m in _CHANCE.finditer(s)),
         ]
         off = [f"{value:g} {unit}" for unit, value, cell in said if cell is None or value != cell]
-        kinds = [name for name, pattern in _KINDS if pattern.search(s) and name != kind]
+        allowed = _IMPLIED.get(kind or "", frozenset({kind}))
+        kinds = [name for name, pattern in _KINDS if name not in allowed and _claimed(pattern, s)]
         if off or kinds:
             out.append(
                 _violation(

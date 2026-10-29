@@ -16,6 +16,7 @@ from sqlalchemy import Engine, insert
 
 from research.capsules.sweep import Subject
 from research.capsules.week.collect import collect_week_sheets, read_week_facts
+from research.capsules.week.depth import weekly_charts
 from research.capsules.week.rollover import ReadsDue
 from research.db.engine import make_engine
 from research.db.schema import (
@@ -203,7 +204,9 @@ def test_a_board_players_sheet_is_built_from_the_real_rows_with_the_weeks_projec
 
 def test_the_sheet_places_him_on_this_weeks_chart_loaded_by_the_write(engine: Engine) -> None:
     """Lane 299: his place is the newest weekly chart loaded by the write (the store's `SEA`), never the week-one
-    chart; a load after the write is not read."""
+    chart; a load after the write is not read. The chart keys on his universe id (gsis), never the provider id the
+    rest of the sheet reads (the review's L5), so the subject carries a universe id of its own."""
+    gsis = "00-0088888"
     loaded, later = datetime(2026, 10, 27, 12, 0, tzinfo=UTC), datetime(2026, 10, 28, 12, 0, tzinfo=UTC)
     with engine.begin() as conn:
         conn.execute(insert(PLAYERS).values(id="00-0039999", name="Zach Charbonnet", position="RB"))
@@ -213,14 +216,39 @@ def test_the_sheet_places_him_on_this_weeks_chart_loaded_by_the_write(engine: En
                 {"season": _SEASON, "week": _WEEK, "team": "SEA", "slot": "RB_11", "depth_order": order,
                  "player_id": pid, "as_of": at, "position": "RB"}
                 for pid, order, at in (
-                    ("00-0039999", 1, loaded), (_PLAYER, 2, loaded), (_PLAYER, 1, later), ("00-0039999", 2, later),
+                    ("00-0039999", 1, loaded), (gsis, 2, loaded), (gsis, 1, later), ("00-0039999", 2, later),
                 )
             ],
         )  # fmt: skip
-    subject = _subject()
+    subject = cast("Subject", SimpleNamespace(facts=_subject().facts, universe_id=gsis))
     with engine.connect() as conn:
         wednesday = read_week_facts(conn, _SEASON, [subject], _WEDNESDAY_RUN)
     assert wednesday is not None
     (sheet,) = collect_week_sheets(wednesday, [subject], {})
-    assert sheet.depth is not None
+    assert sheet.depth is not None and sheet.player_id == gsis
     assert (sheet.depth.slot, sheet.depth.around, sheet.depth.released_at) == (2.0, (("Zach Charbonnet", 1.0),), loaded)
+
+
+def test_a_club_on_its_bye_reads_the_snapshot_filed_under_its_next_game(engine: Engine) -> None:
+    """The review's M1: the dated ingest files a bye club's snapshot after its last game under its next game's
+    week, so the newest load wins whatever week it is filed under, and a load after the write is not read."""
+    before_bye, after_bye = datetime(2026, 10, 20, 12, 0, tzinfo=UTC), datetime(2026, 10, 27, 13, 0, tzinfo=UTC)
+    late = datetime(2026, 10, 29, 13, 0, tzinfo=UTC)
+    with engine.begin() as conn:
+        conn.execute(
+            insert(NFLVERSE_DEPTH_CHART_WEEKS),
+            [
+                {"season": _SEASON, "week": week, "team": "DAL", "slot": "WR_1", "depth_order": order,
+                 "player_id": pid, "as_of": at, "position": "WR"}
+                for week, pid, order, at in (
+                    (7, "00-0077771", 1, before_bye), (7, "00-0077772", 2, before_bye),
+                    (9, "00-0077772", 1, after_bye), (9, "00-0077771", 2, after_bye),
+                    (9, "00-0077771", 1, late), (9, "00-0077772", 2, late),
+                )
+            ],
+        )  # fmt: skip
+    with engine.connect() as conn:
+        charts = weekly_charts(conn, _SEASON, _WEDNESDAY_RUN)
+    chart = charts[("DAL", "WR")]
+    assert chart.released_at == after_bye
+    assert [(pid, place) for pid, _name, place in chart.listed] == [("00-0077772", 1), ("00-0077771", 2)]

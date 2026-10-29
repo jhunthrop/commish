@@ -125,7 +125,7 @@ data class TradeBuilderModel(
     val ideasHead: String,
     /** "8 more", null once every idea shows. */
     val more: String?,
-    /** The idea the ticks hold, pressed. */
+    /** The first place (an offer or an idea) the ticks hold, pressed. */
     val pressed: String?,
     val rosters: RosterSwitch,
     val teams: List<TeamChoice>,
@@ -240,15 +240,12 @@ object TradeBuilder {
         val sentence =
             inputs.problem ?: if (team == null) Words.Analyzer.noTeam else check?.let(TradeChecks::words) ?: prompt(picks)
         val live = team != null && check != null && TradeChecks.fillsBoth(check) && inputs.answered?.same(picks) == true
+        val ideas = inputs.ideas.at(inputs.now)
         return TradeBuilderModel(
-            ideas = inputs.ideas.visible(inputs.allIdeas),
-            ideasHead = inputs.ideas.head,
-            more = inputs.ideas.more(inputs.allIdeas),
-            pressed =
-                inputs.ideas.places
-                    .filterIsInstance<IdeaPlace.Idea>()
-                    .firstOrNull { it.preset.picks.same(picks) }
-                    ?.key,
+            ideas = ideas.visible(inputs.allIdeas),
+            ideasHead = ideas.head,
+            more = ideas.more(inputs.allIdeas),
+            pressed = ideas.places.firstOrNull { it.picks?.same(picks) == true }?.key,
             rosters =
                 RosterSwitch(
                     "${Words.Analyzer.you}${count(picks.give)}",

@@ -139,9 +139,9 @@ class TradesViewModel(
         key: String,
         leagueId: String,
     ): Job? {
-        val preset = ui.value.model?.preset(key) ?: return null
-        if (preset.picks.team != picks?.team) forgetAnswer()
-        picks = preset.picks
+        val loaded = ui.value.model?.picks(key, clock.now()) ?: return null
+        if (loaded.team != picks?.team) forgetAnswer()
+        picks = loaded
         return ask(leagueId)
     }
 

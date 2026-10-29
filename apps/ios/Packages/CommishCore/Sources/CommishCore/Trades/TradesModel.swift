@@ -3,8 +3,8 @@ import CommishDesign
 import Foundation
 
 /// One of our ideas above the rosters (builder.ts Preset, Lane 260): the finder's best trade with a team,
-/// the picks it loads, and its card's two lines, "Best With Max_Jensen10 +5.3 yours, +1.1 theirs" over
-/// "Rodgers for Waddle and Strong".
+/// the picks it loads, and its card's lines, "Best +5.3 yours, +1.1 theirs", "With Max_Jensen10", then
+/// "Rodgers for Waddle and Strong" with what it fills at that line's end, "Fills your WR" (Lane 290).
 public struct TradePreset: Equatable, Sendable, Identifiable {
     /// The web's tradeKey, "8:96>7526+8116".
     public let id: String
@@ -18,47 +18,82 @@ public struct TradePreset: Equatable, Sendable, Identifiable {
     public let gains: String
     /// "Rodgers for Waddle and Strong".
     public let deal: String
+    /// builder.ts fillsWords: "Fills your WR", nil when it fills none of the member's slots or the answer
+    /// does not say (an older API).
+    public let fills: String?
     public let picks: TradePicks
     /// Our best trade (worthProposing's first): the screen opens on its team.
     public let lead: Bool
 }
 
-/// A team the finder lists no trade with (builder.ts noIdeasFrom, B271): every idea it found with them,
-/// they would not take (Lane 269), so its place says so rather than leaving the team out.
+/// A team the finder lists no trade with (builder.ts noIdeasFrom, B271): its place says why, by the API's
+/// empty_reason (Lane 290, B283), rather than leaving the team out.
 public struct NoIdeaLine: Equatable, Sendable, Identifiable {
     public let id: Int
     public let team: String
     /// "With Carried by QJs", over its line.
     public let with: String
-    /// "No idea they would take."
+    /// "No idea they would take.", "They need what you need.", by the API's reason.
     public let note: String
 
     /// The teams with no trade, in the answer's order.
     static func of(_ teams: [TradeTeam]) -> [NoIdeaLine] {
         teams.filter(\.trades.isEmpty).map {
             NoIdeaLine(
-                id: $0.rosterId, team: $0.name, with: "\(Words.Trades.with) \($0.name)", note: Words.Trades.noIdea
+                id: $0.rosterId, team: $0.name, with: "\(Words.Trades.with) \($0.name)", note: note($0.emptyReason)
             )
+        }
+    }
+
+    /// builder.ts emptyNote: the line by the API's empty_reason; an answer without one (an older API), or
+    /// a reason this app does not know, keeps the line every empty team had.
+    static func note(_ reason: Components.Schemas.TradeTeam.EmptyReasonPayload?) -> String {
+        switch reason?.value1 {
+        case .dropped, nil: Words.Trades.noIdea
+        case .sameNeed: Words.Trades.sameNeed
+        case .noNeed: Words.Trades.noNeed
+        case .nothing: Words.Trades.nothingFound
         }
     }
 }
 
-/// One place in the ideas row (builder.ts IdeaPlace): an idea to load, or a team's line with none.
+/// One place in the ideas row (builder.ts IdeaPlace): a host's offer, an idea to load, or a team's line
+/// with none.
 public enum IdeaPlace: Equatable, Sendable, Identifiable {
+    case offer(OfferPreset)
     case idea(TradePreset)
     case none(NoIdeaLine)
 
-    /// The web's keys: the trade's, or "none:3".
+    /// The web's keys: the offer's, the trade's, or "none:3".
     public var id: String {
         switch self {
+        case let .offer(offer): offer.id
         case let .idea(preset): preset.id
         case let .none(line): "none:\(line.id)"
         }
     }
+
+    /// The ticks a tap loads: an idea's, or an offer's the builder can hold; nil on the rest.
+    public var picks: TradePicks? {
+        switch self {
+        case let .offer(offer): offer.picks
+        case let .idea(preset): preset.picks
+        case .none: nil
+        }
+    }
+
+    /// builder.ts ideaPlaces (Lane 290 review M2): the host's newest offer heads the row, then our first
+    /// idea (Best), then the host's other offers, then our other ideas, then each team with none, so the
+    /// three in sight always hold the newest offer and Best.
+    static func row(offers: [OfferPreset], presets: [TradePreset], none: [NoIdeaLine]) -> [IdeaPlace] {
+        offers.prefix(1).map(IdeaPlace.offer) + presets.prefix(1).map(IdeaPlace.idea)
+            + offers.dropFirst().map(IdeaPlace.offer) + presets.dropFirst().map(IdeaPlace.idea)
+            + none.map(IdeaPlace.none)
+    }
 }
 
-/// The ideas row (TradeBuilder's .ideas): its head, our ideas best first, then each team with none; the
-/// best three shown and "N more" for the rest.
+/// The ideas row (TradeBuilder's .ideas): its head, the host's offers and our ideas best first, then each
+/// team with none; the best three shown and "N more" for the rest.
 public struct TradeIdeas: Equatable, Sendable {
     /// builder.ts IDEAS_SHOWN.
     public static let shown = 3
@@ -69,6 +104,17 @@ public struct TradeIdeas: Equatable, Sendable {
     /// The places drawn: every one, or the best three.
     public func visible(all: Bool) -> [IdeaPlace] {
         all ? places : Array(places.prefix(Self.shown))
+    }
+
+    /// The row at `now`: an offer whose host expiry has passed goes (builder.ts offerPresets, review L2),
+    /// so one lapsing while the screen is open leaves on the next draw.
+    public func at(_ now: Date) -> TradeIdeas {
+        TradeIdeas(head: head, places: places.filter { place in
+            guard case let .offer(offer) = place, let ends = offer.endsAt else {
+                return true
+            }
+            return ends > now
+        })
     }
 
     /// builder.ts moreWords: "8 more", nil when every place is drawn.
@@ -102,9 +148,10 @@ public struct TradesModel: Equatable, Sendable {
         verb = TradesWords.verb(advice.moves, platform: platform)
         page = advice.hostTradesUrl.isEmpty ? nil : URL(string: advice.hostTradesUrl)
         reason = advice.hostTradesUrl.isEmpty ? advice.hostNote : nil
+        let offers = TradeOffers.presets(advice, platform: platform, now: now, zone: zone)
         ideas = TradeIdeas(
             head: Words.Analyzer.ideas,
-            places: presets.map(IdeaPlace.idea) + NoIdeaLine.of(advice.teams).map(IdeaPlace.none)
+            places: IdeaPlace.row(offers: offers, presets: presets, none: NoIdeaLine.of(advice.teams))
         )
         opening = TradePicks(team: presets.first(where: \.lead)?.rosterId, give: [], get: [])
         let lines = advice.roster + advice.teams.flatMap { $0.roster + $0.trades.flatMap { $0.give + $0.get } }
@@ -126,25 +173,31 @@ enum TradeFinder {
         return "\(team):\(ids(row.give))>\(ids(row.get))"
     }
 
-    /// The API's order across teams: the trades they gain from first, then the close calls for them,
-    /// each by your gain, then theirs.
-    static func apiOrder(_ lhs: Entry, _ rhs: Entry) -> Bool {
+    /// trades.ts tradeRank, the finder's one team order on the API's own keys (Lane 290 review M3): a
+    /// trade that is not a close call for them first, then one that fills a slot of the member's, then
+    /// the member's gain on the printed tenth. Ties keep the answer's order, the standings'.
+    static func rank(_ lhs: Entry, _ rhs: Entry) -> Bool {
         if lhs.row.closeForThem != rhs.row.closeForThem {
             return !lhs.row.closeForThem
         }
-        if lhs.row.myGain != rhs.row.myGain {
-            return lhs.row.myGain > rhs.row.myGain
+        if fills(lhs.row) != fills(rhs.row) {
+            return fills(lhs.row)
         }
-        return lhs.row.theirGain > rhs.row.theirGain
+        return TradesWords.shown(lhs.row.myGain) > TradesWords.shown(rhs.row.myGain)
     }
 
-    /// trades.ts finderRows with each team's best: its first trade, in the API's order (a stable sort,
-    /// as JavaScript's).
+    /// Whether the answer says the trade fills a slot of the member's (Lane 287's fills set).
+    static func fills(_ row: TradeRow) -> Bool {
+        row.fills?.value1 != nil || row.fills?.value2 != nil
+    }
+
+    /// trades.ts finderRows with each team's best: its first trade (the API's order within a team kept),
+    /// the teams by tradeRank (a stable sort, as JavaScript's).
     static func best(_ teams: [TradeTeam]) -> [Entry] {
         let entries = teams.flatMap { team in
             team.trades.prefix(1).map { Entry(key: key(team: team.rosterId, row: $0), team: team, row: $0) }
         }
-        return stable(entries, by: apiOrder)
+        return stable(entries, by: rank)
     }
 
     /// trades.ts worthProposing: each team's best the other team gains from, at most two.
@@ -170,7 +223,7 @@ enum TradeFinder {
                 gains: "\(TradesWords.gain(row.myGain)) \(Words.Analyzer.yours), "
                     + "\(TradesWords.gain(row.theirGain)) \(Words.Analyzer.theirs)",
                 deal: "\(TradesWords.shortSide(row.give)) \(TradesWords.forWord) \(TradesWords.shortSide(row.get))",
-                picks: picks, lead: lead
+                fills: TradesWords.fills(row.fills), picks: picks, lead: lead
             )
         }
     }

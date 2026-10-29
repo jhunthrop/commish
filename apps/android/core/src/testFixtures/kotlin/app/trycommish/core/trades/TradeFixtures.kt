@@ -19,6 +19,9 @@ object TradeFixtures {
     /** Sunday 18:56Z: the noon games in play. */
     const val SUNDAY = "2026-10-18T18-56-00Z"
 
+    /** The week's answer with the finder's newer fields (Lane 290): offers, fills, empty reasons. */
+    const val NEEDS = "needs-$WEEK"
+
     /** The best trade's key at the week's clock: Rodgers to Max_Jensen10 for Waddle and Strong. */
     const val BEST = "8:96>7526+8116"
 

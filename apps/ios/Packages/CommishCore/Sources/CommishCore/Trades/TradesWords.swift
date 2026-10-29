@@ -61,6 +61,20 @@ public enum TradesWords {
         return figure > 0 ? .gain : .loss
     }
 
+    /// builder.ts fillsWords: the slot a trade fills (Lane 287) as its card names it, "Fills your WR",
+    /// "Fills your flex"; nil for none, an older answer, or a slot this app does not know.
+    static func fills(_ fills: Components.Schemas.TradeRow.FillsPayload?) -> String? {
+        guard let slot = fills?.value1 else {
+            return nil
+        }
+        let words = switch slot {
+        case .flex: Words.Trades.flexSlot
+        case .superflex: Words.Trades.superflexSlot
+        case .qb, .rb, .wr, .te: slot.rawValue
+        }
+        return "\(Words.Trades.fillsYour) \(words)"
+    }
+
     /// trades.ts shortSide: a side by last names, "Skattebo and Strong".
     static func shortSide(_ side: [PlayerLine]) -> String {
         list(side.map { StartRows.lastName($0.player.name) })

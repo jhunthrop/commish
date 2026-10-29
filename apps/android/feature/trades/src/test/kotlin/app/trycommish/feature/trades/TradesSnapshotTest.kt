@@ -58,7 +58,9 @@ import java.io.IOException
  * verdict and the pin, their roster from the switch); every idea shown; an idea they would not take (the
  * refusal in the answer line and the pin); a saved read whose check found no signal (the stamp, the web's
  * line); and Sunday afternoon, the trade's players in play (no week, "--" in the Proj cells, the member's
- * roster with its drop). Both themes, a Pixel 9 and a small phone (the Nexus 5's 360 by 640 dp). The
+ * roster with its drop). The needs scene (Lane 290) reads the answer with the finder's newer fields: the
+ * host's offers heading the row, each idea's fills line and each empty team's reason, every place shown and
+ * the first screen; the long scene reads it too, so a long-named team's offer card heads its row. Both themes, a Pixel 9 and a small phone (the Nexus 5's 360 by 640 dp). The
  * persona panel reads these.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -73,6 +75,8 @@ class TradesSnapshotTest(
         val id: String,
         val clock: String,
         val parts: List<Part>,
+        /** The answer's file at the clock: the needs answer for the scenes that draw its fields. */
+        val file: String = clock,
     ) {
         Open("open", TradeFixtures.WEEK, listOf(Part.Screen, Part.Verdict)),
         Idea("idea", TradeFixtures.WEEK, listOf(Part.Screen, Part.Verdict, Part.Theirs)),
@@ -81,8 +85,11 @@ class TradesSnapshotTest(
         Stale("stale", TradeFixtures.WEEK, listOf(Part.Verdict)),
         Sunday("sunday", TradeFixtures.SUNDAY, listOf(Part.Verdict, Part.Yours)),
 
-        /** Long team names on both sides (review M2): every name drawn whole. */
-        Long("long", TradeFixtures.WEEK, listOf(Part.Screen, Part.Verdict, Part.Theirs)),
+        /** Long team names on both sides (review M2) and on an offer card: every name drawn whole. */
+        Long("long", TradeFixtures.WEEK, listOf(Part.Screen, Part.Verdict, Part.Theirs), TradeFixtures.NEEDS),
+
+        /** The finder's newer fields (Lane 290): offers, fills lines, the empty teams' reasons. */
+        Needs("needs", TradeFixtures.WEEK, listOf(Part.Screen, Part.Ideas), TradeFixtures.NEEDS),
     }
 
     enum class Part(
@@ -182,14 +189,17 @@ internal val ME = TradeMe("McConkey Kong Country", "1-4, 11th of 12")
 private val LONG_ME = TradeMe("McConkey Kong Country Club and Grill", "1-4, 11th of 12")
 private const val LONG_TEAM = "Max_Jensen10 and the Sunday Afternoon Regulars"
 
-/** The best idea's team, renamed long in the long scene. */
-private const val BEST_TEAM = 8
+/** The long scene's offering team (Muttdogs), renamed long. */
+internal const val LONG_OFFER = "Muttdogs of the Thursday Night Waiver Wire Club"
 
-/** The fixture's trades, with the best idea's team renamed long in the long scene. */
+/** The teams renamed long in the long scene: the best idea's and the newest offer's. */
+private val LONG_NAMES = mapOf(8 to LONG_TEAM, 10 to LONG_OFFER)
+
+/** The fixture's trades, with the best idea's and the offering team renamed long in the long scene. */
 private fun adviceAt(scene: TradesSnapshotTest.Scene): TradeAdvice {
-    val advice = TradeFixtures.trades(scene.clock)
+    val advice = TradeFixtures.trades(scene.file)
     if (scene != TradesSnapshotTest.Scene.Long) return advice
-    return advice.copy(teams = advice.teams.map { if (it.rosterId == BEST_TEAM) it.copy(name = LONG_TEAM) else it })
+    return advice.copy(teams = advice.teams.map { it.copy(name = LONG_NAMES[it.rosterId] ?: it.name) })
 }
 
 /** The fixture's check, or one they would not take on their rest of season (Lane 277). */
@@ -236,7 +246,7 @@ internal fun viewModelAt(scene: TradesSnapshotTest.Scene): TradesViewModel {
     }
     when (scene) {
         TradesSnapshotTest.Scene.Open -> Unit
-        TradesSnapshotTest.Scene.Ideas -> vm.showAllIdeas()
+        TradesSnapshotTest.Scene.Ideas, TradesSnapshotTest.Scene.Needs -> vm.showAllIdeas()
         else -> vm.loadIdea(TradeFixtures.BEST, league)
     }
     return vm

@@ -22,7 +22,7 @@ from research.capsules.gateway import GatewayClient
 from research.capsules.narrative import ShapeMasks
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.run_budget import RunBudget
-from research.capsules.week.cadence import FACT_STALE, FIRST, RULE_STALE, STATUS_CHANGED
+from research.capsules.week.cadence import FACT_STALE, FIRST, RULE_STALE, STATUS_CHANGED, falls_since_written
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.store import (
     StoredWeekRead,
@@ -344,6 +344,26 @@ def test_a_fact_stale_rewrite_lands_with_its_reason(engine: Engine) -> None:
     with engine.connect() as conn:
         landed = stored_week_reads(conn, 2026, [6])[(pid, 6)]
     assert (landed.body, landed.reason) == (STARTER_READ, FACT_STALE)
+
+
+def test_a_fact_stale_rewrite_that_falls_keeps_the_written_read_and_the_status_cap(engine: Engine) -> None:
+    """The Lane 299 review's L6: a fallen fact rewrite keeps the written body, reason and status, marks the day
+    attempted, and spends none of the day's status rewrites."""
+    pid = starter().player_id
+    written = _row(pid, 6, "Puka Nacua sits second among Rams receivers. Start him.")
+    with engine.begin() as conn:
+        upsert_week_read(conn, written)
+    off_page = STARTER_READ.replace("25.9 PPR points", "25.6 PPR points")
+    spend = WeekReadSpend()
+    gateway = _gateway(lambda _request: _completion(off_page, "start"))
+    _write(
+        engine, gateway, {(pid, 6): written}, [(starter(), FACT_STALE)], room=lambda: True, spend=spend, masks=_MASKS
+    )
+    with engine.connect() as conn:
+        kept = stored_week_reads(conn, 2026, [6])[(pid, 6)]
+    assert (kept.source, kept.body, kept.reason, kept.status) == ("llm", written.body, "first", None)
+    assert (kept.written_at, kept.attempt_day, kept.attempts) == (written.written_at, date(2026, 10, 16), 1)
+    assert falls_since_written(kept, WRITTEN_AT) == 0 and spend.held == 1
 
 
 def _same_shape_rewrites(engine: Engine) -> tuple[StoredWeekRead, StoredWeekRead]:

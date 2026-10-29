@@ -419,9 +419,9 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         stamp,
         the_board_week,
         rollover(the_board_week, context.games, states, published_from, held, as_of),
-        weekly_charts(conn, season, the_board_week, as_of),
+        weekly_charts(conn, season, as_of),
         usage_by_player(conn, season, as_of) if angles_on() else {},
-        depth_moves(conn, season, the_board_week, as_of) if angles_on() else {},
+        depth_moves(conn, season, as_of) if angles_on() else {},
     )
 
 
