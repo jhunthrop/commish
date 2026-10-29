@@ -3,6 +3,9 @@ package app.trycommish.core.account
 import app.trycommish.api.ApiFailure
 import app.trycommish.api.Unauthorized
 import app.trycommish.api.decodeEnvelope
+import app.trycommish.api.models.NotificationKinds
+import app.trycommish.api.models.NotificationSettings
+import app.trycommish.api.models.NotificationSettingsUpdate
 import kotlinx.coroutines.delay
 import java.io.File
 import java.io.IOException
@@ -98,6 +101,34 @@ class StubAccountScreen(
         deletions = deletions + email
         check()
         deleteRefusal?.let { throw it }
+    }
+
+    /** Each push settings change written, in order. */
+    var notificationChanges: List<NotificationSettingsUpdate> = emptyList()
+
+    /** The account with the change applied over its settings (the standard ones when it has none), as
+     * PATCH /me answers. */
+    override suspend fun updateNotifications(change: NotificationSettingsUpdate): AccountRead {
+        check()
+        notificationChanges = notificationChanges + change
+        val held = account.notifications
+        val kinds = change.kinds
+        account =
+            account.copy(
+                notifications =
+                    NotificationSettings(
+                        timeZone = change.timeZone ?: held?.timeZone ?: "America/New_York",
+                        quietStart = change.quietStart ?: held?.quietStart ?: "23:00",
+                        quietEnd = change.quietEnd ?: held?.quietEnd ?: "08:00",
+                        kinds =
+                            NotificationKinds(
+                                starterStatus = kinds?.starterStatus ?: held?.kinds?.starterStatus ?: true,
+                                weekReads = kinds?.weekReads ?: held?.kinds?.weekReads ?: true,
+                                waiverClaims = kinds?.waiverClaims ?: held?.kinds?.waiverClaims ?: true,
+                            ),
+                    ),
+            )
+        return account
     }
 
     private companion object {

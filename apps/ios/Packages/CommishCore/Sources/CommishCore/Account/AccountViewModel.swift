@@ -2,11 +2,13 @@ import CommishAPI
 import CommishDesign
 import Foundation
 import Observation
+import os
 
 /// Which part of the screen an action's failure is said beside.
 public enum AccountSection: Sendable, Equatable {
     case leagues
     case devices
+    case notifications
 }
 
 /// An action that did not go through: the API's own sentence, else the web's.
@@ -17,9 +19,9 @@ public struct AccountProblem: Equatable, Sendable {
 
 /// The Account screen (web/src/lib/account/AccountPage.svelte): the account, the leagues followed with
 /// detach and its undo (league/AccountLeagues.svelte), the paired devices with this phone marked and
-/// unpair (hosts/AccountDevices.svelte), the plan in the free season, the push switches kept on this
-/// phone until the account carries them, and sign out. The API, the cache, the clock, the switches'
-/// store and the session's verbs are injected.
+/// unpair (hosts/AccountDevices.svelte), the plan in the free season, the push switches the account
+/// keeps (PATCH /me `notifications`) with this phone's registration behind them, and sign out. The
+/// API, the cache, the clock, the phone's push and the session's verbs are injected.
 @MainActor
 @Observable
 public final class AccountViewModel {
@@ -30,10 +32,17 @@ public final class AccountViewModel {
     }
 
     public private(set) var state: State = .loading
-    public private(set) var push: PushSettings
+    /// The account's switches and quiet hours, as last read or written.
+    public internal(set) var push = PushSettings.standard
+    /// The settings the account last confirmed (read or written), put back when a write fails.
+    @ObservationIgnored var confirmed = PushSettings.standard
+    /// Whether this view model has written the phone's zone to the account (once, on load).
+    @ObservationIgnored var zoneWritten = false
+    /// Whether this phone may show a push; until it may, every switch draws off.
+    public internal(set) var permission = PushPermission.notAsked
     /// The row an action is under way on (a league's or a device's id).
     public private(set) var busy: String?
-    public private(set) var problem: AccountProblem?
+    public internal(set) var problem: AccountProblem?
     /// The last detach's undo window, kept so a test can await it; the app never waits on it.
     public var undoWindow: Task<Void, Never>? {
         lastDetached.flatMap { undoWindows[$0] }
@@ -43,9 +52,10 @@ public final class AccountViewModel {
     public static let undoSeconds: Double = 10
     /// The cache key of the screen's answer.
     public static let route = "/account"
+    nonisolated static let log = Logger(subsystem: "app.trycommish.ios", category: "account")
 
-    private var answer: AccountScreenAnswer?
-    private var stamp = Date.distantPast
+    var answer: AccountScreenAnswer?
+    var stamp = Date.distantPast
     private var stale = false
     private var detached: Set<String> = []
     private var thisDevice: String?
@@ -53,17 +63,21 @@ public final class AccountViewModel {
     @ObservationIgnored private var undoWindows: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var lastDetached: String?
 
-    private let api: any AccountScreenAPI
-    private let cache: any AnswerCache
+    let api: any AccountScreenAPI
+    let cache: any AnswerCache
     private let clock: any Clock
-    private let zone: TimeZone
-    private let store: any PushStore
+    let zone: TimeZone
+    let control: any PushControl
+    /// The quiet hours' write, after the wheel has stopped a moment (one PATCH, not one per tick).
+    @ObservationIgnored var quietWrite: Task<Void, Never>?
+    /// How long the wheel rests before quiet hours are written.
+    static let quietPause: Double = 0.8
     private let deviceID: @Sendable () async -> String?
     private let signOutSession: @MainActor () async -> Void
     private let onSignedOut: @MainActor () -> Void
     private let accountDeleted: @MainActor () async -> Void
     private let leaguesChanged: @MainActor () -> Void
-    private let wait: @Sendable (Double) async -> Void
+    let wait: @Sendable (Double) async -> Void
 
     /// `signOut` is the session's (it revokes this phone and forgets it); `onSignedOut` runs when the API
     /// refuses the token or this phone was unpaired here; `deleted` is the session's once the account is
@@ -71,7 +85,7 @@ public final class AccountViewModel {
     /// after a detach or a restore, so the league switch reads the account again; `wait` sleeps for
     /// seconds, the undo's window.
     public init(
-        api: any AccountScreenAPI, cache: any AnswerCache, clock: any Clock, zone: TimeZone, push: any PushStore,
+        api: any AccountScreenAPI, cache: any AnswerCache, clock: any Clock, zone: TimeZone, push: any PushControl,
         deviceID: @escaping @Sendable () async -> String?,
         signOut: @escaping @MainActor () async -> Void,
         onSignedOut: @escaping @MainActor () -> Void,
@@ -83,8 +97,7 @@ public final class AccountViewModel {
         self.cache = cache
         self.clock = clock
         self.zone = zone
-        store = push
-        self.push = push.load()
+        control = push
         self.deviceID = deviceID
         signOutSession = signOut
         self.onSignedOut = onSignedOut
@@ -126,7 +139,7 @@ public final class AccountViewModel {
     }
 
     /// The API refused the token: the pending detaches are let go, then the app signs out.
-    private func signedOut() {
+    func signedOut() {
         forgetPending()
         onSignedOut()
     }
@@ -143,6 +156,7 @@ public final class AccountViewModel {
     /// dated; with nothing shown, a sentence. A refused token signs out.
     public func load() async {
         thisDevice = await deviceID()
+        permission = await control.permission()
         if answer == nil, let saved = await cache.read(AccountScreenAnswer.self, route: Self.route) {
             show(saved.value, stamp: saved.stamp, stale: true)
         }
@@ -151,6 +165,7 @@ public final class AccountViewModel {
             let now = clock.now
             await cache.write(read, route: Self.route, stamp: now)
             show(read, stamp: now, stale: false)
+            await writeZone(read.me)
         } catch where APIError.signsOut(error) {
             state = .failed(AppWords.Failure.signedOut)
             signedOut()
@@ -250,19 +265,6 @@ public final class AccountViewModel {
         busy = nil
     }
 
-    public func set(_ kind: PushKind, isOn: Bool) {
-        save(push.with(kind, isOn: isOn))
-    }
-
-    public func setQuiet(from: Int, to: Int) {
-        save(push.with(quietFrom: from, quietTo: to))
-    }
-
-    private func save(_ settings: PushSettings) {
-        push = settings
-        store.save(settings)
-    }
-
     private func act(_ id: String, _ section: AccountSection, _ step: @Sendable () async throws -> Void) async {
         busy = id
         problem = nil
@@ -295,6 +297,10 @@ public final class AccountViewModel {
 
     private func show(_ read: AccountScreenAnswer?, stamp: Date, stale: Bool) {
         answer = read
+        if let read, quietWrite == nil {
+            push = PushSettings(read.me.notifications?.value1)
+            confirmed = push
+        }
         self.stamp = stamp
         self.stale = stale
         redraw()

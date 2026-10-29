@@ -88,6 +88,10 @@ public struct AccountScreenAnswer: Codable, Equatable, Sendable {
         )
     }
 
+    func with(me: AccountAnswer) -> AccountScreenAnswer {
+        AccountScreenAnswer(me: me, leagues: leagues, devices: devices, freeSeason: freeSeason)
+    }
+
     func without(league id: String) -> AccountScreenAnswer {
         AccountScreenAnswer(
             me: me, leagues: leagues?.filter { $0.id != id }, devices: devices, freeSeason: freeSeason

@@ -25,8 +25,6 @@ import app.trycommish.core.account.AccountHooks
 import app.trycommish.core.account.AccountScreenReads
 import app.trycommish.core.account.AccountViewModel
 import app.trycommish.core.account.ApiAccountScreenReads
-import app.trycommish.core.account.DevicePushStore
-import app.trycommish.core.account.PushStore
 import app.trycommish.core.board.ApiRunReads
 import app.trycommish.core.board.BoardViewModel
 import app.trycommish.core.board.RunReads
@@ -59,6 +57,11 @@ import app.trycommish.core.player.ApiPlayerReads
 import app.trycommish.core.player.PlayerPageViewModel
 import app.trycommish.core.player.PlayerReadsGraph
 import app.trycommish.core.player.PlayerSheetViewModel
+import app.trycommish.core.push.ApiPushApi
+import app.trycommish.core.push.PendingRemoval
+import app.trycommish.core.push.PrefsPushOffFlag
+import app.trycommish.core.push.PushRegistrar
+import app.trycommish.core.push.PushTap
 import app.trycommish.core.rankings.ApiRankingsReads
 import app.trycommish.core.rankings.RankingsReads
 import app.trycommish.core.rankings.RankingsViewModel
@@ -179,8 +182,53 @@ class AppGraph(
         if (BuildConfig.DEBUG && asked) companionReplay = true
     }
 
-    private val push: PushStore = DevicePushStore(context)
     private val appContext: Context = context.applicationContext
+    private val pushPrefs = context.getSharedPreferences(PrefsPushOffFlag.PREFS, Context.MODE_PRIVATE)
+    private val pushPlatform = FirebasePush(appContext, pushPrefs)
+
+    /** This phone's push (Lane 288): its FCM token on its own device, the Account's switches behind it. */
+    private val push: PushRegistrar by lazy {
+        // A removal a sign out without signal could not finish, with the signed-out device's own token.
+        val pending = EncryptedSession(appContext, EncryptedSession.PUSH_PENDING)
+        PushRegistrar(
+            ApiPushApi(transport),
+            pushPlatform,
+            session,
+            PendingRemoval(pending, ApiPushApi(Transport(apiBaseUrl, token = { pending.token }))),
+            PrefsPushOffFlag(pushPrefs),
+        ) { what, e -> Log.w(TAG, what, e) }
+    }
+
+    private val mutablePushed = MutableStateFlow<PushTap?>(null)
+
+    /** A tapped push, opened by the shell once it is signed in. */
+    val pushed: StateFlow<PushTap?> = mutablePushed.asStateFlow()
+
+    fun openPush(tap: PushTap) {
+        mutablePushed.value = tap
+    }
+
+    /** The shell opened the push's screen (or let it go). */
+    fun pushOpened() {
+        mutablePushed.value = null
+    }
+
+    /** The activity's notification prompt while it is up; null once it is gone. */
+    fun pushAsker(ask: (suspend () -> Boolean)?) {
+        pushPlatform.asker = ask
+    }
+
+    /** The app's start: a removal left from a sign out without signal is tried again; signed in, a phone that
+     * allows push registers its token. */
+    fun startPush() {
+        appScope.launch { if (session.token != null) push.start() else push.launched() }
+    }
+
+    /** Firebase handed over a new token (CommishMessaging.onNewToken). */
+    fun pushTokenArrived(token: String) {
+        appScope.launch { push.tokenArrived(token) }
+    }
+
     private val clipboard: ClipboardManager? = context.getSystemService(ClipboardManager::class.java)
 
     /** Work that must outlive a screen or a rotation: the sign-in's pairing, once its verifier is spent. */
@@ -373,14 +421,20 @@ class AppGraph(
      * sign-in when it can be reached, the phone forgets its token and every kept answer whatever the API
      * said, and the app returns to sign-in. */
     fun signOut() {
-        appScope.launch { signInState.signOut() }
+        appScope.launch {
+            push.signingOut()
+            signInState.signOut()
+        }
     }
 
     /** Completes a sign-in from its return link in the app's scope, so a rotation cannot cancel it. */
     fun completeSignIn(link: String) {
         appScope.launch {
             when (val result = signInFlow.complete(link)) {
-                SignInResult.SignedIn -> signInState.signedInNow()
+                SignInResult.SignedIn -> {
+                    signInState.signedInNow()
+                    push.start()
+                }
                 is SignInResult.Refused -> signInState.refused(result.message)
                 SignInResult.Ignored -> Unit
             }

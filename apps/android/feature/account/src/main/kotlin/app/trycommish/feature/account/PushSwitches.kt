@@ -31,6 +31,7 @@ import app.trycommish.core.account.AccountWords
 import app.trycommish.core.account.PushKind
 import app.trycommish.core.account.PushSettings
 import app.trycommish.core.account.QuietEnd
+import app.trycommish.core.push.PushPermission
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
 import app.trycommish.design.NumWeight
@@ -43,10 +44,13 @@ import kotlinx.coroutines.flow.drop
 private const val MINUTES_IN_AN_HOUR = 60
 
 /** The push switches (spec §5.3): one per kind with what it sends, then quiet hours with their two ends,
- * and under them where the switches are kept and that nothing is sent yet. */
+ * and under them where the switches are kept and, while the phone may not show a push, what a switch does
+ * or where to allow it; a write that failed says so. `push` is the switches as drawn. */
 @Composable
 internal fun PushSwitches(
     push: PushSettings,
+    permission: PushPermission,
+    problem: String?,
     toggle: (PushKind, Boolean) -> Unit,
     editQuiet: (QuietEnd) -> Unit,
 ) {
@@ -78,7 +82,8 @@ internal fun PushSwitches(
                 QuietEndButton(Words.Push.to, AccountWords.clockTime(push.quietTo), Modifier.weight(1f)) { editQuiet(QuietEnd.To) }
             }
         }
-        BasisText(AccountWords.pushFoot)
+        problem?.let { ProblemText(it) }
+        BasisText(AccountWords.pushFoot(permission))
     }
 }
 

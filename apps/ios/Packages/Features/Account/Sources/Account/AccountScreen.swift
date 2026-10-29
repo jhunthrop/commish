@@ -52,17 +52,21 @@ public enum QuietEnd: String, Identifiable, Sendable {
     }
 }
 
-/// What the screen shows beside its model: the stamp over a saved read, the switches, the row under
-/// way, and an action's failure.
+/// What the screen shows beside its model: the stamp over a saved read, the switches as drawn and
+/// whether the phone may show a push, the row under way, and an action's failure.
 public struct AccountScreenState {
     public let stamp: String?
     public let push: PushSettings
+    public let permission: PushPermission
     public let busy: String?
     public let problem: AccountProblem?
 
-    public init(stamp: String?, push: PushSettings, busy: String?, problem: AccountProblem?) {
+    public init(
+        stamp: String?, push: PushSettings, permission: PushPermission, busy: String?, problem: AccountProblem?
+    ) {
         self.stamp = stamp
         self.push = push
+        self.permission = permission
         self.busy = busy
         self.problem = problem
     }
@@ -106,7 +110,11 @@ public struct AccountScreen: View {
                         PlanView(plan: plan, openLink: actions.openLink)
                     }
                 case .switches:
-                    PushSwitchesView(push: state.push, toggle: actions.toggle, editQuiet: actions.editQuiet)
+                    PushSwitchesView(
+                        push: state.push, permission: state.permission,
+                        problem: state.problem.flatMap { $0.section == .notifications ? $0.text : nil },
+                        toggle: actions.toggle, editQuiet: actions.editQuiet
+                    )
                 case .devices:
                     AccountDevicesView(model: model, state: state, unpair: actions.unpair)
                     AccountFootView(deleteAccount: actions.deleteAccount, openLink: actions.openLink)

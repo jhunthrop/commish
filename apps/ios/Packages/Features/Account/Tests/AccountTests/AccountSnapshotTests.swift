@@ -64,17 +64,20 @@ struct AccountSnapshotTests {
         try APIDecoding.envelopeData(type, from: Data(contentsOf: inseason.appendingPathComponent(file)))
     }
 
-    /// The view model at the scene's state: read, with a starter's status switched off; or with the ESPN
-    /// stand-in detached a moment ago.
+    /// The view model at the scene's state: read, the account holding a starter's status switched off and
+    /// the phone allowing push; or with the ESPN stand-in detached a moment ago.
     static func viewModel(_ scene: Scene) async throws -> AccountViewModel {
         let leagues = try answer([AttachedLeague].self, "leagues-attached.json").filter { shown.contains($0.id) }
+        var account = try answer(AccountAnswer.self, "me.json")
+        account.notifications = .init(value1: .init(
+            timeZone: zone.identifier, quietStart: "23:00", quietEnd: "08:00",
+            kinds: .init(starterStatus: false, weekReads: true, waiverClaims: true)
+        ))
         let stub = try StubAccountScreen(
-            account: answer(AccountAnswer.self, "me.json"), leagues: leagues,
-            paired: answer([PairedDeviceRow].self, "devices.json")
+            account: account, leagues: leagues, paired: answer([PairedDeviceRow].self, "devices.json")
         )
         let viewModel = AccountViewModel(
-            api: stub, cache: NullCache(), clock: FixedClock(now), zone: zone,
-            push: MemoryPushStore(PushSettings.standard.with(.status, isOn: false)),
+            api: stub, cache: NullCache(), clock: FixedClock(now), zone: zone, push: StaticPush(.allowed),
             deviceID: { phone }, signOut: {}, onSignedOut: {}, deleted: {},
             wait: { _ in try? await Task.sleep(for: .seconds(3600)) }
         )
@@ -91,7 +94,8 @@ struct AccountSnapshotTests {
             throw SceneError.notLoaded(item.scene.rawValue)
         }
         let state = AccountScreenState(
-            stamp: viewModel.stampWords, push: viewModel.push, busy: viewModel.busy, problem: viewModel.problem
+            stamp: viewModel.stampWords, push: viewModel.shownPush, permission: viewModel.permission,
+            busy: viewModel.busy, problem: viewModel.problem
         )
         return AnyView(AccountScreen(model: model, state: state, actions: .none, parts: [item.part]))
     }
@@ -138,7 +142,7 @@ struct AccountSnapshotTests {
             refusal: scene == .refused ? APIError.envelope(code: "conflict", message: renewing) : nil
         )
         let account = AccountViewModel(
-            api: stub, cache: NullCache(), clock: FixedClock(now), zone: zone, push: MemoryPushStore(),
+            api: stub, cache: NullCache(), clock: FixedClock(now), zone: zone, push: StaticPush(),
             deviceID: { phone }, signOut: {}, onSignedOut: {}, deleted: {}
         )
         await account.load()
@@ -231,6 +235,10 @@ struct StubAccountScreen: AccountScreenAPI {
 
     func freeSeasonFlag() async throws -> Bool? {
         nil
+    }
+
+    func updateNotifications(_: NotificationSettingsChange) async throws -> AccountAnswer {
+        account
     }
 }
 

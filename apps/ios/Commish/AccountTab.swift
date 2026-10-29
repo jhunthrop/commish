@@ -18,7 +18,7 @@ struct AccountTab: View {
         let store = environment.session
         _viewModel = State(initialValue: AccountViewModel(
             api: environment.api, cache: environment.cache, clock: environment.clock, zone: .current,
-            push: DevicePushStore(), deviceID: { await store.deviceID() },
+            push: environment.push, deviceID: { await store.deviceID() },
             signOut: { await session.signOut() }, onSignedOut: expired, deleted: { await session.deleted() },
             leaguesChanged: { Task { await session.restore() } }
         ))

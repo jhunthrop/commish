@@ -89,9 +89,15 @@ public enum AccountWords {
             ?? Words.Attached.inSeason
     }
 
-    /// Under the switches while the account does not carry them: where they are kept, and that nothing
-    /// is sent yet.
-    public static let pushFoot = "\(Words.Push.savedHere). \(Words.Push.notYet)"
+    /// Under the switches: where they are kept, then, while the phone may not show a push, what turning
+    /// one on does (not asked yet) or where to allow it (refused).
+    public static func pushFoot(_ permission: PushPermission) -> String {
+        switch permission {
+        case .allowed: Words.Push.kept
+        case .notAsked: "\(Words.Push.kept) \(Words.Push.ask)"
+        case .refused: "\(Words.Push.kept) \(Words.Push.blocked)"
+        }
+    }
 
     /// A time of day from minutes after midnight: "11:00 pm".
     public static func clockTime(_ minutes: Int) -> String {

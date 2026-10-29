@@ -749,15 +749,18 @@ public enum Words {
         public static let thursday = "The Thursday read"
         public static let thursdayLine = "When the week's rankings are out"
         public static let status = "A starter's status"
-        public static let statusLine = "When a player in your lineup is ruled out or listed questionable"
+        public static let statusLine = "When a player in your lineup is ruled out, doubtful or cleared to play"
         public static let waivers = "Waivers clearing"
         public static let waiversLine = "When your platform runs waivers and your claims go through or miss"
         public static let quiet = "Quiet hours"
         public static let quietLine = "Nothing arrives between these times, on your phone's clock"
         public static let from = "From"
         public static let to = "To"
-        public static let savedHere = "Saved on this phone"
-        public static let notYet = "Nothing is sent yet. These take effect when notifications start."
+        public static let kept = "Kept with your account, for every phone you sign in on."
+        public static let ask = "Turn one on and your phone asks to let Commish send notifications."
+        public static let blocked = "Notifications for Commish are off in your phone's settings. Turn them on there first."
+        public static let channel = "Your leagues"
+        public static let channelLine = "Your starters' status, the Thursday read and waivers clearing"
     }
 
     public enum AccountFoot {

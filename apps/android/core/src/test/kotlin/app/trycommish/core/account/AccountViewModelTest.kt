@@ -1,5 +1,9 @@
 package app.trycommish.core.account
 
+import app.trycommish.api.models.NotificationKinds
+import app.trycommish.api.models.NotificationKindsUpdate
+import app.trycommish.api.models.NotificationSettings
+import app.trycommish.api.models.NotificationSettingsUpdate
 import app.trycommish.core.AppWords
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
@@ -7,6 +11,9 @@ import app.trycommish.core.MemorySession
 import app.trycommish.core.SignInState
 import app.trycommish.core.SignOut
 import app.trycommish.core.leaguehome.Fixtures
+import app.trycommish.core.push.PushControl
+import app.trycommish.core.push.PushPermission
+import app.trycommish.core.push.StaticPush
 import app.trycommish.design.Words
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,7 +58,7 @@ class AccountViewModelTest {
     private fun account(
         stub: StubAccountScreen = StubAccountScreen(),
         cache: MemoryCache = MemoryCache(),
-        store: PushStore = MemoryPushStore(),
+        store: PushControl = StaticPush(),
         heard: Heard = Heard(),
         now: Instant = Fixtures.week,
         signedIn: () -> Boolean = { true },
@@ -402,18 +409,139 @@ class AccountViewModelTest {
             assertEquals(1, heard.leaguesChanged)
         }
 
+    /** The switches are the account's (PATCH /me `notifications`): each move writes the three kinds as drawn
+     * with quiet hours in the phone's zone, a relaunch reads them back, and the last one off takes this
+     * phone's token off. */
     @Test
-    fun `the switches persist across a relaunch`() =
+    fun `the switches are written to the account and the last off unregisters`() =
         runTest(main) {
-            val store = MemoryPushStore()
-            val vm = account(store = store)
+            val stub = StubAccountScreen()
+            val push = StaticPush(PushPermission.Allowed)
+            val vm = opened(account(stub, store = push))
+            assertEquals(PushSettings.standard, vm.ui.value.shownPush)
             vm.set(PushKind.Status, isOn = false)
-            vm.setQuiet(QuietEnd.From, 22 * 60 + 30)
-            val again = account(store = store).ui.value.push
+            advanceUntilIdle()
+            val first = stub.notificationChanges.first()
+            assertEquals(Fixtures.zone.id, first.timeZone)
+            assertEquals("23:00", first.quietStart)
+            assertEquals("08:00", first.quietEnd)
+            assertEquals(NotificationKindsUpdate(starterStatus = false, weekReads = true, waiverClaims = true), first.kinds)
+            assertEquals(0, push.disabled)
+            vm.set(PushKind.Thursday, isOn = false)
+            vm.set(PushKind.Waivers, isOn = false)
+            advanceUntilIdle()
+            assertFalse(vm.ui.value.push.anyOn)
+            assertEquals(1, push.disabled)
+            vm.set(PushKind.Waivers, isOn = true)
+            advanceUntilIdle()
+            assertEquals(1, push.enabled)
+            assertEquals(
+                NotificationKindsUpdate(starterStatus = false, weekReads = false, waiverClaims = true),
+                stub.notificationChanges.last().kinds,
+            )
+            val again = opened(account(stub, store = StaticPush())).ui.value.push
+            assertTrue(again.on(PushKind.Waivers))
             assertFalse(again.on(PushKind.Status))
-            assertTrue(again.on(PushKind.Thursday))
-            assertEquals(22 * 60 + 30, again.quietFrom)
-            assertEquals("10:30 pm", AccountWords.clockTime(again.quietFrom))
+        }
+
+    /** The fixture account holding the settings given (its zone the phone's unless named). */
+    private fun holding(
+        status: Boolean,
+        thursday: Boolean,
+        waivers: Boolean,
+        zone: String = Fixtures.zone.id,
+    ) = StubAccountScreen(
+        account =
+            AccountFixtures.me().copy(
+                notifications =
+                    NotificationSettings(
+                        timeZone = zone,
+                        quietStart = "23:00",
+                        quietEnd = "08:00",
+                        kinds = NotificationKinds(starterStatus = status, weekReads = thursday, waiverClaims = waivers),
+                    ),
+            ),
+    )
+
+    /** Never asked, every switch draws off and the line says a switch asks; turning one on shows the prompt
+     * and, allowed, writes the account's stored switches with only that kind changed, so Status and Waivers
+     * already on stay on (review M3). Refused, nothing is written. */
+    @Test
+    fun `a switch on asks the phone once and changes only its kind`() =
+        runTest(main) {
+            val stub = holding(status = true, thursday = false, waivers = true)
+            val push = StaticPush(PushPermission.NotAsked, asked = PushPermission.Allowed)
+            val vm = opened(account(stub, store = push))
+            assertFalse(vm.ui.value.shownPush.anyOn)
+            assertEquals("${Words.Push.kept} ${Words.Push.ask}", AccountWords.pushFoot(vm.ui.value.permission))
+            vm.set(PushKind.Thursday, isOn = true)
+            advanceUntilIdle()
+            assertEquals(PushPermission.Allowed, vm.ui.value.permission)
+            assertEquals(
+                NotificationKindsUpdate(starterStatus = true, weekReads = true, waiverClaims = true),
+                stub.notificationChanges.last().kinds,
+            )
+            val refusedStub = StubAccountScreen()
+            val refused = opened(account(refusedStub, store = StaticPush(PushPermission.NotAsked, asked = PushPermission.Refused)))
+            refused.set(PushKind.Status, isOn = true)
+            advanceUntilIdle()
+            assertEquals(PushPermission.Refused, refused.ui.value.permission)
+            assertTrue(refusedStub.notificationChanges.isEmpty())
+            assertEquals("${Words.Push.kept} ${Words.Push.blocked}", AccountWords.pushFoot(PushPermission.Refused))
+        }
+
+    /** The account's zone is not the phone's (the API's New York default): the phone's is written once on
+     * load, nothing else with it, and a second load writes nothing (review M2). */
+    @Test
+    fun `the account takes the phone's zone once on load`() =
+        runTest(main) {
+            val stub = holding(status = true, thursday = true, waivers = true, zone = "America/New_York")
+            val vm = opened(account(stub, store = StaticPush()))
+            vm.load()
+            advanceUntilIdle()
+            assertEquals(listOf(NotificationSettingsUpdate(timeZone = Fixtures.zone.id)), stub.notificationChanges)
+            val same = holding(status = true, thursday = true, waivers = true)
+            opened(account(same, store = StaticPush()))
+            assertTrue(same.notificationChanges.isEmpty())
+        }
+
+    /** A quiet hours write that fails puts the account's last confirmed hours back (review M4). */
+    @Test
+    fun `a failed quiet hours write puts the confirmed hours back`() =
+        runTest(main) {
+            val stub = StubAccountScreen()
+            val vm = opened(account(stub, store = StaticPush()))
+            stub.offline = true
+            vm.setQuiet(QuietEnd.From, 21 * 60)
+            assertEquals(21 * 60, vm.ui.value.push.quietFrom)
+            advanceUntilIdle()
+            assertEquals(PushSettings.standard, vm.ui.value.push)
+            assertEquals(AccountProblem(AccountSection.Notifications, Words.Account.failed), vm.ui.value.problem)
+        }
+
+    /** Quiet hours draw as the picker moves and are written once it rests, in one PATCH; a failed write puts
+     * the account's back and says so beside the switches. */
+    @Test
+    fun `quiet hours are written once the picker rests, and a failed write keeps the account's`() =
+        runTest(main) {
+            val stub = StubAccountScreen()
+            val vm = opened(account(stub, store = StaticPush()))
+            vm.setQuiet(QuietEnd.From, 22 * 60 + 30)
+            vm.setQuiet(QuietEnd.To, 7 * 60 + 30)
+            assertEquals(22 * 60 + 30, vm.ui.value.push.quietFrom)
+            advanceUntilIdle()
+            assertEquals(1, stub.notificationChanges.size)
+            assertEquals("22:30", stub.notificationChanges.first().quietStart)
+            assertEquals("07:30", stub.notificationChanges.first().quietEnd)
+            assertEquals("10:30 pm", AccountWords.clockTime(vm.ui.value.push.quietFrom))
+            stub.offline = true
+            vm.set(PushKind.Status, isOn = false)
+            advanceUntilIdle()
+            assertTrue(
+                vm.ui.value.push
+                    .on(PushKind.Status),
+            )
+            assertEquals(AccountProblem(AccountSection.Notifications, Words.Account.failed), vm.ui.value.problem)
         }
 
     @Test
@@ -445,7 +573,7 @@ class AccountViewModelTest {
                     MemoryCache(),
                     FixedClock(Fixtures.week),
                     Fixtures.zone,
-                    MemoryPushStore(),
+                    StaticPush(),
                     { AccountFixtures.PHONE },
                     AccountHooks({}, {}, {}, { true }, {}),
                 )

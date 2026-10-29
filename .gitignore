@@ -62,6 +62,9 @@ test-results/
 *.sqlite
 *.sqlite3
 
+# Firebase's Android client config (Lane 288): CI writes it from the GOOGLE_SERVICES_JSON secret.
+apps/android/app/google-services.json
+
 # superpowers SDD scratch (ledgers, briefs, review packages)
 .superpowers/
 

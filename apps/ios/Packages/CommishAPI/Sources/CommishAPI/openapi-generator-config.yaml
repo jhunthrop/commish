@@ -65,6 +65,8 @@ filter:
     - lobbyCard
     - lobbyReport
     - updateMe
+    - registerPush
+    - removePush
     - listSheets
     - getSheet
     - createSheet

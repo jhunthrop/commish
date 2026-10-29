@@ -3,11 +3,14 @@ import CommishDesign
 import SwiftUI
 
 /// The push switches (spec §5.3): one per kind with what it sends, then quiet hours with their two
-/// ends, and under them where the switches are kept and that nothing is sent yet. The switch is drawn
-/// here rather than the system's, so the snapshot draws it as the phone does.
+/// ends, and under them where the switches are kept and, while the phone may not show a push, what a
+/// switch does or where to allow it; a write that failed says so. The switch is drawn here rather than
+/// the system's, so the snapshot draws it as the phone does.
 struct PushSwitchesView: View {
     @Environment(\.colorScheme) private var colorScheme
     let push: PushSettings
+    let permission: PushPermission
+    let problem: String?
     let toggle: (PushKind, Bool) -> Void
     let editQuiet: (QuietEnd) -> Void
 
@@ -40,7 +43,10 @@ struct PushSwitchesView: View {
                 }
                 .padding(.vertical, Tokens.Space.s2)
             }
-            BasisText(AccountWords.pushFoot)
+            if let problem {
+                ProblemText(text: problem)
+            }
+            BasisText(AccountWords.pushFoot(permission))
         }
     }
 

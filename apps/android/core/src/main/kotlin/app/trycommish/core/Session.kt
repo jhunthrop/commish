@@ -44,14 +44,15 @@ class MemorySession(
 }
 
 /** The session in EncryptedSharedPreferences, keyed by a master key in the Android Keystore: the token
- * never sits in plain storage. */
+ * never sits in plain storage. `file` names the store: the sign-in's, or push's kept removal (Lane 288). */
 class EncryptedSession(
     context: Context,
+    file: String = FILE,
 ) : Session {
     private val prefs: SharedPreferences =
         EncryptedSharedPreferences.create(
             context,
-            FILE,
+            file,
             MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
@@ -75,9 +76,12 @@ class EncryptedSession(
         prefs.edit().clear().apply()
     }
 
-    private companion object {
-        const val FILE = "commish_session"
-        const val TOKEN = "device_token"
-        const val DEVICE = "device_id"
+    companion object {
+        private const val FILE = "commish_session"
+
+        /** The store push keeps a removal a sign out could not finish in (Lane 288 security M1). */
+        const val PUSH_PENDING = "commish_push_pending"
+        private const val TOKEN = "device_token"
+        private const val DEVICE = "device_id"
     }
 }

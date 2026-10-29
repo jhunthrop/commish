@@ -9,9 +9,12 @@ import app.trycommish.api.Unauthorized
 import app.trycommish.api.data
 import app.trycommish.api.infrastructure.HttpResponse
 import app.trycommish.api.models.AccountDeletion
+import app.trycommish.api.models.AccountUpdate
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.LeaguePhase
 import app.trycommish.api.models.LeagueStanding
+import app.trycommish.api.models.NotificationSettings
+import app.trycommish.api.models.NotificationSettingsUpdate
 import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -31,6 +34,8 @@ data class AccountRead(
     val features: List<String> = emptyList(),
     @SerialName("draft_pass") val draftPass: PlanSource? = null,
     val membership: PlanSource? = null,
+    /** The push switches and quiet hours (Lane 262); absent from an older API, read as the defaults. */
+    val notifications: NotificationSettings? = null,
 )
 
 /** Where a pass or a membership came from ("purchase", "subscription", "grant"). */
@@ -97,6 +102,9 @@ interface AccountScreenReads {
      * 204. A 400 throws the API's sentence for the email, a 409 its sentence (a membership that still
      * renews), a 401 [Unauthorized]. */
     suspend fun deleteAccount(email: String)
+
+    /** Writes the push settings (PATCH /me `notifications`) and answers the account as the API now holds it. */
+    suspend fun updateNotifications(change: NotificationSettingsUpdate): AccountRead
 }
 
 /** The Account's routes through the generated clients. */
@@ -122,6 +130,9 @@ class ApiAccountScreenReads(
             .data<PlansRead>()
             .freeSeason
 
+    override suspend fun updateNotifications(change: NotificationSettingsUpdate): AccountRead =
+        transport.auth().updateMe(AccountUpdate(notifications = change)).data()
+
     override suspend fun deleteAccount(email: String) {
         val answer = transport.auth().deleteMe(AccountDeletion(email))
         if (answer.status == HTTP_NO_CONTENT) return
@@ -133,7 +144,7 @@ private const val HTTP_NO_CONTENT = 204
 
 /** A write's answer: nothing to read when it went through, the API's failure when it did not, in the
  * refused `field`'s own sentence where the API names one ("Type the email you sign in with"). */
-private suspend fun HttpResponse<*>.done(field: String? = null) {
+internal suspend fun HttpResponse<*>.done(field: String? = null) {
     if (status == HTTP_UNAUTHORIZED) throw Unauthorized()
     val envelope = CommishJson.decodeFromString<Envelope<JsonElement>>(response.bodyAsText())
     val error = envelope.error

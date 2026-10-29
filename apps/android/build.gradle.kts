@@ -11,6 +11,7 @@ plugins {
     alias(libs.plugins.paparazzi) apply false
     alias(libs.plugins.openapi.generator) apply false
     alias(libs.plugins.ktlint) apply false
+    alias(libs.plugins.google.services) apply false
 }
 
 subprojects {
