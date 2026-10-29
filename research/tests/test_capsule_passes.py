@@ -72,12 +72,12 @@ def _passes(script: _Script, monkeypatch: pytest.MonkeyPatch) -> _Passes:
     return passes
 
 
-def _kind(plan: SweepPlan) -> str:
+def _kind(name: str, plan: SweepPlan) -> str:
     if plan.unwritten_only:
         return "retry"
     if plan.grace:
         return "graced"
-    return "spans" if plan.keep_written else "hard"
+    return "spans" if name.startswith("capsule span repair") else "hard"
 
 
 def test_each_attempt_retries_then_rewrites_hard_then_retries_then_spans_and_the_last_never_spans(
@@ -85,7 +85,7 @@ def test_each_attempt_retries_then_rewrites_hard_then_retries_then_spans_and_the
 ) -> None:
     script = _Script()
     _passes(script, monkeypatch).repair()
-    kinds = [_kind(plan) for _, plan in script.plans]
+    kinds = [_kind(name, plan) for name, plan in script.plans]
     # The scripted retry pass writes its page, so each retry is one sweep.
     one_attempt = ["retry", "hard", "retry", "spans"]
     last_attempt = ["retry", "hard", "retry"]
@@ -229,7 +229,7 @@ def test_the_span_repair_rewrites_at_most_the_nights_cap(monkeypatch: pytest.Mon
     monkeypatch.setattr(passes, "_judged", judged)
     monkeypatch.setattr(passes, "sweep", sweep)
     passes.repair()
-    span_plans = [plan for _, plan in script.plans if plan.keep_written]
+    span_plans = [plan for name, plan in script.plans if name.startswith("capsule span repair")]
     assert [plan.only for plan in span_plans] == [("b",)]
     assert passes.span_pages_left == 0
 
@@ -244,7 +244,7 @@ def _fell_to_facts(name: str, violation: str) -> tuple[Subject, CapsuleResult]:
 def test_a_page_that_falls_to_its_facts_block_is_named_with_why_on_the_report() -> None:
     report = SweepReport(NOW, 4, 1)
     subject, result = _fell_to_facts("Ricky Pearsall", "Mixed evidence: the strongest downside is never cited.")
-    sweep_module._tally(report, subject, result, demoted=False, kept=False)
+    sweep_module._tally(report, subject, result, kept=False)
     assert report.fell == [
         "Ricky Pearsall: facts (failed validation: Mixed evidence: the strongest downside is never cited.)"
     ]
@@ -464,6 +464,39 @@ def test_a_hard_target_whose_rewrite_was_refused_is_checked_though_the_pass_wrot
     passes, _, writes = _checking_passes(monkeypatch)
     passes._check_pages("capsule repair 3 (1 pages)", SweepReport(NOW, 4, 1, ["b"], 0, 0, kept=1, refused=1))
     assert writes == [("b", FACTS_SOURCE, RETRY_FIRST_FACTS_HASH)]
+
+
+def test_a_held_spent_page_whose_old_prose_fails_tonights_page_gate_falls_to_its_facts_block(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lane 294 review H1: page b is held over a fallen rewrite and spent at the night's ceiling, so no checked
+    pass reached it; its old prose fails tonight's page gate. The night's last check drops it to its facts
+    block (held and stale, counted unwritten), and page a, held with prose that passes, keeps it."""
+    passes, lines, writes = _checking_passes(monkeypatch)
+    passes.held = frozenset({"a", "b"})
+    passes.asks_by_player = {"a": NIGHT_CALLS_PER_PLAYER, "b": NIGHT_CALLS_PER_PLAYER}
+    passes.graced = {"a", "b"}
+    passes.check_held()
+    assert writes == [("b", FACTS_SOURCE, RETRY_FIRST_FACTS_HASH)]
+    assert passes.held == {"a"} and passes.dropped == {"b"}
+    assert (passes.spend.held, passes.spend.held_stale) == (1, 1)
+    assert lines == [
+        "capsules held over a fallen rewrite, checked against tonight's page gate: 1 pages failed the page gate "
+        "and fell to their facts blocks: Player B (rank_off_page:b:WR3)"
+    ]
+    # Every held page is spent, so no retry pass is asked for them (review L2).
+    assert passes._askable_held() == frozenset()
+
+
+def test_a_held_page_the_night_demoted_or_dropped_is_not_counted_held(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Review L1: the held count is settled at the night's end against what the demotion and the checks left."""
+    passes, _, writes = _checking_passes(monkeypatch)
+    passes.held = frozenset({"a", "c", "d"})
+    passes.dropped = frozenset({"c"})
+    passes.demoted = [Demotion("d", "slug-d", "the role explains it", 2)]
+    passes.check_held()
+    assert writes == []
+    assert passes.held == {"a"} and (passes.spend.held, passes.spend.held_stale) == (1, 0)
 
 
 def test_a_page_the_check_drops_is_never_written_again_that_night(monkeypatch: pytest.MonkeyPatch) -> None:

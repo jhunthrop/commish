@@ -10,7 +10,10 @@ The order, and why each pass exists:
    six-word spans the pass's latest pages already share (`landing.TonightWindow`), so tonight's
    collisions are avoided as they are written; the span rules are built once for the night.
 3. **The retry passes** (up to `RETRY_PASSES`): another attempt at the pages still unwritten (facts blocks), from the budget
-   left, because a throttled or refused read often succeeds on a second try.
+   left, because a throttled or refused read often succeeds on a second try, and at the pages held tonight: a
+   rewrite of a written capsule that fell keeps the written row (the hold path, `capsules.sweep`) and is asked
+   again in each retry pass, as the week reads ask a held rewrite again (Lane 294). A pass that reaches no page
+   ends the retries.
 4. **The repair attempts** (`REPAIR_PASSES`, `nightly.capsule_repair`). The capsule gate fails a run
    when the board's unwritten share passes the run's line (2% preseason, 3% in season) or a written
    sentence of four words or more sits on two pages; the page gate fails a written page with no page
@@ -40,7 +43,10 @@ The order, and why each pass exists:
    From the last attempt's read of the page gate on (its hard rewrite and blocked retry, the graced
    rewrite, this retry), no repair judges the pages a pass writes, so each such pass checks them itself
    (`_Passes._check_pages`): a page failing the page gate falls to its facts block (Lane 73).
-8. **The capsule gate** (`capsule_gate`), judged once more after the demotion: the step's verdict.
+8. **The held pages checked** (`_Passes.check_held`, Lane 294 review H1): every page still held over a
+   fallen rewrite is judged by tonight's page gate, whatever pass reached it; one whose old prose fails
+   falls to its facts block, held and stale, counted unwritten under the line, never a failure alone.
+9. **The capsule gate** (`capsule_gate`), judged once more after the demotion: the step's verdict.
 
 Every pass keeps the writer's pool full (`gateway.GatewayClient.rolling`: a slot refilled the moment its page
 lands, each page told the spans of every page landed before it started, and checked as it lands against the
@@ -58,6 +64,10 @@ budget stays the hard ceiling.
 The writer's settings and the model are checked before anything is written: a malformed setting, or
 a model the gateway's list (read before the first call) does not carry, fails the step there. A
 pass that raises part way still reports what the night spent (`CapsuleStepError`).
+
+A read the writer's asks could not write is asked once more of the retry writer (`RETRY_WRITER_MODEL`, the
+week read's, on the same gateway path, Lane 294), outside the night's ceiling; a model the gateway's list does
+not carry or does not price turns it off for the night by a warning, never fails the step.
 
 Without AI_GATEWAY_API_KEY the writing passes are skipped by name (a sweep without the key would
 demote written reads to facts blocks) and the gate still judges what is stored.
@@ -124,6 +134,8 @@ RETRY_PASSES: Final = 3
 # whole six (`generate.charged_asks`, re-review N1), so the bound per page a night
 # is three drafts (two ordinary and the grace) plus the one retry after the demotion, each at most six
 # asks, every ask's own re-asks bounded by `throttle_waits_ms` and the run's wait cap (review 73 item 5).
+# The retry writer's draft for a read the writer could not write (Lane 294) is outside the ceiling: at most one
+# a read a generation, so two a generation.
 NIGHT_CALLS_PER_PLAYER: Final = 12
 Log = Callable[[str], None]
 
@@ -152,6 +164,14 @@ class CapsuleSpend:
     stated_limits: tuple[str, ...] = ()
     # The run's one loud line once its throttle pool ran dry (`throttle_waits.RunWaits.line`), else None.
     throttle_alarm: str | None = None
+    # The retry writer (None when off), its drafts and the pages it rescued; the pages still held over a
+    # fallen rewrite at the night's end (the hold path).
+    retry_model: str | None = None
+    retry_asks: int = 0
+    rescued: int = 0
+    held: int = 0
+    # The held pages whose old prose failed tonight's page gate and fell to their facts blocks (review H1).
+    held_stale: int = 0
 
     def add(self, report: SweepReport) -> None:
         self.calls += report.calls
@@ -163,6 +183,8 @@ class CapsuleSpend:
         self.processed += len(report.processed)
         self.landed_sentences += report.landed_sentences
         self.landed_spans += report.landed_spans
+        self.retry_asks += report.retry_asks
+        self.rescued += report.rescued
 
     def close(self, gateway: GatewayClient, writer: str, price: ModelPrice) -> None:
         """The run's ledger and price, kept on the spend the run's report carries."""
@@ -173,10 +195,17 @@ class CapsuleSpend:
         self.stated_limits = gateway.ledger.stated_limits
         self.throttle_alarm = gateway.waits.line()
 
+    def _retry_line(self) -> str:
+        if self.retry_model is None:
+            return "the retry writer off"
+        return f"{self.retry_asks} reads asked of the retry writer {self.retry_model}, {self.rescued} pages rescued"
+
     def line(self) -> str:
         limits = ", ".join(self.stated_limits) or "none stated"
         return (
-            f"{self.processed} pages attempted ({self.written} written, {self.facts_blocks} facts blocks), "
+            f"{self.processed} pages attempted ({self.written} written, {self.facts_blocks} facts blocks, "
+            f"{self.held} held over the written read at the night's end, {self.held_stale} held pages stale "
+            f"against tonight's page gate and fallen to their facts blocks), {self._retry_line()}, "
             f"{self.calls} calls, {self.prompt_tokens} prompt and {self.completion_tokens} completion tokens, "
             f"${self.cost_usd:.6f}, {self.rate_limited} calls met a 429 (the gateway's limit: {limits}), "
             f"{self.landed_sentences} sentences and {self.landed_spans} spans shared as pages landed, left to the repair"
@@ -219,7 +248,8 @@ def _sweep_line(name: str, report: SweepReport) -> str:
     return (
         f"{name}: {report.board_players} board players, {report.eligible} eligible, "
         f"{len(report.processed)} processed ({report.llm} written, {report.facts} facts blocks), {report.calls} calls, "
-        f"${report.cost_usd:.6f}, {report.kept} written reads kept ({report.refused} rewrites refused for a sentence another page carries), {report.queued} queued by the repetition check, "
+        f"${report.cost_usd:.6f}, {report.kept} written reads kept ({len(report.held)} held over a rewrite that fell, "
+        f"{report.refused} rewrites refused for a sentence another page carries), {report.queued} queued by the repetition check, "
         f"{report.landed_sentences} sentences and {report.landed_spans} spans shared as pages landed, "
         f"{len(report.landed_carriers)} carriers left to the repair"
     )
@@ -287,6 +317,11 @@ class _Passes:
         # Pages the page check dropped to their facts blocks tonight (`_check_pages`): stamped to be
         # written first the next night, so no later pass tonight writes them (review 73 item 1).
         self.dropped: frozenset[str] = frozenset()
+        # Written pages whose latest rewrite tonight fell and kept the written row (the hold path), asked
+        # again by each retry pass until one lands.
+        self.held: frozenset[str] = frozenset()
+        # The retry writer the night's reads may ask (`checked_retry_model`), None when off.
+        self.retry_model: str | None = None
 
     @property
     def left(self) -> int:
@@ -312,6 +347,7 @@ class _Passes:
             span_rules=self.rules,
             avoid_by_page=avoid_by_page,
             first=self.first,
+            retry_model=self.retry_model,
         )
         try:
             report = sweep_capsules(self.engine, self.gateway, self.now, plan, self.facts)
@@ -330,9 +366,14 @@ class _Passes:
         whose rewrite was refused keeps its failing read, review 73 item 2), falls to its facts block,
         stamped to be written first the next night and never written again tonight (`dropped`), so no
         page is served without the check. A pass that reached no page reads nothing."""
-        processed = tuple(dict.fromkeys(report.processed))
+        self._drop_failing(name, report.processed)
+
+    def _drop_failing(self, name: str, pages: Sequence[str]) -> frozenset[str]:
+        """Each of `pages` that fails tonight's page gate falls to its facts block, stamped to be written
+        first the next night and never written again tonight (`dropped`); the ids that fell."""
+        processed = tuple(dict.fromkeys(pages))
         if not processed:
-            return
+            return frozenset()
 
         def check() -> list[tuple[Subject, tuple[str, ...]]]:
             with self.engine.begin() as conn:
@@ -343,10 +384,34 @@ class _Passes:
             return fell
 
         fell = once_more_on_disconnect(check)
+        ids = frozenset(s.universe_id for s, _ in fell)
         if fell:
-            self.dropped = self.dropped | {s.universe_id for s, _ in fell}
+            self.dropped = self.dropped | ids
             named = ", ".join(f"{s.facts.identity.name} ({'; '.join(reasons)})" for s, reasons in fell)
             self.log(f"{name}: {len(fell)} pages failed the page gate and fell to their facts blocks: {named}")
+        return ids
+
+    def check_held(self) -> None:
+        """THE PAGE GATE OVER EVERY HELD PAGE (Lane 294 review H1), after the night's last writing pass. A held
+        capsule keeps prose written against an older sheet, and a held page the ceiling or the budget kept out
+        of every checked pass would otherwise reach the run's gate unchecked, where one page finding fails the
+        night. Each held page that fails tonight's page gate falls to its facts block (stale, `held_stale`),
+        counted unwritten under the 3% line as a fallen rewrite was before the hold path; every other held
+        page keeps its prose. The held count is then settled: a held page the demotion or a check dropped is
+        no longer written, so it is not counted held (review L1)."""
+        demoted = frozenset(d.player_id for d in self.demoted)
+        live = self.held - self.dropped - demoted
+        name = "capsules held over a fallen rewrite, checked against tonight's page gate"
+        stale = self._drop_failing(name, sorted(live))
+        self.held = live - stale
+        self.spend.held = len(self.held)
+        self.spend.held_stale = len(stale)
+
+    def _askable_held(self) -> frozenset[str]:
+        """The held pages a retry pass could still write: not at the night's ceiling past their grace, not
+        dropped (review L2: a pass over none of them is an empty pass)."""
+        spent = spent_out_for(self.asks_by_player, frozenset(self.graced), grace=True)
+        return self.held - spent - self.dropped
 
     def _account(self, name: str, report: SweepReport, at_ceiling: frozenset[str], *, graced_pass: bool) -> None:
         """A sweep's report on the night: the grace taken, the asks per player, the spend, the line."""
@@ -355,7 +420,9 @@ class _Passes:
             self.graced |= at_ceiling & set(report.processed)
         for pid, asks in report.asks_by_player.items():
             self.asks_by_player[pid] = self.asks_by_player.get(pid, 0) + asks
+        self.held = (self.held - set(report.processed)) | set(report.held)
         self.spend.add(report)
+        self.spend.held = len(self.held)
         self.log(_sweep_line(name, report))
         if report.fell:
             self.log(f"{name}, {len(report.fell)} pages fell to their facts blocks: {'; '.join(report.fell)}")
@@ -371,14 +438,18 @@ class _Passes:
         self.retry("capsule retries", report.facts, shared)
         self.repair()
         self.retry_after_demotion()
+        self.check_held()
 
     def retry(self, name: str, unwritten: int, avoid: tuple[str, ...], *, check_pages: bool = False) -> None:
+        """Up to `RETRY_PASSES` passes over the unwritten pages and tonight's held rewrites (`held`), until
+        none is left, the budget is spent, or a pass reaches no page (each one left is at the ceiling)."""
         for attempt in range(1, RETRY_PASSES + 1):
-            if self.left <= 0 or unwritten == 0:
+            if self.left <= 0 or (unwritten == 0 and not self._askable_held()):
                 return
-            retry = self.sweep(
-                f"{name} {attempt}", SweepPlan(self.left, unwritten_only=True, avoid=avoid), check_pages=check_pages
-            )
+            plan = SweepPlan(self.left, unwritten_only=True, avoid=avoid, again=self.held)
+            retry = self.sweep(f"{name} {attempt}", plan, check_pages=check_pages)
+            if not retry.processed:
+                return
             unwritten = retry.facts
 
     def _judged(self) -> tuple[CapsuleGateResult, list[str], dict[str, tuple[str, ...]]]:
@@ -394,7 +465,7 @@ class _Passes:
     def _retry_unwritten(self, name: str, *, check_pages: bool = False) -> None:
         gate, _, _ = self._judged()
         # The pages the check dropped are facts blocks no pass writes tonight (re-review N2).
-        if gate.facts_blocks > len(self.dropped) and self.left > 0:
+        if (gate.facts_blocks > len(self.dropped) or self._askable_held()) and self.left > 0:
             self.retry(
                 name, gate.facts_blocks, tuple(sentence.sentence for sentence in gate.shared), check_pages=check_pages
             )
@@ -433,9 +504,7 @@ class _Passes:
                     f"capsule span repair {attempt} ({len(gate.spans)} shared spans, {len(spans)} pages of "
                     f"{len(targets.spans)} carriers, the span cap at {self.span_pages_left} before this pass)"
                 )
-                plan = SweepPlan(
-                    self.left, only=spans, avoid=avoid, avoid_by_page=quoted_spans(gate, spans), keep_written=True
-                )
+                plan = SweepPlan(self.left, only=spans, avoid=avoid, avoid_by_page=quoted_spans(gate, spans))
                 self.span_pages_left -= len(self.sweep(name, plan).processed)
         self.grace_shared_sentences()
         self.demote_shared_sentences()
@@ -553,7 +622,9 @@ def run_capsule_step(
         spend, demoted = _write(engine, key, now, plan, log, facts, rules)
         log(f"capsules spent: {spend.line()}")
     gate, findings = once_more_on_disconnect(lambda: _final_judgment(engine, now, rules, facts))
-    gate = replace(gate, throttle_alarm=spend.throttle_alarm, demoted=len(demoted))
+    gate = replace(
+        gate, throttle_alarm=spend.throttle_alarm, demoted=len(demoted), held=spend.held, held_stale=spend.held_stale
+    )
     log(f"{gate.summary()}; {len(findings.by_page)} written pages fail the page gate")
     return CapsuleStepResult(gate, findings, spend, bool(key), demoted)
 
@@ -580,6 +651,24 @@ def checked_price(http: httpx.Client, key: str, settings: WriterSettings) -> Mod
     return price
 
 
+def checked_retry_model(http: httpx.Client, key: str, settings: WriterSettings, log: Log) -> str | None:
+    """The retry writer's model checked against the gateway's list, as the week reads check theirs (Lane 276
+    review H2): one the list does not carry, or carries with no price, turns the retry writer off for the
+    night by a warning naming its setting, and never fails the step."""
+    if settings.retry_model is None:
+        return None
+    price = fetch_price(http, key, settings.retry_model)
+    unpriced = price.input_usd_per_million is None or price.output_usd_per_million is None
+    if price.listed is False or (price.listed and unpriced):
+        why = "does not carry" if price.listed is False else "carries with no price"
+        log(
+            f"capsules: retry writer WARNING: {CAPSULE_CONFIG.gateway.retry_model_variable} names "
+            f"{settings.retry_model}, which the gateway's model list {why}; the retry writer is off tonight"
+        )
+        return None
+    return settings.retry_model
+
+
 def _write(  # noqa: PLR0913, PLR0917 - the step's parts
     engine: Engine, key: str, now: datetime, plan: CapsuleStepPlan, log: Log, facts: FactsPassMemo, rules: SpanRules
 ) -> tuple[CapsuleSpend, tuple[Demotion, ...]]:
@@ -590,11 +679,13 @@ def _write(  # noqa: PLR0913, PLR0917 - the step's parts
     log(f"capsules: {settings.line()}")
     with httpx.Client() as http:
         price = checked_price(http, key, settings)
+        retry_model = checked_retry_model(http, key, settings, log)
         if plan.regenerate_all:
             log(_regenerate_all(engine, now))
         gateway = GatewayClient.for_run(key, http, settings)
         writers = pooled_like(engine, settings.concurrency)
         passes = _Passes(writers, gateway, now, plan, log, facts, rules=rules)
+        passes.retry_model = passes.spend.retry_model = retry_model
         try:
             passes.run()
         except Exception as error:
