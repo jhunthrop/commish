@@ -75,6 +75,9 @@ export const SHEET_IMPORT = {
 	replace: 'Replace my sheet',
 	use: 'Use this sheet',
 	cancel: 'Cancel',
+	/** The phones' verb under an import that read no player: back to the paste box, the text kept to fix
+	 * (Lane 297). The web reads in the browser and never sends such a list. */
+	fixList: 'Fix the list',
 	unreadable: 'That file does not read as CSV',
 	didNotOpen: 'That file did not open',
 	tooLarge: 'That file is over 1 MB',

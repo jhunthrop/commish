@@ -7,6 +7,20 @@ public typealias SheetRowAnswer = Components.Schemas.SheetRow
 public typealias SheetRowInput = Components.Schemas.SheetRowInput
 public typealias SheetImportResult = Components.Schemas.SheetImportResult
 public typealias ExportLink = Components.Schemas.ExportLink
+public typealias ImportSkip = Components.Schemas.ImportSkip
+
+/// The import's refusal of a body that read to no player (400, code invalid): the API's sentence, and
+/// each line skipped with its reason, empty when no line said why (Lane 297). An API from before Lane 297
+/// sends no lines and is answered as ``APIError/envelope(code:message:)``.
+public struct SheetImportRefused: Error, Equatable, Sendable {
+    public let sentence: String
+    public let skipped: [ImportSkip]
+
+    public init(sentence: String, skipped: [ImportSkip]) {
+        self.sentence = sentence
+        self.skipped = skipped
+    }
+}
 
 /// What an import sends (POST /sheets/{id}/import): the sheet's CSV, typed text/csv, or a list of names in
 /// the drafter's order, typed text/plain, which the API reads against the board of the sheet's format.
@@ -33,7 +47,8 @@ public protocol SheetsAPI: Sendable {
     /// a conflict when the sheet changed since.
     func replaceRows(id: String, rows: [SheetRowInput], ifUpdatedAt: Date?) async throws -> SheetDetail
     /// POST /sheets/{id}/import: the rows replaced from a CSV or a list of names, and the lines skipped with
-    /// their reasons. A body that reads to no player is refused (400, its sentence) and the sheet kept.
+    /// their reasons. A body that reads to no player is refused (400, its sentence and its skipped lines,
+    /// ``SheetImportRefused``) and the sheet kept.
     func importSheet(id: String, body: SheetImportBody) async throws -> SheetImportResult
     /// POST /sheets/{id}/exports: the sheet written as a CSV file, with a link to it.
     func exportSheet(id: String) async throws -> ExportLink
@@ -124,7 +139,7 @@ extension APIClient: SheetsAPI {
         case let .ok(answer):
             return try Self.payload(answer.body.json.value2.data)
         case let .badRequest(answer):
-            throw try Self.refusal(answer.body.json)
+            throw try Self.importRefusal(answer.body.json)
         case let .notFound(answer):
             throw try Self.refusal(answer.body.json)
         case let .serviceUnavailable(answer):
@@ -132,6 +147,16 @@ extension APIClient: SheetsAPI {
         case let .undocumented(status, _):
             throw APIError.status(status)
         }
+    }
+
+    /// The import's 400: with its skipped lines, the refusal of a body that read to no player; without
+    /// them (a header the import cannot use, or an older API), the refusal in its own words.
+    static func importRefusal(_ envelope: Components.Schemas.Envelope) -> any Error {
+        let error = refusal(envelope)
+        guard let skipped = envelope.error?.value1.skipped, case let .envelope(_, sentence) = error else {
+            return error
+        }
+        return SheetImportRefused(sentence: sentence, skipped: skipped)
     }
 
     public func exportSheet(id: String) async throws -> ExportLink {

@@ -139,7 +139,9 @@ class SheetScenesTest {
         val words = (refused.ui.importing as SheetImport.Done).words
         assertEquals("0 players read", words.read)
         assertEquals(SheetStub.EMPTY_READ, words.kept)
-        assertEquals(SheetWords.listShape, words.shape)
+        assertEquals(3, words.rows.size)
+        assertNull("the rows say why", words.shape)
+        assertEquals(SheetWords.fixList, words.verb)
         assertEquals("the sheet is as it was", 8, refused.model?.players)
         val empty = SheetScenes.view(SheetSnapshotTest.Scene.Empty)
         assertEquals(5, empty.ui.preview.size)
@@ -191,9 +193,12 @@ private object SheetScenes {
                 vm.paste(pasted())
             }
             SheetSnapshotTest.Scene.Refused -> {
+                // A list of names the account reads no player from: the stub refuses it as the API does, each row with
+                // its reason (the parity file's refusal with rows, Lane 297).
+                val refusal = SheetParity.load().refusals.first { it.skipped.isNotEmpty() }
+                stub.importRefusal = refusal.failure
                 vm.openImport()
-                // A list of names the account reads no player from: the stub refuses it as the API does.
-                vm.paste("Gibbs\nJahmyr")
+                vm.paste(refusal.text)
                 vm.importText(vm.ui.value.pasted)
             }
         }

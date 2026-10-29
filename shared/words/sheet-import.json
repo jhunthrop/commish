@@ -8,6 +8,7 @@
 	"replace": "Replace my sheet",
 	"use": "Use this sheet",
 	"cancel": "Cancel",
+	"fixList": "Fix the list",
 	"unreadable": "That file does not read as CSV",
 	"didNotOpen": "That file did not open",
 	"tooLarge": "That file is over 1 MB",

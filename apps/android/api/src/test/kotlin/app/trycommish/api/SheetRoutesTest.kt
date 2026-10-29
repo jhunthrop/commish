@@ -59,7 +59,7 @@ class SheetRoutesTest {
                     respond("""{"ok":true,"data":{"imported":0,"skipped":[],"sheet":$sheet},"error":null}""", HttpStatusCode.OK, json)
                 }
             val list = "1. Puka Nacua\n2. Ja'Marr Chase, WR"
-            Transport("http://api.test", engine, token = { "tok" }).sheets().importNames(id, list).data()
+            Transport("http://api.test", engine, token = { "tok" }).sheets().importNames(id, list).data<SheetImportResult>()
             assertEquals("text/plain", type?.substringBefore(';'))
             assertEquals(list, sent)
         }

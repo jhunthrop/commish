@@ -21,8 +21,8 @@ public enum SheetImport: Equatable, Sendable {
 
 /// What an import says once it is in or refused: the players read, the lines skipped and why, the first
 /// twelve named and the rest counted, and, when it read no player, what became of the sheet, what a list
-/// that reads looks like when no skipped row says why, and that Done goes back to the box with the text
-/// kept so it can be fixed.
+/// that reads looks like when no skipped row says why, and that its verb ("Fix the list") goes back to the
+/// box with the text kept so it can be fixed.
 public struct SheetImportWords: Equatable, Sendable {
     public let read: String
     public let skipped: String?
@@ -30,7 +30,7 @@ public struct SheetImportWords: Equatable, Sendable {
     public let kept: String?
     /// The shape a list is read in, when nothing was read and no skipped row says why.
     public let shape: String?
-    /// True when nothing was read: Done goes back to the box, the text kept, to fix it.
+    /// True when nothing was read: the verb goes back to the box, the text kept, to fix it.
     public let again: Bool
 
     init(read count: Int, skipped skips: [SheetCSV.Skip], kept: String?) {
@@ -53,9 +53,20 @@ public struct SheetImportWords: Equatable, Sendable {
         )
     }
 
-    /// The account's refusal of a body that read to no player, in its own sentence: the sheet is as it was.
-    init(refused sentence: String) {
-        self.init(read: 0, skipped: [], kept: SheetWords.rowWords(sentence))
+    /// The account's refusal of a body that read to no player, in its own sentence (the sheet is as it was),
+    /// with each line it skipped and why, said as a CSV import's are; an older API sends none.
+    init(refused sentence: String, skipped: [ImportSkip] = []) {
+        self.init(
+            read: 0,
+            skipped: skipped.map { SheetCSV.Skip(line: $0.line, reason: SheetWords.rowWords($0.reason)) },
+            kept: SheetWords.rowWords(sentence)
+        )
+    }
+
+    /// The result's verb: "Fix the list" when nothing was read and the box opens again with the text kept,
+    /// else Done.
+    public var verb: String {
+        again ? SheetWords.fixList : SheetWords.done
     }
 }
 
@@ -135,7 +146,7 @@ public extension CheatSheetViewModel {
         }
     }
 
-    /// Done on the result: an import that read nothing goes back to the box with the text kept, to fix it;
+    /// The result's verb: an import that read nothing goes back to the box with the text kept, to fix it;
     /// any other closes the panel.
     func finishImport() {
         if case let .done(words) = importing, words.again {
@@ -165,8 +176,8 @@ public extension CheatSheetViewModel {
     /// is, typed text/plain, and the account reads it against our board. A CSV is read on the phone first,
     /// as the web's panel reads it: a header that cannot be used is refused with its sentence and a file
     /// that reads no player with what it skipped, and nothing is sent or made. An import the account
-    /// refuses because it read no player is shown as the import's result in the account's sentence, and the
-    /// sheet read again as the account holds it; nothing is written back.
+    /// refuses because it read no player is shown as the import's result in the account's sentence with the
+    /// lines it skipped and why, and the sheet read again as the account holds it; nothing is written back.
     func importText(_ text: String) async {
         guard text.utf8.count <= SheetLimits.csvBytes else {
             importing = .open(problem: SheetWords.tooLarge)
@@ -195,8 +206,8 @@ public extension CheatSheetViewModel {
         await send(.csv(text))
     }
 
-    /// The code of the import's 400 (api/internal/sheets/handler.go, WriteInvalid): the body read to no
-    /// player, or its first line was a header the import cannot use, and the sheet is as it was.
+    /// The code of the import's 400 without skipped lines (api/internal/sheets/handler.go): a header the
+    /// import cannot use, or an API from before Lane 297 refusing a body that read to no player.
     internal static let readNothing = "invalid"
 
     private func send(_ body: SheetImportBody) async {
@@ -222,6 +233,9 @@ public extension CheatSheetViewModel {
             pasted = ""
         } catch where APIError.signsOut(error) {
             signedOut()
+        } catch let refused as SheetImportRefused {
+            importing = .done(SheetImportWords(refused: refused.sentence, skipped: refused.skipped))
+            await reread(made: made)
         } catch let APIError.envelope(code, sentence) where code == Self.readNothing {
             importing = .done(SheetImportWords(refused: sentence))
             await reread(made: made)

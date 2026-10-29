@@ -134,8 +134,11 @@ object SheetWords {
     const val pastePlaceholder = Words.SheetImport.pasteExample
 
     /** The phone's own: what a list that reads looks like, said under an import that read nothing and named no
-     * skipped row (the account's refusal carries no row's reason). */
+     * skipped row, so the format itself was wrong. */
     const val listShape = "Paste one player to a row, like 1. Puka Nacua"
+
+    /** The verb under an import that read no player: back to the box, the text kept (Lane 297). */
+    const val fixList = Words.SheetImport.fixList
     const val replace = Words.SheetImport.replace
     const val use = Words.SheetImport.use
     const val cancel = Words.SheetImport.cancel

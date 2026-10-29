@@ -149,12 +149,14 @@ public enum SheetWords {
     /// ImportPanel.svelte PASTE_EXAMPLE.
     public static let pastePlaceholder = Words.SheetImport.pasteExample
     /// The phone's own: what a list that reads looks like, said under an import that read nothing and named
-    /// no skipped row (the account's refusal carries no row's reason).
+    /// no skipped row, so the format itself was wrong.
     public static let listShape = "Paste one player to a row, like 1. Puka Nacua"
     public static let replace = Words.SheetImport.replace
     public static let use = Words.SheetImport.use
     public static let cancel = Words.SheetImport.cancel
     public static let done = Words.Sheet.done
+    /// The verb under an import that read no player: back to the box, the text kept (Lane 297).
+    public static let fixList = Words.SheetImport.fixList
     public static let tooLarge = Words.SheetImport.tooLarge
     public static let unreadable = Words.SheetImport.unreadable
     /// How many skipped lines the result names before it counts the rest (SKIPS_SHOWN).

@@ -59,20 +59,75 @@ struct CheatSheetImportTests {
                 continue
             }
             #expect(words.read == SheetWords.read(kept.count))
-            if kept.isEmpty {
-                #expect(words.kept == SheetStub.emptyRead, "\(list.text)")
-                #expect(words.lines.isEmpty)
-                #expect(viewModel.model?.players == 8, "the sheet is as it was")
-                #expect(await stub.writes.isEmpty)
-                continue
-            }
             let named = list.skipped.prefix(SheetWords.skipsShown).map {
                 "Row \($0.line): \($0.reason.replacingOccurrences(of: "line", with: "row"))"
             }
             #expect(Array(words.lines.prefix(named.count)) == named, "\(list.text)")
+            if kept.isEmpty {
+                #expect(words.kept == SheetStub.emptyRead, "\(list.text)")
+                #expect(words.shape == (list.skipped.isEmpty ? SheetWords.listShape : nil), "\(list.text)")
+                #expect(words.verb == SheetWords.fixList)
+                #expect(viewModel.model?.players == 8, "the sheet is as it was")
+                #expect(await stub.writes.isEmpty)
+                continue
+            }
             #expect(words.kept == nil)
             #expect(viewModel.model?.players == kept.count)
         }
+    }
+
+    /// Every refusal of the parity file (Lane 297): under "0 players read" and the account's sentence, each
+    /// line it skipped and why, said as a CSV import's are; the list's shape only when no line said why; the
+    /// verb "Fix the list", which goes back to the box with the text kept; nothing written.
+    @Test func everyParityRefusalListsItsSkippedRowsAndFixTheListKeepsTheText() async throws {
+        let parity = try SheetParity.load()
+        #expect(parity.refusals.contains { !$0.error.skipped.isEmpty })
+        #expect(parity.refusals.contains { $0.error.skipped.isEmpty })
+        for refusal in parity.refusals {
+            let (stub, viewModel) = try await CheatSheetViewModelTests.loaded()
+            await stub.set(importAnswer: nil, refusal: refusal.refused)
+            viewModel.openImport()
+            viewModel.pasted = "1. Puka Nacua"
+            await viewModel.importText(viewModel.pasted)
+            guard case let .done(words) = viewModel.importing else {
+                Issue.record("the refusal was not shown as the import's result: \(viewModel.importing)")
+                continue
+            }
+            let skipped = refusal.error.skipped
+            #expect(words.read == "0 players read")
+            #expect(words.kept == refusal.error.fields.body)
+            #expect(words.skipped == (skipped.isEmpty ? nil : SheetWords.skipped(skipped.count)))
+            #expect(words.lines == skipped.map { "Row \($0.line): \(SheetWords.rowWords($0.reason))" })
+            #expect(words.shape == (skipped.isEmpty ? SheetWords.listShape : nil), "\(refusal.text)")
+            #expect(words.verb == "Fix the list")
+            #expect(await stub.writes.isEmpty)
+            #expect(viewModel.model?.players == 8, "the sheet is as it was")
+            viewModel.finishImport()
+            #expect(viewModel.importing == .open(problem: nil))
+            #expect(viewModel.pasted == "1. Puka Nacua", "the text is kept to fix")
+        }
+    }
+
+    /// An API from before Lane 297 refuses with its sentence alone: shown as the import's result, the shape
+    /// said, the verb "Fix the list".
+    @Test func anOlderAPIsRefusalWithoutRowsStillReadsAsTheResult() async throws {
+        let (stub, viewModel) = try await CheatSheetViewModelTests.loaded()
+        await stub.set(importAnswer: nil, refusal: APIError.envelope(code: "invalid", message: SheetStub.emptyRead))
+        await viewModel.importText("Gibbs")
+        guard case let .done(words) = viewModel.importing else {
+            Issue.record("the refusal was not shown as the import's result: \(viewModel.importing)")
+            return
+        }
+        #expect(words.kept == SheetStub.emptyRead)
+        #expect(words.lines.isEmpty)
+        #expect(words.shape == SheetWords.listShape)
+        #expect(words.verb == SheetWords.fixList)
+    }
+
+    @Test func aResultThatReadPlayersSaysDone() throws {
+        let rows = try Array(parityRows().prefix(1))
+        let result = SheetImportResult(imported: 1, skipped: [], sheet: sheetDetail(rows))
+        #expect(SheetImportWords(result).verb == SheetWords.done)
     }
 
     @Test func theAccountsWordForALineIsSaidAsARow() {
@@ -111,8 +166,9 @@ struct CheatSheetImportTests {
         #expect(viewModel.model == nil)
     }
 
-    /// A list the account reads no player from says why (its sentence), what a list that reads looks like,
-    /// and Done goes back to the box with the text kept to fix it; an import that read players closes.
+    /// A list the account reads no player from and names no row for says why (its sentence), what a list
+    /// that reads looks like, and "Fix the list" goes back to the box with the text kept; an import that read
+    /// players closes.
     @Test func aListThatReadsNothingSaysWhatToPasteAndDoneKeepsTheText() async throws {
         let (stub, viewModel) = try await CheatSheetViewModelTests.loaded()
         viewModel.openImport()
@@ -159,7 +215,7 @@ struct CheatSheetImportTests {
     @Test func aRefusalForAnotherReasonSaysTheAPIsSentenceAndKeepsTheSheet() async throws {
         let (stub, viewModel) = try await CheatSheetViewModelTests.loaded()
         let sentence = "Our board did not load, so a list of names cannot be read yet"
-        await stub.set(importAnswer: nil, refusal: .envelope(code: "unavailable", message: sentence))
+        await stub.set(importAnswer: nil, refusal: APIError.envelope(code: "unavailable", message: sentence))
         await viewModel.importText("1. Puka Nacua")
         #expect(viewModel.importing == .open(problem: sentence))
         #expect(viewModel.model?.players == 8)
@@ -230,7 +286,7 @@ struct CheatSheetImportTests {
         await viewModel.load()
         #expect(viewModel.model == nil)
         #expect(viewModel.importVerb == SheetWords.use)
-        await stub.set(importAnswer: nil, refusal: .envelope(code: "unavailable", message: "Refused"))
+        await stub.set(importAnswer: nil, refusal: APIError.envelope(code: "unavailable", message: "Refused"))
         try await viewModel.importText(SheetParity.load().csv)
         #expect(viewModel.importing == .open(problem: "Refused"))
         #expect(await stub.created.count == 1)

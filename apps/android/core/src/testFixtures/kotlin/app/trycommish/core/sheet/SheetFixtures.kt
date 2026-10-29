@@ -43,6 +43,7 @@ data class SheetParity(
     val statuses: List<Status>,
     val reads: List<FileRead>,
     val lists: List<ListRead>,
+    val refusals: List<Refusal>,
 ) {
     data class Row(
         val id: String,
@@ -118,7 +119,25 @@ data class SheetParity(
         val skipped: List<Skipped>,
     )
 
+    /** The import's 400 for a body that reads to no player (Lane 297), which the API's handler is held to: the
+     * body, whether it is a CSV, the error's code, its sentences, and each line skipped and why, none when no
+     * line said why. */
+    data class Refusal(
+        val text: String,
+        val csv: Boolean,
+        val code: String,
+        val message: String,
+        val body: String,
+        val skipped: List<Skipped>,
+    ) {
+        /** The refusal as the client throws it. */
+        val failure: ApiFailure
+            get() = ApiFailure(BAD_REQUEST, code, message, mapOf("body" to body), skipped.map { ImportSkip(it.line, it.reason) })
+    }
+
     companion object {
+        private const val BAD_REQUEST = 400
+
         /** The file read by hand: the fixtures' source set has no serialization plugin. */
         fun load(): SheetParity {
             val json = Json.parseToJsonElement(File(System.getProperty("fixtures"), "parity/sheet.json").readText()).jsonObject
@@ -182,6 +201,18 @@ data class SheetParity(
                             list.getValue("csv").jsonPrimitive.boolean,
                             list.texts("ids"),
                             list.list("skipped").map { Skipped(it.int("line"), it.text("reason")) },
+                        )
+                    },
+                refusals =
+                    json.list("refusals").map { refusal ->
+                        val error = refusal.obj("error")
+                        Refusal(
+                            refusal.text("text"),
+                            refusal.getValue("csv").jsonPrimitive.boolean,
+                            error.text("code"),
+                            error.text("message"),
+                            error.obj("fields").text("body"),
+                            error.list("skipped").map { Skipped(it.int("line"), it.text("reason")) },
                         )
                     },
             )
@@ -337,7 +368,7 @@ class SheetStub(
     }
 
     /** The answer set, else the refusal set; an answer of no player is refused as the API refuses it (400, code
-     * invalid, the body's sentence) and the sheet is left as it was. */
+     * invalid, the body's sentence, the answer's skipped lines) and the sheet is left as it was. */
     override suspend fun import(
         id: String,
         body: SheetImportBody,
@@ -347,7 +378,13 @@ class SheetStub(
         importRefusal?.let { throw it }
         val answer =
             importAnswer?.takeIf { it.imported > 0 }
-                ?: throw ApiFailure(BAD_REQUEST, "invalid", "Some of that did not check out", mapOf("body" to EMPTY_READ))
+                ?: throw ApiFailure(
+                    BAD_REQUEST,
+                    "invalid",
+                    "Some of that did not check out",
+                    mapOf("body" to EMPTY_READ),
+                    importAnswer?.skipped.orEmpty(),
+                )
         val sheet = sheetDetail(answer.rows, id, stamp = SheetClock.now.plusSeconds(IMPORT_SECONDS).toString())
         detail = sheet
         return SheetImportResult(answer.imported, answer.skipped, sheet)

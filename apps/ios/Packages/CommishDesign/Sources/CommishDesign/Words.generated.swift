@@ -1137,6 +1137,7 @@ public enum Words {
         public static let replace = "Replace my sheet"
         public static let use = "Use this sheet"
         public static let cancel = "Cancel"
+        public static let fixList = "Fix the list"
         public static let unreadable = "That file does not read as CSV"
         public static let didNotOpen = "That file did not open"
         public static let tooLarge = "That file is over 1 MB"

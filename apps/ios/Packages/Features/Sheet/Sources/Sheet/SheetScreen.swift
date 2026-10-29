@@ -201,7 +201,7 @@ struct SheetImportView: View {
                 .accessibilityAddTraits(.isHeader)
             if case let .done(words) = viewModel.importing {
                 result(words, theme: theme)
-                Verb(SheetWords.done) { viewModel.finishImport() }
+                Verb(words.verb) { viewModel.finishImport() }
             } else {
                 sources(theme)
                 if case let .open(problem?) = viewModel.importing {

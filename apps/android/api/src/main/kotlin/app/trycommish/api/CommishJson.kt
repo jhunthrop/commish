@@ -1,5 +1,6 @@
 package app.trycommish.api
 
+import app.trycommish.api.models.ImportSkip
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -66,13 +67,15 @@ val CommishJson: Json =
  * with a default the app did not set is still left out. */
 val CommishRequestJson: Json = Json(CommishJson) { explicitNulls = true }
 
-/** The API's error as the envelope carries it: its code, its sentence, and the sentence per field it
- * refused, where it names one (a move's spent token says so under `confirm`). */
+/** The API's error as the envelope carries it: its code, its sentence, the sentence per field it
+ * refused, where it names one (a move's spent token says so under `confirm`), and the lines an import
+ * skipped with their reasons when it read no player (Lane 297; absent from every other error). */
 @Serializable
 data class EnvelopeError(
     val code: String,
     val message: String,
     val fields: Map<String, String>? = null,
+    val skipped: List<ImportSkip>? = null,
 )
 
 /** Every answer's envelope: ok, the data, the error. The request id and page meta are not read. */
@@ -83,13 +86,14 @@ data class Envelope<T>(
     val error: EnvelopeError? = null,
 )
 
-/** The API answered with an error envelope, or with no data: its sentence, and the sentence per field
- * it refused. */
+/** The API answered with an error envelope, or with no data: its sentence, the sentence per field it
+ * refused, and the lines an import skipped when it read no player (null when the error carries none). */
 class ApiFailure(
     val status: Int,
     val code: String,
     override val message: String,
     val fields: Map<String, String> = emptyMap(),
+    val skipped: List<ImportSkip>? = null,
 ) : Exception(message)
 
 /** The API refused the device's token (401): it lapsed unused or was revoked. The app signs the
@@ -110,6 +114,7 @@ inline fun <reified T> decodeEnvelope(
             error?.code ?: "unknown",
             error?.message ?: "The API answered with no data.",
             error?.fields.orEmpty(),
+            error?.skipped,
         )
     }
     return envelope.data ?: throw ApiFailure(status, "empty", "The API answered with no data.")
