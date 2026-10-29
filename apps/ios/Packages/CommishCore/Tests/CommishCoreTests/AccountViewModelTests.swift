@@ -6,8 +6,8 @@ import Testing
 
 /// The Account screen's view model: the account, the leagues followed and the paired devices read
 /// once (saved for no signal), this phone marked, unpair taking a device off the list (and a 401 after
-/// it signing out), detach and restore round-tripping with the web's undo, the push switches kept on the
-/// phone across a relaunch, and sign out revoking this phone and returning to sign-in.
+/// it signing out), detach and restore round-tripping with the web's undo, the push switches written to the
+/// account behind the phone's permission, and sign out revoking this phone and returning to sign-in.
 @MainActor
 struct AccountViewModelTests {
     nonisolated static let phone = "6f1d1c52-2626-4a26-9a26-0000000000d1"
@@ -22,7 +22,7 @@ struct AccountViewModelTests {
     }
 
     static func viewModel(
-        _ stub: StubAccountScreen, cache: any AnswerCache = NullCache(), push: any PushStore = MemoryPushStore(),
+        _ stub: StubAccountScreen, cache: any AnswerCache = NullCache(), push: any PushControl = StaticPush(),
         device: String? = phone, calls: Calls = Calls(), clock: any Clock = FixedClock(now),
         wait: @escaping @Sendable (Double) async -> Void = { _ in }
     ) -> AccountViewModel {
@@ -62,8 +62,9 @@ struct AccountViewModelTests {
         #expect(model.plan?.title == Words.FreePlan.title)
         #expect(model.followMore == false)
         #expect(viewModel.stampWords == nil)
-        #expect(AccountWords
-            .pushFoot == "Saved on this phone. Nothing is sent yet. These take effect when notifications start.")
+        #expect(AccountWords.pushFoot(.allowed) == "Kept with your account, for every phone you sign in on.")
+        #expect(AccountWords.pushFoot(.notAsked) == "\(Words.Push.kept) \(Words.Push.ask)")
+        #expect(AccountWords.pushFoot(.refused) == "\(Words.Push.kept) \(Words.Push.blocked)")
     }
 
     @Test func unpairTakesTheDeviceOffTheListAndA401AfterItSignsOut() async throws {
@@ -164,7 +165,7 @@ struct AccountViewModelTests {
         let gate = Gate()
         let viewModel = try AccountViewModel(
             api: StubAccountScreen.fixture(), cache: NullCache(), clock: FixedClock(Self.now), zone: Fixtures.zone,
-            push: MemoryPushStore(), deviceID: { Self.phone }, signOut: {}, onSignedOut: {}, deleted: {},
+            push: StaticPush(), deviceID: { Self.phone }, signOut: {}, onSignedOut: {}, deleted: {},
             leaguesChanged: { Task { await session.restore() } }, wait: { _ in await gate.wait() }
         )
         await viewModel.load()
@@ -215,22 +216,6 @@ struct AccountViewModelTests {
         #expect(try Self.loaded(viewModel).leagues?.first?.detached == false)
     }
 
-    @Test func theSwitchesAreKeptOnThePhoneAcrossARelaunch() throws {
-        let defaults = try #require(UserDefaults(suiteName: "commish-push-\(UUID().uuidString)"))
-        let first = try Self.viewModel(StubAccountScreen.fixture(), push: DevicePushStore(defaults: defaults))
-        #expect(first.push == .standard)
-        first.set(.status, isOn: false)
-        first.setQuiet(from: 22 * 60, to: 7 * 60 + 30)
-        let relaunched = try Self.viewModel(StubAccountScreen.fixture(), push: DevicePushStore(defaults: defaults))
-        #expect(relaunched.push.on(.status) == false)
-        #expect(relaunched.push.on(.thursday))
-        #expect(relaunched.push.on(.waivers))
-        #expect(relaunched.push.quietFrom == 22 * 60)
-        #expect(relaunched.push.quietTo == 7 * 60 + 30)
-        #expect(AccountWords.clockTime(relaunched.push.quietFrom) == "10:00 pm")
-        #expect(AccountWords.clockTime(PushSettings.standard.quietTo) == "8:00 am")
-    }
-
     @Test func signOutRevokesThisPhoneAndReturnsToSignIn() async throws {
         let store = MemorySessionStore()
         await store.save(token: "t", deviceID: Self.phone)
@@ -241,7 +226,7 @@ struct AccountViewModelTests {
         await session.restore()
         let viewModel = try AccountViewModel(
             api: StubAccountScreen.fixture(), cache: NullCache(), clock: FixedClock(Self.now), zone: Fixtures.zone,
-            push: MemoryPushStore(), deviceID: { await store.deviceID() },
+            push: StaticPush(), deviceID: { await store.deviceID() },
             signOut: { await session.signOut() }, onSignedOut: { Task { await session.expire() } },
             deleted: { await session.deleted() }
         )

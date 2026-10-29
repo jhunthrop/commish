@@ -5,7 +5,7 @@ import Foundation
 /// The Account routes as the fixture answers them, each write recorded, and the failures a test asks
 /// for.
 actor StubAccountScreen: AccountScreenAPI {
-    private let account: AccountAnswer
+    private var account: AccountAnswer
     private let leagues: [AttachedLeague]
     private let paired: [PairedDeviceRow]
     private var readError: (any Error)?
@@ -115,6 +115,33 @@ actor StubAccountScreen: AccountScreenAPI {
             throw writeError
         }
         revoked.append(id)
+    }
+
+    /// Each push settings change written, in order.
+    private(set) var notificationChanges: [NotificationSettingsChange] = []
+
+    /// The account with the change applied over its settings (the standard ones when it has none), as
+    /// PATCH /me answers.
+    func updateNotifications(_ change: NotificationSettingsChange) async throws -> AccountAnswer {
+        if let writeError {
+            throw writeError
+        }
+        notificationChanges.append(change)
+        let held = account.notifications?.value1
+        let kinds = change.kinds
+        var written = account
+        written.notifications = .init(value1: NotificationSettingsAnswer(
+            timeZone: change.timeZone ?? held?.timeZone ?? "America/New_York",
+            quietStart: change.quietStart ?? held?.quietStart ?? "23:00",
+            quietEnd: change.quietEnd ?? held?.quietEnd ?? "08:00",
+            kinds: .init(
+                starterStatus: kinds?.starterStatus ?? held?.kinds.starterStatus ?? true,
+                weekReads: kinds?.weekReads ?? held?.kinds.weekReads ?? true,
+                waiverClaims: kinds?.waiverClaims ?? held?.kinds.waiverClaims ?? true
+            )
+        ))
+        account = written
+        return written
     }
 }
 

@@ -7,18 +7,21 @@ import UIKit
 
 @main
 struct CommishApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private let environment: AppEnvironment
     @State private var session: AppSession
     @State private var flow: SignInFlow
     @State private var signIn = SignInModel()
     @State private var linked: ShellRoute?
+    /// A tapped push's screen, opened by the shell once signed in.
+    @State private var pushed: PushRoute?
 
     init() {
         let environment = AppEnvironment.live()
         self.environment = environment
         _session = State(initialValue: AppSession(
             account: environment.api, store: environment.session, cache: environment.cache,
-            clock: environment.clock
+            clock: environment.clock, signingOut: { await environment.push.signingOut() }
         ))
         let signIn = SignIn(pairing: environment.pairing, store: environment.session, deviceName: UIDevice.current.name)
         _flow = State(initialValue: SignInFlow(signIn: signIn, base: environment.baseURL))
@@ -27,7 +30,11 @@ struct CommishApp: App {
     var body: some Scene {
         WindowGroup {
             content
-                .task { await session.restore() }
+                .task {
+                    delegate.registrar = environment.push
+                    delegate.opened = { pushed = $0 }
+                    await restore()
+                }
                 .onOpenURL { link in route(link) }
         }
     }
@@ -46,6 +53,7 @@ struct CommishApp: App {
                     working: signIn.working, problem: signIn.problem ?? session.notice, signIn: beginSignIn
                 ),
                 linked: $linked,
+                pushed: $pushed,
                 expired: { Task { await session.expire() } }
             )
             .id(session.generation)
@@ -75,12 +83,21 @@ struct CommishApp: App {
         }
     }
 
+    /// Reads the account; signed in, a phone that allows push asks Apple for its token, which registers
+    /// on this phone's device (never the permission prompt: only the Account's switch asks).
+    private func restore() async {
+        await session.restore()
+        if session.isSignedIn {
+            await environment.push.start()
+        }
+    }
+
     /// The return link, from the sheet or as a universal link: pair, then read the account.
     private func finish(_ link: URL) async {
         do {
             if try await flow.finish(link) {
                 signIn.finished(nil)
-                await session.restore()
+                await restore()
             } else {
                 // Not this flow's return (or no flow under way): the verb comes back.
                 signIn.ended()

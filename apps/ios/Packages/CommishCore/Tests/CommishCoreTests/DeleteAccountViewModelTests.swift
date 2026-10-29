@@ -33,7 +33,7 @@ struct DeleteAccountViewModelTests {
     static func sheet(_ stub: StubAccountScreen, calls: Calls = Calls()) async throws -> DeleteAccountViewModel {
         let viewModel = AccountViewModel(
             api: stub, cache: NullCache(), clock: FixedClock(AccountViewModelTests.now), zone: Fixtures.zone,
-            push: MemoryPushStore(), deviceID: { AccountViewModelTests.phone }, signOut: {},
+            push: StaticPush(), deviceID: { AccountViewModelTests.phone }, signOut: {},
             onSignedOut: { calls.signedOut += 1 }, deleted: { calls.deleted += 1 }
         )
         await viewModel.load()
@@ -43,7 +43,7 @@ struct DeleteAccountViewModelTests {
     @Test func theSheetWaitsForAnAccountToBeRead() throws {
         let viewModel = try AccountViewModel(
             api: StubAccountScreen.fixture(), cache: NullCache(), clock: FixedClock(AccountViewModelTests.now),
-            zone: Fixtures.zone, push: MemoryPushStore(), deviceID: { nil }, signOut: {}, onSignedOut: {},
+            zone: Fixtures.zone, push: StaticPush(), deviceID: { nil }, signOut: {}, onSignedOut: {},
             deleted: {}
         )
         #expect(viewModel.deletion() == nil)
@@ -98,7 +98,7 @@ struct DeleteAccountViewModelTests {
         #expect(session.notice == nil)
         let viewModel = try AccountViewModel(
             api: StubAccountScreen.fixture(), cache: cache, clock: FixedClock(AccountViewModelTests.now),
-            zone: Fixtures.zone, push: MemoryPushStore(), deviceID: { await store.deviceID() },
+            zone: Fixtures.zone, push: StaticPush(), deviceID: { await store.deviceID() },
             signOut: { await session.signOut() }, onSignedOut: { Task { await session.expire() } },
             deleted: { await session.deleted() }
         )
@@ -147,7 +147,7 @@ struct DeleteAccountViewModelTests {
         let heard = Heard()
         let viewModel = try AccountViewModel(
             api: StubAccountScreen.fixture(), cache: cache, clock: FixedClock(AccountViewModelTests.now),
-            zone: Fixtures.zone, push: MemoryPushStore(), deviceID: { await store.deviceID() },
+            zone: Fixtures.zone, push: StaticPush(), deviceID: { await store.deviceID() },
             signOut: { await session.signOut() }, onSignedOut: { Task { await session.expire() } },
             deleted: { await session.deleted() }, leaguesChanged: { heard.leaguesChanged += 1 },
             wait: { _ in try? await Task.sleep(for: .seconds(3600)) }

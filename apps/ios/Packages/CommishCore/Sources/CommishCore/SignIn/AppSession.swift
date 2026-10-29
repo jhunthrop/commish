@@ -85,11 +85,15 @@ public final class AppSession {
     private let clock: any Clock
     private let zone: TimeZone
     private let defaults: UserDefaults
+    /// What signing out does first, while the phone still holds its token: push takes its token off.
+    private let signingOut: @MainActor () async -> Void
 
     public init(
         account: any AccountAPI, store: any SessionStore, cache: any AnswerCache, clock: any Clock = SystemClock(),
-        zone: TimeZone = .current, defaults: UserDefaults = .standard
+        zone: TimeZone = .current, defaults: UserDefaults = .standard,
+        signingOut: @escaping @MainActor () async -> Void = {}
     ) {
+        self.signingOut = signingOut
         self.account = account
         self.store = store
         self.cache = cache
@@ -163,9 +167,10 @@ public final class AppSession {
         }
     }
 
-    /// Unpairs this phone on the API, then forgets its token and its saved answers whatever the API
-    /// said: a sign-out on the phone always signs out.
+    /// Takes this phone's push token off and unpairs it on the API, then forgets its token and its saved
+    /// answers whatever the API said: a sign-out on the phone always signs out.
     public func signOut() async {
+        await signingOut()
         if let device = await store.deviceID() {
             try? await account.revokeDevice(id: device)
         }

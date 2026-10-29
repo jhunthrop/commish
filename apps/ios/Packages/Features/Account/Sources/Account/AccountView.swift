@@ -75,7 +75,8 @@ public struct AccountView: View {
 
     private var screenState: AccountScreenState {
         AccountScreenState(
-            stamp: viewModel.stampWords, push: viewModel.push, busy: viewModel.busy, problem: viewModel.problem
+            stamp: viewModel.stampWords, push: viewModel.shownPush, permission: viewModel.permission,
+            busy: viewModel.busy, problem: viewModel.problem
         )
     }
 
@@ -85,7 +86,7 @@ public struct AccountView: View {
             detach: { id in Task { await viewModel.detach(id) } },
             restore: { id in Task { await viewModel.restore(id) } },
             unpair: { id in Task { await viewModel.unpair(id) } },
-            toggle: { kind, isOn in viewModel.set(kind, isOn: isOn) },
+            toggle: { kind, isOn in Task { await viewModel.set(kind, isOn: isOn) } },
             editQuiet: { editing = $0 },
             signOut: { Task { await viewModel.signOut() } },
             deleteAccount: { deletion = viewModel.deletion() },

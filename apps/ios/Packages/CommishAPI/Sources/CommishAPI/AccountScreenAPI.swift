@@ -8,8 +8,9 @@ public typealias PairedDeviceRow = Components.Schemas.Device
 /// The Account screen's reads and writes (web/src/lib/account/AccountPage.svelte): the account, the
 /// leagues followed with detach and restore (league/AccountLeagues.svelte), the paired devices with
 /// unpair (hosts/AccountDevices.svelte). The seam the view model's tests replace with a stub. Sign out
-/// is the session's (AppSession.signOut), which revokes this phone the same way.
-public protocol AccountScreenAPI: Sendable {
+/// is the session's (AppSession.signOut), which revokes this phone the same way. The push switches
+/// write through NotificationSettingsAPI (PATCH /me).
+public protocol AccountScreenAPI: NotificationSettingsAPI {
     func me() async throws -> AccountAnswer
     func attached() async throws -> [AttachedLeague]
     /// Stops following a league; the attachment is kept as detached, so `restore` takes it back.

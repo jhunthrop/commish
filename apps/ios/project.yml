@@ -98,6 +98,9 @@ targets:
           # The sign-in sheet takes its https return on iOS 17.4 and later only for a domain the app
           # holds web credentials for (apple-app-site-association's webcredentials).
           - webcredentials:trycommish.app
+        # Push (Lane 288): APNs. Automatic signing adds the capability to the App ID, and the App Store
+        # export (fastlane beta) writes production in the signed app.
+        aps-environment: development
     info:
       path: Commish/Info.plist
       properties:
