@@ -2,7 +2,8 @@
 
 The founder's rule: every non-stat sentence on a page comes from the writer, and a stock sentence
 across players is a defect. The run fails when
-- the board's unwritten pages pass the run's line (`CapsuleConfig.unwritten_line`: 2% before the
+- the board's unwritten pages (a page held over a rewrite that fell keeps its written capsule, so it
+  is written, Lane 294) pass the run's line (`CapsuleConfig.unwritten_line`: 2% before the
   season's first kickoff, 3% from it on, the run's date deciding): a facts block (the
   fallback for a player the writer could not serve, `capsules.facts_block`), a row still on the
   oracle's template, or no row at all; or
@@ -83,6 +84,9 @@ class CapsuleGateResult:
     # The pages the capsule step demoted tonight to their facts blocks for a sentence still on two pages
     # after the graced rewrite (`capsule_demotion`), counted among the facts blocks and so unwritten.
     demoted: int = 0
+    # The written pages whose rewrite fell tonight and that keep their written capsule (the hold path,
+    # `capsules.sweep`): counted written, since the page still shows a written read (Lane 294 ruling 3).
+    held: int = 0
 
     @property
     def unwritten_share(self) -> float:
@@ -97,10 +101,13 @@ class CapsuleGateResult:
     def _demoted_note(self) -> str:
         return "" if not self.demoted else f" ({self.demoted} demoted tonight for a sentence on two pages)"
 
+    def _held_note(self) -> str:
+        return "" if not self.held else f" ({self.held} held over a rewrite that fell tonight)"
+
     def summary(self) -> str:
         verdict = "passed" if self.ok else "failed"
         line = (
-            f"capsule gate: {verdict}, {self.board_players} board pages, {self.written} written, "
+            f"capsule gate: {verdict}, {self.board_players} board pages, {self.written} written{self._held_note()}, "
             f"{self.facts_blocks} facts blocks{self._demoted_note()}, {self.template} on the oracle's template, "
             f"{self.missing} missing "
             f"({self.unwritten_share:.1%} unwritten, the {self.line.voice} line {self.line.share_max:.0%}: "

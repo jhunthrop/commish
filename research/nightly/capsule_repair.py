@@ -9,7 +9,7 @@
    carries; the step rewrites only the first `span_repair_pages_per_night` of them a night (ruled
    2026-10-15). Spans never fail the run, so a
    span rewrite that cannot pass its validator keeps the page's written read rather than leaving a
-   facts block (`SweepPlan.keep_written`).
+   facts block, as every rewrite of a written page does (the hold path, `capsules.sweep`).
 """
 
 from collections.abc import Mapping, Sequence

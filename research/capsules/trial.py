@@ -105,7 +105,7 @@ def write_chosen(engine: Engine, gateway: GatewayClient, as_of: datetime, choice
     paid = gateway.with_budget(budget)
 
     def write(subject: Subject) -> Written:
-        result, _, _ = write_one(engine, subject, stored.get(subject.universe_id), paid, worn)
+        result, _ = write_one(engine, subject, stored.get(subject.universe_id), paid, worn)
         row = rows[subject.facts.identity.id]
         findings = capsule_findings(
             subject.facts.identity.id,

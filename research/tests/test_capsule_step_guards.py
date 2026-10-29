@@ -151,6 +151,8 @@ def _paid_read(view: GatewayClient) -> Any:
         usage=answer.usage,
         calls=view.calls,
         asks=1,
+        retry_asks=0,
+        rescued=False,
         model="m/x",
     )
 
@@ -170,7 +172,7 @@ def test_a_raising_worker_leaves_the_headline_spend_equal_to_the_ledger(monkeypa
 
     monkeypatch.setattr(sweep, "stored_capsules_for", lambda conn, ids: {})
     monkeypatch.setattr(sweep, "queue_regeneration", lambda conn, ids: 0)
-    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, view, worn: _paid_read(view))
+    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, view, worn, **_: _paid_read(view))
     monkeypatch.setattr(sweep, "upsert_capsule", upsert)
     usage = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150, "cost": 0.002}
     body = {"choices": [{"message": {"content": " ".join(["word"] * 30)}}], "usage": usage}

@@ -3,12 +3,19 @@ check over the board as it then stands.
 
 Ported from `research-ts/src/capsules/sweep.ts`. A player is written when his row is missing, his
 facts hash moved, or his row is not written (a facts block, or the oracle's template: a throttled or
-refused read keeps retrying);
-players demoted from a written read go first. Each player is committed as he is written, so a run
-stopped part way loses at most the pages in flight. Pages are written concurrently on the writer's
-rolling pool, each checked as it lands (`capsules.landing`). The worn language the board already carries is
-quoted into every prompt; the check runs again at the end and queues anyone over a line. Capsules
-key on the universe id (`research.players.id`), through the crosswalk.
+refused read keeps retrying); players demoted to their facts blocks (`nightly.capsule_demotion`, the
+page check) go first.
+
+THE HOLD PATH (Lane 294, the founder's "we should always show a read"): a rewrite of a written capsule
+that falls to its facts block never replaces it. The written row stands, its old facts hash keeping it
+due, and the page is counted held (`SweepReport.held`) for the night's retry passes to ask again. A
+first capsule that falls stores its facts block.
+
+Each player is committed as he is written, so a run stopped part way loses at most the pages in
+flight. Pages are written concurrently on the writer's rolling pool, each checked as it lands
+(`capsules.landing`). The worn language the board already carries is quoted into every prompt; the
+check runs again at the end and queues anyone over a line. Capsules key on the universe id
+(`research.players.id`), through the crosswalk.
 """
 
 from collections.abc import Callable, Mapping, Sequence
@@ -39,6 +46,7 @@ from research.capsules.span_rules import span_rules_for
 from research.capsules.spans import SpanRules, page_texts
 from research.capsules.store import (
     RETRY_FIRST_FACTS_HASH,
+    WRITTEN_SOURCE,
     CapsuleWrite,
     StoredCapsule,
     queue_regeneration,
@@ -98,11 +106,15 @@ class SweepReport:
     processed: list[str] = field(default_factory=list)
     llm: int = 0
     facts: int = 0
-    demoted: int = 0
-    # Rewrites that left the page's written read as it was: a span repair that fell short, or any
-    # rewrite refused because it would land a sentence another page carries (`refused` of them).
+    # Rewrites that left the page's written read as it was: a rewrite that fell to its facts block (the
+    # hold path, `held` of them by universe id), or one refused because it would land a sentence another
+    # page carries (`refused` of them).
     kept: int = 0
     refused: int = 0
+    held: list[str] = field(default_factory=list)
+    # The retry writer's drafts (Lane 294) and the written pages it rescued.
+    retry_asks: int = 0
+    rescued: int = 0
     calls: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
@@ -146,6 +158,7 @@ def _count_spend(report: SweepReport, subject: Subject, result: CapsuleResult) -
     """A page's calls, tokens and cost on the sweep's report."""
     usage = result.usage
     report.calls += result.calls
+    report.retry_asks += result.retry_asks
     # The night's ceiling counts the writer's asks, never the gateway's re-asks (Lane 73 ruling 1).
     report.asks_by_player[subject.universe_id] = report.asks_by_player.get(subject.universe_id, 0) + result.asks
     if usage is not None:
@@ -154,29 +167,30 @@ def _count_spend(report: SweepReport, subject: Subject, result: CapsuleResult) -
         report.cost_usd += usage.cost_usd or 0.0
 
 
-def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted: bool, kept: bool) -> None:
+def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, kept: bool) -> None:
     usage = result.usage
     _count_spend(report, subject, result)
     name = subject.facts.identity.name
     report.detail += [f"{name}: narrative slot rejected, {line}" for line in result.narrative.rejected]
+    fell = f"{name}: {describe_fallback(result.compact, result.full)}"
     if kept:
         report.kept += 1
         if result.source == "llm":
             report.refused += 1
             report.detail.append(f"{name}: rewrite refused, it would land a sentence another page carries")
         else:
-            report.detail.append(f"{name}: {describe_fallback(result.compact, result.full)}, kept the written read")
+            report.held.append(subject.universe_id)
+            report.fell.append(f"{fell}, held over the written read")
+            report.detail.append(f"{fell}, held over the written read")
         return
     if result.source == "llm":
         report.llm += 1
+        report.rescued += int(result.rescued)
         report.detail.append(f"{name}: llm, {result.calls} calls, ${(usage.cost_usd or 0.0) if usage else 0.0:.6f}")
         return
     report.facts += 1
-    report.demoted += int(demoted)
-    suffix = ", kept nothing, was written" if demoted else ""
-    fell = f"{name}: {describe_fallback(result.compact, result.full)}"
     report.fell.append(fell)
-    report.detail.append(f"{fell}{suffix}")
+    report.detail.append(fell)
 
 
 def write_one(  # noqa: PLR0913 - one write's parts
@@ -186,22 +200,22 @@ def write_one(  # noqa: PLR0913 - one write's parts
     gateway: GatewayClient,
     worn: WornPhrases,
     *,
-    keep_written: bool = False,
     claim: Callable[[CapsuleResult], bool] | None = None,
-) -> tuple[CapsuleResult, bool, bool]:
-    """One player's capsule, generated and committed on its own: the result, whether a written row was
-    demoted, and whether it was kept. With `keep_written` a rewrite that falls to the facts block leaves
-    a written row as it was (a span repair's failure costs nothing). `claim` (`landing.BoardSentences`)
-    is asked before anything lands: False keeps the page as it is, nothing written."""
-    result = generate_capsule(subject.facts, gateway, worn)
-    demoted = stored is not None and stored.source == "llm" and result.source == FACTS_SOURCE
-    if demoted and keep_written:
-        return result, False, True
+    retry_model: str | None = None,
+) -> tuple[CapsuleResult, bool]:
+    """One player's capsule, generated and committed on its own: the result, and whether the page was
+    kept as it was. A rewrite of a written row that falls to its facts block is held: the written row
+    stands, nothing is written (the hold path). `claim` (`landing.BoardSentences`) is asked before
+    anything lands: False keeps the page as it is, nothing written. `retry_model` is the retry writer a
+    read the writer could not write is asked once more of (`generate_capsule`)."""
+    result = generate_capsule(subject.facts, gateway, worn, retry_model=retry_model)
+    if stored is not None and stored.source == WRITTEN_SOURCE and result.source == FACTS_SOURCE:
+        return result, True
     if claim is not None and not claim(result):
-        return result, False, True
+        return result, True
     row = CapsuleWrite(
         subject.universe_id,
-        RETRY_FIRST_FACTS_HASH if demoted else subject.facts.facts_hash,
+        subject.facts.facts_hash,
         result.compact.text,
         result.full.text,
         result.source,
@@ -218,7 +232,7 @@ def write_one(  # noqa: PLR0913 - one write's parts
         once_more_on_disconnect(commit)
     except DBAPIError as error:
         raise PageCommitError(subject, result, error) from error
-    return result, demoted, False
+    return result, False
 
 
 def subjects_of(conn: Connection, as_of: datetime, history: ReadThrough = UNCACHED) -> list[Subject]:
@@ -288,9 +302,12 @@ class SweepPlan:
     # The night's span rules (`capsules.span_rules`), built once by the nightly; None builds them here.
     # Each writer call is told the spans tonight's latest pages already share (`landing.TonightWindow`).
     span_rules: SpanRules | None = None
-    # A span repair (`nightly.capsule_repair`): a rewrite that cannot pass its validator leaves the
-    # page's written read as it is, never a facts block (a shared span costs less than no prose).
-    keep_written: bool = False
+    # Written pages an `unwritten_only` pass asks again besides the unwritten ones: tonight's held
+    # rewrites (`SweepReport.held`, the hold path), so a fallen rewrite has the night's rounds too.
+    again: frozenset[str] = frozenset()
+    # The retry writer a read the writer's asks could not write is asked once more of (Lane 294); None
+    # turns it off.
+    retry_model: str | None = None
     # Players the night has spent its call budget on (`nightly.capsule_step`), never written again.
     exclude: frozenset[str] = frozenset()
     # A graced pass (`nightly.capsule_step.spent_out_for`): a page at the night's call ceiling may take
@@ -307,7 +324,9 @@ def _eligible(subject: Subject, row: StoredCapsule | None, plan: SweepPlan) -> b
         return False
     if plan.only is not None:
         return subject.universe_id in plan.only
-    return _unwritten(row) if plan.unwritten_only else _needs_generation(subject, row)
+    if plan.unwritten_only:
+        return _unwritten(row) or subject.universe_id in plan.again
+    return _needs_generation(subject, row)
 
 
 def _ordered(subjects: Sequence[Subject], stored: dict[str, StoredCapsule], plan: SweepPlan) -> list[Subject]:
@@ -332,7 +351,7 @@ def _ordered(subjects: Sequence[Subject], stored: dict[str, StoredCapsule], plan
     return [*demoted, *unwritten, *(s for s in eligible if s not in demoted and s not in unwritten)]
 
 
-Written = tuple[CapsuleResult, bool, bool]
+Written = tuple[CapsuleResult, bool]
 
 
 def _reads(row: StoredCapsule) -> tuple[str, str]:
@@ -341,7 +360,7 @@ def _reads(row: StoredCapsule) -> tuple[str, str]:
 
 def _land(report: SweepReport, tonight: TonightWindow, subject: Subject, written: Written) -> None:
     """One page as it lands: tallied, checked against the pages landed before it, added to the window."""
-    result, demoted, kept = written
+    result, kept = written
     if result.source == "llm" and not kept:
         texts = page_texts(result.compact.text, result.full.text, result.narrative.slots)
         landing = tonight.land(texts, (result.compact.text, result.full.text))
@@ -349,7 +368,7 @@ def _land(report: SweepReport, tonight: TonightWindow, subject: Subject, written
         report.landed_spans += landing.spans
         if landing.carrier:
             report.landed_carriers.append(subject.universe_id)
-    _tally(report, subject, result, demoted, kept)
+    _tally(report, subject, result, kept)
     report.processed.append(subject.universe_id)
 
 
@@ -402,8 +421,8 @@ def sweep_capsules(
             stored.get(subject.universe_id),
             view,
             worn,
-            keep_written=plan.keep_written,
             claim=claim_for(subject),
+            retry_model=plan.retry_model,
         )
 
     try:

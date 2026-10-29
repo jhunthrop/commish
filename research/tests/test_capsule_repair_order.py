@@ -44,16 +44,14 @@ def test_the_sweep_keeps_a_repairs_own_order() -> None:
     assert [s.universe_id for s in sweep._ordered(subjects, {}, plan)] == ["e", "b"]
 
 
-def test_a_span_repair_that_falls_to_the_facts_block_keeps_the_written_read(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_rewrite_that_falls_to_the_facts_block_keeps_the_written_read(monkeypatch: pytest.MonkeyPatch) -> None:
     fallen = SimpleNamespace(source="facts")
-    monkeypatch.setattr(sweep, "generate_capsule", lambda *_: fallen)
+    monkeypatch.setattr(sweep, "generate_capsule", lambda *_, **__: fallen)
     stored = StoredCapsule("a", "h", "c", "f", "llm", None, None, datetime(2026, 10, 14, tzinfo=UTC))
     subject = cast("sweep.Subject", SimpleNamespace(universe_id="a", facts=None))
     # No engine is touched: nothing is written.
-    result, demoted, kept = sweep.write_one(
-        cast("Engine", None), subject, stored, cast("Any", None), NO_WORN_PHRASES, keep_written=True
-    )
-    assert result.source == "facts" and not demoted and kept
+    result, kept = sweep.write_one(cast("Engine", None), subject, stored, cast("Any", None), NO_WORN_PHRASES)
+    assert result.source == "facts" and kept
 
 
 def test_the_span_pages_carrying_the_most_shared_spans_go_first() -> None:
