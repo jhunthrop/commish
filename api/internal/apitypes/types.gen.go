@@ -2091,6 +2091,36 @@ func (e WaiverOrder) Valid() bool {
 	}
 }
 
+// Defines values for WaiverPositionCardPosition.
+const (
+	WaiverPositionCardPositionDEF WaiverPositionCardPosition = "DEF"
+	WaiverPositionCardPositionK   WaiverPositionCardPosition = "K"
+	WaiverPositionCardPositionQB  WaiverPositionCardPosition = "QB"
+	WaiverPositionCardPositionRB  WaiverPositionCardPosition = "RB"
+	WaiverPositionCardPositionTE  WaiverPositionCardPosition = "TE"
+	WaiverPositionCardPositionWR  WaiverPositionCardPosition = "WR"
+)
+
+// Valid indicates whether the value is a known member of the WaiverPositionCardPosition enum.
+func (e WaiverPositionCardPosition) Valid() bool {
+	switch e {
+	case WaiverPositionCardPositionDEF:
+		return true
+	case WaiverPositionCardPositionK:
+		return true
+	case WaiverPositionCardPositionQB:
+		return true
+	case WaiverPositionCardPositionRB:
+		return true
+	case WaiverPositionCardPositionTE:
+		return true
+	case WaiverPositionCardPositionWR:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WeekDoneState.
 const (
 	WeekDoneStateFinal  WeekDoneState = "final"
@@ -6174,6 +6204,9 @@ type WaiverAdvice struct {
 	// PickupsProj this week's Proj of the lineup the advice sets with every pickup made, one decimal; lineup_proj with none; null before the week's projection is read
 	PickupsProj *float64 `json:"pickups_proj"`
 
+	// Positions the position panel (Lane 291): one card per position the league starts, in the order QB, RB, WR, TE, K, DEF, a flex or superflex spot folded into the position of the player who fills it. Set on the full page alone (no position asked); absent on a narrowed page, where the board carries no rest-of-season points, and from an older answer
+	Positions *[]WaiverPositionCard `json:"positions,omitempty"`
+
 	// ProjectionArrivesAt when for_week's published projection is first captured (its first kickoff less the capture's lead), set only while none is read for it; null otherwise, absent from an older answer
 	ProjectionArrivesAt *time.Time `json:"projection_arrives_at,omitempty"`
 
@@ -6276,6 +6309,52 @@ type WaiverMovesClaim string
 // WaiverOrder rolling, a successful claim sends the team to the back of the order; inverse_standings, the order resets each week, the last place first
 type WaiverOrder string
 
+// WaiverPositionCard one position of the member's against the league's (Lane 291): where the member stands there, his players there and the best free agents there
+type WaiverPositionCard struct {
+	// Available the best free agents at the position the table lists, at most five, by rest-of-season points, highest first: each one's row is the table's, the pickup rule's verdict (Beats, Gain) and the Add verb's input
+	Available []WaiverPositionFree `json:"available"`
+
+	// Mine the member's active players at the position, by rest-of-season points, highest first (none last)
+	Mine []WaiverPositionPlayer `json:"mine"`
+
+	// Need the trade finder's team profile (Lane 287) names a need of the member's here: a starting spot that takes the position falls below the league's median team there by the close call a week or more, a shared spot marking each of its positions where the member ranks below the middle; never at K or DEF
+	Need     bool                       `json:"need"`
+	Position WaiverPositionCardPosition `json:"position"`
+
+	// RestOfSeason the rest-of-season points of the starters each team's best lineup fields at the position, week by week with each club's bye over the weeks the order covers (the team profile's fill); null where no rostered player there carries rest-of-season points
+	RestOfSeason *WaiverStanding `json:"rest_of_season"`
+
+	// Teams the league's teams, the rank's out of
+	Teams int `json:"teams"`
+
+	// Week this week's Proj of the starters at the position in the lineup the advice sets for each team (the Lineup screen's rule, each team's own starters kept where their games have kicked off); null before the week's projection is read
+	Week *WaiverStanding `json:"week"`
+}
+
+// WaiverPositionCardPosition defines model for WaiverPositionCard.Position.
+type WaiverPositionCardPosition string
+
+// WaiverPositionFree defines model for WaiverPositionFree.
+type WaiverPositionFree struct {
+	// RestOfSeasonPoints his rest-of-season points over his club's games left, one decimal (the order's key); null without one
+	RestOfSeasonPoints *float64  `json:"rest_of_season_points"`
+	Row                WaiverRow `json:"row"`
+}
+
+// WaiverPositionPlayer defines model for WaiverPositionPlayer.
+type WaiverPositionPlayer struct {
+	Line PlayerLine `json:"line"`
+
+	// RestOfSeasonPoints his rest-of-season points over his club's games left, one decimal (the order's key); null without one
+	RestOfSeasonPoints *float64 `json:"rest_of_season_points"`
+
+	// Starter the member's best lineup with everyone playing starts him (the team profile's lineup)
+	Starter bool `json:"starter"`
+
+	// StartsThisWeek the lineup the advice sets this week starts him (the Lineup screen's rule)
+	StartsThisWeek bool `json:"starts_this_week"`
+}
+
 // WaiverRow defines model for WaiverRow.
 type WaiverRow struct {
 	Add PlayerLine `json:"add"`
@@ -6307,6 +6386,18 @@ type WaiverRow struct {
 
 	// WeekGain this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start. Null on every row once any pickup's add or drop has kicked off (gameStateAt): the pickups then go in season Gain order and no week figure counts
 	WeekGain *float64 `json:"week_gain"`
+}
+
+// WaiverStanding defines model for WaiverStanding.
+type WaiverStanding struct {
+	// Median the league's median team's figure, one decimal
+	Median float64 `json:"median"`
+
+	// Points the member's figure, one decimal
+	Points float64 `json:"points"`
+
+	// Rank the member's place among the league's teams by points, 1 the most; teams level at the printed tenth share a place
+	Rank int `json:"rank"`
 }
 
 // WaiverStash defines model for WaiverStash.

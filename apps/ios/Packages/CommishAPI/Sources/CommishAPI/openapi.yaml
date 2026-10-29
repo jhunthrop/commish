@@ -10472,6 +10472,112 @@ components:
           description: one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
         moves:
           $ref: "#/components/schemas/WaiverMoves"
+        positions:
+          type: array
+          description: "the position panel (Lane 291): one card per position the league starts, in the order QB, RB, WR, TE, K, DEF, a flex or superflex spot folded into the position of the player who fills it. Set on the full page alone (no position asked); absent on a narrowed page, where the board carries no rest-of-season points, and from an older answer"
+          items:
+            $ref: "#/components/schemas/WaiverPositionCard"
+    WaiverPositionCard:
+      type: object
+      description: "one position of the member's against the league's (Lane 291): where the member stands there, his players there and the best free agents there"
+      required:
+        - position
+        - teams
+        - need
+        - rest_of_season
+        - week
+        - mine
+        - available
+      properties:
+        position:
+          anyOf:
+            - type: string
+              enum:
+                - QB
+                - RB
+                - WR
+                - TE
+                - K
+                - DEF
+            - type: string
+        teams:
+          type: integer
+          description: the league's teams, the rank's out of
+        need:
+          type: boolean
+          description: "the trade finder's team profile (Lane 287) names a need of the member's here: a starting spot that takes the position falls below the league's median team there by the close call a week or more, a shared spot marking each of its positions where the member ranks below the middle; never at K or DEF"
+        rest_of_season:
+          allOf:
+            - $ref: "#/components/schemas/WaiverStanding"
+          nullable: true
+          description: the rest-of-season points of the starters each team's best lineup fields at the position, week by week with each club's bye over the weeks the order covers (the team profile's fill); null where no rostered player there carries rest-of-season points
+        week:
+          allOf:
+            - $ref: "#/components/schemas/WaiverStanding"
+          nullable: true
+          description: this week's Proj of the starters at the position in the lineup the advice sets for each team (the Lineup screen's rule, each team's own starters kept where their games have kicked off); null before the week's projection is read
+        mine:
+          type: array
+          description: the member's active players at the position, by rest-of-season points, highest first (none last)
+          items:
+            $ref: "#/components/schemas/WaiverPositionPlayer"
+        available:
+          type: array
+          description: "the best free agents at the position the table lists, at most five, by rest-of-season points, highest first: each one's row is the table's, the pickup rule's verdict (Beats, Gain) and the Add verb's input"
+          items:
+            $ref: "#/components/schemas/WaiverPositionFree"
+    WaiverStanding:
+      type: object
+      required:
+        - rank
+        - points
+        - median
+      properties:
+        rank:
+          type: integer
+          description: the member's place among the league's teams by points, 1 the most; teams level at the printed tenth share a place
+        points:
+          type: number
+          format: double
+          description: the member's figure, one decimal
+        median:
+          type: number
+          format: double
+          description: the league's median team's figure, one decimal
+    WaiverPositionPlayer:
+      type: object
+      required:
+        - line
+        - starter
+        - starts_this_week
+        - rest_of_season_points
+      properties:
+        line:
+          $ref: "#/components/schemas/PlayerLine"
+        starter:
+          type: boolean
+          description: the member's best lineup with everyone playing starts him (the team profile's lineup)
+        starts_this_week:
+          type: boolean
+          description: the lineup the advice sets this week starts him (the Lineup screen's rule)
+        rest_of_season_points:
+          type: number
+          format: double
+          nullable: true
+          description: his rest-of-season points over his club's games left, one decimal (the order's key); null without one
+    WaiverPositionFree:
+      type: object
+      required:
+        - row
+        - rest_of_season_points
+      properties:
+        row:
+          $ref: "#/components/schemas/WaiverRow"
+        rest_of_season_points:
+          type: number
+          format: double
+          nullable: true
+          description: his rest-of-season points over his club's games left, one decimal (the order's key); null without one
     WaiverMoves:
       type: object
       required:
