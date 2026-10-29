@@ -104,7 +104,7 @@ public struct TradeBuilderModel: Equatable, Sendable {
     public let ideasHead: String
     /// "8 more", nil once every idea shows.
     public let more: String?
-    /// The idea the ticks hold, pressed.
+    /// The first place (an offer or an idea) the ticks hold, pressed.
     public let pressed: String?
     public let rosters: RosterSwitch
     public let teams: [TeamChoice]
@@ -240,16 +240,12 @@ enum TradeBuilder {
         let live = team != nil && check.map(TradeChecks.fillsBoth) == true
             && inputs.answered.map(picks.same) == true
         let boxed = boxes(inputs, team: team, check: check)
+        let ideas = inputs.ideas.at(inputs.now)
         return TradeBuilderModel(
-            ideas: inputs.ideas.visible(all: inputs.allIdeas),
-            ideasHead: inputs.ideas.head,
-            more: inputs.ideas.more(all: inputs.allIdeas),
-            pressed: inputs.ideas.places.compactMap { place -> String? in
-                guard case let .idea(preset) = place, preset.picks.same(picks) else {
-                    return nil
-                }
-                return preset.id
-            }.first,
+            ideas: ideas.visible(all: inputs.allIdeas),
+            ideasHead: ideas.head,
+            more: ideas.more(all: inputs.allIdeas),
+            pressed: ideas.places.first { $0.picks?.same(picks) == true }?.id,
             rosters: RosterSwitch(
                 yours: "\(Words.Analyzer.you)\(count(picks.give))",
                 theirs: "\(team?.name ?? Words.Analyzer.pickTeam)\(count(picks.get))"

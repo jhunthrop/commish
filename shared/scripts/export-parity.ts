@@ -569,7 +569,7 @@ export async function renderTrades(host: LeagueSync['host']): Promise<string> {
 	const clocks: Record<string, unknown> = {};
 	for (const clock of CLOCKS) {
 		const advice = await answer<TradeAdvice>(`trades-${LEAGUE}-${clock}.json`);
-		clocks[clock] = tradesAt(advice, host, me, instantOf(clock), ZONE);
+		clocks[clock] = tradesAt(advice, host, instantOf(clock), ZONE);
 	}
 	const checks: Record<string, unknown[]> = {};
 	for (const clock of CHECK_CLOCKS) {
@@ -603,9 +603,7 @@ export async function renderTrades(host: LeagueSync['host']): Promise<string> {
 				`trades-${LEAGUE}-player-${HOLDING_PLAYER}-${CHECK_CLOCKS[0]}.json`
 			),
 			HOLDING_PLAYER,
-			me,
-			instantOf(CHECK_CLOCKS[0]),
-			ZONE
+			instantOf(CHECK_CLOCKS[0])
 		),
 		builder: builderAt(weekAdvice, firstCheck, me, instantOf(CHECK_CLOCKS[0]), ZONE),
 		needs: await needsOf(host, me)

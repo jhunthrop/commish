@@ -114,10 +114,21 @@ struct TradesParity: Decodable {
         let gains: String?
         let deal: String?
         let note: String?
+        /// What the idea fills (Lane 290), null on an answer without the field and on a team with none.
+        let fills: String?
 
         init(_ place: IdeaPlace) {
             key = place.id
             switch place {
+            case let .offer(offer):
+                kind = "offer"
+                rosterId = offer.rosterId
+                team = offer.team
+                mark = offer.label
+                gains = nil
+                deal = offer.deal
+                note = offer.note
+                fills = nil
             case let .idea(preset):
                 kind = "idea"
                 rosterId = preset.rosterId
@@ -126,6 +137,7 @@ struct TradesParity: Decodable {
                 gains = preset.gains
                 deal = preset.deal
                 note = nil
+                fills = preset.fills
             case let .none(line):
                 kind = "none"
                 rosterId = line.id
@@ -134,6 +146,7 @@ struct TradesParity: Decodable {
                 gains = nil
                 deal = nil
                 note = line.note
+                fills = nil
             }
         }
     }

@@ -110,6 +110,23 @@ class TradesViewModelTest {
 
     private fun builder(vm: TradesViewModel): TradeBuilderModel = requireNotNull(vm.ui.value.builder)
 
+    /** Lane 290: a host's offer loads its team and ticks like an idea and is pressed; one the builder cannot
+     * hold loads nothing and asks nothing. Nothing is ever written to the host. */
+    @Test
+    fun `an offer loads its ticks and one the builder cannot hold loads nothing`() =
+        runTest(main) {
+            val stub = TradesStub(TradeFixtures.trades(TradeFixtures.NEEDS), TradeFixtures.check())
+            val vm = viewModel(stub)
+            open(vm)
+            run(vm.loadIdea("offer:fixture-offer-2", TradeFixtures.LEAGUE))
+            assertTrue(stub.checked.isEmpty())
+            run(vm.loadIdea("offer:fixture-offer-1", TradeFixtures.LEAGUE))
+            assertEquals(listOf(TradeCheckInput(10, listOf("4046"), listOf("4217", "6770"))), stub.checked)
+            assertEquals(10, builder(vm).team)
+            assertEquals("offer:fixture-offer-1", builder(vm).pressed)
+            assertEquals("offer:fixture-offer-1", builder(vm).ideas.first().key)
+        }
+
     @Test
     fun `the screen opens on the best trade's team with nothing ticked`() =
         runTest(main) {

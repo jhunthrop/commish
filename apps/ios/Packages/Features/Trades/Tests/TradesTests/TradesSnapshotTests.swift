@@ -17,7 +17,10 @@ import Testing
 /// Sunday afternoon, the trade's players in play (no week, "--" in the Proj cells, the member's roster
 /// with its drop). Each state is the view model's, read from the shared fixtures through a stub of the
 /// API. Long team names on both sides (review M2) draw whole: the member's head, the Best card's "With"
-/// line, the team choice and the verdict's rows. With SNAPSHOT_SHOTS set each is also written at its phone's own scale
+/// line, the team choice and the verdict's rows. The needs scene (Lane 290) reads the answer with the
+/// finder's newer fields: the host's offers heading the row, each idea's fills line and each empty team's
+/// reason, every place shown and the first screen; the long scene reads it too, so a long-named team's
+/// offer card heads its row. With SNAPSHOT_SHOTS set each is also written at its phone's own scale
 /// for the persona panel.
 @MainActor
 struct TradesSnapshotTests {
@@ -33,16 +36,18 @@ struct TradesSnapshotTests {
     /// The long scene's names, each past what one line of its place holds on a phone.
     static let longMe = TradeMe(name: "McConkey Kong Country Club and Grill", aside: "1-4, 11th of 12")
     static let longTeam = "Max_Jensen10 and the Sunday Afternoon Regulars"
+    /// The long scene's offering team (Muttdogs, roster 10), renamed long.
+    static let longOffer = "Muttdogs of the Thursday Night Waiver Wire Club"
 
-    /// The fixture's trades, with the best idea's team renamed long in the long scene.
+    /// The fixture's trades, with the best idea's team and the offering team renamed long in the long
+    /// scene.
     static func advice(_ scene: Scene) throws -> TradeAdvice {
-        var advice = try answer(TradeAdvice.self, "trades-\(league)-\(scene.clock).json")
+        var advice = try answer(TradeAdvice.self, "trades-\(league)-\(scene.file).json")
         if scene == .long {
+            let names = [8: longTeam, 10: longOffer]
             advice.teams = advice.teams.map { team in
                 var team = team
-                if team.rosterId == 8 {
-                    team.name = longTeam
-                }
+                team.name = names[team.rosterId] ?? team.name
                 return team
             }
         }
@@ -56,11 +61,18 @@ struct TradesSnapshotTests {
         case refused
         case stale
         case sunday
-        /// Long team names on both sides (review M2): every name drawn whole.
+        /// Long team names on both sides (review M2) and on an offer card: every name drawn whole.
         case long
+        /// The finder's newer fields (Lane 290): offers, fills lines, the empty teams' reasons.
+        case needs
 
         var clock: String {
             self == .sunday ? "2026-10-18T18-56-00Z" : "2026-10-17T17-00-00Z"
+        }
+
+        /// The answer's file: the needs answer for the scenes that draw its fields.
+        var file: String {
+            self == .needs || self == .long ? "needs-\(clock)" : clock
         }
 
         var parts: [Part] {
@@ -71,6 +83,7 @@ struct TradesSnapshotTests {
             case .refused, .stale: [.verdict]
             case .sunday: [.verdict, .yours]
             case .long: [.screen, .verdict, .theirs]
+            case .needs: [.screen, .ideas]
             }
         }
     }
@@ -140,10 +153,10 @@ struct TradesSnapshotTests {
             await stub.dropSignal()
             await viewModel.load(leagueID: league)
         }
-        if scene != .open, scene != .ideas {
+        if ![.open, .ideas, .needs].contains(scene) {
             await viewModel.load(idea: best, leagueID: league)
         }
-        if scene == .ideas {
+        if scene == .ideas || scene == .needs {
             viewModel.showAllIdeas()
         }
         return viewModel
@@ -183,6 +196,28 @@ struct TradesSnapshotTests {
         let viewModel = try await Self.viewModel(.refused)
         #expect(viewModel.builder?.pin == .words(Words.Trades.theyGiveUp))
         #expect(viewModel.builder?.bug.theirs.rest.refuses == true)
+    }
+
+    /// The needs scene draws the three offers first (newest, then Best, then the rest) and every empty
+    /// team's line by its reason; the long scene's row is headed by the long-named team's offer.
+    @Test func theNeedsSceneDrawsTheOffersAndTheReasons() async throws {
+        let builder = try #require(try await Self.viewModel(.needs).builder)
+        let ids = builder.ideas.map(\.id)
+        #expect(ids.prefix(2) == ["offer:fixture-offer-1", Self.best])
+        let notes = builder.ideas.compactMap { place -> String? in
+            if case let .none(line) = place {
+                return line.note
+            }
+            return nil
+        }
+        #expect(Set(notes) == [
+            Words.Trades.noIdea, Words.Trades.sameNeed, Words.Trades.noNeed, Words.Trades.nothingFound,
+        ])
+        let long = try #require(try await Self.viewModel(.long).builder)
+        guard case let .offer(offer) = long.ideas.first else {
+            throw SceneError.notLoaded("long offer")
+        }
+        #expect(offer.team == Self.longOffer)
     }
 
     enum SceneError: Error {
