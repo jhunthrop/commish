@@ -43,10 +43,8 @@ struct PushAPITests {
     }
 
     @Test func aTokenAnotherMembersPhoneHoldsIsTheAPIsSentence() async {
-        let body = Data(
-            #"{"ok":false,"data":null,"error":{"code":"conflict","message":"That token is another account's."},"request_id":"r"}"#
-                .utf8
-        )
+        let error = #"{"code":"conflict","message":"That token is another account's."}"#
+        let body = Data(#"{"ok":false,"data":null,"error":\#(error),"request_id":"r"}"#.utf8)
         await #expect(throws: APIError.envelope(code: "conflict", message: "That token is another account's.")) {
             try await Self.client(RecordingTransport(status: .conflict, body: body))
                 .registerPush(device: Self.phone, token: Self.token)
