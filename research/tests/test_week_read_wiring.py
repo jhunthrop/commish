@@ -20,6 +20,8 @@ from research.capsules.week.rollover import ReadsDue
 from research.db.engine import make_engine
 from research.db.schema import (
     CAPTURE_SNAPSHOTS,
+    NFLVERSE_DEPTH_CHART_WEEKS,
+    PLAYERS,
     PROVIDER_GAMES,
     PROVIDER_PLAYERS,
     PUBLISHED_BOARDS,
@@ -197,3 +199,28 @@ def test_a_board_players_sheet_is_built_from_the_real_rows_with_the_weeks_projec
     (after,) = collect_week_sheets(wednesday, [subject], {})
     assert (before.week, before.team, before.projection) == (_WEEK, "SEA", None)
     assert after.week == _WEEK and after.projection is not None and after.projection.points == 15.2  # noqa: PLR2004
+
+
+def test_the_sheet_places_him_on_this_weeks_chart_loaded_by_the_write(engine: Engine) -> None:
+    """Lane 299: his place is the newest weekly chart loaded by the write (the store's `SEA`), never the week-one
+    chart; a load after the write is not read."""
+    loaded, later = datetime(2026, 10, 27, 12, 0, tzinfo=UTC), datetime(2026, 10, 28, 12, 0, tzinfo=UTC)
+    with engine.begin() as conn:
+        conn.execute(insert(PLAYERS).values(id="00-0039999", name="Zach Charbonnet", position="RB"))
+        conn.execute(
+            insert(NFLVERSE_DEPTH_CHART_WEEKS),
+            [
+                {"season": _SEASON, "week": _WEEK, "team": "SEA", "slot": "RB_11", "depth_order": order,
+                 "player_id": pid, "as_of": at, "position": "RB"}
+                for pid, order, at in (
+                    ("00-0039999", 1, loaded), (_PLAYER, 2, loaded), (_PLAYER, 1, later), ("00-0039999", 2, later),
+                )
+            ],
+        )  # fmt: skip
+    subject = _subject()
+    with engine.connect() as conn:
+        wednesday = read_week_facts(conn, _SEASON, [subject], _WEDNESDAY_RUN)
+    assert wednesday is not None
+    (sheet,) = collect_week_sheets(wednesday, [subject], {})
+    assert sheet.depth is not None
+    assert (sheet.depth.slot, sheet.depth.around, sheet.depth.released_at) == (2.0, (("Zach Charbonnet", 1.0),), loaded)

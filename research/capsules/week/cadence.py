@@ -24,8 +24,14 @@ the read" the one the read was written with (`StoredWeekRead.projection_points`,
 move had rewritten the whole board mid-week (330 reads on the night of 2026-10-21, Lane 256) and hid reads
 behind a withhold until the nightly.
 
-Anything else (a new projection, a new forecast, a new depth chart) waits for one of those, so a quiet week
-costs nothing.
+- The written read states a fact tonight's sheet does not bear out (`FACT_STALE`, Lane 299,
+  `fact_rules.fact_violations`): his place on this week's depth chart (a read written from the week-one chart, or
+  whose place has moved since), or a game's figure tied to the wrong week. Nightly only, at most once a Central
+  day, ahead of the rule-stale ones; a rewrite that falls keeps the old read shown. Week 8's charts moved 4 to 13
+  board players' places a night after the roll-over, so about $0.01 to $0.03 a night once the backlog is written.
+
+Anything else (a new projection, a new forecast, a chart that moves no place a read states) waits for one of
+those, so a quiet week costs nothing.
 """
 
 from dataclasses import replace
@@ -33,6 +39,7 @@ from datetime import date, datetime, timedelta
 from typing import Final
 
 from research.capsules.store import WRITTEN_SOURCE
+from research.capsules.week.fact_rules import fact_violations
 from research.capsules.week.rules import body_rule_violations
 from research.capsules.week.sheet import CENTRAL, WeekSheet
 from research.capsules.week.store import StoredWeekRead
@@ -57,8 +64,9 @@ FIRST: Final = "first"
 UNWRITTEN: Final = "unwritten"
 STATUS_CHANGED: Final = "status"
 RULE_STALE: Final = "rule"
+FACT_STALE: Final = "fact"
 # The order a nightly writes its due reads in, so a budget stop leaves the rule-stale rewrites for the next night.
-PRIORITY: Final = (FIRST, UNWRITTEN, STATUS_CHANGED, RULE_STALE)
+PRIORITY: Final = (FIRST, UNWRITTEN, STATUS_CHANGED, FACT_STALE, RULE_STALE)
 # What an hourly pass writes: the reads whose status moved (the coordinator's M3), and a read still unwritten,
 # asked every hour until one is written (Lane 276).
 HOURLY_REASONS: Final = frozenset({STATUS_CHANGED, UNWRITTEN})
@@ -112,6 +120,15 @@ def _rule_stale(stored: StoredWeekRead, now: datetime) -> bool:
     )
 
 
+def _fact_stale(sheet: WeekSheet, stored: StoredWeekRead, now: datetime) -> bool:
+    """A written read tonight's sheet no longer bears out, not yet attempted on `now`'s Central day (Lane 299)."""
+    return (
+        stored.source == WRITTEN_SOURCE
+        and attempts_today(stored, now) == 0
+        and bool(fact_violations(stored.body, sheet))
+    )
+
+
 def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None, now: datetime, *, hourly: bool = False) -> str | None:
     """Why `sheet`'s read is written at `now`, or None when the stored read for his week stands."""
     if stored is None or stored.season != sheet.season or stored.week != sheet.week:
@@ -120,6 +137,8 @@ def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None, now: datetime, *
         reason = None if status_rewrite_capped(stored, now) else STATUS_CHANGED
     elif stored.source != WRITTEN_SOURCE and _retry_allowed(stored, now):
         reason = UNWRITTEN
+    elif _fact_stale(sheet, stored, now):
+        reason = FACT_STALE
     elif _rule_stale(stored, now):
         reason = RULE_STALE
     else:
