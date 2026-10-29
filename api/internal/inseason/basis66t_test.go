@@ -15,19 +15,19 @@ import (
 // Lane 103: the footer says who decides and the keep rule in one
 // sentence; what a Gain is sits under the heads (B42).
 func TestTradesBasisSaysWhoDecidesAndTheKeepRule(t *testing.T) {
-	want := "Each team's best trade both lineups gain by, yours first. The other team decides. " +
-		"A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot."
+	want := "Each team's best trades, those for your weakest starting spot first. Every one fills a weak spot on one side or both, " +
+		"and neither lineup loses by it. The other team decides. A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot."
 	for _, b := range []OrderBasis{RestOfSeason, Preseason} {
 		if got := TradesBasis(b, 12, StandardHorizon); got != want {
 			t.Errorf("%v:\n got %q\nwant %q", b, got, want)
 		}
 	}
-	for weeks, want := range map[int]string{12: "points over replacement in each lineup, weeks 6 to 17", 1: "points over replacement in each lineup, week 17"} {
+	for weeks, want := range map[int]string{12: "points over replacement in each lineup week by week, byes counted, weeks 6 to 17", 1: "points over replacement in each lineup week by week, byes counted, week 17"} {
 		if got := TradeGainBasis(RestOfSeason, weeks, StandardHorizon); got != want {
 			t.Errorf("%d weeks: %q", weeks, got)
 		}
 	}
-	if got := TradeGainBasis(Preseason, 17, StandardHorizon); got != "points over replacement in each lineup, over the season's 17 weeks on our preseason number" {
+	if got := TradeGainBasis(Preseason, 17, StandardHorizon); got != "points over replacement in each lineup week by week, byes counted, over the season's 17 weeks on our preseason number" {
 		t.Errorf("preseason: %q", got)
 	}
 }

@@ -25,14 +25,14 @@ func TestTradesKeepThisWeeksStarters(t *testing.T) {
 	// The same roster with his Proj low: the old rule's drop was his.
 	benched := set(mine, "m-qb2", func(c Candidate) Candidate { c.Proj = 1; return c })
 	dropsHim := false
-	for _, tr := range Trades(config, SeasonGames, Squad{Players: benched}, Squad{Players: theirs}, "", 1000) {
+	for _, tr := range pairTrades(config, SeasonGames, Squad{Players: benched}, Squad{Players: theirs}, "", 1000) {
 		dropsHim = dropsHim || (tr.Drop >= 0 && benched[tr.Drop].ID == "m-qb2")
 	}
 	if !dropsHim {
 		t.Fatal("the case is gone: no trade drops the benched m-qb2")
 	}
 	drops := 0
-	for _, tr := range Trades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
+	for _, tr := range pairTrades(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
 		if tr.Drop < 0 {
 			continue
 		}
@@ -61,7 +61,7 @@ func TestAStarterGoesOnlyForHisSpot(t *testing.T) {
 	theirs := set(deepAtReceiver(), "t-qb", func(c Candidate) Candidate { return withProj(c, 22) })
 	held := map[string]bool{"m-rb4": true, "m-wr4": true, "m-te2": true, "m-rb5": true}
 	seen := map[string]Trade{}
-	for _, tr := range Trades(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, "", 1000) {
+	for _, tr := range pairTrades(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, "", 1000) {
 		words := tradeWords(tr, mine, theirs)
 		seen[words] = tr
 		if tr.Drop < 0 {
@@ -89,7 +89,7 @@ func TestAStarterGoesOnlyForHisSpot(t *testing.T) {
 	if tr, ok := seen["m-qb for t-qb+t-wr5"]; ok {
 		t.Fatalf("the finder lists m-qb for t-qb+t-wr5: %+v", tr)
 	}
-	checked := Check(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, []int{0}, []int{0, 7})
+	checked := pairCheck(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, []int{0}, []int{0, 7})
 	if checked.Drop < 0 || mine[checked.Drop].ID != "m-qb2" || checked.DropFor != 0 ||
 		SlotLabel(slots, checked.DropSlot) != "QB" || checked.ForSlot != checked.DropSlot {
 		t.Fatalf("the builder's drop %d for %d: %+v, want t-qb in m-qb2's QB spot", checked.Drop, checked.DropFor, checked.Trade)
@@ -97,7 +97,7 @@ func TestAStarterGoesOnlyForHisSpot(t *testing.T) {
 	if Acceptable(checked.TheirRest, SeasonGames) {
 		t.Fatalf("m-qb for t-qb+t-wr5 reads acceptable to them: %v", checked.TheirRest)
 	}
-	empty := Check(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, []int{0}, []int{6, 7})
+	empty := pairCheck(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, []int{0}, []int{6, 7})
 	if empty.Mine.Room || empty.Drop >= 0 {
 		t.Fatalf("m-qb for two receivers drops %d with no one at QB this week", empty.Drop)
 	}
@@ -311,7 +311,7 @@ func TestAStarterDropBeatsTheBestBenchDrop(t *testing.T) {
 	theirs := rosterWithProj(deepAtReceiver(), 6)
 	squad := Squad{Players: mine, Held: held}
 	// m-rb3 for t-wr4 and t-wr5, two receivers who start this week.
-	checked := Check(config, SeasonGames, squad, Squad{Players: theirs}, []int{3}, []int{6, 7})
+	checked := pairCheck(config, SeasonGames, squad, Squad{Players: theirs}, []int{3}, []int{6, 7})
 	if checked.Drop < 0 || mine[checked.Drop].ID == "m-qb" || checked.DropFor < 0 {
 		t.Fatalf("the trade drops %d (for %d), want a starter with a player who starts for him", checked.Drop, checked.DropFor)
 	}

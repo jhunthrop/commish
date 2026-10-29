@@ -131,7 +131,7 @@ func contentKey(a *advisor) string {
 		put("team", t.RosterID, t.Starters)
 		for _, p := range a.active(t) {
 			c := p.cand
-			put(c.ID, c.Position, c.Rank, c.HasValue, c.HasPerGame, c.HasProj, int(c.Tier), c.Locked, c.InjuredReserve)
+			put(c.ID, c.Position, c.Rank, c.HasValue, c.HasPerGame, c.HasProj, int(c.Tier), c.Locked, c.InjuredReserve, c.Plays)
 			num(c.Value)
 			num(c.PerGame)
 			num(c.Proj)

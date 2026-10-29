@@ -48,6 +48,10 @@ type Candidate struct {
 	// loses him could pick up. 0, the last starter's level, where the
 	// league's free agents are not read.
 	FreeLevel float64
+	// Plays marks the weeks his club plays over the order's span (Lane
+	// 287, PlaysIn: bit w for week w, bit 0 set once his schedule is read);
+	// 0, his schedule not read, plays every week.
+	Plays uint32
 }
 
 // Slot is one starting spot: its type, the positions it takes and its

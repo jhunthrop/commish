@@ -1953,6 +1953,90 @@ func (e TradeMovesPropose) Valid() bool {
 	}
 }
 
+// Defines values for TradeRowFills.
+const (
+	TradeRowFillsFLEX      TradeRowFills = "FLEX"
+	TradeRowFillsQB        TradeRowFills = "QB"
+	TradeRowFillsRB        TradeRowFills = "RB"
+	TradeRowFillsSUPERFLEX TradeRowFills = "SUPERFLEX"
+	TradeRowFillsTE        TradeRowFills = "TE"
+	TradeRowFillsWR        TradeRowFills = "WR"
+)
+
+// Valid indicates whether the value is a known member of the TradeRowFills enum.
+func (e TradeRowFills) Valid() bool {
+	switch e {
+	case TradeRowFillsFLEX:
+		return true
+	case TradeRowFillsQB:
+		return true
+	case TradeRowFillsRB:
+		return true
+	case TradeRowFillsSUPERFLEX:
+		return true
+	case TradeRowFillsTE:
+		return true
+	case TradeRowFillsWR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TradeRowGives.
+const (
+	TradeRowGivesQB TradeRowGives = "QB"
+	TradeRowGivesRB TradeRowGives = "RB"
+	TradeRowGivesTE TradeRowGives = "TE"
+	TradeRowGivesWR TradeRowGives = "WR"
+)
+
+// Valid indicates whether the value is a known member of the TradeRowGives enum.
+func (e TradeRowGives) Valid() bool {
+	switch e {
+	case TradeRowGivesQB:
+		return true
+	case TradeRowGivesRB:
+		return true
+	case TradeRowGivesTE:
+		return true
+	case TradeRowGivesWR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TradeRowTheirFills.
+const (
+	TradeRowTheirFillsFLEX      TradeRowTheirFills = "FLEX"
+	TradeRowTheirFillsQB        TradeRowTheirFills = "QB"
+	TradeRowTheirFillsRB        TradeRowTheirFills = "RB"
+	TradeRowTheirFillsSUPERFLEX TradeRowTheirFills = "SUPERFLEX"
+	TradeRowTheirFillsTE        TradeRowTheirFills = "TE"
+	TradeRowTheirFillsWR        TradeRowTheirFills = "WR"
+)
+
+// Valid indicates whether the value is a known member of the TradeRowTheirFills enum.
+func (e TradeRowTheirFills) Valid() bool {
+	switch e {
+	case TradeRowTheirFillsFLEX:
+		return true
+	case TradeRowTheirFillsQB:
+		return true
+	case TradeRowTheirFillsRB:
+		return true
+	case TradeRowTheirFillsSUPERFLEX:
+		return true
+	case TradeRowTheirFillsTE:
+		return true
+	case TradeRowTheirFillsWR:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WaiverAdvicePickupOrder.
 const (
 	WaiverAdvicePickupOrderSeasonGain WaiverAdvicePickupOrder = "season_gain"
@@ -5966,12 +6050,21 @@ type TradeRow struct {
 	Drop *PlayerLine `json:"drop"`
 
 	// DropReason the trade's sentence when its drop starts this week: the spot he starts in and the player the trade brings in who takes it (Lane 66u); null for a bench drop or none
-	DropReason *string      `json:"drop_reason"`
-	Get        []PlayerLine `json:"get"`
-	Give       []PlayerLine `json:"give"`
+	DropReason *string `json:"drop_reason"`
 
-	// MyGain points over replacement a week to the drafter's lineup
+	// Fills the drafter's starting slot the trade fills (Lane 287): of the slots where his best lineup over the weeks left falls below the league's median team, the furthest below that the trade makes up half the gap at least (and 0.5 a week at least), so the card can say "Fills your WR"; null when it fills none of his, absent from an older answer
+	Fills *TradeRowFills `json:"fills,omitempty"`
+	Get   []PlayerLine   `json:"get"`
+	Give  []PlayerLine   `json:"give"`
+
+	// Gives the position the drafter gives from (Lane 287): a player he gives who sits on his bench and would start for the league's median team, or whose position's own slots stay at that team's or over after the trade; null for neither, absent from an older answer
+	Gives *TradeRowGives `json:"gives,omitempty"`
+
+	// MyGain points over replacement a week to the drafter's best lineup over the weeks gain_basis names, one decimal: the lineup filled week by week as the Lineup screen fills it from the players whose clubs play that week (Lane 287), each at his rest-of-season points a game, a slot no one fills at the best free agent's level
 	MyGain float64 `json:"my_gain"`
+
+	// MyLineupRestOfSeason the drafter's best lineup's change over the weeks gain_basis names (Lane 287), byes counted: my_gain over all those weeks, one decimal; absent from an older answer
+	MyLineupRestOfSeason *float64 `json:"my_lineup_rest_of_season,omitempty"`
 
 	// MyProjChange this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
 	MyProjChange *float64 `json:"my_proj_change"`
@@ -5982,8 +6075,14 @@ type TradeRow struct {
 	// Need the trade's sentence when the need is why it is listed (Lane 103): it sends out a player we rank first at his position for under 1.0 a week and fills a starting spot of the drafter's lineup for the week the page addresses that no one of his who can play fills, leaving no other spot empty ("Fills your empty WR2 while Gibbs sits on bye."); null on every other row, absent from an older answer
 	Need *string `json:"need,omitempty"`
 
+	// TheirFills the same for theirs. The finder lists a trade only when it fills a slot on at least one side; null when it fills none of theirs, absent from an older answer
+	TheirFills *TradeRowTheirFills `json:"their_fills,omitempty"`
+
 	// TheirGain the same to theirs
 	TheirGain float64 `json:"their_gain"`
+
+	// TheirLineupRestOfSeason the same for theirs; absent from an older answer
+	TheirLineupRestOfSeason *float64 `json:"their_lineup_rest_of_season,omitempty"`
 
 	// TheirProjChange the same for theirs
 	TheirProjChange *float64 `json:"their_proj_change"`
@@ -5991,6 +6090,15 @@ type TradeRow struct {
 	// TheirRestOfSeason the same for theirs, their drop counted against them; absent from an older answer
 	TheirRestOfSeason *float64 `json:"their_rest_of_season,omitempty"`
 }
+
+// TradeRowFills the drafter's starting slot the trade fills (Lane 287): of the slots where his best lineup over the weeks left falls below the league's median team, the furthest below that the trade makes up half the gap at least (and 0.5 a week at least), so the card can say "Fills your WR"; null when it fills none of his, absent from an older answer
+type TradeRowFills string
+
+// TradeRowGives the position the drafter gives from (Lane 287): a player he gives who sits on his bench and would start for the league's median team, or whose position's own slots stay at that team's or over after the trade; null for neither, absent from an older answer
+type TradeRowGives string
+
+// TradeRowTheirFills the same for theirs. The finder lists a trade only when it fills a slot on at least one side; null when it fills none of theirs, absent from an older answer
+type TradeRowTheirFills string
 
 // TradeSideTotals defines model for TradeSideTotals.
 type TradeSideTotals struct {
@@ -6020,7 +6128,7 @@ type TradeTeam struct {
 	Roster   []PlayerLine `json:"roster"`
 	RosterId int          `json:"roster_id"`
 
-	// Trades at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first; a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills a need (Lane 103)
+	// Trades at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group with the trades that fill one of the drafter's slots first (fills), then best for the drafter over the weeks left, then by this week's Proj change; a trade sending out the top player at his position in our order only when it gains the drafter's lineup 1.0 a week or more or fills a need (Lane 103). One or two players a side (Lane 287); a trade is listed only when the drafter's lineup gains, theirs gains or loses nothing for a slot it fills, it fills a slot on at least one side and opens or deepens none of the drafter's (a slot short of the median team by 0.5 a week or more), it sends out no player this week's lineup needs to fill a spot, neither side gives up more rest of season than the rule allows, and it is not a listed trade with a player added who changes nothing. The array's order is the finder's and is the contract: a client keeps it for the team's list (Lane 287; sorting by my_gain alone undoes the fills-first order)
 	Trades []TradeRow `json:"trades"`
 }
 
