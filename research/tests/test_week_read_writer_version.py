@@ -67,7 +67,7 @@ def _stored(sheet: WeekSheet, *, version: int = _OLD, source: str = WRITTEN_SOUR
 
 def test_a_read_an_older_writer_wrote_is_due_on_the_nightly_and_never_the_hourly() -> None:
     sheet = starter()
-    assert WEEK_WRITER_VERSION == 1
+    assert WEEK_WRITER_VERSION == 2  # noqa: PLR2004 - Lane 302's decided call
     assert due_reason(sheet, _stored(sheet, version=_OLD), _NEXT_NIGHT) == WRITER
     assert due_reason(sheet, _stored(sheet, version=WEEK_WRITER_VERSION), _NEXT_NIGHT) is None
     assert due_reason(sheet, _stored(sheet, version=_OLD), _NEXT_NIGHT, hourly=True) is None

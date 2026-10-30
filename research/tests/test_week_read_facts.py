@@ -27,12 +27,12 @@ from research.capsules.week.fact_rules import (
     week_figure_violations,
 )
 from research.capsules.week.rules import week_rule_violations
-from research.capsules.week.sheet import Allowed, DepthPlace, GameLine, Status, Weather, WeekSheet
+from research.capsules.week.sheet import Allowed, BoardPlace, DepthPlace, GameLine, Status, Weather, WeekSheet
 from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.write import WEEK_WRITER_VERSION
 from research.db.schema.boards import WEEK_READ_REASONS
 from research.nightly.build.player_season import SeasonContext
-from research.tests.week_read_fixtures import LINES, REPORT, WRITTEN_AT, starter
+from research.tests.week_read_fixtures import BOARD, LINES, REPORT, WRITTEN_AT, starter
 
 RELEASED = datetime(2026, 10, 27, 6, 1, tzinfo=UTC)
 CHART_AT_THE_WRITE = WRITTEN_AT - timedelta(hours=20)
@@ -48,6 +48,8 @@ def _white(slot: float, around: tuple[tuple[str, float], ...]) -> WeekSheet:
         depth=DepthPlace(slot, around, CHART_AT_THE_WRITE),
         allowed=Allowed(16, 32, 21.2, "RB", 7, LINES),
         points_per_game=9.8,
+        # Past the running backs' starter line, so his stored reads' call, sit, is the decided one (Lane 302).
+        board=BoardPlace(120, 40, 80.0, "rest_of_season", 6, BOARD),
     )
 
 

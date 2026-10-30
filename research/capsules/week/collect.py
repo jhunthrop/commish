@@ -30,6 +30,7 @@ from sqlalchemy import Connection, text
 from research.capsules.page_figures import expected_score, page_tenth, projection_tenth
 from research.capsules.sweep import Subject
 from research.capsules.week.angles import AnglePlayer, angles_on, board_angles
+from research.capsules.week.call import week_ranks
 from research.capsules.week.depth import WeeklyChart, weekly_charts, weekly_place
 from research.capsules.week.depth_moves import depth_moves
 from research.capsules.week.rollover import Rollover, projection_held, published_from_week, rollover
@@ -531,13 +532,40 @@ def collect_week_sheets(
     (Lane 300): every board player's candidates scored against his position's peers on the board. The peers and
     the week's clubs are every board player and club with a game in the board week, its kickoff passed or not
     (review M1): an hourly rewrite after Thursday night places him among the whole week, never a partial one."""
-    pairs = [(subject, sheet) for subject in subjects if (sheet := week_sheet(facts, subject, stored)) is not None]
+    ranks = board_week_ranks(facts, subjects)
+    pairs = [
+        (subject, replace(sheet, week_rank=ranks.get(sheet.player_id)))
+        for subject in subjects
+        if (sheet := week_sheet(facts, subject, stored)) is not None
+    ]
     if not angles_on():
         return [sheet for _, sheet in pairs]
     written = {sheet.player_id: angle_player(facts, subject, sheet) for subject, sheet in pairs}
     players = [written.get(s.universe_id) or p for s in subjects if (p := _pool_player(facts, s)) is not None]
     angles = board_angles(players, week_clubs(facts), facts.board_week)
     return [replace(sheet, angles=angles.get(sheet.player_id, ()) if sheet.can_play else ()) for _, sheet in pairs]
+
+
+def board_week_ranks(facts: WeekFacts, subjects: Sequence[Subject]) -> dict[str, int]:
+    """Every board player's place among his position by the board week's published projection (Lane 302 fix round
+    1, the call's ranking): every subject with one, his sheet written tonight or not, so a place never moves with
+    which sheets read. A player who takes no field that week holds no place (fix round 2, the review's L3): his club
+    has no board-week game (a bye club's defense is still projected), or his status keeps him off the field."""
+    points = [
+        (s.universe_id, s.facts.identity.position, p.points)
+        for s in subjects
+        if (p := facts.projections.get((s.facts.identity.id, facts.board_week))) is not None
+        and _takes_the_field(facts, s)
+    ]
+    return week_ranks(points)
+
+
+def _takes_the_field(facts: WeekFacts, subject: Subject) -> bool:
+    """Whether a board player's club plays the board week and his status lets him play."""
+    identity = subject.facts.identity
+    club = call_for(facts.context.clubs, identity.id).club
+    status = facts.statuses.get(identity.id, Status(None, None)).status
+    return club is not None and _board_game(facts, club) is not None and status not in CANNOT_PLAY
 
 
 def _board_game(facts: WeekFacts, club: str) -> Game | None:

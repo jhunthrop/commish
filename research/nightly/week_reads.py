@@ -60,11 +60,12 @@ from research.capsules.run_budget import RunBudget
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.sweep import FactsPassMemo
 from research.capsules.week.cadence import (
+    HEADLINE_REASONS,
     PRIORITY,
-    STATUS_CHANGED,
     STATUS_REWRITES_A_DAY,
     UNWRITTEN,
     attempts_today,
+    call_moved,
     central_day,
     due_reason,
     falls_since_written,
@@ -347,7 +348,7 @@ def landed_row(
 ) -> StoredWeekRead:
     """What a landed read stores: the new row, or the written read kept over a fallen rewrite."""
     if before is not None and keeps_written(result, before):
-        return kept_read(before, at, status_fall=before.status != sheet.status.status)
+        return kept_read(before, at, status_fall=before.status != sheet.status.status or call_moved(sheet, before))
     return stored_row(sheet, result, reason, before, at)
 
 
@@ -476,7 +477,7 @@ def asked_again(
             continue
         if row is None or row.source != WRITTEN_SOURCE:
             again.append((sheet, UNWRITTEN))
-        elif reason != STATUS_CHANGED or status_reask_allowed(row, sheet.written_at):
+        elif reason not in HEADLINE_REASONS or status_reask_allowed(row, sheet.written_at):
             again.append((sheet, reason))
     return again
 

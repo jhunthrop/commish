@@ -76,6 +76,8 @@ def week_grounding(sheet: WeekSheet) -> Grounding:
     return Grounding(
         number_ledger=changes,
         name_ledger=week_name_ledger(sheet),
+        # The decided call's place is never quoted (Lane 302 fix round 2, the review's L4): it stays out of the
+        # grounding, so a read that states it is refused as a figure the sheet does not carry.
         prompt_text=render_week_sheet(sheet),
         tension=None,
         page_numbers=(),

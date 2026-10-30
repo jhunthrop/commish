@@ -11,6 +11,8 @@ chart, his last three games, and his place in our order. The parts:
 - `rules`: the week read's own rules on top of the writer's (`validate`): the published projection never
   named in the read and never called ours (Lane 275); a player who cannot play never recommended; a bye named; no betting word,
   no provider or rival product, no tip; three to five sentences.
+- `call`: the read's call (start, sit, hold or none), decided in code from his status and his place in our
+  order against his position's starter line (Lane 302); the writer argues it and never picks it.
 - `prompt`, `write`: the writer's instructions, and one read written within its ceiling of calls, the
   facts block its counted fallback.
 - `cadence`: when a read is written again (no read for the week, his status changed, the last one

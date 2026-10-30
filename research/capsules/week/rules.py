@@ -47,10 +47,12 @@ from typing import Final
 from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.names import name_pattern
 from research.capsules.page_figures import page_tenth
+from research.capsules.render_words import ordinal
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
 from research.capsules.week.angle_rules import figure_violations as angle_figure_violations
 from research.capsules.week.angle_rules import ordinary_rank_violations
+from research.capsules.week.call import HOLD, NONE, QUESTIONABLE, SIT, START, week_call
 from research.capsules.week.cells import cell_figures, misnamed, misranked, quotable_figures
 from research.capsules.week.fact_rules import place_violations, weather_violations, week_figure_violations
 from research.capsules.week.place_rules import place_violations as angle_place_violations
@@ -59,7 +61,7 @@ from research.capsules.week.rank_words import fits, rank_words, superlatives_in
 from research.capsules.week.render import report_said
 from research.capsules.week.report_day import report_day, report_issued, report_out
 from research.capsules.week.sheet import STATUS_WORDS, WeekSheet, central_day_and_time, sheet_names
-from research.capsules.week.start_advice import start_advice_in
+from research.capsules.week.start_advice import CONDITIONAL, sit_advice_in, start_advice_in
 
 MIN_SENTENCES: Final = 3
 MAX_SENTENCES: Final = 5
@@ -68,9 +70,9 @@ MAX_FIGURES: Final = 3
 # A read built on its angles (Lane 300) may state one figure more: an angle's share and the one it is set
 # against are two figures, and the angles are in no cell, so the cap on retelling the cells is not what they spend.
 ANGLE_FIGURES: Final = 1
-# The writer's own call for its read, one word (H2): what it tells a manager who has him to do this week.
-START: Final = "start"
-CALLS: Final = (START, "sit", "hold", "none")
+# The call's four words (H2), the API's enum: the call is decided in code (Lane 302, `call.week_call`), and the
+# answer's "call" must be that one.
+CALLS: Final = (START, SIT, HOLD, NONE)
 # The words a week read never carries beyond the writer's lists: each a named rule, shown to the writer.
 WEEK_NEVER_WORDS: Final = (
     named_rule(
@@ -146,11 +148,12 @@ _RANK_WORD: Final = re.compile(r"\b\d+(?:st|nd|rd|th)\b", re.IGNORECASE)
 # A call is a verb of the call list said of him ("start him", "sit Gibbs", "keep him on the bench"), never
 # "sits first among" or "play Arizona" (review LOW-11).
 _CALL_WORDS: Final = re.compile(
-    r"\b(?:[Ss]tart|[Ss]it|[Bb]ench|[Kk]eep|[Hh]old|[Dd]rop|[Aa]dd|[Ff]lex|[Tt]rust)(?:s|ed|ing)? (?:him|them|[A-Z]\w+)\b|"
+    r"\b(?:[Ss]tart|[Ss]it|[Bb]ench|[Kk]eep|[Hh]old|[Dd]rop|[Aa]dd|[Ff]lex|[Tt]rust)(?:s|ed|ing)? (?:(?:him|them|[A-Z]\w+)\b|[A-Z]\.)|"
     r"\b[Pp]ick(?:s|ing)? (?:him )?up\b|"
     # The call in the forms the writer uses for it (Lane 300 fix round 4): "Higgins starts this week", "he sits
     # this week", "can't be started", "fire him up".
     r"\b(?:starts|sits)\s+this\s+week\b|\b(?:can(?:'t|not)|shouldn't|should not|won't)\s+be\s+(?:started|benched)\b|"
+    # Initials count as his name (Lane 302): "Sit A.J. Brown this week".
     r"\b[Ff]ire\s+(?:him|them|[A-Z]\w+)\s+up\b"
 )
 # The call's forms that say nothing of whom they are said (Lane 303 and its review's M3): they count only in a
@@ -158,7 +161,9 @@ _CALL_WORDS: Final = re.compile(
 # "isn't startable", "isn't worth a starting spot", "has no case to start", and main's "find a fill-in".
 _HIS_CALL: Final = re.compile(
     r"\bPlay\s+(?P<played>him\b|[A-Z][\w'.-]*(?:\s+[A-Z][\w'.-]*)*)|\bfill-in\b|"
-    r"\b(?:in|into|out of)\s+(?:a|the|any)\s+(?:starting\s+)?lineup\b|"
+    r"\b(?:in|into|out of)\s+(?:a|the|any|your)\s+(?:starting\s+)?lineup\b|"
+    # The decided call said as what he is (Lane 302): "Higgins is a start this week", "he's a sit".
+    r"\b(?:is|he's|he is)\s+an?\s+(?:start|sit|hold)\b|"
     r"\b(?:rides?|riding|stays?|belongs?)\s+(?:on\s+)?the\s+bench\b|\bstartable\b|"
     r"\bworth\s+(?:a\s+)?start(?:ing|s)?\b|\b(?:case|reason)\s+to\s+(?:start|sit)\b"
 )
@@ -387,7 +392,7 @@ def _cannot_start_violations(sentences: Sequence[str], sheet: WeekSheet, call: s
     if call == START:
         out.append(
             f"The read's call is start, but he {why} in {week}. Never recommend him for this week: say what it means "
-            "for a roster that has him, and make the call sit, hold or none."
+            f'for a roster that has him, and give the call the ask gives, "{week_call(sheet).call}".'
         )
     for s in sentences:
         found = start_advice_in(s, sheet.name)
@@ -431,12 +436,81 @@ def _returning_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[st
 
 
 def _wait_violation(text: str, sheet: WeekSheet, call: str | None) -> list[str]:
-    if call != START or _WAITS.search(text) is None:
+    # A Questionable player inside the line is a start once his game status report is out (Lane 302 fix round 1):
+    # his read may still say what his start waits on ("if he is active").
+    if call != START or sheet.status.status == QUESTIONABLE or _WAITS.search(text) is None:
         return []
     return [
-        f"The read waits on {sheet.name}'s status before saying start, but its call is start. A read that waits "
-        "on his status calls itself hold."
+        f"The read waits on {sheet.name}'s status before saying start, but the call is start: nothing on his "
+        "status holds him. Argue the start, and never wait on his status."
     ]
+
+
+def _decided_call_violations(sentences: Sequence[str], sheet: WeekSheet, call: str | None) -> list[str]:
+    """Lane 302: the answer's call is the decided one (`call.week_call`), and the read argues it (fix round 2, the
+    review's M1): a sit read for a player who may play never tells a manager to start him, a start read never tells
+    him to sit or bench him, and a hold read settles the week neither way unless the sentence says what it waits on
+    ("if he's cleared, start him"). A player who may not be started has his own guard (`_cannot_start_violations`)."""
+    decided = week_call(sheet)
+    out = []
+    if call in CALLS and call != decided.call:
+        out.append(
+            f'The answer\'s call is "{call}", but the call for him this week is "{decided.call}". {decided.words} '
+            f'Give "call" as "{decided.call}" and write the read that argues it.'
+        )
+    out += _week_place_violations(sentences, sheet)
+    for s in sentences:
+        found = _against_the_call(s, sheet, decided.call)
+        if found is not None:
+            said, argue = found
+            out.append(
+                _sentence_violation(
+                    f"tells a manager to {said} when the call is {decided.call}", s, f"{decided.words} {argue}"
+                )
+            )
+    return out
+
+
+def _week_place_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
+    """His place this week is the call's alone and never quoted (fix round 2, the review's L4): its basis is the
+    published projection, which a read never names (Lane 275), and no weekly order of ours is live."""
+    if sheet.week_rank is None:
+        return []
+    ordinal_place = re.compile(rf"\b{ordinal(sheet.week_rank)}\s+among\b")
+    # His code ("WR18") is his place in our order when the sentence names the order (`_order_violations`).
+    code_place = re.compile(rf"\b{re.escape(sheet.position)}{sheet.week_rank}\b")
+    out = []
+    for s in sentences:
+        found = ordinal_place.search(s) or (None if _ORDER_NAMED.search(s) else code_place.search(s))
+        if found is not None:
+            out.append(
+                _sentence_violation(
+                    f'states his place this week ("{found.group(0)}")',
+                    s,
+                    "His place this week is for the call alone: argue the call from his week's facts, never quote it.",
+                )
+            )
+    return out
+
+
+_ORDER_NAMED: Final = re.compile(r"\bour (?:rest-of-season|preseason) order\b", re.IGNORECASE)
+
+
+def _against_the_call(sentence: str, sheet: WeekSheet, decided: str) -> tuple[str, str] | None:
+    """What `sentence` tells a manager against the decided call, and how to argue it instead; None when nothing."""
+    start, sit = start_advice_in(sentence, sheet.name), sit_advice_in(sentence, sheet.name)
+    if decided == SIT and sheet.may_start and start is not None:
+        return f'start him ("{start}")', "Argue the sit: never recommend him for this week."
+    if decided == START and sit is not None:
+        return f'sit him ("{sit}")', "Argue the start: never tell a manager to sit or bench him."
+    if decided == HOLD and CONDITIONAL.search(sentence) is None:
+        said = start or sit
+        if said is not None:
+            verb = "start" if start is not None else "sit"
+            return f'{verb} him ("{said}") with nothing to wait on', (
+                'Argue the hold: say what his week waits on, and any start or sit only with it ("if he\'s cleared").'
+            )
+    return None
 
 
 _CLUB_CODE: Final = re.compile(r"\b(?:" + "|".join(sorted(NFL_TEAM_NAMES, key=len, reverse=True)) + r")\b")
@@ -837,10 +911,11 @@ def _count_violation(sentences: Sequence[str]) -> list[str]:
     return [f"The read has {len(sentences)} sentences. Write {MIN_SENTENCES} to {MAX_SENTENCES} sentences."]
 
 
-def _call_violation(call: str | None) -> list[str]:
+def _call_violation(call: str | None, sheet: WeekSheet) -> list[str]:
     if call in CALLS:
         return []
-    return [f'The answer gave no call. Give "call" as one word of {", ".join(CALLS)}: what the read tells a manager.']
+    decided = week_call(sheet).call
+    return [f'The answer gave no call. Give "call" as "{decided}", the call the ask gives, word for word.']
 
 
 def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none") -> list[str]:
@@ -850,7 +925,8 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
     return [
         *_paragraph_violation(text),
         *_count_violation(sentences),
-        *_call_violation(call),
+        *_call_violation(call, sheet),
+        *_decided_call_violations(sentences, sheet, call),
         *_word_violations(sentences, names),
         *_projection_violations(sentences, sheet),
         *_cannot_start_violations(sentences, sheet, call),

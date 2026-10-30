@@ -61,5 +61,5 @@ def judge_violation(sheet: WeekSheet) -> str:
     why = "is on his bye" if sheet.bye else "may not be started on his status"
     return (
         f"{VIOLATION}, and he {why} in week {sheet.week} of {sheet.season}. Rewrite it so no reader could take "
-        "it as start advice: say what his week means for a roster that has him, and make the call sit, hold or none."
+        "it as start advice: say what his week means for a roster that has him, and argue the call the ask gives."
     )
