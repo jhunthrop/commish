@@ -146,7 +146,7 @@ function extractProperNamePhrases(text: string): readonly string[] {
     // The contraction goes before the run is built, and a position code never joins a run at all
     // (see `POSITION_CODES` and `stripTrailingClitic`).
     const bare = stripTrailingClitic(match[0]);
-    if (bare === "" || isPositionCode(bare) || FIRST_PERSON_PATTERN.test(bare)) continue;
+    if (bare === "" || isPositionCode(bare) || DESIGNATIONS.has(bare.replace(/\.$/, "")) || FIRST_PERSON_PATTERN.test(bare)) continue;
     words.push({ text: bare, start: match.index, end: match.index + match[0].length });
   }
 
@@ -249,7 +249,16 @@ const SENTENCE_VERB_WORDS = new Set([
   "Buy", "Sell", "Draft", "Target", "Avoid", "Fade", "Stash", "Trust", "Start", "Sit",
   "Take", "Grab", "Pick", "Rank", "Pass", "Wait", "Roster", "Hold",
   "Bet", "Watch", "Ride", "Ditch", "Cut", "Drop", "Add", "Claim", "Rostering",
+  // Lane 303 (B306): the call's imperatives before a surname ("Keep Engram", "Leave Rudolph").
+  "Keep", "Leave", "Bench", "Play",
 ]);
+
+/** Lane 303 (B306): an injury designation is a word of the report, never half a name ("He's
+ *  Questionable" was read as the person "He Questionable"); it breaks a Titlecase run as a code does.
+ *  So "Fakename Out" leaves the lone surname "Fakename", which is never checked: the lone-word policy
+ *  of `extractProperNamePhrases` (a lower-case "out" never joined a run either), no new class (the
+ *  Lane 303 review's L4). */
+const DESIGNATIONS: ReadonlySet<string> = new Set(["Questionable", "Doubtful", "Out", "Probable"]);
 
 /** True when `word` alone equals the trailing word of some MULTI-word ledger entry — the exact
  *  word-suffix relationship `isNameGrounded` already grants a full shorthand phrase ("St. Brown"

@@ -832,15 +832,26 @@ def test_a_suffix_before_a_capital_still_ends_its_sentence() -> None:
         "Demercado can't be started this week.",
         "Fire him up against the Titans.",
         "Chimere Dike sits this week, and it is not close.",
-        # Lane 302's run: the decided call said as what he is, and a name led by initials.
+        # Lane 302's run: a name led by initials.
         "Sit A.J. Brown this week.",
-        "Higgins is a start this week, and the air yards are why.",
-        "Parker Washington is a start in week 8 of 2026 at home against Indianapolis.",
-        "Justin Herbert is in the lineup this week.",
     ],
 )
 def test_the_opener_knows_the_calls_forms(opener: str) -> None:
     assert not _opener_violation(split_sentences(opener), 2026)
+
+
+@pytest.mark.parametrize(
+    ("opener", "name"),
+    [
+        # Lane 302's run: the decided call said as what he is, counted of him as Lane 303's forms are.
+        ("Higgins is a start this week, and the air yards are why.", "Tee Higgins"),
+        ("Parker Washington is a start in week 8 of 2026 at home against Indianapolis.", "Parker Washington"),
+        ("Justin Herbert is in the lineup this week.", "Justin Herbert"),
+    ],
+)
+def test_the_opener_knows_the_decided_calls_forms_said_of_him(opener: str, name: str) -> None:
+    assert not _opener_violation(split_sentences(opener), 2026, (name,))
+    assert _opener_violation(split_sentences(opener), 2026, ("Puka Nacua",))
 
 
 def test_an_opener_with_no_call_figure_or_status_is_still_refused() -> None:

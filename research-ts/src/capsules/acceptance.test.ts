@@ -255,6 +255,22 @@ describe("cause 3: name false positives", () => {
     expect(slotResult("He's QB proof that the ADP and the production have come apart.").ok).toBe(true);
   });
 
+  /** Lane 303 (B306): a pronoun and his designation, and the call's imperative before his surname, are
+   *  words, never the people "He Questionable", "His Questionable" or "Keep Long". */
+  it("reads a pronoun plus a designation as words, not as the name 'He Questionable'", () => {
+    expect(slotResult("He's Questionable for now, and the ADP has not caught up yet.").ok).toBe(true);
+    expect(slotResult("His Questionable tag is the only worry, and the ADP has not caught up.").ok).toBe(true);
+    expect(slotResult("He's Out this week, so the ADP has nothing to catch up to.").ok).toBe(true);
+    expect(slotResult("The ADP has not caught up, and for now He's Doubtful.").ok).toBe(true);
+  });
+
+  it("grounds the call's imperative before a ledgered surname, and still fails an unledgered one", () => {
+    for (const verb of ["Keep", "Leave", "Bench", "Play"]) {
+      expect(slotResult(`${verb} Long in mind, because the ADP has not caught up yet.`).ok).toBe(true);
+    }
+    expect(slotResult("Keep Fakename in mind, because the ADP has not caught up yet.").ok).toBe(false);
+  });
+
   it("grounds the city of a team the facts name", () => {
     expect(slotResult("New York leans on him every single week, and that is the case for him.").ok).toBe(true);
   });

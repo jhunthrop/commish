@@ -13,6 +13,9 @@ more of the retry writer (Lane 276, `retry_model`, the setting `config.RETRY_WRI
 the writer's last draft with his voice's reminder (Lane 282), or the first ask when no draft was answered, held to the same
 rules and the same judge. Only a read that every writer failed is his facts block (`render_week_facts_block`),
 labelled facts and no prose.
+
+Every answer's read has its season said once (`season_words.said_once`, Lane 303) before the validator reads it,
+and that is the read stored and the draft a correction hands back.
 """
 
 from collections.abc import Sequence, Set
@@ -38,6 +41,7 @@ from research.capsules.week.judge import (
 )
 from research.capsules.week.prompt import parse_week_answer, week_correction, week_prompt, week_rules
 from research.capsules.week.render import render_week_facts_block
+from research.capsules.week.season_words import said_once
 from research.capsules.week.sheet import WeekSheet
 from research.capsules.week.validate import WEEK_BAND, validate_week_read
 
@@ -207,7 +211,7 @@ def _writer_read(
             continue  # an empty or cut answer is an ask spent: ask again while asks remain
         usage = add_usage(usage, completion.usage)
         answer = parse_week_answer(completion.content)
-        text = answer.read or ""
+        text = said_once(answer.read or "", sheet.season, None if sheet.bye else sheet.week)
         result = validate_week_read(text, sheet, taken, answer.call)
         if asks.count_over(result):
             attempts.append(WeekAttempt(text, answer.call, result.violations))
@@ -287,7 +291,7 @@ def _retry_writer_read(  # noqa: PLR0913 - the read's parts
         return done(block, FACTS_SOURCE, fallen.fallback)
     usage = add_usage(usage, completion.usage)
     answer = parse_week_answer(completion.content)
-    text = answer.read or ""
+    text = said_once(answer.read or "", sheet.season, None if sheet.bye else sheet.week)
     violations = validate_week_read(text, sheet, taken, answer.call).violations
     if not violations and not sheet.may_start:
         try:

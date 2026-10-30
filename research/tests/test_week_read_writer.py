@@ -41,6 +41,7 @@ from research.capsules.week.prompt import (
     week_rules,
 )
 from research.capsules.week.render import render_week_sheet
+from research.capsules.week.season_words import said_once
 from research.capsules.week.sheet import Status, WeekSheet
 from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
@@ -163,7 +164,8 @@ def test_a_read_that_passes_is_written_in_one_call() -> None:
 
 def test_a_long_read_is_told_its_count_and_the_cut() -> None:
     long_read = " ".join([STARTER_READ, STARTER_READ])
-    words = len(long_read.split())
+    # The read handed back is the one the validator read, its season said once (Lane 303).
+    words = len(said_once(long_read, starter().season).split())
     gateway = _StubGateway([_answer(long_read), _answer(STARTER_READ)])
     assert write_week_read(starter(), gateway).source == "llm"  # type: ignore[arg-type]
     correction = gateway.asked[1][-1]["content"]
@@ -378,7 +380,7 @@ def test_the_heaviest_sheet_prints_every_section() -> None:
     """Every line the sheet can print (`render_week_sheet`): the player, the day, the game, the injury report,
     the published projection, the expected points, the forecast, the opponent's rank, the depth chart, his
     games and our order."""
-    assert len(render_week_sheet(heaviest()).splitlines()) == 11  # noqa: PLR2004 - the sheet's eleven lines
+    assert len(render_week_sheet(heaviest()).splitlines()) == 12  # noqa: PLR2004 - the sheet's twelve lines
 
 
 _NOW = WRITTEN_AT

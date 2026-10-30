@@ -48,6 +48,7 @@ Anything else (a new projection, a forecast no read quotes, a chart that moves n
 one of those, so a quiet week costs nothing.
 """
 
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date, datetime, timedelta
 from typing import Final
@@ -56,7 +57,7 @@ from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.week.call import call_flipped
 from research.capsules.week.fact_rules import fact_violations
 from research.capsules.week.rules import body_rule_violations
-from research.capsules.week.sheet import CENTRAL, WeekSheet
+from research.capsules.week.sheet import CENTRAL, WeekSheet, sheet_names
 from research.capsules.week.store import StoredWeekRead
 
 RETRY_GAP: Final = timedelta(hours=1)
@@ -125,7 +126,7 @@ def kept_read(before: StoredWeekRead, at: datetime, *, status_fall: bool = True)
     return replace(before, attempt_day=central_day(at), attempts=attempts + status_fall)
 
 
-def _rule_stale(stored: StoredWeekRead, now: datetime) -> bool:
+def _rule_stale(stored: StoredWeekRead, now: datetime, names: Sequence[str] = ()) -> bool:
     """A written read the current rules refuse, not yet attempted on `now`'s Central day. The check is every week
     rule that judges the stored body alone (`rules.body_rule_violations`: H4's projection named, and Lane 286's
     roster addressed, colon opener and rank stated twice among them): the full validator would read today's
@@ -134,7 +135,7 @@ def _rule_stale(stored: StoredWeekRead, now: datetime) -> bool:
     return (
         stored.source == WRITTEN_SOURCE
         and attempts_today(stored, now) == 0
-        and bool(body_rule_violations(stored.body, stored.season))
+        and bool(body_rule_violations(stored.body, stored.season, names))
     )
 
 
@@ -166,7 +167,7 @@ def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None, now: datetime, *
         reason = UNWRITTEN
     elif _fact_stale(sheet, stored, now):
         reason = FACT_STALE
-    elif _rule_stale(stored, now):
+    elif _rule_stale(stored, now, sheet_names(sheet)):
         reason = RULE_STALE
     else:
         reason = None
