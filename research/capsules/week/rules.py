@@ -41,6 +41,7 @@ from typing import Final
 
 from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.page_figures import page_tenth
+from research.capsules.render_words import ordinal
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
 from research.capsules.week.angle_rules import figure_violations as angle_figure_violations
@@ -53,7 +54,7 @@ from research.capsules.week.place_rules import unusual_violations
 from research.capsules.week.rank_words import fits, rank_words, superlatives_in
 from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import STATUS_WORDS, WeekSheet
-from research.capsules.week.start_advice import start_advice_in
+from research.capsules.week.start_advice import CONDITIONAL, sit_advice_in, start_advice_in
 
 MIN_SENTENCES: Final = 3
 MAX_SENTENCES: Final = 5
@@ -356,7 +357,7 @@ def _cannot_start_violations(sentences: Sequence[str], sheet: WeekSheet, call: s
     if call == START:
         out.append(
             f"The read's call is start, but he {why} in {week}. Never recommend him for this week: say what it means "
-            "for a roster that has him, and make the call sit, hold or none."
+            f'for a roster that has him, and give the call the ask gives, "{week_call(sheet).call}".'
         )
     for s in sentences:
         found = start_advice_in(s, sheet.name)
@@ -411,9 +412,10 @@ def _wait_violation(text: str, sheet: WeekSheet, call: str | None) -> list[str]:
 
 
 def _decided_call_violations(sentences: Sequence[str], sheet: WeekSheet, call: str | None) -> list[str]:
-    """Lane 302: the answer's call is the decided one (`call.week_call`), and a read whose call is sit for a
-    player who may play never tells a manager to start him (a player who may not be started has his own guard,
-    `_cannot_start_violations`). A hold's read may say when it turns to a start ("if he's cleared, start him")."""
+    """Lane 302: the answer's call is the decided one (`call.week_call`), and the read argues it (fix round 2, the
+    review's M1): a sit read for a player who may play never tells a manager to start him, a start read never tells
+    him to sit or bench him, and a hold read settles the week neither way unless the sentence says what it waits on
+    ("if he's cleared, start him"). A player who may not be started has his own guard (`_cannot_start_violations`)."""
     decided = week_call(sheet)
     out = []
     if call in CALLS and call != decided.call:
@@ -421,18 +423,59 @@ def _decided_call_violations(sentences: Sequence[str], sheet: WeekSheet, call: s
             f'The answer\'s call is "{call}", but the call for him this week is "{decided.call}". {decided.words} '
             f'Give "call" as "{decided.call}" and write the read that argues it.'
         )
-    if decided.call == SIT and sheet.may_start:
-        for s in sentences:
-            found = start_advice_in(s, sheet.name)
-            if found is not None:
-                out.append(
-                    _sentence_violation(
-                        f'tells a manager to start him ("{found}") when the call is sit',
-                        s,
-                        f"{decided.words} Argue the sit: never recommend him for this week.",
-                    )
+    out += _week_place_violations(sentences, sheet)
+    for s in sentences:
+        found = _against_the_call(s, sheet, decided.call)
+        if found is not None:
+            said, argue = found
+            out.append(
+                _sentence_violation(
+                    f"tells a manager to {said} when the call is {decided.call}", s, f"{decided.words} {argue}"
                 )
+            )
     return out
+
+
+def _week_place_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
+    """His place this week is the call's alone and never quoted (fix round 2, the review's L4): its basis is the
+    published projection, which a read never names (Lane 275), and no weekly order of ours is live."""
+    if sheet.week_rank is None:
+        return []
+    ordinal_place = re.compile(rf"\b{ordinal(sheet.week_rank)}\s+among\b")
+    # His code ("WR18") is his place in our order when the sentence names the order (`_order_violations`).
+    code_place = re.compile(rf"\b{re.escape(sheet.position)}{sheet.week_rank}\b")
+    out = []
+    for s in sentences:
+        found = ordinal_place.search(s) or (None if _ORDER_NAMED.search(s) else code_place.search(s))
+        if found is not None:
+            out.append(
+                _sentence_violation(
+                    f'states his place this week ("{found.group(0)}")',
+                    s,
+                    "His place this week is for the call alone: argue the call from his week's facts, never quote it.",
+                )
+            )
+    return out
+
+
+_ORDER_NAMED: Final = re.compile(r"\bour (?:rest-of-season|preseason) order\b", re.IGNORECASE)
+
+
+def _against_the_call(sentence: str, sheet: WeekSheet, decided: str) -> tuple[str, str] | None:
+    """What `sentence` tells a manager against the decided call, and how to argue it instead; None when nothing."""
+    start, sit = start_advice_in(sentence, sheet.name), sit_advice_in(sentence, sheet.name)
+    if decided == SIT and sheet.may_start and start is not None:
+        return f'start him ("{start}")', "Argue the sit: never recommend him for this week."
+    if decided == START and sit is not None:
+        return f'sit him ("{sit}")', "Argue the start: never tell a manager to sit or bench him."
+    if decided == HOLD and CONDITIONAL.search(sentence) is None:
+        said = start or sit
+        if said is not None:
+            verb = "start" if start is not None else "sit"
+            return f'{verb} him ("{said}") with nothing to wait on', (
+                'Argue the hold: say what his week waits on, and any start or sit only with it ("if he\'s cleared").'
+            )
+    return None
 
 
 _CLUB_CODE: Final = re.compile(r"\b(?:" + "|".join(sorted(NFL_TEAM_NAMES, key=len, reverse=True)) + r")\b")
@@ -722,10 +765,11 @@ def _count_violation(sentences: Sequence[str]) -> list[str]:
     return [f"The read has {len(sentences)} sentences. Write {MIN_SENTENCES} to {MAX_SENTENCES} sentences."]
 
 
-def _call_violation(call: str | None) -> list[str]:
+def _call_violation(call: str | None, sheet: WeekSheet) -> list[str]:
     if call in CALLS:
         return []
-    return [f'The answer gave no call. Give "call" as one word of {", ".join(CALLS)}: what the read tells a manager.']
+    decided = week_call(sheet).call
+    return [f'The answer gave no call. Give "call" as "{decided}", the call the ask gives, word for word.']
 
 
 def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none") -> list[str]:
@@ -734,7 +778,7 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
     return [
         *_paragraph_violation(text),
         *_count_violation(sentences),
-        *_call_violation(call),
+        *_call_violation(call, sheet),
         *_decided_call_violations(sentences, sheet, call),
         *_word_violations(sentences),
         *_projection_violations(sentences, sheet),

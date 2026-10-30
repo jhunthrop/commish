@@ -81,3 +81,34 @@ def start_advice_in(sentence: str, name: str) -> str | None:
             continue
         return match.group(0)
     return None
+
+
+# WORDS THAT TELL A MANAGER TO SIT HIM (Lane 302 fix round 2, the review's M1): the mirror the decided call needs now
+# that the writer no longer picks it. A start read never benches him and a hold read never settles the week either way.
+def _sit(name: str) -> re.Pattern[str]:
+    him = _him(name)
+    return re.compile(
+        rf"\b(?:sit|sitting|bench|benching|fade|fading)\s+(?:{him})\b|"
+        rf"\b(?:leave|keep|put|stash)\s+(?:{him})\s+(?:on\s+(?:your\s+|the\s+)?bench|benched|out\s+of\s+(?:your\s+|the\s+)?"
+        r"(?:starting\s+)?(?:lineups?|flex))\b|"
+        r"\bstart\s+(?:someone|somebody|anyone|another\s+\w+)\s+(?:else\s+)?(?:over|instead\s+of|ahead\s+of)\b|"
+        r"\bstart\s+(?:someone|somebody)\s+else\b",
+        re.IGNORECASE,
+    )
+
+
+def sit_advice_in(sentence: str, name: str) -> str | None:
+    """The words in `sentence` that tell a manager to sit the player `name` (unless a negation stands in their
+    clause: "don't sit him" recommends starting him, `start_advice_in`), or None."""
+    for match in _sit(name).finditer(sentence):
+        head, _clause = _clause_around(sentence, match.start(), match.end())
+        if _NEGATION.search(head):
+            continue
+        return match.group(0)
+    return None
+
+
+# A sentence that makes its advice wait on something: a hold's read may say what turns it to a start or a sit.
+CONDITIONAL: Final = re.compile(
+    r"\b(?:if|until|unless|once|when|whether|wait\w*|before|in case|depending|pending|should he)\b", re.IGNORECASE
+)

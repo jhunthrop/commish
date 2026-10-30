@@ -18,7 +18,12 @@ rewrite only the reads whose week moved.
   rewrites it, nightly and hourly (a new projection capture and the report both land mid-week), held like a status
   rewrite (`STATUS_REWRITES_A_DAY`). The read itself never states the projection, so this is the call moving, not
   the read standing through a projection move (Lane 275). Week 7's seven later captures crossed a line for 18, 10,
-  6, 11, 2, 2 and 0 board players, 49 in the week: at 1.48 attempts and $0.0023 a read, about $0.17 a week.
+  6, 11, 2, 2 and 0 board players, 49 in the week: at 1.48 attempts and $0.0023 a read, about $0.17 a week. A
+  start or sit flips on his place alone only `call.CALL_MARGIN` places past the line (fix round 2, the review's M2),
+  so a player at the line never reads start, sit, start on tenths: week 7 replayed, 30 flips and 3 back again
+  instead of 53 and 17. A roll-over written without the week's projection (the last nightly before a kickoff,
+  `rollover`) reads every call from our rest-of-season order, so the first capture after it moves many calls at
+  once through the hourly passes, held by the hourly dollars: expect a burst of `call` rewrites that morning.
 - The written read breaks a rule the writer holds reads to now (`RULE_STALE`, Lane 275 fix round 1: a read
   written while the rules asked for the published projection names it; Lane 286: every rule of the body alone,
   `rules.body_rule_violations`, so a read that says "your roster" is written again), nightly only and at most
@@ -48,7 +53,7 @@ from datetime import date, datetime, timedelta
 from typing import Final
 
 from research.capsules.store import WRITTEN_SOURCE
-from research.capsules.week.call import week_call
+from research.capsules.week.call import call_flipped
 from research.capsules.week.fact_rules import fact_violations
 from research.capsules.week.rules import body_rule_violations
 from research.capsules.week.sheet import CENTRAL, WeekSheet
@@ -144,8 +149,9 @@ def _fact_stale(sheet: WeekSheet, stored: StoredWeekRead, now: datetime) -> bool
 
 def call_moved(sheet: WeekSheet, stored: StoredWeekRead) -> bool:
     """Whether a written read's call is no longer the one decided for tonight's sheet (Lane 302): his place this week
-    crossed his position's starter line, or a Questionable player's game status report came out."""
-    return stored.source == WRITTEN_SOURCE and stored.call != week_call(sheet).call
+    crossed his position's starter line by `call.CALL_MARGIN` places (fix round 2), or a Questionable player's game
+    status report came out."""
+    return stored.source == WRITTEN_SOURCE and call_flipped(sheet, stored.call)
 
 
 def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None, now: datetime, *, hourly: bool = False) -> str | None:

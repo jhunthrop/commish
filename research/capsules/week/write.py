@@ -5,7 +5,8 @@ The ask is the season writer's (`generate.ask`, Lane 52): a rate limit or a tran
 asks again with the same prompt and never spends one of the read's asks; a call the run's budget refuses
 (`run_budget`, the step attaches one) ends the read at once, named for the budget. An empty or cut answer
 is an ask spent. The answer is the read and its call (`prompt.parse_week_answer`), which must be the call decided
-before the ask (Lane 302, `call.week_call`); the result always carries the decided call, a facts block's too. A draft
+before the ask (Lane 302, `call.week_call`); every read written stores the decided call, a facts block's too
+(a written read the nightly keeps over a fallen rewrite keeps the call its body argues, `cadence.kept_read`). A draft
 that breaks a rule is handed back with every rule broken so far and its sentence (`rule_notes`), up to
 `MAX_CALLS_PER_READ` asks in all. A read whose writer's asks are spent without a written read is asked once
 more of the retry writer (Lane 276, `retry_model`, the setting `config.RETRY_WRITER_MODEL`): the correction of

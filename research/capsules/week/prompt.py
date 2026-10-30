@@ -68,7 +68,8 @@ def call_section(sheet: WeekSheet) -> str:
     decided = week_call(sheet)
     return (
         f'The call, decided before you write: {decided.words} Your answer\'s "call" is "{decided.call}". Argue it '
-        "from the facts that decide his week, and never quote where our starter line falls."
+        "from the facts that decide his week. His place in this sentence is for the call alone: never quote it, and "
+        "never where our starter line falls."
     )
 
 
@@ -127,7 +128,7 @@ THE READ
 - Open on the fact that matters most for him this week: the first sentence carries the call, a figure or his status. Never open with a scene-setting clause (no "runs into the kind of matchup" before a colon), a greeting, a question, or his name followed by a verdict. Name him in the read.
 - Every read on this site is written from facts like these, and no sentence may sit on two players' pages, even with the names and numbers swapped: build each sentence your own way for this player, never a sentence shape that would fit another player.
 - End on what a manager who has him does this week, in his own terms: start him, sit him, keep him on the bench, find a fill-in for the week.
-- A player who may not be started this week (on his bye, Out, Doubtful, on a season-long list) is never recommended to start, in any wording: his call is sit, hold or none. If he cannot play, say he does not play and what that means for a roster that has him: who fills the spot this week, whether he stays on the roster, his next game.
+- A player who may not be started this week (on his bye, Out, Doubtful, on a season-long list) is never recommended to start, in any wording: his call is the one the ask gives. If he cannot play, say he does not play and what that means for a roster that has him: who fills the spot this week, whether he stays on the roster, his next game.
 - A Questionable player: say what a manager waits on before his kickoff, in words of your own.
 
 THE NUMBER

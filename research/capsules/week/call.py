@@ -66,12 +66,27 @@ class WeekCall:
     words: str
 
 
+# A STORED CALL FLIPS ON A MARGIN (fix round 2, the review's M2): a written start turns to a sit, or a sit to a start,
+# only once tonight's place is at least this many places past the line on the other side. The first write uses the
+# plain line, and a move a status drives (his bye, a status that keeps him off the field, a hold) is immediate.
+# Week 7's eight captures, replayed for every board player: at the plain line 53 flips, 17 of them back again
+# (13 players went start, sit, start or the reverse on tenths of a point); at 2 places 37 and 7; at 3 places 30
+# and 3; at 4 places 22 and none, but a real move of three places waits. Three keeps the real moves and leaves
+# 3 flips back in the week.
+CALL_MARGIN: Final = 3
+
+
 @dataclass(frozen=True, slots=True)
 class _Place:
-    """His place at his position against the line, and the words that say where it comes from."""
+    """His place at his position (`rank`) against the line, and the words that say where it comes from."""
 
-    inside: bool
+    rank: int
+    line: int
     words: str
+
+    @property
+    def inside(self) -> bool:
+        return self.rank <= self.line
 
 
 def week_ranks(points: Iterable[tuple[str, str, float]]) -> dict[str, int]:
@@ -95,12 +110,13 @@ def _place(sheet: WeekSheet) -> _Place | None:
         return None
     plural = _plural(sheet)
     if sheet.week_rank is not None:
-        return _Place(sheet.week_rank <= line, f"he ranks {ordinal(sheet.week_rank)} among {plural} this week")
+        return _Place(sheet.week_rank, line, f"he ranks {ordinal(sheet.week_rank)} among {plural} this week")
     board = sheet.board
     if board is None:
         return None
     return _Place(
-        board.position_rank <= line,
+        board.position_rank,
+        line,
         f"with no ranking for him this week, the call reads {board.order_words}, where he is "
         f"{sheet.position}{board.position_rank}",
     )
@@ -152,3 +168,16 @@ def week_call(sheet: WeekSheet) -> WeekCall:
     if not place.inside:
         return WeekCall(SIT, f"The call is sit: {place.words}, past the {_plural(sheet)} a lineup starts.")
     return _held(sheet, place.words) or WeekCall(START, f"The call is start: {place.words}, so he belongs in a lineup.")
+
+
+def call_flipped(sheet: WeekSheet, stored: str | None) -> bool:
+    """Whether a read stored with the call `stored` is due its decided call tonight: any change, except that a start
+    turns to a sit (or a sit to a start) on his place alone only `CALL_MARGIN` places past the line."""
+    decided = week_call(sheet).call
+    if decided == stored:
+        return False
+    place = _place(sheet)
+    if {decided, stored} != {START, SIT} or not sheet.can_play or place is None:
+        return True
+    past = place.rank - place.line if decided == SIT else place.line + 1 - place.rank
+    return past >= CALL_MARGIN

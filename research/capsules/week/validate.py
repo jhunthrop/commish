@@ -26,7 +26,6 @@ from typing import Final
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.narrative import ShapeMasks, held_shapes, shown_shape
 from research.capsules.validate import Grounding, ValidationResult, validate_prose
-from research.capsules.week.call import week_call
 from research.capsules.week.render import render_week_sheet
 from research.capsules.week.rules import week_rule_violations
 from research.capsules.week.sheet import WeekSheet, week_name_ledger
@@ -82,8 +81,9 @@ def week_grounding(sheet: WeekSheet) -> Grounding:
     return Grounding(
         number_ledger=changes,
         name_ledger=week_name_ledger(sheet),
-        # The decided call's sentence is a fact of the ask (Lane 302, `prompt.call_section`): his place this week.
-        prompt_text=f"{render_week_sheet(sheet)}\n{week_call(sheet).words}",
+        # The decided call's place is never quoted (Lane 302 fix round 2, the review's L4): it stays out of the
+        # grounding, so a read that states it is refused as a figure the sheet does not carry.
+        prompt_text=render_week_sheet(sheet),
         tension=None,
         page_numbers=(),
         adp=None,

@@ -549,13 +549,23 @@ def collect_week_sheets(
 def board_week_ranks(facts: WeekFacts, subjects: Sequence[Subject]) -> dict[str, int]:
     """Every board player's place among his position by the board week's published projection (Lane 302 fix round
     1, the call's ranking): every subject with one, his sheet written tonight or not, so a place never moves with
-    which sheets read."""
+    which sheets read. A player who takes no field that week holds no place (fix round 2, the review's L3): his club
+    has no board-week game (a bye club's defense is still projected), or his status keeps him off the field."""
     points = [
         (s.universe_id, s.facts.identity.position, p.points)
         for s in subjects
         if (p := facts.projections.get((s.facts.identity.id, facts.board_week))) is not None
+        and _takes_the_field(facts, s)
     ]
     return week_ranks(points)
+
+
+def _takes_the_field(facts: WeekFacts, subject: Subject) -> bool:
+    """Whether a board player's club plays the board week and his status lets him play."""
+    identity = subject.facts.identity
+    club = call_for(facts.context.clubs, identity.id).club
+    status = facts.statuses.get(identity.id, Status(None, None)).status
+    return club is not None and _board_game(facts, club) is not None and status not in CANNOT_PLAY
 
 
 def _board_game(facts: WeekFacts, club: str) -> Game | None:

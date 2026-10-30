@@ -10,14 +10,33 @@ import pytest
 
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.store import WRITTEN_SOURCE
-from research.capsules.week.cadence import CALL_CHANGED, HOURLY_REASONS, STATUS_REWRITES_A_DAY, due_reason
-from research.capsules.week.call import HOLD, NONE, SIT, START, STARTER_LINE, week_call, week_ranks
+from research.capsules.week import collect
+from research.capsules.week.cadence import (
+    CALL_CHANGED,
+    HOURLY_REASONS,
+    STATUS_REWRITES_A_DAY,
+    due_reason,
+    kept_read,
+)
+from research.capsules.week.call import (
+    CALL_MARGIN,
+    HOLD,
+    NONE,
+    SIT,
+    START,
+    STARTER_LINE,
+    call_flipped,
+    week_call,
+    week_ranks,
+)
 from research.capsules.week.collect import board_week_ranks
 from research.capsules.week.prompt import call_section, week_correction, week_prompt
 from research.capsules.week.report_day import status_report_issued
 from research.capsules.week.rules import week_rule_violations
 from research.capsules.week.sheet import BoardPlace, PublishedProjection, Status, WeekSheet
+from research.capsules.week.start_advice import sit_advice_in
 from research.capsules.week.store import StoredWeekRead
+from research.capsules.week.validate import validate_week_read
 from research.capsules.week.write import MAX_ASKS_WITH_RETRY, write_week_read
 from research.tests.test_week_read_writer import _answer, _StubGateway
 from research.tests.week_read_fixtures import BOARD, KICKOFF, REPORT, WRITTEN_AT, on_bye, starter
@@ -188,15 +207,38 @@ def _stored(sheet: WeekSheet, call: str, attempts: int = 1) -> StoredWeekRead:
 
 
 def test_a_read_whose_call_moved_is_due_nightly_and_hourly() -> None:
-    crossed = _ranked("WR", 30)
+    crossed = _ranked("WR", 28)
     assert due_reason(crossed, _stored(crossed, SIT), _NOW) == CALL_CHANGED
     assert due_reason(crossed, _stored(crossed, SIT), _NOW, hourly=True) == CALL_CHANGED
     assert CALL_CHANGED in HOURLY_REASONS
     assert due_reason(crossed, _stored(crossed, START), _NOW) is None
 
 
+def test_a_start_or_sit_flips_on_his_place_only_past_the_margin() -> None:
+    """The review's M2: a player at the line never reads start, sit, start on tenths. WR line 30, margin 3."""
+    assert CALL_MARGIN == 3  # noqa: PLR2004 - the ruling's margin, its reason at the constant
+    # A stored start: sit only at 3 places past the line.
+    assert not call_flipped(_ranked("WR", 31), START)
+    assert not call_flipped(_ranked("WR", 32), START)
+    assert call_flipped(_ranked("WR", 33), START)
+    # A stored sit: start only 3 places inside it (30 is 1, 29 is 2, 28 is 3).
+    assert not call_flipped(_ranked("WR", 30), SIT)
+    assert not call_flipped(_ranked("WR", 29), SIT)
+    assert call_flipped(_ranked("WR", 28), SIT)
+    # The same call never flips.
+    assert not call_flipped(_ranked("WR", 50), SIT)
+
+
+def test_a_move_a_status_drives_flips_at_once() -> None:
+    at_line = _ranked("WR", 31)
+    assert call_flipped(replace(at_line, status=Status("out", REPORT)), START)
+    assert call_flipped(replace(_ranked("WR", 30), status=Status("doubtful", REPORT)), START)
+    assert call_flipped(replace(_ranked("WR", 30), status=Status("questionable", _ISSUED)), HOLD)
+    assert call_flipped(replace(_ranked("WR", 31), bye=True), START)
+
+
 def test_a_call_rewrite_that_keeps_falling_is_capped_like_a_status_rewrite() -> None:
-    crossed = _ranked("WR", 30)
+    crossed = _ranked("WR", 28)
     day = datetime(2026, 10, 16, 23, 0, tzinfo=UTC)
     capped = replace(_stored(crossed, SIT, attempts=STATUS_REWRITES_A_DAY + 1), attempt_day=day.date())
     assert due_reason(crossed, capped, day) is None
@@ -207,12 +249,93 @@ def _subject(universe: str, provider: str, position: str) -> SimpleNamespace:
     return SimpleNamespace(universe_id=universe, facts=SimpleNamespace(identity=identity))
 
 
-def test_the_board_weeks_places_rank_every_board_player_with_a_projection_that_week() -> None:
+def test_the_board_weeks_places_rank_every_board_player_with_a_projection_that_week(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """`collect.board_week_ranks`: the peers are every subject with a published projection for the board week, his
     sheet read tonight or not; another week's projection and a player with none take no place."""
     projected = {("p1", 6): 12.0, ("p2", 6): 19.5, ("p3", 7): 30.0}
     facts = SimpleNamespace(
         board_week=6, projections={k: PublishedProjection(v, REPORT, None, None) for k, v in projected.items()}
     )
+    monkeypatch.setattr(collect, "_takes_the_field", lambda _facts, _subject: True)
     subjects = [_subject("u1", "p1", "RB"), _subject("u2", "p2", "RB"), _subject("u3", "p3", "RB")]
     assert board_week_ranks(facts, subjects) == {"u2": 1, "u1": 2}  # type: ignore[arg-type]
+
+
+def test_a_player_who_takes_no_field_holds_no_place(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The review's L3: a bye club's projected defense and a player ruled out take no starter place from anyone."""
+    clubs = {"p1": "ATL", "p2": "DET", "p3": "ATL", "p4": "ATL"}
+    monkeypatch.setattr(collect, "call_for", lambda _clubs, pid: SimpleNamespace(club=clubs[pid]))
+    monkeypatch.setattr(collect, "_board_game", lambda _facts, club: None if club == "DET" else object())
+    projected = {("p1", 6): 12.0, ("p2", 6): 19.5, ("p3", 6): 15.0, ("p4", 6): 9.0}
+    facts = SimpleNamespace(
+        board_week=6,
+        context=SimpleNamespace(clubs={}),
+        statuses={"p3": Status("out", REPORT)},
+        projections={k: PublishedProjection(v, REPORT, None, None) for k, v in projected.items()},
+    )
+    subjects = [_subject(f"u{n}", f"p{n}", "RB") for n in range(1, 5)]
+    assert board_week_ranks(facts, subjects) == {"u1": 1, "u4": 2}  # type: ignore[arg-type]
+
+
+_BENCHING = (
+    "Bench Puka Nacua for week 6 of 2026, because his role is thinner than it looks. Arizona is an ordinary "
+    "matchup for receivers. He carries no designation on the Tuesday-night list. Sit him this week and play a "
+    "steadier receiver instead."
+)
+
+
+def test_a_start_read_that_tells_a_manager_to_sit_or_bench_him_is_refused() -> None:
+    """The review's M1 probe: a decided start whose read benches him."""
+    refused = [v for v in week_rule_violations(_BENCHING, _ranked("WR", 5), START) if "when the call is start" in v]
+    assert len(refused) == 2  # noqa: PLR2004 - "Bench Puka Nacua" and "Sit him"
+    assert "Argue the start" in refused[0]
+
+
+@pytest.mark.parametrize(
+    ("sentence", "said"),
+    [
+        ("Sit him this week.", "Sit him"),
+        ("Bench Nacua for week 6.", "Bench Nacua"),
+        ("Keep him out of your lineup.", "Keep him out of your lineup"),
+        ("Leave him on the bench.", "Leave him on the bench"),
+        ("Start someone else over him.", "Start someone else over"),
+        ("He sits first among Los Angeles receivers.", None),
+        ("Don't sit him.", None),
+        ("Never bench Nacua.", None),
+    ],
+)
+def test_the_sit_phrases_are_read_and_a_negation_is_not_one(sentence: str, said: str | None) -> None:
+    assert sit_advice_in(sentence, "Puka Nacua") == said
+
+
+def test_a_hold_read_settles_the_week_only_with_what_it_waits_on() -> None:
+    held = replace(_ranked("WR", 10), status=Status("questionable", _BEFORE))
+    assert week_call(held).call == HOLD
+    for flat in ("Start him this week.", "Bench him this week."):
+        assert any("with nothing to wait on" in v for v in week_rule_violations(flat, held, HOLD)), flat
+    for waits in ("If he's cleared, start him.", "Bench him until Friday's report clears him."):
+        assert not any("with nothing to wait on" in v for v in week_rule_violations(waits, held, HOLD)), waits
+
+
+def test_his_place_this_week_is_never_quoted() -> None:
+    """The review's L4: the place is the call's alone, so a read that states it is refused as a figure the sheet
+    does not carry, and the ask says so."""
+    sheet = _ranked("WR", 18)
+    quoted = "Puka Nacua ranks 18th among receivers this week."
+    assert any("states his place this week" in v for v in validate_week_read(quoted, sheet, call=START).violations)
+    in_our_order = "Puka Nacua is WR18 in our rest-of-season order."
+    assert not any("states his place this week" in v for v in week_rule_violations(in_our_order, sheet, START))
+    assert "never quote it" in call_section(sheet)
+
+
+def test_a_missing_call_is_told_the_decided_one() -> None:
+    assert any('Give "call" as "sit"' in v for v in week_rule_violations(_SIT_READ, _ranked("WR", 31), None))
+
+
+def test_a_kept_read_keeps_the_call_its_body_argues() -> None:
+    """The review's L1: a written read kept over a fallen call rewrite keeps its own call, never the new one."""
+    sheet = _ranked("WR", 28)
+    before = _stored(sheet, SIT)
+    assert kept_read(before, _NOW).call == SIT
