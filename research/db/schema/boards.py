@@ -208,10 +208,11 @@ REGISTER_WEEKLY_ROWS: Final = Table(
 )
 
 
-# The week-ahead reads (revision 0012, Lane 72; reason "rule" since 0024, Lane 275; "fact" since 0025, Lane 299): one per player and week, the writer's three to five
+# The week-ahead reads (revision 0012, Lane 72; reason "rule" since 0024, Lane 275; "fact" since 0025, Lane 299;
+# "writer" and `writer_version` since 0026, Lane 306): one per player and week, the writer's three to five
 # sentences about his next game or its facts block, stamped with the write and every fact's own stamp.
 WEEK_READ_SOURCES: Final = ("llm", "facts")
-WEEK_READ_REASONS: Final = ("first", "unwritten", "status", "projection", "demoted", "rule", "fact")
+WEEK_READ_REASONS: Final = ("first", "unwritten", "status", "projection", "demoted", "rule", "fact", "writer")
 WEEK_READ_CALLS: Final = ("start", "sit", "hold", "none")
 PLAYER_WEEK_READS: Final = Table(
     "player_week_reads",
@@ -232,6 +233,9 @@ PLAYER_WEEK_READS: Final = Table(
     Column("attempt_day", Date, nullable=False),
     Column("attempts", Integer, nullable=False),
     recorded_at("recorded_at"),
+    # The writer version that wrote the read (revision 0026, Lane 306, `write.WEEK_WRITER_VERSION`): declared last
+    # and nullable, NULL read as 0; the revision stamps the rows before it from their written instant.
+    Column("writer_version", Integer),
     one_of("source", WEEK_READ_SOURCES, "player_week_reads_source_ck"),
     one_of("reason", WEEK_READ_REASONS, "player_week_reads_reason_ck"),
     CheckConstraint("week BETWEEN 1 AND 18", name="player_week_reads_week_ck"),

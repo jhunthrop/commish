@@ -10,6 +10,7 @@ from typing import cast
 from research.capsules.week.caption import PROJECTION_MOVED_CAPTION
 from research.capsules.week.rollover import ReadsDue
 from research.capsules.week.store import StoredWeekRead
+from research.capsules.week.write import WEEK_WRITER_VERSION
 from research.nightly.build.page_club import ClubCall
 from research.nightly.build.pages import (
     Identity,
@@ -30,7 +31,7 @@ _WRITTEN = datetime(2026, 10, 17, 2, 0, tzinfo=UTC)
 def _read(source: str = "llm", status: str | None = "questionable") -> StoredWeekRead:
     return StoredWeekRead(
         "00-0038542", 2026, 6, source, "Bijan Robinson is Questionable on Friday's report.", "m/x", _WRITTEN,
-        _WRITTEN, {}, 15.2, status, "status", "start", date(2026, 10, 16), 1,
+        _WRITTEN, {}, 15.2, status, "status", "start", date(2026, 10, 16), 1, WEEK_WRITER_VERSION,
     )  # fmt: skip
 
 

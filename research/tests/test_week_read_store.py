@@ -34,6 +34,7 @@ from research.capsules.week.store import (
     upsert_week_read,
 )
 from research.capsules.week.validate import week_masks
+from research.capsules.week.write import WEEK_WRITER_VERSION
 from research.db.engine import make_engine
 from research.db.schema import CAPTURE_SNAPSHOTS, PLAYER_WEEK_READ_RUNS, PLAYER_WEEK_READS, PLAYERS
 from research.db.url import sqlalchemy_url
@@ -160,7 +161,7 @@ def _row(player_id: str, week: int, body: str, written_at: datetime = WRITTEN_AT
     return StoredWeekRead(
         player_id, 2026, week, "llm", body, "m/x", written_at, written_at - timedelta(hours=1),
         {"projection": (written_at - timedelta(hours=1)).isoformat()}, 18.4, None, "first", "start",
-        date(2026, 10, 16), 1,
+        date(2026, 10, 16), 1, WEEK_WRITER_VERSION,
     )  # fmt: skip
 
 

@@ -5,7 +5,8 @@ the row (the cadence says when, `cadence`); a new week is a new row, so last wee
 Each row keeps the write's instant, the facts' newest stamp and every fact's own (`sheet.stamps`), the
 status the cadence compares against, the published projection it was written with (the card's "Proj at the
 read"), the call
-the writer classified it as, and its attempts on its Central day. The page serves the row of the board
+the writer classified it as, its attempts on its Central day, and the writer version that wrote it (revision
+0026, Lane 306). The page serves the row of the board
 week only (`served_week_reads`). Each pass's spend is a row of `player_week_read_runs`, which the hourly
 passes' daily cap reads (`hourly_spend_since`).
 """
@@ -38,6 +39,9 @@ class StoredWeekRead:
     call: str | None
     attempt_day: date
     attempts: int
+    # The writer version that wrote it (`write.WEEK_WRITER_VERSION`, revision 0026, Lane 306); a row from before
+    # the column reads as 0.
+    writer_version: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,14 +59,14 @@ class WeekReadRun:
 
 _COLUMNS = (
     "player_id, season, week, source, body, model, written_at, facts_at, stamps, projection_points, status, reason, "
-    "call, attempt_day, attempts"
+    "call, attempt_day, attempts, coalesce(writer_version, 0) as writer_version"
 )
 
 
 def _row(r: Any) -> StoredWeekRead:
     return StoredWeekRead(
         r.player_id, r.season, r.week, r.source, r.body, r.model, r.written_at, r.facts_at, dict(r.stamps),
-        r.projection_points, r.status, r.reason, r.call, r.attempt_day, r.attempts,
+        r.projection_points, r.status, r.reason, r.call, r.attempt_day, r.attempts, r.writer_version,
     )  # fmt: skip
 
 
@@ -113,6 +117,7 @@ def _values(row: StoredWeekRead) -> dict[str, object]:
         "call": row.call,
         "attempt_day": row.attempt_day,
         "attempts": row.attempts,
+        "writer_version": row.writer_version,
     }
 
 
