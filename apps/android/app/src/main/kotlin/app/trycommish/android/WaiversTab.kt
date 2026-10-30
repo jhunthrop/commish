@@ -87,6 +87,9 @@ private fun LeagueWaivers(
                 choosePosition = { vm.choosePosition(it, id) },
                 find = vm::find,
                 sortBy = vm::sortBy,
+                choosePanelMode = vm::choosePanelMode,
+                toggleCard = vm::toggleCard,
+                addFromPanel = { vm.addFromPanel(it, id) },
                 refresh = { vm.load(id) },
                 pin =
                     WaiverPinActions(

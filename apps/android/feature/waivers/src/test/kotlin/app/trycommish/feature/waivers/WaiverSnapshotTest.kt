@@ -25,6 +25,7 @@ import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
 import app.trycommish.core.leaguehome.Fixtures
 import app.trycommish.core.start.StartFixtures
+import app.trycommish.core.waivers.PanelMode
 import app.trycommish.core.waivers.WaiverFixtures
 import app.trycommish.core.waivers.WaiverKeys
 import app.trycommish.core.waivers.WaiverPin
@@ -60,6 +61,8 @@ import java.io.IOException
  * chip's read and his name searched. An add's drop panel open on ESPN with the pair pinned. The claim on
  * the ESPN stand-ins: confirmed with its bid in waiver dollars (FAAB), pending with the time ESPN runs it,
  * refused in ESPN's own words, done. And a saved read with no signal, the verb disabled with its stamp.
+ * The position panel (Lane 304): a card open on the rest of the season, on This week, with no free agent
+ * and with no figure.
  * Both themes, a Pixel 9 and a small phone (the Nexus 5's 360 by 640 dp). The persona panel reads these.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -91,6 +94,18 @@ class WaiverSnapshotTest(
 
         /** A wide receiver past the page's rows reached: the WR chip's read, his name searched. */
         Reach("reach", WaiverFixtures.FFPC, listOf(Part.Top, Part.Foot)),
+
+        /** The position panel's QB card open on the rest of the season: Need, his three, five free agents. */
+        Positions("positions", WaiverFixtures.FFPC, listOf(Part.Positions)),
+
+        /** The toggle on This week, the TE card open: the week's own free agents by Proj. */
+        PositionsWeek("positionsWeek", WaiverFixtures.FFPC, listOf(Part.Positions)),
+
+        /** The RB card open: no free agent we list plays there. */
+        PositionsEmpty("positionsEmpty", WaiverFixtures.FFPC, listOf(Part.Positions)),
+
+        /** The D/ST card open: no rest-of-season figure, so no rank and no median. */
+        PositionsDefense("positionsDefense", WaiverFixtures.FFPC, listOf(Part.Positions)),
         ;
 
         val espn: Boolean get() = league != WaiverFixtures.FFPC
@@ -107,6 +122,9 @@ class WaiverSnapshotTest(
         Panel("panel"),
         Foot("foot"),
         Pin("pin"),
+
+        /** The position panel alone, its card open on its list. */
+        Positions("positions"),
     }
 
     enum class Phone(
@@ -134,9 +152,10 @@ class WaiverSnapshotTest(
     @Test
     fun waivers() {
         val mode = if (part == Part.Phone || part == Part.Pin) RenderingMode.SHRINK else RenderingMode.V_SCROLL
-        // The long runs (every row past the gaining ones, every drop of the panel) are drawn at 1x, as
+        // The long runs (every row past the gaining ones, every drop of the panel, an open position's
+        // list) are drawn at 1x, as
         // iOS records, so each reference stays under 300 KB; the rest at 2x as the Start screen's.
-        val long = part == Part.Foot || part == Part.Panel
+        val long = part == Part.Foot || part == Part.Panel || part == Part.Positions
         paparazzi.unsafeUpdateConfig(deviceConfig = if (long) oneX(phone.config) else phone.config, renderingMode = mode)
         val vm = viewModelAt(scene)
         val ui = vm.ui.value
@@ -250,6 +269,13 @@ internal fun viewModelAt(scene: WaiverSnapshotTest.Scene): WaiverViewModel {
             vm.choosePosition(WaiverPosition.WR, league)
             vm.find("dotson")
         }
+        WaiverSnapshotTest.Scene.PositionsWeek -> {
+            vm.choosePanelMode(PanelMode.Week)
+            vm.toggleCard("TE")
+        }
+        WaiverSnapshotTest.Scene.Positions -> vm.toggleCard("QB")
+        WaiverSnapshotTest.Scene.PositionsEmpty -> vm.toggleCard("RB")
+        WaiverSnapshotTest.Scene.PositionsDefense -> vm.toggleCard("DEF")
         WaiverSnapshotTest.Scene.Before, WaiverSnapshotTest.Scene.Stale -> Unit
     }
     return vm
@@ -288,6 +314,7 @@ private fun Mock(
         WaiverSnapshotTest.Part.Foot -> WaiverPage(model, ui, stamp, actions, listOf(WaiverPart.Foot), bg)
         WaiverSnapshotTest.Part.Panel -> WaiverOpenRow(model, ui, actions, bg)
         WaiverSnapshotTest.Part.Pin -> WaiverPinView(pin, WaiverPinActions(), still = true)
+        WaiverSnapshotTest.Part.Positions -> WaiverPositions(ui, actions, bg)
     }
 }
 

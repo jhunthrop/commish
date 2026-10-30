@@ -226,10 +226,38 @@ class WaiverViewModel(
 
     /** The verb: the claim planned where it is made from here, else his name copied and the platform's
      * page opened. Nothing while the waivers shown are a saved read or a claim is open. */
-    fun press(leagueId: String): Job? {
+    fun press(leagueId: String): Job? = ui.value.target?.let { act(it, leagueId) }
+
+    /** The position panel's toggle: its figures for the rest of the season or this week. */
+    fun choosePanelMode(mode: PanelMode) {
+        mutableUi.update { it.copy(panelMode = mode) }
+    }
+
+    /** A panel card tapped: its list opened under the row, or closed when it was the one open. */
+    fun toggleCard(key: String) {
+        mutableUi.update { it.copy(openCard = if (it.openCard == key) null else key) }
+    }
+
+    /** A free agent's Add on the panel (WaiverScreen.svelte addFromPanel): the add with the advice's
+     * drop, through the screen's one verb (the claim planned here, else the platform's page with his
+     * name). */
+    fun addFromPanel(
+        source: WaiverRow,
+        leagueId: String,
+    ): Job? {
+        val model = ui.value.model ?: return null
+        mutableUi.update { it.copy(openRow = null) }
+        return act(model.panelPair(source), leagueId)
+    }
+
+    /** The one verb on an add (WaiverScreen.svelte act): the claim planned where it is made from here,
+     * else his name copied and the platform's page opened. Nothing on a saved read or with a claim open. */
+    private fun act(
+        target: WaiverRow,
+        leagueId: String,
+    ): Job? {
         val ui = ui.value
         val loaded = ui.loaded ?: return null
-        val target = ui.target ?: return null
         if (loaded.stale || ui.step != MoveStep.Closed) return null
         if (!loaded.model.claimsHere(target)) {
             openPlatform(target)

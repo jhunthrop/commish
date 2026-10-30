@@ -72,22 +72,7 @@ data class PoolRow(
 
     /** The player his name opens in the sheet, keyed by the row's own key (a free agent has no platform
      * id): null where the site has no page for him. */
-    val sheetPlayer: SheetPlayer?
-        get() {
-            val row = cells.row
-            return row.slug?.let {
-                SheetPlayer(
-                    key,
-                    it,
-                    row.name,
-                    row.position,
-                    row.rank?.toString() ?: row.status?.rank,
-                    row.club,
-                    row.headshot,
-                    boardId = row.boardId,
-                )
-            }
-        }
+    val sheetPlayer: SheetPlayer? get() = WaiverRows.sheetPlayer(key, cells)
 }
 
 /** One card of the strip (PickupStrip.svelte): his slot, Best over the first of more than one, the
@@ -139,7 +124,28 @@ internal object WaiverRows {
     fun names(advice: WaiverAdvice): List<String> =
         (advice.rows + advice.pickups + advice.stash.orEmpty()).map { it.add.player.name } + advice.roster.map { it.player.name }
 
-    private fun cells(
+    /** The player a row's name opens in the sheet, by the key given: null where the site has no page
+     * for him. */
+    fun sheetPlayer(
+        key: String,
+        cells: RowCells,
+    ): SheetPlayer? {
+        val row = cells.row
+        return row.slug?.let {
+            SheetPlayer(
+                key,
+                it,
+                row.name,
+                row.position,
+                row.rank?.toString() ?: row.status?.rank,
+                row.club,
+                row.headshot,
+                boardId = row.boardId,
+            )
+        }
+    }
+
+    fun cells(
         line: PlayerLine,
         reserve: ReserveRow?,
         zone: ZoneId,
