@@ -6,7 +6,7 @@
  * Pure, tested in position-nav.test.ts. */
 import type { components } from '#lib/api/types.ts';
 import type { WaiverAdvice, WaiverPosition } from '../inseason/api.ts';
-import { BOX, boxNumber, boxRow, positionWord, type BoxRow } from './box.ts';
+import { boxNumber, boxRow, positionWord, type BoxRow } from './box.ts';
 import { PANEL, placeWords, type PanelMode } from './positions.ts';
 import { DEFAULT_SORT, WAIVERS, type Sort } from './waivers.ts';
 
@@ -24,23 +24,20 @@ export const NAV = {
 	beat: 'beat yours',
 	every: 'Every position',
 	pickup: 'Pickup',
+	/** The season/week toggle's own name, apart from the section's. */
+	figuresFor: 'Figures for',
 	/** On a card that reads this week's Proj in place of a rest-of-season order (K, D/ST). */
-	weekTag: 'Proj this week',
+	weekTag: 'this week',
 	/** On a card with no figure to rank yet. */
 	waits: "Ranks once this week's Proj is read.",
 	allHead: 'Every free agent we rank',
 	allSays: 'Pick a position to set them against your players there.',
 	yours: (word: string): string => `Your ${word}`,
 	freeAt: (word: string): string => `Free at ${word}`,
-	against: (points: string, median: string): string => `${points} against a ${median} median.`,
 	swapped: (word: string): string =>
 		`${word} has no rest-of-season order, so its card ranks this week's Proj.`,
-	rank: {
-		season: (word: string): string =>
-			`Rank is your starters' rest of season at ${word} against the league's.`,
-		week: (word: string): string =>
-			`Rank is your starters' Proj this week at ${word} against the league's.`
-	}
+	/** Where a position's own read failed: its players from the screen's first read stay listed. */
+	firstRead: (word: string): string => `Showing the first read's players at ${word}.`
 } as const;
 
 /** The standing a card reads in the mode: its own, or on Rest of season where the position has no
@@ -59,13 +56,14 @@ export function navStanding(
 export interface NavCard {
 	key: NavKey;
 	word: string;
-	/** "rank 9 of 12"; on the All card the free agents' count; "--" with no figure. */
-	place: string;
-	/** The member's figure (on All, how many beat a player of his). */
-	figure: string;
+	/** "rank 9 of 12"; on the All card the free agents' count; null with no figure (the card says
+	 * what it waits on, never a bare "--"). */
+	place: string | null;
+	/** The member's figure (on All, how many beat a player of his); null with no figure. */
+	figure: string | null;
 	/** "155.6 median"; on All, "Every position"; null with no figure. */
 	foot: string | null;
-	/** Words beside the figure: "Proj this week" on a swapped card, the All card's count words. */
+	/** Words beside the figure: "this week" on a swapped card (its Proj), short enough for a phone's card, the All card's count words. */
 	tag: string | null;
 	need: boolean;
 	/** The strip's pickups include one here. */
@@ -125,8 +123,8 @@ function positionCard(
 	if (read === null) {
 		return {
 			...base,
-			place: BOX.none,
-			figure: BOX.none,
+			place: null,
+			figure: null,
 			foot: null,
 			tag: null,
 			need: false,
@@ -222,25 +220,38 @@ export function yoursRows(
 		}));
 }
 
-/** The line over the comparison: the chosen card's rank and what it is; All's words for All. */
+/** The line over the comparison: the chosen card's rank, and beside it only what the card cannot
+ * say (a Need's meaning, a swapped figure's); All's words for All. The rank's own meaning is said once
+ * a mode, by the toggle (PANEL.explain), and the figure and median are the card's. A position with no
+ * panel card (an older answer) is named alone. */
 export function navLead(
 	advice: Pick<WaiverAdvice, 'positions'>,
 	key: NavKey,
 	mode: PanelMode
-): { head: string; words: string } {
+): { head: string; words: string | null } {
+	if (key === ALL) return { head: NAV.allHead, words: NAV.allSays };
+	const word = positionWord(key);
 	const card = (advice.positions ?? []).find((c) => c.position === key);
-	if (card === undefined) return { head: NAV.allHead, words: NAV.allSays };
-	const word = positionWord(card.position);
-	const read = navStanding(card, mode);
-	if (read === null) return { head: word, words: NAV.waits };
+	const read = card === undefined ? null : navStanding(card, mode);
+	if (card === undefined || read === null) return { head: word, words: null };
 	const { standing, swapped } = read;
-	const against = NAV.against(boxNumber(standing.points), boxNumber(standing.median));
-	const what = swapped ? NAV.swapped(word) : NAV.rank[mode](word);
-	const need = card.need && mode === 'season' && !swapped ? ` ${PANEL.needSays}` : '';
+	const need = card.need && mode === 'season' && !swapped;
 	return {
 		head: `${word} ${placeWords(standing, card.teams)}`,
-		words: `${against} ${what}${need}`
+		words: swapped ? NAV.swapped(word) : need ? PANEL.needSays : null
 	};
+}
+
+/** A narrowed answer kept on screen while the next lands, less any free agent the fresher answer has
+ * on the member's roster (claimed since): he is never listed as free and as his at once. */
+export function withoutRostered<T extends Pick<WaiverAdvice, 'rows' | 'stash'>>(
+	answer: T,
+	roster: readonly { player: { host_id: string } }[]
+): T {
+	const mine = new Set(roster.map((l) => l.player.host_id));
+	if (mine.size === 0) return answer;
+	const free = (r: WaiverAdvice['rows'][number]): boolean => !mine.has(r.add.player.host_id);
+	return { ...answer, rows: answer.rows.filter(free), stash: answer.stash?.filter(free) };
 }
 
 /** The list's order the toggle sets: the season Gain (the table's default) or this week's Proj. */

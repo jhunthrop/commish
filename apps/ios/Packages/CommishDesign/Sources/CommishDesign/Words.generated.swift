@@ -446,6 +446,19 @@ public enum Words {
         public static let tradesNeeds = "The Trades screen's needs are by starting slot."
     }
 
+    public enum WaiverNav {
+        public static let all = "All"
+        public static let freeAgents = "free agents"
+        public static let beat = "beat yours"
+        public static let every = "Every position"
+        public static let pickup = "Pickup"
+        public static let figuresFor = "Figures for"
+        public static let weekTag = "this week"
+        public static let waits = "Ranks once this week's Proj is read."
+        public static let allHead = "Every free agent we rank"
+        public static let allSays = "Pick a position to set them against your players there."
+    }
+
     public enum Season {
         public static let perGame = "A game"
         public static let gain = "Gain"

@@ -282,9 +282,10 @@
 			>
 		</tr>
 	</thead>
-	{#if compare}
+	{#if compare && compare.rows.length > 0}
 		<!-- The member's players at the chosen position, then the free agents there (Lane 305): their
-		     Beats cell holds their role, so a free agent's Beats reads against the row above. -->
+		     Beats cell holds their role, so a free agent's Beats reads against the row above. Each head
+		     only over rows of its own; no free agent says so in the empty row (review 305 L1). -->
 		<tbody>
 			<tr class="group"><th colspan={COLUMNS} scope="rowgroup">{compare.yours}</th></tr>
 		</tbody>
@@ -307,6 +308,8 @@
 				</BoxLine>
 			{/each}
 		</tbody>
+	{/if}
+	{#if compare && rows.length > 0}
 		<tbody>
 			<tr class="group free-at"><th colspan={COLUMNS} scope="rowgroup">{compare.free}</th></tr>
 		</tbody>

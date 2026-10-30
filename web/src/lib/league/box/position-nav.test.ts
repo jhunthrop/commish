@@ -14,8 +14,11 @@ import {
 	navSort,
 	navStanding,
 	openingKey,
+	withoutRostered,
 	yoursRows
 } from './position-nav.ts';
+import { BOX } from './box.ts';
+import { PANEL } from './positions.ts';
 import { DEFAULT_SORT } from './waivers.ts';
 
 type Card = components['schemas']['WaiverPositionCard'];
@@ -152,8 +155,18 @@ void test('K and D/ST never read "--" on Rest of season: this week, said so, or 
 	const kicker = cards.find((c) => c.key === 'K');
 	assert.ok(kicker);
 	assert.equal(kicker.waits, NAV.waits);
+	assert.equal(kicker.place, null);
+	assert.equal(kicker.figure, null);
 	assert.deepEqual(navStanding(def, 'week'), { standing: def.week, swapped: false });
-	assert.equal(navLead(advice, 'DEF', 'season').words.includes(NAV.swapped('D/ST')), true);
+	assert.equal(navLead(advice, 'DEF', 'season').words, NAV.swapped('D/ST'));
+	// No card, on either toggle, prints a bare "--" in any field.
+	for (const mode of ['season', 'week'] as const) {
+		for (const c of navCards(advice, mode, counts, new Map())) {
+			for (const field of [c.place, c.figure, c.foot, c.tag, c.waits]) {
+				assert.notEqual(field, BOX.none, `${c.key} on ${mode}`);
+			}
+		}
+	}
 });
 
 void test('This week reads every card on the week and marks no Need', () => {
@@ -205,14 +218,32 @@ void test('an answer without the panel still navigates by its rows', () => {
 		]
 	);
 	assert.deepEqual(navLead({}, ALL, 'season'), { head: NAV.allHead, words: NAV.allSays });
+	// A position chosen without the panel is named, never told to pick a position.
+	assert.deepEqual(navLead({}, 'TE', 'season'), { head: 'TE', words: null });
+});
+
+void test('a kept narrowed answer never lists a player the fresher roster holds', () => {
+	const kept = { rows: [taylor, jones], stash: [taylor] };
+	const after = withoutRostered(kept, [otton, taylor.add]);
+	assert.deepEqual(
+		after.rows.map((r) => r.add.player.name),
+		['Daniel Jones']
+	);
+	assert.deepEqual(after.stash, []);
+	assert.equal(withoutRostered(kept, []), kept);
 });
 
 void test('the lead says the rank and the Need in words the guard passes', () => {
 	const lead = navLead(advice, 'TE', 'season');
 	assert.equal(lead.head, 'TE rank 9 of 12');
-	assert.match(lead.words, /^141\.0 against a 155\.6 median\. Rank is your starters'/);
+	// The card prints the figure, the median and the rank's meaning is the toggle's: the lead adds
+	// only the Need's meaning, and nothing at all once the card has no Need.
+	assert.equal(lead.words, PANEL.needSays);
+	assert.equal(navLead(advice, 'QB', 'week').words, null);
+	assert.equal(navLead(advice, 'K', 'season').words, null);
 	const words = [
-		lead.words,
+		NAV.figuresFor,
+		NAV.firstRead('TE'),
 		NAV.all,
 		NAV.freeAgents,
 		NAV.beat,

@@ -6,13 +6,16 @@
 // its comparison (the member's players over the free agents, Add on the free agents), the chosen card
 // is pressed and in view on a phone (one row of cards), a card chooses its position, the toggle changes
 // the cards, and the strip's pickup at the chosen position marks its row. Prints the taps from landing
-// to an add.
+// to an add. Then (review 305 H2) the answer a minute later holds a free agent at the chosen position on
+// the member's roster, claimed since: the list reads again and lists him as the member's alone. On a
+// phone the row shows a part of a card at its edge (it scrolls), the lead says the rank alone and the
+// comparison's first row clears the pinned verb (M3, M5).
 //
 //   node scripts/waiver-nav-shots.ts [web origin] [out dir, from scripts/]
 // with the site built against PUBLIC_API_URL at the fixture API (API_ORIGIN, default 8799), started
 // with FIXTURE_CLOCK on the fixture week's clock.
 import { mkdir } from 'node:fs/promises';
-import { chromium, type BrowserContext, type Page } from 'playwright';
+import { chromium, type BrowserContext, type Page, type Route } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { PANEL } from '../src/lib/league/box/positions.ts';
 import { LINES } from '../src/lib/league/inseason/words.ts';
@@ -84,6 +87,8 @@ interface CardSeen {
 	top: number;
 	pressed: boolean;
 	inView: boolean;
+	/** Cut by the row's left or right edge: a phone's row says it scrolls. */
+	partial: boolean;
 }
 
 function cardsSeen(page: Page): Promise<CardSeen[]> {
@@ -97,7 +102,11 @@ function cardsSeen(page: Page): Promise<CardSeen[]> {
 				text: (c as HTMLElement).innerText,
 				top: Math.round(r.top),
 				pressed: c.getAttribute('aria-pressed') === 'true',
-				inView: box !== undefined && r.left >= box.left - 1 && r.right <= box.right + 1
+				inView: box !== undefined && r.left >= box.left - 1 && r.right <= box.right + 1,
+				partial:
+					box !== undefined &&
+					((r.left < box.left - 1 && r.right > box.left + 1) ||
+						(r.left < box.right - 1 && r.right > box.right + 1))
 			};
 		});
 	}, NAV);
@@ -114,6 +123,109 @@ function comparison(page: Page): Promise<{ yours: number; free: number; named: n
 			named: table?.querySelectorAll('tbody:not(.yours) tr.moved-in').length ?? 0
 		};
 	});
+}
+
+/** On a phone: whether the lead says more than its head, and where the comparison's first row ends
+ * against the pinned verb's top. */
+function phoneFold(
+	page: Page
+): Promise<{ leadWords: boolean; rowTop: number; rowBottom: number; pinTop: number }> {
+	return page.evaluate(() => {
+		const words = document.querySelector<HTMLElement>('[data-lead] span');
+		// Hidden whole on a phone where the chosen card says it, or its words hidden.
+		const row = document
+			.querySelector('table.pool tbody.yours tr, table.pool tbody:not(.yours) tr[data-player]')
+			?.getBoundingClientRect();
+		const pin = [...document.querySelectorAll<HTMLElement>('.pin')]
+			.find((p) => p.offsetParent !== null)
+			?.getBoundingClientRect();
+		return {
+			leadWords: words !== null && words.offsetParent !== null,
+			rowTop: row?.top ?? Infinity,
+			rowBottom: row?.bottom ?? Infinity,
+			pinTop: pin?.top ?? innerHeight
+		};
+	});
+}
+
+interface Line {
+	player: { host_id: string; board_id: string; position: string };
+}
+interface Answer {
+	rows: { add: Line }[];
+	stash?: { add: Line }[];
+	roster: Line[];
+	positions?: { position: string; mine: unknown[] }[];
+}
+
+/** The answer as if the member had claimed `boardId` since: off the free agents, on his roster and on
+ * his card's players. */
+function claimed(answer: Answer, boardId: string): Answer {
+	const his = answer.rows.find((r) => r.add.player.board_id === boardId)?.add;
+	if (his === undefined) return answer;
+	const free = (r: { add: Line }): boolean => r.add.player.board_id !== boardId;
+	return {
+		...answer,
+		rows: answer.rows.filter(free),
+		stash: answer.stash?.filter(free),
+		roster: [...answer.roster, his],
+		positions: answer.positions?.map((c) =>
+			c.position === his.player.position
+				? {
+						...c,
+						mine: [
+							...c.mine,
+							{
+								line: his,
+								starter: false,
+								starts_this_week: false,
+								rest_of_season_points: null
+							}
+						]
+					}
+				: c
+		)
+	};
+}
+
+/** H2: a free agent at the chosen position claimed since; the minute's read (the page's clock moved a
+ * minute on) brings an answer with him on the roster, and the chosen position's list reads again. */
+async function claimedSince(page: Page, where: string): Promise<void> {
+	const id = await page
+		.locator('table.pool tbody:not(.yours) tr[data-player]')
+		.first()
+		.getAttribute('data-player');
+	if (id === null) {
+		fault(where, 'no free agent to claim');
+		return;
+	}
+	const answers = '**/leagues/attached/*/waivers*';
+	const swap = async (route: Route): Promise<void> => {
+		const response = await route.fetch();
+		const body = (await response.json()) as { data: Answer | null };
+		const data = body.data === null ? null : claimed(body.data, id);
+		await route.fulfill({ response, json: { ...body, data } });
+	};
+	await page.route(answers, swap);
+	await page.clock.fastForward(60_000);
+	const settled = await page
+		.waitForFunction(
+			(player) => {
+				const mine = document.querySelector(`table.pool tbody.yours tr[data-player="${player}"]`);
+				const free = document.querySelector(
+					`table.pool tbody:not(.yours) tr[data-player="${player}"]`
+				);
+				return mine !== null && free === null;
+			},
+			id,
+			{ timeout: READY_TIMEOUT_MS }
+		)
+		.then(
+			() => true,
+			() => false
+		);
+	if (!settled) fault(where, `the claimed ${id} is not his alone after the minute's read`);
+	await page.unrouteAll({ behavior: 'wait' });
 }
 
 async function settle(page: Page): Promise<void> {
@@ -146,6 +258,24 @@ for (const [theme, width] of SHOTS) {
 		if (!/rank \d+ of \d+|free agents|Ranks once/i.test(c.text)) {
 			fault(where, `a card without its rank, count or wait: ${c.text.replace(/\n/g, ' ')}`);
 		}
+		if (c.text.includes('--')) fault(where, `a card prints "--": ${c.text.replace(/\n/g, ' ')}`);
+	}
+	if (width === 390 && !cards.some((c) => c.partial)) {
+		fault(where, 'no card shows in part at the row edge, so nothing says the row scrolls');
+	}
+	if (width === 390) {
+		const phone = await phoneFold(page);
+		if (phone.leadWords) fault(where, 'the lead says more than the rank on a phone');
+		// The comparison starts above the pinned verb: its first row begins in view at landing.
+		if (phone.rowTop > phone.pinTop) {
+			fault(
+				where,
+				`the comparison's first row starts ${phone.rowTop.toFixed(0)} px, under the pin at ${phone.pinTop.toFixed(0)} px`
+			);
+		}
+		process.stdout.write(
+			`${where}: comparison's first row ${phone.rowTop.toFixed(0)}-${phone.rowBottom.toFixed(0)} px, pin at ${phone.pinTop.toFixed(0)} px\n`
+		);
 	}
 	const opened = cards.find((c) => c.pressed);
 	if (opened?.key !== OPENS_ON)
@@ -172,6 +302,7 @@ for (const [theme, width] of SHOTS) {
 	const verb = page.locator('table.pool .go button');
 	if ((await verb.count()) === 0) fault(where, 'the Add opened no verb');
 	await shoot(page, `after-${tag}-qb-add`);
+	await claimedSince(page, where);
 	await page.locator(`${NAV} [data-card="DEF"]`).click();
 	await settle(page);
 	await check(page, `${where} D/ST`);

@@ -9,7 +9,7 @@
 	import { positionWord } from '../box/box.ts';
 	import PickupStrip from '../box/PickupStrip.svelte';
 	import PositionNav from '../box/PositionNav.svelte';
-	import { panelHasWeek, type PanelMode } from '../box/positions.ts';
+	import { PANEL, panelHasWeek, type PanelMode } from '../box/positions.ts';
 	import {
 		ALL,
 		atPosition,
@@ -19,6 +19,7 @@
 		navLead,
 		navSort,
 		openingKey,
+		withoutRostered,
 		yoursRows,
 		type NavKey
 	} from '../box/position-nav.ts';
@@ -75,7 +76,7 @@
 	} from './move.ts';
 	import { Narrowing } from './state.ts';
 	import { NOT_FREE, POSITION_PARAM, askedPlayer, markAsked } from '../box/asked.ts';
-	import { onMount, tick } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { LINES } from './words.ts';
 	import { page } from '$app/state';
 	import type { BoxRow } from '../box/box.ts';
@@ -164,8 +165,11 @@
 	/** What the platform verb said, once pressed. */
 	let copied = $state<CopiedLine | null>(null);
 
-	/** The chosen position's rows from the first answer until its own read lands. */
-	const shown = $derived(narrowed ?? atPosition(advice, position ?? ALL));
+	/** The chosen position's rows from the first answer until its own read lands; its own read kept
+	 * while the next lands, less anyone the fresher answer has on the member's roster (review 305 H2). */
+	const shown = $derived(
+		narrowed ? withoutRostered(narrowed, advice.roster) : atPosition(advice, position ?? ALL)
+	);
 	/** "Week 7 projections expected Thursday.", over the table while the week has no Proj (Lane 95). */
 	const arrives = $derived(arrivesPart(shown, addressedWeek(shown), memberZone()));
 	/** Every free agent of the first answer, the All card's counts. */
@@ -351,12 +355,50 @@
 		const outcome = await narrowing.choose(next);
 		if (outcome.kind === 'overtaken') return;
 		reading = false;
-		if (outcome.kind === 'answer') {
-			narrowedAt = Date.now();
-			narrowed = outcome.answer;
-		}
+		if (outcome.kind === 'answer') land(outcome.answer);
 		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
+
+	/** A position's own answer on screen, drawn at the instant it was read. */
+	function land(answer: WaiverAdvice): void {
+		narrowedAt = Date.now();
+		narrowed = answer;
+	}
+
+	/** The line a failed top-up leaves, so a later top-up that lands takes only its own line away. */
+	let toppedProblem: string | null = null;
+
+	/** The chosen position read again without dimming its rows or closing an open Add: on landing,
+	 * its rows from the first answer already listed (review 305 M6), and whenever the page's answer is
+	 * replaced, after a claim and on the minute's read, so the list is never older than the cards and
+	 * the member's players (H2). A failed top-up keeps the first answer's rows and says so briefly. */
+	async function topUp(key: WaiverPosition, base: WaiverAdvice): Promise<void> {
+		const outcome = await narrowing.choose(key);
+		// Overtaken by a tap, a later answer's own top-up, or the card moved on: theirs to draw.
+		if (outcome.kind === 'overtaken' || position !== key || advice !== base) return;
+		// It may have overtaken a tapped read of the same position: it answers for that one too.
+		reading = false;
+		if (outcome.kind === 'answer') {
+			land(outcome.answer);
+			if (problem !== null && problem === toppedProblem) problem = null;
+			toppedProblem = null;
+			return;
+		}
+		if (outcome.kind === 'failed') {
+			narrowed = null;
+			toppedProblem = NAV.firstRead(positionWord(key));
+			problem = toppedProblem;
+		}
+	}
+
+	/** Each answer the page reads (the first one too) tops the chosen position's list up. A player page's
+	 * named player (?player=) takes the landing over in onMount, overtaking the first top-up. */
+	$effect(() => {
+		const answer = advice;
+		untrack(() => {
+			if (position !== null) void topUp(position, answer);
+		});
+	});
 
 	/** Another row's drops or another card: the last copy's confirm is for neither (review 66f L6). */
 	function toggle(row: PoolRow): void {
@@ -379,11 +421,8 @@
 	 * in, and is marked and brought into view. */
 	onMount(async () => {
 		const asked = askedPlayer(window.location.href);
-		// The opening card's own read: every free agent at the weakest Need.
-		if (asked === null) {
-			if (position !== null) await choose(position);
-			return;
-		}
+		// The opening card's own read is the first top-up's (the effect above).
+		if (asked === null) return;
 		// A named player: every position first, his own where the first answer does not hold him.
 		await choose(null);
 		const his = (): PoolRow | undefined => pool.find((r) => r.source.add.player.board_id === asked);
@@ -494,6 +533,18 @@
 	/>
 {/snippet}
 
+<!-- The search: in the filters row at a desk, in the cards' head on a phone (one drawn at a time). -->
+{#snippet search()}
+	<label class="search"
+		><Icon name="search" size={16} /><input
+			type="search"
+			placeholder={WAIVERS.find}
+			aria-label={WAIVERS.find}
+			bind:value={query}
+		/></label
+	>
+{/snippet}
+
 {#snippet cardVerb(c: PickupCard, lead: boolean)}
 	<StripAction {lead} size="sm" onclick={() => act(c.source)}>{verbWords(c.source)}</StripAction>
 {/snippet}
@@ -553,17 +604,14 @@
 		week={panelHasWeek(advice)}
 		onmode={chooseMode}
 		controls={COMPARE_ID}
+		phoneTools={search}
 	/>
-	<p class="lead" data-lead><b>{lead.head}</b> <span>{lead.words}</span></p>
+	<p class="lead" class:all={navKey === ALL} data-lead>
+		<b>{lead.head}</b>{#if lead.words}
+			<span>{lead.words}</span>{/if}
+	</p>
 	<div class="filters">
-		<label class="search"
-			><Icon name="search" size={16} /><input
-				type="search"
-				placeholder={WAIVERS.find}
-				aria-label={WAIVERS.find}
-				bind:value={query}
-			/></label
-		>
+		{@render search()}
 		<span class="count">{countWords(pool, host)}</span>
 	</div>
 	{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
@@ -582,7 +630,7 @@
 			chosen={drop?.key ?? null}
 			onchoose={(d: DropRow) => (chosenDrop = d.key)}
 			{go}
-			empty={WAIVERS.noneFound}
+			empty={compare && query === '' ? PANEL.noneFree : WAIVERS.noneFound}
 			{stash}
 			{stashLine}
 			onstash={(entry: PoolRow) => openPlatform(entry.source)}
@@ -683,15 +731,26 @@
 	}
 
 	@media (max-width: 760px) {
-		.filters {
-			gap: var(--s-2);
+		/* The chosen card says its rank, figure, median and Need, drawn solid over the comparison: on
+		   a phone the line repeating it gives way to the comparison (review 305 M5). All keeps its
+		   head, the one card whose list is not a comparison. */
+		.lead:not(.all) {
+			display: none;
+		}
+
+		.lead span {
+			display: none;
 		}
 
 		.search {
-			flex: 1 1 100%;
+			flex: 1 1 auto;
+			min-width: 0;
+			gap: 6px;
+			padding: 0 var(--s-2);
 		}
 
-		.count {
+		/* The search sits in the cards' head on a phone, the count is a desk's: the row gives way. */
+		.filters {
 			display: none;
 		}
 

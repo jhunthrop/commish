@@ -919,6 +919,7 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 			proj: rows.map((tr) => text(tr.querySelector('td.proj') ?? tr)),
 			rest: rows.map((tr) => tr.querySelector('td.rest')?.textContent.trim() ?? ''),
 			tinted: rows.filter((tr) => tr.classList.contains('moved-in')).length,
+			stripCards: pickups.length,
 			cards:
 				word === 'All'
 					? pickups.length
@@ -941,6 +942,9 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 	if (width > EVIDENCE_FOLDS_AT && !seen.rest.every((n) => BOX_NUMBER.test(n)))
 		faults.push(`rest of season ${seen.rest.join(' ')}`);
 	if (width <= EVIDENCE_FOLDS_AT && !seen.phoneRest) faults.push('no A game under a name');
+	// The strip draws its pickups whatever card is chosen (review 305 L6), and the table tints each one
+	// at the chosen position.
+	if (seen.stripCards === 0) faults.push('the strip draws no pickup');
 	if (seen.tinted !== seen.cards)
 		faults.push(`${String(seen.tinted)} rows tinted for ${String(seen.cards)} cards`);
 	if (

@@ -1,0 +1,18 @@
+{
+	"all": "All",
+	"freeAgents": "free agents",
+	"beat": "beat yours",
+	"every": "Every position",
+	"pickup": "Pickup",
+	"figuresFor": "Figures for",
+	"weekTag": "this week",
+	"waits": "Ranks once this week's Proj is read.",
+	"allHead": "Every free agent we rank",
+	"allSays": "Pick a position to set them against your players there.",
+	"functions": [
+		"yours",
+		"freeAt",
+		"swapped",
+		"firstRead"
+	]
+}

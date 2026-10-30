@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import { PANEL, type PanelMode } from './positions.ts';
@@ -19,17 +20,21 @@
 		onmode: (mode: PanelMode) => void;
 		/** The id of the comparison the cards control. */
 		controls: string;
+		/** Drawn in the label's place on a phone (the screen's search), so the comparison starts above
+		 * the pinned verb (review 305 M5); the screen draws its own at a desk. */
+		phoneTools?: Snippet;
 	}
 
-	let { cards, chosen, onchoose, mode, week, onmode, controls }: Props = $props();
+	let { cards, chosen, onchoose, mode, week, onmode, controls, phoneTools }: Props = $props();
 
 	let row = $state<HTMLElement | undefined>();
 
-	/** The chosen card scrolled into the row's view, the page never moved (a phone's sideways row). */
+	/** The chosen card scrolled into the row's view, the page never moved (a phone's sideways row).
+	 * The row is the cards' offset parent (position: relative), so a card's offsetLeft is its own. */
 	$effect(() => {
 		const el = row?.querySelector<HTMLElement>(`[data-card="${chosen}"]`);
 		if (row === undefined || el === null || el === undefined) return;
-		const left = el.offsetLeft - row.offsetLeft;
+		const left = el.offsetLeft;
 		const right = left + el.offsetWidth;
 		if (left < row.scrollLeft) row.scrollTo({ left });
 		else if (right > row.scrollLeft + row.clientWidth) {
@@ -41,14 +46,17 @@
 <section class="nav" aria-label={PANEL.label} data-nav="positions">
 	<div class="head">
 		<span class="label">{PANEL.label}</span>
+		<!-- The rank's meaning, once a mode, not once a card (review 305 M5). -->
+		<span class="explain">{PANEL.explain[mode]}</span>
 		{#if week}
-			<ChipGroup label={PANEL.label}>
+			<ChipGroup label={NAV.figuresFor}>
 				<Chip size="sm" pressed={mode === 'season'} onclick={() => onmode('season')}
 					>{PANEL.season}</Chip
 				>
 				<Chip size="sm" pressed={mode === 'week'} onclick={() => onmode('week')}>{PANEL.week}</Chip>
 			</ChipGroup>
 		{:else}<span class="basis">{PANEL.season}</span>{/if}
+		{#if phoneTools}<span class="tools">{@render phoneTools()}</span>{/if}
 	</div>
 	<div class="cards" bind:this={row}>
 		{#each cards as card (card.key)}
@@ -66,7 +74,7 @@
 					><b class="pos">{card.word}</b>{#if card.pickup}<span class="pickup">{NAV.pickup}</span
 						>{/if}</span
 				>
-				<span class="place">{card.place}</span>
+				{#if card.place !== null}<span class="place">{card.place}</span>{/if}
 				{#if card.waits}
 					<span class="waits">{card.waits}</span>
 				{:else}
@@ -103,6 +111,17 @@
 		gap: var(--s-3);
 	}
 
+	.explain {
+		flex: 1;
+		min-width: 0;
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+	}
+
+	.tools {
+		display: none;
+	}
+
 	.label {
 		font-size: var(--t-xs);
 		font-weight: 700;
@@ -118,6 +137,7 @@
 	}
 
 	.cards {
+		position: relative;
 		display: grid;
 		grid-auto-flow: column;
 		grid-auto-columns: minmax(0, 1fr);
@@ -147,9 +167,17 @@
 			transform 80ms;
 	}
 
-	.card:hover {
-		border-color: var(--ink-3);
-		background: var(--surface-2);
+	/* Hover only where a pointer hovers: on touch it would stick after the tap. */
+	@media (hover: hover) {
+		.card:hover {
+			border-color: var(--ink-3);
+			background: var(--surface-2);
+		}
+
+		.card.on:hover {
+			background: var(--ink);
+			border-color: var(--ink);
+		}
 	}
 
 	.card:active {
@@ -166,11 +194,6 @@
 		background: var(--ink);
 		border-color: var(--ink);
 		color: var(--bg);
-	}
-
-	.card.on:hover {
-		background: var(--ink);
-		border-color: var(--ink);
 	}
 
 	.on .need {
@@ -306,6 +329,13 @@
 		color: color-mix(in srgb, var(--bg) 78%, var(--ink));
 	}
 
+	/* The Pickup mark on the solid card: the accent itself under the card's own ground, so it reads
+	   at contrast in both themes (review 305 M4). */
+	.on .pickup {
+		background: var(--accent);
+		color: var(--accent-ink);
+	}
+
 	.on .meter {
 		background: color-mix(in srgb, var(--bg) 30%, var(--ink));
 	}
@@ -315,11 +345,61 @@
 	}
 
 	@media (max-width: 760px) {
-		/* One row scrolled sideways inside the nav, the page never. */
+		/* One row scrolled sideways inside the nav, the page never: three cards and a part of the
+		   fourth show, so the row says it scrolls (review 305 M3). The padding keeps a focused card's
+		   ring inside the scroller, the negative margins keep the cards on the page's edge (L4). */
 		.cards {
-			grid-auto-columns: 7rem;
+			grid-auto-columns: calc((100% - 3 * var(--s-2)) / 3.4);
 			overflow-x: auto;
 			scrollbar-width: none;
+			margin: -4px -4px 0;
+			padding: 4px 4px 8px;
+			scroll-padding: 0 4px;
+		}
+
+		/* The figure's words wrap under it rather than cut (L2); a Need stays beside the figure, a
+		   size down, so every card keeps one height. */
+		.figs {
+			flex-wrap: wrap;
+		}
+
+		.need {
+			padding: 0 4px;
+		}
+
+		.explain {
+			display: none;
+		}
+
+		/* The search in the label's place, the toggle after it: one row (review 305 M5). */
+		.head:has(.tools) .label {
+			display: none;
+		}
+
+		.tools {
+			display: flex;
+			flex: 1;
+			min-width: 0;
+			order: -1;
+		}
+
+		/* A phone's cards, compact so the comparison starts above the pinned verb (review 305 M5):
+		   the position word and the figure a size down, the median beside the meter's tick. */
+		.card {
+			padding: 6px var(--s-2);
+			gap: 0;
+		}
+
+		.pos {
+			font-size: var(--t-lg);
+		}
+
+		.figure {
+			font-size: var(--t-md);
+		}
+
+		.meter {
+			margin: 4px 0 2px;
 		}
 	}
 </style>
