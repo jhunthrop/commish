@@ -76,12 +76,24 @@ data class WaiverUi(
     val problem: String? = null,
     val sort: WaiverSort = WaiverSort.Initial,
     val query: String = "",
+    /** The position panel's figures and its open card, by position (none open at first). */
+    val panelMode: PanelMode = PanelMode.Season,
+    val openCard: String? = null,
 ) {
     val loaded: WaiverState.Loaded? get() = state as? WaiverState.Loaded
     val model: WaiverModel? get() = loaded?.model
 
     /** The table as the sort and the search draw it, empty before an answer. */
     val table: WaiverTable get() = model?.table(sort, query) ?: WaiverTable.Empty
+
+    /** The position panel's cards in the toggle's figures, none before an answer or from one without it. */
+    val panel: List<PanelCard> get() = model?.panel(panelMode).orEmpty()
+
+    /** The card whose list is open, if any. */
+    val openedCard: PanelCard? get() = openCard?.let { key -> panel.firstOrNull { it.key == key } }
+
+    /** Whether the panel's toggle is drawn: the answer reads this week's figures. */
+    val panelHasWeek: Boolean get() = model?.panelHasWeek ?: false
 
     /** The open row, if any. */
     val opened: PoolRow? get() = openRow?.let { key -> model?.rows?.firstOrNull { it.key == key } }

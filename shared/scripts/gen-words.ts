@@ -69,7 +69,8 @@ const SHEET_MODULE = "web/src/lib/sheet/words.ts";
  * Matchup's (Lane 183): the words beside its box scores; then the Board's (Lane 182): its chips and heads,
  * its formats' chips, the Gap's definition, and the season pages' verbs; then the run's board on the Board
  * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word; then the
- * Waivers' (Lane 186): its table, strip and drop panel, the heads' basis, the Stash group, the season
+ * Waivers' (Lane 186): its table, strip and drop panel, the heads' basis, the Stash group, the
+ * position panel's (Lane 291 on the web, Lane 304 in the apps), the season
  * figures' heads and the strip's mark; then the Trades' (Lane 189): the trade table's words, the
  * picker's first choice and the close call's chip, the builder's lines and the builder-first screen's
  * own (Lane 289: its ideas row, its roster switch, its team choice); then the player sheet's
@@ -326,6 +327,12 @@ export const TABLES: readonly TableSource[] = [
     module: WAIVERS_MODULE,
     picks: ["STASH"],
     json: "shared/words/league-stash.json",
+  },
+  {
+    name: "WaiverPanel",
+    module: "web/src/lib/league/box/positions.ts",
+    picks: ["PANEL"],
+    json: "shared/words/league-waiver-panel.json",
   },
   {
     name: "Season",
@@ -835,6 +842,26 @@ ${kotlin}
   };
 }
 
+const isStringTable = (
+  value: unknown,
+): value is Readonly<Record<string, string>> =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  Object.keys(value).length > 0 &&
+  Object.values(value).every((item) => typeof item === "string");
+
+/** A member that is a table of strings (the position panel's `explain: { season, week }`) as one
+ * string member each, keyed by the member's key and the string's (`explainSeason`, `explainWeek`);
+ * any other member as it is. */
+function flattened([key, value]: [string, unknown]): [string, unknown][] {
+  if (!isStringTable(value)) return [[key, value]];
+  return Object.entries(value).map(([inner, text]): [string, unknown] => [
+    `${key}${inner.charAt(0).toUpperCase()}${inner.slice(1)}`,
+    text,
+  ]);
+}
+
 /** One table from a module's exports by its picks, or an error naming the export that is missing,
  * not the kind its pick says, or a key given twice. */
 export function gather(
@@ -858,7 +885,7 @@ export function gather(
       throw new Error(
         `${where} ${exportName} is a ${typeof value}, not a table.`,
       );
-    return Object.entries(value);
+    return Object.entries(value).flatMap(flattened);
   });
   const twice = entries.find(
     ([key], i) => entries.findIndex(([other]) => other === key) !== i,

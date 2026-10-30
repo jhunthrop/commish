@@ -379,6 +379,86 @@ class WaiverParityTest {
         assertNotNull(model("DEF").table().rows.firstOrNull())
     }
 
+    /** The position panel's card as the web's JSON writes it (positions.ts, Lane 291). */
+    private fun webCard(card: JsonObject): List<Any?> =
+        listOf(
+            card.text("key"),
+            card.text("rank"),
+            card.text("figure"),
+            card.text("median"),
+            card.text("need"),
+            card
+                .getValue(
+                    "mine",
+                ).jsonArray
+                .map { it.jsonObject }
+                .map { listOf(it.text("name"), it.text("team"), it.text("mark"), it.text("figure")) },
+            card.getValue("free").jsonArray.map { it.jsonObject }.map { free ->
+                listOf("key", "name", "team", "mark", "figure", "beats", "verb", "move").map { free.text(it) }
+            },
+        )
+
+    /** The same from the port. */
+    private fun portCard(
+        card: PanelCard,
+        model: WaiverModel,
+    ): List<Any?> =
+        listOf(
+            card.key,
+            card.rank,
+            card.figure,
+            card.median,
+            if (card.need) Words.WaiverPanel.need else null,
+            card.mine.map { listOf(it.name, it.team, it.mark, it.figure) },
+            card.free.map {
+                listOf(
+                    it.key,
+                    it.name,
+                    it.team,
+                    it.mark,
+                    it.figure,
+                    it.beats,
+                    Words.InSeason.add,
+                    it.pool?.let { pool ->
+                        model.panelVerb(pool.source)
+                    },
+                )
+            },
+        )
+
+    @ParameterizedTest
+    @MethodSource("screens")
+    fun `the position panel is the web's`(name: String) {
+        val panel = web(name).obj("panel")
+        val model = model(name)
+        if (panel == null) {
+            assertTrue(model.panel(PanelMode.Season).isEmpty())
+            assertFalse(model.panelHasWeek)
+            return
+        }
+        val week = panel.obj("week")
+        assertEquals(week != null, model.panelHasWeek)
+        listOfNotNull(PanelMode.Season to panel.getValue("season").jsonObject, week?.let { PanelMode.Week to it }).forEach { (mode, web) ->
+            val cards = model.panel(mode)
+            assertEquals(web.getValue("cards").jsonArray.map { webCard(it.jsonObject) }, cards.map { portCard(it, model) }, "$name $mode")
+            assertEquals(web.text("explain"), WaiverPanel.explain(mode, cards))
+        }
+    }
+
+    @Test
+    fun `the panel's states are each in the fixture`() {
+        val panels = screens().mapNotNull { web(it).obj("panel") }
+        val cards =
+            panels.flatMap { listOfNotNull(it.obj("season"), it.obj("week")) }.flatMap { mode ->
+                mode.getValue("cards").jsonArray.map { it.jsonObject }
+            }
+        assertTrue(cards.any { it.text("median") == null && it.text("rank").orEmpty().endsWith(Words.Box.none) })
+        assertTrue(cards.any { it.getValue("free").jsonArray.isEmpty() })
+        assertTrue(cards.any { it.text("need") != null })
+        assertTrue(panels.any { it.obj("week") == null } && panels.any { it.obj("week") != null })
+        assertTrue(screens().any { web(it).obj("panel") == null })
+    }
+
     companion object {
         /** The game cell's place in the Lineup parity's row order (ParityRows.kt rowOf). */
         private const val GAME_CELL = 11

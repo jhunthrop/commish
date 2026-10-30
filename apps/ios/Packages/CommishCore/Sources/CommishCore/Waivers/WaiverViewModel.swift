@@ -36,6 +36,9 @@ public final class WaiverViewModel {
     /// The table's sort and search.
     public internal(set) var sort: WaiverSort = .initial
     public internal(set) var query = ""
+    /// The position panel's figures and its open card, by position (none open at first).
+    public internal(set) var panelMode: PanelMode = .season
+    public internal(set) var openCard: String?
     /// The chosen position's own read and its instant, which its rows draw at (WaiverScreen's narrowedAt).
     var narrowed: (advice: WaiverAdvice, at: Date)?
     /// Which position read is the latest: an earlier one's answer is overtaken (state.ts Narrowing).
@@ -151,36 +154,6 @@ public final class WaiverViewModel {
         )
     }
 
-    /// The bid field while the claim is confirmed or sent, where the league bids.
-    var bidField: BidField? {
-        let showing = switch step {
-        case .confirm, .sending: true
-        default: false
-        }
-        guard showing, let bid else {
-            return nil
-        }
-        let sending = if case .sending = step {
-            true
-        } else {
-            false
-        }
-        return BidField(
-            label: WaiverWords.bidLabel(bid), typed: typed,
-            problem: WaiverWords.bidProblem(platform, typed: typed, bid: bid), editable: !sending
-        )
-    }
-
-    /// The verb makes only the claim the sentence names: it waits while the claim is planned again, and
-    /// while the bid typed is not the one planned or is one the league does not take.
-    var waits: Bool {
-        guard let bid else {
-            return replanning
-        }
-        return replanning || WaiverWords.bidProblem(platform, typed: typed, bid: bid) != nil
-            || WaiverWords.bidValue(typed.trimmingCharacters(in: .whitespacesAndNewlines)) != bid.amount
-    }
-
     // MARK: reads
 
     /// The saved answer at once on the first open, then the API's; a failed read keeps the answer shown,
@@ -245,7 +218,16 @@ public final class WaiverViewModel {
     /// The verb: the claim planned where it is made from here, else his name copied and the platform's page
     /// opened. Nothing while the answer shown is a saved one or a claim is open.
     public func press(leagueID: String) async {
-        guard case let .loaded(model, _, false) = state, step == .closed, let target else {
+        guard let target else {
+            return
+        }
+        await act(on: target, leagueID: leagueID)
+    }
+
+    /// The one verb on an add (WaiverScreen.svelte act): the claim planned where it is made from here,
+    /// else his name copied and the platform's page opened. Nothing on a saved read or with a claim open.
+    func act(on target: WaiverRow, leagueID: String) async {
+        guard case let .loaded(model, _, false) = state, step == .closed else {
             return
         }
         if model.claimsHere(target) {

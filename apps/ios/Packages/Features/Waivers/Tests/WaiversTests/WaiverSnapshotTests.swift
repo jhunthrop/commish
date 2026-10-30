@@ -14,8 +14,9 @@ import Testing
 /// verb pinned, then the strip with the rows that gain, then the rest with the basis. An add's drop
 /// panel open on ESPN with the pair pinned. The claim on the ESPN stand-ins: confirmed with its bid in
 /// waiver dollars (FAAB), pending with the time ESPN runs it, refused in ESPN's own words, done. And a
-/// saved read with no signal, the verb disabled with its stamp. With SNAPSHOT_SHOTS set each is also
-/// written at its phone's own scale for the persona panel.
+/// saved read with no signal, the verb disabled with its stamp. The position panel (Lane 304): a card open
+/// on the rest of the season, on This week, with no free agent and with no figure. With SNAPSHOT_SHOTS
+/// set each is also written at its phone's own scale for the persona panel.
 @MainActor
 struct WaiverSnapshotTests {
     static let folder = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -45,12 +46,32 @@ struct WaiverSnapshotTests {
         case sorted
         /// A wide receiver past the page's rows reached: the WR chip's read, his name searched.
         case reach
+        /// The position panel's QB card open on the rest of the season: Need, his three, five free agents.
+        case positions
+        /// The toggle on This week, the TE card open: the week's own free agents by Proj.
+        case positionsWeek
+        /// The RB card open: no free agent we list plays there.
+        case positionsEmpty
+        /// The D/ST card open: no rest-of-season figure, so no rank and no median.
+        case positionsDefense
+
+        /// The panel's toggle and its open card in the scene, nil where none is open.
+        var panel: (mode: PanelMode, card: String)? {
+            switch self {
+            case .positions: (.season, "QB")
+            case .positionsWeek: (.week, "TE")
+            case .positionsEmpty: (.season, "RB")
+            case .positionsDefense: (.season, "DEF")
+            default: nil
+            }
+        }
 
         var parts: [Part] {
             switch self {
             case .before: [.phone, .top, .foot]
             case .narrowed, .sorted: [.top]
             case .reach: [.top, .foot]
+            case .positions, .positionsWeek, .positionsEmpty, .positionsDefense: [.positions]
             case .drops: [.panel, .pin]
             case .faab, .pending, .refused, .done: [.pin]
             case .stale: [.phone]
@@ -59,7 +80,8 @@ struct WaiverSnapshotTests {
 
         var league: String {
             switch self {
-            case .before, .narrowed, .sorted, .reach: WaiverSnapshotTests.ffpc
+            case .before, .narrowed, .sorted, .reach, .positions, .positionsWeek, .positionsEmpty,
+                 .positionsDefense: WaiverSnapshotTests.ffpc
             case .refused: WaiverSnapshotTests.espn.refused
             case .done: WaiverSnapshotTests.espn.done
             default: WaiverSnapshotTests.espn.pending
@@ -75,6 +97,8 @@ struct WaiverSnapshotTests {
         case panel
         case foot
         case pin
+        /// The position panel alone, its card open on its list.
+        case positions
     }
 
     struct Case: Sendable {
@@ -135,6 +159,17 @@ struct WaiverSnapshotTests {
             host: .init(value1: espn ? .espn : .ffpc), zone: zone, copy: { _ in }
         )
         await viewModel.load(leagueID: league)
+        await act(scene, on: viewModel, league: league)
+        if let panel = scene.panel {
+            viewModel.choose(panelMode: panel.mode)
+            viewModel.toggle(card: panel.card)
+        }
+        return viewModel
+    }
+
+    /// The scene's state from the loaded screen: a row's drop panel open, the claim pressed, planned and
+    /// made, a position chosen, a head chosen, a name searched.
+    static func act(_ scene: Scene, on viewModel: WaiverViewModel, league: String) async {
         switch scene {
         case .drops:
             if case let .loaded(model, _, _) = viewModel.state, let row = model.gaining.first(where: { !$0.named }) {
@@ -152,10 +187,9 @@ struct WaiverSnapshotTests {
         case .reach:
             await viewModel.choose(position: .wr, leagueID: league)
             viewModel.find("dotson")
-        case .before, .stale:
+        case .before, .stale, .positions, .positionsWeek, .positionsEmpty, .positionsDefense:
             break
         }
-        return viewModel
     }
 
     static func view(_ item: Case) async throws -> some View {
@@ -175,6 +209,11 @@ struct WaiverSnapshotTests {
             filters: FiltersView(
                 positions: model.positions, chosen: viewModel.position, choose: { _ in }, query: viewModel.query,
                 find: { _ in }, problem: viewModel.problem, still: true
+            ),
+            panel: PanelActions(
+                cards: viewModel.panel, mode: viewModel.panelMode, hasWeek: viewModel.panelHasWeek,
+                opened: viewModel.openedCard, choose: { _ in }, toggle: { _ in }, add: { _ in }, open: { _ in },
+                still: true
             )
         )
     }
@@ -206,6 +245,16 @@ struct WaiverSnapshotTests {
         #expect(drops.pin.pair != nil)
         let reach = try await Self.viewModel(.reach)
         #expect(reach.table.rows.map(\.cells.row.name) == ["Jahan Dotson"])
+        let positions = try await Self.viewModel(.positions)
+        #expect(positions.openedCard?.need == true)
+        #expect(positions.openedCard?.free.count == 5)
+        let week = try await Self.viewModel(.positionsWeek)
+        #expect(week.panelMode == .week)
+        #expect(week.openedCard?.rank == "TE rank 12 of 12")
+        let empty = try await Self.viewModel(.positionsEmpty)
+        #expect(empty.openedCard?.free.isEmpty == true)
+        let defense = try await Self.viewModel(.positionsDefense)
+        #expect(defense.openedCard?.median == nil)
         let narrowed = try await Self.viewModel(.narrowed)
         #expect(narrowed.position == .def)
         #expect(narrowed.table.rows.allSatisfy { $0.cells.row.position == "D/ST" })
@@ -227,6 +276,7 @@ struct WaiverMock: View {
     let actions: TableActions
     let chosenCard: String?
     let filters: FiltersView
+    let panel: PanelActions
 
     /// The status bar, the top bar and the tab bar the screen sits between, by phone.
     private var room: Double {
@@ -254,13 +304,17 @@ struct WaiverMock: View {
                 .padding(.vertical, Tokens.Space.s4)
         case .pin:
             WaiverPinView(pin: pin, actions: .none, still: true)
+        case .positions:
+            WaiverPanelView(panel: panel)
+                .padding(.horizontal, Tokens.Space.s3)
+                .padding(.vertical, Tokens.Space.s4)
         }
     }
 
     private func screen(_ part: WaiverPart) -> WaiverPartView {
         WaiverPartView(
             part: part, model: model, stamp: stamp, chosenCard: chosenCard, chooseCard: { _ in }, actions: actions,
-            filters: filters
+            filters: filters, panel: panel
         )
     }
 
