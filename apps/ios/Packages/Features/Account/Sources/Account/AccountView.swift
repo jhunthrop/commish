@@ -136,7 +136,6 @@ struct QuietHoursSheet: View {
 
 private extension View {
     /// The time wheel on the phone; the package's Mac test build has no wheel and takes its default.
-    @ViewBuilder
     func wheelOnPhone() -> some View {
         #if os(iOS)
             datePickerStyle(.wheel)
