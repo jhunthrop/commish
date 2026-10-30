@@ -429,6 +429,23 @@ public enum Words {
         public static let late = "IR and out players back after the regular season are not listed."
     }
 
+    public enum WaiverPanel {
+        public static let label = "Your positions"
+        public static let season = "Rest of season"
+        public static let week = "This week"
+        public static let need = "Need"
+        public static let median = "median"
+        public static let rank = "rank"
+        public static let of = "of"
+        public static let yours = "Yours"
+        public static let free = "Free"
+        public static let noneFree = "No free agent we list plays here."
+        public static let explainSeason = "Rank is your starters' rest of season at the position against the league's."
+        public static let explainWeek = "Rank is your starters' Proj this week at the position against the league's."
+        public static let needSays = "Need: your rest of season at this position is under the league's median."
+        public static let tradesNeeds = "The Trades screen's needs are by starting slot."
+    }
+
     public enum Season {
         public static let perGame = "A game"
         public static let gain = "Gain"

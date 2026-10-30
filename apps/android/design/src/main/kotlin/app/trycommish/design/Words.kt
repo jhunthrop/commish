@@ -431,6 +431,23 @@ object Words {
         const val late = "IR and out players back after the regular season are not listed."
     }
 
+    object WaiverPanel {
+        const val label = "Your positions"
+        const val season = "Rest of season"
+        const val week = "This week"
+        const val need = "Need"
+        const val median = "median"
+        const val rank = "rank"
+        const val of = "of"
+        const val yours = "Yours"
+        const val free = "Free"
+        const val noneFree = "No free agent we list plays here."
+        const val explainSeason = "Rank is your starters' rest of season at the position against the league's."
+        const val explainWeek = "Rank is your starters' Proj this week at the position against the league's."
+        const val needSays = "Need: your rest of season at this position is under the league's median."
+        const val tradesNeeds = "The Trades screen's needs are by starting slot."
+    }
+
     object Season {
         const val perGame = "A game"
         const val gain = "Gain"

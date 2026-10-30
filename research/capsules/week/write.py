@@ -70,6 +70,20 @@ MAX_ASKS_WITH_RETRY: Final = MAX_ASKS_PER_READ + RETRY_WRITER_DRAFTS + RETRY_WRI
 _NO_JUDGE_ASK: Final = "No ask was left for the judge."
 # A five-sentence read and its call run about 180 tokens; the cap leaves room and never cuts an honest read.
 MAX_TOKENS: Final = 600
+# THE WRITER VERSION (Lane 306, the founder 2026-10-30: "why can we not update all player reads at the same
+# time?"). Every stored read records the version that wrote it (`player_week_reads.writer_version`, revision
+# 0026; a row from before it reads as 0), and the next nightly rewrites every written read of the board week
+# below the current version in one pass (`cadence.WRITER`), so the board never mixes writers. Bumping it is the
+# one act that says the writer changed. Bump it for a change to what a read says or how: the prompt, the sheet's
+# lines, the voices, a rule that changes what is written. Leave it for a change that only refuses or rescues
+# reads the same writer would write (a refusal-only bug fix, a normaliser that keeps a read from falling), the
+# judge's or the retry writer's settings, and the cadence or budget.
+# 0: every read stored before revision 0026 and written before the 2026-10-30T05 nightly (the checklist writer).
+# 1: Lane 299's depth-chart and card-rank facts, Lane 300's full summary of every fact on his week, Lane 303's
+#    mechanical rules (refusal side, no bump of its own); first written by the 2026-10-30T05 nightly.
+# 2: Lane 302's decided call: the call is decided in code from his place this week and his status, given to the
+#    writer as a fact to argue, and the read is held to it (start, sit and hold each argued, the place never quoted).
+WEEK_WRITER_VERSION: Final = 2
 
 
 @dataclass(frozen=True, slots=True)

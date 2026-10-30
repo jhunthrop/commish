@@ -1,0 +1,17 @@
+{
+	"label": "Your positions",
+	"season": "Rest of season",
+	"week": "This week",
+	"need": "Need",
+	"median": "median",
+	"rank": "rank",
+	"of": "of",
+	"yours": "Yours",
+	"free": "Free",
+	"noneFree": "No free agent we list plays here.",
+	"explainSeason": "Rank is your starters' rest of season at the position against the league's.",
+	"explainWeek": "Rank is your starters' Proj this week at the position against the league's.",
+	"needSays": "Need: your rest of season at this position is under the league's median.",
+	"tradesNeeds": "The Trades screen's needs are by starting slot.",
+	"functions": []
+}

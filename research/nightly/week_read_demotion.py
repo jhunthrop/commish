@@ -64,6 +64,7 @@ def _demoted(read: StoredWeekRead, block: str, at: datetime) -> StoredWeekRead:
     return StoredWeekRead(
         read.player_id, read.season, read.week, FACTS_SOURCE, block, None, max(at, read.written_at), read.facts_at,
         read.stamps, read.projection_points, read.status, DEMOTED, read.call, read.attempt_day, read.attempts,
+        read.writer_version,
     )  # fmt: skip
 
 

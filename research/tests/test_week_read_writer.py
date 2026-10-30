@@ -27,6 +27,7 @@ from research.capsules.week.cadence import (
     STATUS_CHANGED,
     STATUS_REWRITES_A_DAY,
     UNWRITTEN,
+    WRITER,
     due_reason,
     kept_read,
     status_rewrite_capped,
@@ -50,6 +51,7 @@ from research.capsules.week.write import (
     MAX_ASKS_WITH_RETRY,
     MAX_CALLS_PER_READ,
     OVER_CAP_FALL,
+    WEEK_WRITER_VERSION,
     WeekReadResult,
     write_week_read,
 )
@@ -411,6 +413,7 @@ def _stored(sheet_week: int = 6, **changes: object) -> StoredWeekRead:
         call="start",  # his decided call (Lane 302): Questionable on Friday's report, inside the line
         attempt_day=date(2026, 10, 16),
         attempts=1,
+        writer_version=WEEK_WRITER_VERSION,
     )
     return replace(row, **changes)  # type: ignore[arg-type]
 
@@ -530,8 +533,9 @@ def _written_result() -> WeekReadResult:
 
 
 def test_the_nightly_writes_its_due_reads_in_the_cadences_priority() -> None:
-    """A budget stop leaves the rule-stale rewrites, last in `PRIORITY`, for the next night."""
-    assert PRIORITY.index(RULE_STALE) == len(PRIORITY) - 1
+    """A budget stop leaves the rule-stale rewrites, then the writer's (Lane 306), last in `PRIORITY`, for the next
+    night."""
+    assert PRIORITY[-2:] == (RULE_STALE, WRITER)
     assert set(PRIORITY) <= set(WEEK_READ_REASONS)
 
 

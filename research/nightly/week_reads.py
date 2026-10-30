@@ -11,8 +11,8 @@ Two modes on one pass (`run_week_read_step`), both on the board week alone (`col
   unwritten are counted at the head of the step line, the step's status "partial", each named on a line of
   its own, and asked again on the next nightly. After it, a nightly writes only
   what the cadence says moved (`capsules.week.cadence`: a status, a read still unwritten, a player new to the
-  board, a written read the current rules refuse; a move of the published projection leaves the read
-  standing, Lane 275), in the same rounds: a rewrite that falls keeps the written read and is asked again
+  board, a written read the current rules refuse, every written read an older writer wrote, Lane 306; a move of
+  the published projection leaves the read standing, Lane 275), in the same rounds: a rewrite that falls keeps the written read and is asked again
   within the pass like a first read that fell (Lane 293).
 - **Hourly**, after the in-season job's status capture (`research.inseason --task capture-harvest`): the
   reads whose status moved, then every read still unwritten (Lane 276, asked each hour until one is written),
@@ -84,7 +84,7 @@ from research.capsules.week.store import (
     stored_week_reads,
 )
 from research.capsules.week.validate import week_masks
-from research.capsules.week.write import MAX_TOKENS, WeekReadResult, write_week_read
+from research.capsules.week.write import MAX_TOKENS, WEEK_WRITER_VERSION, WeekReadResult, write_week_read
 from research.nightly.capsule_step import checked_price
 from research.nightly.steps import StepRecord
 from research.nightly.week_read_demotion import demote_shared_keeping, player_names, read_shapes
@@ -110,6 +110,11 @@ HOURLY: Final = "hourly"
 # the stop writes nothing and is asked again the next night. An hourly pass writes only the reads a status
 # moved, held the same way at HOURLY_BUDGET_USD a pass and
 # HOURLY_DAY_USD across a Central day's passes (the capture runs 18 times).
+# A writer change (Lane 306, `cadence.WRITER`) rewrites the written board in one nightly: about 520 reads at
+# about $0.0023 with the rounds, $1.20 to $1.90, under this with a quiet night's other reasons (the fact-stale
+# ones about $0.15). A night whose other reasons are heavy too (the 2026-10-29 nightly's 404 rule-stale rewrites)
+# can pass it, so the writer's rewrites are last in `cadence.PRIORITY` and the budget's stop carries the rest to
+# the next nightly, named on the step line's unwritten and counted on its "stopped by the budget".
 NIGHTLY_BUDGET_USD: Final = 2.50
 # The asks of a read within a nightly pass: its first, then two more for a read that fell to its facts block or
 # was demoted for a shared sentence, a rewrite held over the written read among them (Lane 293: the 2026-10-29
@@ -317,11 +322,12 @@ def stored_row(
     sheet: WeekSheet, result: WeekReadResult, reason: str, before: StoredWeekRead | None, at: datetime
 ) -> StoredWeekRead:
     """The row a written (or fallen) read is kept as: the facts' stamps, what the cadence compares, the
-    writer's call, and its attempts on `at`'s Central day (`_attempts`)."""
+    writer's call, its attempts on `at`'s Central day (`_attempts`), and the writer version (Lane 306)."""
     return StoredWeekRead(
         sheet.player_id, sheet.season, sheet.week, result.source, result.text, result.model, sheet.written_at,
         sheet.facts_at, sheet.stamps(), None if sheet.projection is None else sheet.projection.points,
         sheet.status.status, reason, result.call, central_day(at), _attempts(result, before, at),
+        WEEK_WRITER_VERSION,
     )  # fmt: skip
 
 

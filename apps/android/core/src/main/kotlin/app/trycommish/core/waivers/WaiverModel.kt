@@ -128,7 +128,24 @@ class WaiverModel(
     val sheetPlayers: List<SheetPlayer> get() = (pool + stashPool).mapNotNull { it.sheetPlayer }
 
     /** The players an add could replace, the advice's drop first. */
-    fun drops(row: PoolRow): List<DropRow> = WaiverRows.drops(row.source, shown.roster, zone, now)
+    fun drops(row: PoolRow): List<DropRow> = drops(row.source)
+
+    private fun drops(source: WaiverRow): List<DropRow> = WaiverRows.drops(source, shown.roster, zone, now)
+
+    // The position panel (Lane 291 on the web).
+
+    /** The position panel's cards in the mode, from the page's answer; none from an answer without it. */
+    fun panel(mode: PanelMode): List<PanelCard> = WaiverPanel.cards(advice, mode, zone, now)
+
+    /** Whether the panel's toggle is drawn: a card reads this week. */
+    val panelHasWeek: Boolean get() = WaiverPanel.hasWeek(advice)
+
+    /** What a panel Add does, in the table's words: "Add on ESPN", or "Open ESPN waivers". */
+    fun panelVerb(source: WaiverRow): String = WaiverWords.addVerb(advice.moves, source.add.player.hostId, platform)
+
+    /** The panel's Add (WaiverScreen.svelte addFromPanel): the add with the advice's drop, the pair the
+     * shelf and the table's verb act on. */
+    fun panelPair(source: WaiverRow): WaiverRow = WaiverRows.with(source, drops(source).firstOrNull())
 
     /** The drop panel's head and lead: "Drop one for Mason Taylor", "+4.8 Proj this week with any of
      * them. The one you lose least by comes first." */

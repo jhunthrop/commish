@@ -37,7 +37,7 @@ from research.capsules.week.sheet import BoardPlace, PublishedProjection, Status
 from research.capsules.week.start_advice import sit_advice_in
 from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
-from research.capsules.week.write import MAX_ASKS_WITH_RETRY, write_week_read
+from research.capsules.week.write import MAX_ASKS_WITH_RETRY, WEEK_WRITER_VERSION, write_week_read
 from research.tests.test_week_read_writer import _answer, _StubGateway
 from research.tests.week_read_fixtures import BOARD, KICKOFF, REPORT, WRITTEN_AT, on_bye, starter
 
@@ -202,7 +202,7 @@ _NOW = WRITTEN_AT + timedelta(hours=2)
 def _stored(sheet: WeekSheet, call: str, attempts: int = 1) -> StoredWeekRead:
     return StoredWeekRead(
         sheet.player_id, sheet.season, sheet.week, WRITTEN_SOURCE, _SIT_READ, "stub/writer", WRITTEN_AT, None, {},
-        None, sheet.status.status, "first", call, _NOW.date(), attempts,
+        None, sheet.status.status, "first", call, _NOW.date(), attempts, WEEK_WRITER_VERSION,
     )  # fmt: skip
 
 
