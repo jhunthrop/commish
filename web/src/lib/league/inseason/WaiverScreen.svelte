@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { memberZone } from '#lib/format/clock.ts';
 	import BasisBlock from '#lib/ui/BasisBlock.svelte';
-	import Chip from '#lib/ui/Chip.svelte';
-	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import StripAction from '#lib/ui/StripAction.svelte';
@@ -10,9 +8,21 @@
 	import type { LeagueHost } from '../api.ts';
 	import { positionWord } from '../box/box.ts';
 	import PickupStrip from '../box/PickupStrip.svelte';
-	import PositionPanel from '../box/PositionPanel.svelte';
-	import { BAND_QUERY } from '../box/positions.ts';
-	import { MediaQuery } from 'svelte/reactivity';
+	import PositionNav from '../box/PositionNav.svelte';
+	import { PANEL, panelHasWeek, type PanelMode } from '../box/positions.ts';
+	import {
+		ALL,
+		atPosition,
+		NAV,
+		navCards,
+		navCounts,
+		navLead,
+		navSort,
+		openingKey,
+		withoutRostered,
+		yoursRows,
+		type NavKey
+	} from '../box/position-nav.ts';
 	import { addressedWeek, arrivesPart, weekProjected } from '../box/next-week.ts';
 	import WaiverTable from '../box/WaiverTable.svelte';
 	import {
@@ -21,7 +31,6 @@
 		cardName,
 		copiedWords,
 		countWords,
-		DEFAULT_SORT,
 		dropRows,
 		findRows,
 		headBasis,
@@ -67,7 +76,7 @@
 	} from './move.ts';
 	import { Narrowing } from './state.ts';
 	import { NOT_FREE, POSITION_PARAM, askedPlayer, markAsked } from '../box/asked.ts';
-	import { onMount, tick } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { LINES } from './words.ts';
 	import { page } from '$app/state';
 	import type { BoxRow } from '../box/box.ts';
@@ -120,6 +129,7 @@
 	const BID_PAUSE_MS = 600;
 	/** The positions the route narrows to, in the board's order. */
 	const POSITIONS: readonly WaiverPosition[] = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+	const COMPARE_ID = 'waiver-compare';
 
 	let step = $state<MoveStep>({ kind: 'closed' });
 	/** The claim as last planned: the one the token makes, whatever is typed meanwhile. */
@@ -131,7 +141,12 @@
 	let replanning = $state(false);
 	let pause: ReturnType<typeof setTimeout> | undefined;
 
-	let position = $state<WaiverPosition | null>(null);
+	/** The card chosen (Lane 305): the screen opens on the weakest Need, All where none. */
+	// svelte-ignore state_referenced_locally
+	const opening = openingKey(advice);
+	let position = $state<WaiverPosition | null>(opening === ALL ? null : opening);
+	/** The toggle: the cards and the list read for the rest of the season or this week. */
+	let mode = $state<PanelMode>('season');
 	/** The answer for the chosen position, null for every position or until it is read. */
 	let narrowed = $state<WaiverAdvice | null>(null);
 	/** When the narrowed answer was read, in ms: a narrowed read is a read of its own, so its rows
@@ -141,7 +156,7 @@
 	let reading = $state(false);
 	let problem = $state<string | null>(null);
 	let query = $state('');
-	let sort = $state<Sort>(DEFAULT_SORT);
+	let sort = $state<Sort>(navSort('season'));
 	/** The row whose drops are open, and the drop chosen there. */
 	let open = $state<string | null>(null);
 	let chosenDrop = $state<string | null>(null);
@@ -150,11 +165,46 @@
 	/** What the platform verb said, once pressed. */
 	let copied = $state<CopiedLine | null>(null);
 
-	const shown = $derived(narrowed ?? advice);
+	/** The chosen position's rows from the first answer until its own read lands; its own read kept
+	 * while the next lands, less anyone the fresher answer has on the member's roster (review 305 H2). */
+	const shown = $derived(
+		narrowed
+			? { ...withoutRostered(narrowed, advice.roster), roster: advice.roster }
+			: atPosition(advice, position ?? ALL)
+	);
 	/** "Week 7 projections expected Thursday.", over the table while the week has no Proj (Lane 95). */
 	const arrives = $derived(arrivesPart(shown, addressedWeek(shown), memberZone()));
-	const positions = $derived(
-		POSITIONS.filter((p) => advice.rows.some((r) => r.add.player.position === p))
+	/** Every free agent of the first answer, the All card's counts. */
+	const allPool = $derived(
+		poolRows(
+			{ rows: advice.rows, pickups: advice.pickups, roster: advice.roster },
+			memberZone(),
+			pageNow
+		)
+	);
+	const navKey = $derived<NavKey>(position ?? ALL);
+	const cardsNav = $derived(
+		navCards(
+			advice,
+			mode,
+			navCounts(allPool),
+			new Map(
+				POSITIONS.map(
+					(p) => [p, navCounts(allPool.filter((r) => r.source.add.player.position === p))] as const
+				).filter(([, c]) => c.free > 0)
+			)
+		)
+	);
+	const lead = $derived(navLead(advice, navKey, mode));
+	/** The member's players at the chosen position over its free agents, one comparison. */
+	const compare = $derived(
+		position === null || !advice.positions?.some((c) => c.position === position)
+			? null
+			: {
+					yours: NAV.yours(positionWord(position)),
+					free: NAV.freeAt(positionWord(position)),
+					rows: yoursRows(advice, position, mode, memberZone(), pageNow)
+				}
 	);
 	const pool = $derived(
 		poolRows({ rows: shown.rows, pickups: advice.pickups, roster: shown.roster }, memberZone(), now)
@@ -287,6 +337,17 @@
 		claiming = null;
 	}
 
+	/** A card: All, or a position the league starts. */
+	function chooseKey(key: NavKey): void {
+		void choose(key === ALL ? null : key);
+	}
+
+	/** The toggle: the cards' figures and the list's order together (ruling 4). */
+	function chooseMode(next: PanelMode): void {
+		mode = next;
+		sort = navSort(next);
+	}
+
 	async function choose(next: WaiverPosition | null): Promise<void> {
 		position = next;
 		narrowed = null;
@@ -296,12 +357,60 @@
 		const outcome = await narrowing.choose(next);
 		if (outcome.kind === 'overtaken') return;
 		reading = false;
-		if (outcome.kind === 'answer') {
-			narrowedAt = Date.now();
-			narrowed = outcome.answer;
-		}
+		if (outcome.kind === 'answer') land(outcome.answer);
 		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
+
+	/** A position's own answer on screen, drawn at the instant it was read. */
+	function land(answer: WaiverAdvice): void {
+		narrowedAt = Date.now();
+		narrowed = answer;
+	}
+
+	/** The answer the last top-up was for (its read and the member's roster): the minute's read of an
+	 * unchanged league sends no narrowed read (round 2 N4); null once a top-up failed, so the next
+	 * answer tries again. */
+	let toppedFor: string | null = null;
+
+	/** The chosen position read again without dimming its rows or closing an open Add: on landing,
+	 * its rows from the first answer already listed (review 305 M6), and whenever the page's answer is
+	 * replaced, after a claim and on the minute's read, so the list is never older than the cards and
+	 * the member's players (H2). A failed top-up keeps the position's own list where it has one, saying
+	 * nothing; with none yet, the first answer's rows stay and the line says so (round 2 N1). */
+	async function topUp(key: WaiverPosition, base: WaiverAdvice): Promise<void> {
+		const outcome = await narrowing.choose(key);
+		// Overtaken by a tap, a later answer's own top-up, or the card moved on: theirs to draw.
+		if (outcome.kind === 'overtaken' || position !== key || advice !== base) return;
+		// It may have overtaken a tapped read of the same position: it answers for that one too.
+		reading = false;
+		if (outcome.kind === 'answer') {
+			land(outcome.answer);
+			// The position's list landed: no earlier line about it stands (round 2 N5).
+			problem = null;
+			return;
+		}
+		if (outcome.kind === 'failed') {
+			toppedFor = null;
+			if (narrowed === null) problem = NAV.firstRead(positionWord(key));
+		}
+	}
+
+	/** One answer's mark: when it was read and whose players the member holds. */
+	function answerMark(answer: WaiverAdvice): string {
+		return `${answer.read_at}|${answer.roster.map((l) => l.player.host_id).join(',')}`;
+	}
+
+	/** Each answer the page reads (the first one too) tops the chosen position's list up. A player page's
+	 * named player (?player=) takes the landing over in onMount, overtaking the first top-up. */
+	$effect(() => {
+		const answer = advice;
+		untrack(() => {
+			const mark = answerMark(answer);
+			if (position === null || mark === toppedFor) return;
+			toppedFor = mark;
+			void topUp(position, answer);
+		});
+	});
 
 	/** Another row's drops or another card: the last copy's confirm is for neither (review 66f L6). */
 	function toggle(row: PoolRow): void {
@@ -324,7 +433,10 @@
 	 * in, and is marked and brought into view. */
 	onMount(async () => {
 		const asked = askedPlayer(window.location.href);
+		// The opening card's own read is the first top-up's (the effect above).
 		if (asked === null) return;
+		// A named player: every position first, his own where the first answer does not hold him.
+		await choose(null);
 		const his = (): PoolRow | undefined => pool.find((r) => r.source.add.player.board_id === asked);
 		const at = new URL(window.location.href).searchParams.get(POSITION_PARAM);
 		const narrowTo = POSITIONS.find((p) => p === at);
@@ -345,17 +457,6 @@
 	function advisedDrop(source: WaiverRow): DropRow | null {
 		return dropRows(source, shown.roster, memberZone(), now)[0] ?? null;
 	}
-
-	/** The position panel's Add (Lane 291): the add with the advice's drop, by the verb rule the
-	 * shelf and the table's go verb use. */
-	function addFromPanel(source: WaiverRow): void {
-		act(withDrop(source, advisedDrop(source)));
-	}
-
-	/** Where the position panel sits: beside the pickups strip in one band at a desk, under it as a
-	 * sideways row narrower (coordinator's ruling, 2026-10-29). */
-	const banded = new MediaQuery(BAND_QUERY, false);
-	const panelProps = $derived({ advice, zone: memberZone(), now: pageNow, onadd: addFromPanel });
 
 	/** The player shelf's verb on an add's row (Lane 113): the screen's own, for the add with the
 	 * advice's drop, its pair said under it; none on a player of the member's. */
@@ -444,6 +545,18 @@
 	/>
 {/snippet}
 
+<!-- The search: in the filters row at a desk, in the cards' head on a phone (one drawn at a time). -->
+{#snippet search()}
+	<label class="search"
+		><Icon name="search" size={16} /><input
+			type="search"
+			placeholder={WAIVERS.find}
+			aria-label={WAIVERS.find}
+			bind:value={query}
+		/></label
+	>
+{/snippet}
+
 {#snippet cardVerb(c: PickupCard, lead: boolean)}
 	<StripAction {lead} size="sm" onclick={() => act(c.source)}>{verbWords(c.source)}</StripAction>
 {/snippet}
@@ -478,13 +591,7 @@
 	expanded={onHost ? step.kind !== 'closed' : undefined}
 	footSays={card !== null}
 >
-	{#snippet summary()}
-		{#if banded.current}
-			<PositionPanel {...panelProps} beside={strip} />
-		{:else}
-			{@render strip()}
-		{/if}
-	{/snippet}
+	{#snippet summary()}{@render strip()}{/snippet}
 	{#snippet verbFoot()}{@render why()}{/snippet}
 	{#snippet move()}
 		{#if step.kind !== 'closed'}
@@ -501,31 +608,27 @@
 			/>
 		{/if}
 	{/snippet}
-	{#if !banded.current}<PositionPanel {...panelProps} />{/if}
+	<PositionNav
+		cards={cardsNav}
+		chosen={navKey}
+		onchoose={chooseKey}
+		{mode}
+		week={panelHasWeek(advice)}
+		onmode={chooseMode}
+		controls={COMPARE_ID}
+		phoneTools={search}
+	/>
+	<p class="lead" class:all={navKey === ALL} data-lead>
+		<b>{lead.head}</b>{#if lead.words}
+			<span>{lead.words}</span>{/if}
+	</p>
 	<div class="filters">
-		<ChipGroup label={LINES.position}>
-			<Chip size="sm" pressed={position === null} onclick={() => void choose(null)}
-				>{LINES.all}</Chip
-			>
-			{#each positions as p (p)}
-				<Chip size="sm" pressed={position === p} onclick={() => void choose(p)}
-					>{positionWord(p)}</Chip
-				>
-			{/each}
-		</ChipGroup>
-		<label class="search"
-			><Icon name="search" size={16} /><input
-				type="search"
-				placeholder={WAIVERS.find}
-				aria-label={WAIVERS.find}
-				bind:value={query}
-			/></label
-		>
+		{@render search()}
 		<span class="count">{countWords(pool, host)}</span>
 	</div>
 	{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 	{#if arrives}<p class="arrives">{arrives}</p>{/if}
-	<div class="rows" class:reading aria-busy={reading}>
+	<div class="rows" id={COMPARE_ID} class:reading aria-busy={reading}>
 		<WaiverTable
 			projected={weekProjected(shown)}
 			label={LINES.waiverAdds}
@@ -539,10 +642,11 @@
 			chosen={drop?.key ?? null}
 			onchoose={(d: DropRow) => (chosenDrop = d.key)}
 			{go}
-			empty={WAIVERS.noneFound}
+			empty={compare && query === '' ? PANEL.noneFree : WAIVERS.noneFound}
 			{stash}
 			{stashLine}
 			onstash={(entry: PoolRow) => openPlatform(entry.source)}
+			{compare}
 		/>
 	</div>
 	<PlayerShelfLayer host={shelf} />
@@ -553,6 +657,22 @@
 	/* While a position is read, its rows from the last answer stay, quieter. */
 	.reading {
 		opacity: 0.6;
+	}
+
+	/* The chosen card's rank and what it is, over the comparison. */
+	.lead {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 2px var(--s-3);
+		margin: 0;
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+	}
+
+	.lead b {
+		font-size: var(--t-md);
+		color: var(--ink);
 	}
 
 	.filters {
@@ -623,22 +743,26 @@
 	}
 
 	@media (max-width: 760px) {
-		/* The position chips scroll on one line, the search under them. */
-		.filters {
-			gap: var(--s-2);
+		/* The chosen card says its rank, figure, median and Need, drawn solid over the comparison: on
+		   a phone the line repeating it gives way to the comparison (review 305 M5). All keeps its
+		   head, the one card whose list is not a comparison. */
+		.lead:not(.all) {
+			display: none;
 		}
 
-		.filters :global([role='group']) {
-			max-width: 100%;
-			overflow-x: auto;
-			scrollbar-width: none;
+		.lead span {
+			display: none;
 		}
 
 		.search {
-			flex: 1 1 100%;
+			flex: 1 1 auto;
+			min-width: 0;
+			gap: 6px;
+			padding: 0 var(--s-2);
 		}
 
-		.count {
+		/* The search sits in the cards' head on a phone, the count is a desk's: the row gives way. */
+		.filters {
 			display: none;
 		}
 

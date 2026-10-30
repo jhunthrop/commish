@@ -448,6 +448,19 @@ object Words {
         const val tradesNeeds = "The Trades screen's needs are by starting slot."
     }
 
+    object WaiverNav {
+        const val all = "All"
+        const val freeAgents = "free agents"
+        const val beat = "beat yours"
+        const val every = "Every position"
+        const val pickup = "Pickup"
+        const val figuresFor = "Figures for"
+        const val weekTag = "this week"
+        const val waits = "Ranks once this week's Proj is read."
+        const val allHead = "Every free agent we rank"
+        const val allSays = "Pick a position to set them against your players there."
+    }
+
     object Season {
         const val perGame = "A game"
         const val gain = "Gain"

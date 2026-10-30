@@ -187,6 +187,7 @@ void test("the tables: the League home's, the box score's, then the shell's and 
       "WaiverHeads",
       "Stash",
       "WaiverPanel",
+      "WaiverNav",
       "Season",
       "Strip",
       "Trades",

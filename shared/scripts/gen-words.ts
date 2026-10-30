@@ -70,7 +70,7 @@ const SHEET_MODULE = "web/src/lib/sheet/words.ts";
  * its formats' chips, the Gap's definition, and the season pages' verbs; then the run's board on the Board
  * (Lane 190): a tier band's words, what its count counts, the run's stamp and a past bye's word; then the
  * Waivers' (Lane 186): its table, strip and drop panel, the heads' basis, the Stash group, the
- * position panel's (Lane 291 on the web, Lane 304 in the apps), the season
+ * position panel's (Lane 291 on the web, Lane 304 in the apps), the position cards' (Lane 305), the season
  * figures' heads and the strip's mark; then the Trades' (Lane 189): the trade table's words, the
  * picker's first choice and the close call's chip, the builder's lines and the builder-first screen's
  * own (Lane 289: its ideas row, its roster switch, its team choice); then the player sheet's
@@ -333,6 +333,12 @@ export const TABLES: readonly TableSource[] = [
     module: "web/src/lib/league/box/positions.ts",
     picks: ["PANEL"],
     json: "shared/words/league-waiver-panel.json",
+  },
+  {
+    name: "WaiverNav",
+    module: "web/src/lib/league/box/position-nav.ts",
+    picks: ["NAV"],
+    json: "shared/words/league-waiver-nav.json",
   },
   {
     name: "Season",

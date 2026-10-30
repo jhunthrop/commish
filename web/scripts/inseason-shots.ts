@@ -736,8 +736,8 @@ for (const width of SHOT_WIDTHS) {
 	if (!/^Copied \S+\. Add him on Sleeper's waiver page\.$/.test(confirmed.trim()))
 		missing.push(`waivers copy confirm ${String(width)}: ${confirmed}`);
 	await page.screenshot({ path: file(`waivers-copied-dark-${String(width)}`), fullPage: true });
-	// A position chip reads the adds at that position again (?position=).
-	await page.getByRole('button', { name: 'WR', exact: true }).click();
+	// A position card reads the adds at that position again (?position=, Lane 305).
+	await page.locator('[data-nav="positions"] [data-card="WR"]').click();
 	await page.locator('.rows[aria-busy="false"]').waitFor({ timeout: READY_TIMEOUT_MS });
 	await page.screenshot({ path: file(`waivers-wr-dark-${String(width)}`), fullPage: true });
 	await ctx.close();
@@ -903,18 +903,27 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 		const table = document.querySelector('main table.pool');
 		const text = (el: Element): string => (el as HTMLElement).innerText.trim();
 		// The player rows: not the drop panel, nor the no-gain or Stash divider (Lane 98), nor the Stash
-		// group's line (Lane 118), which the capture's undated IR free agents draw (Lane 128).
+		// group's line (Lane 118), which the capture's undated IR free agents draw (Lane 128), nor the
+		// chosen position's head and the member's own rows over the free agents (Lane 305).
 		const rows = [
 			...(table?.querySelectorAll(
-				'tbody tr:not(.dsect):not(.dgo):not(.divider):not(.stash-basis)'
+				'tbody:not(.yours) tr:not(.dsect):not(.dgo):not(.divider):not(.stash-basis):not(.group)'
 			) ?? [])
 		];
+		// The strip's cards at the chosen position (every card on All): the rows the table tints.
+		const chosen = document.querySelector('[data-nav="positions"] [aria-pressed="true"] .pos');
+		const word = chosen?.textContent.trim() ?? 'All';
+		const pickups = [...document.querySelectorAll('main .pickups .pickup')];
 		return {
 			heads: [...(table?.querySelectorAll('thead th') ?? [])].map(text).filter((h) => h !== ''),
 			proj: rows.map((tr) => text(tr.querySelector('td.proj') ?? tr)),
 			rest: rows.map((tr) => tr.querySelector('td.rest')?.textContent.trim() ?? ''),
 			tinted: rows.filter((tr) => tr.classList.contains('moved-in')).length,
-			cards: document.querySelectorAll('main .pickups .pickup').length,
+			stripCards: pickups.length,
+			cards:
+				word === 'All'
+					? pickups.length
+					: pickups.filter((c) => c.querySelector('.slot')?.textContent.trim() === word).length,
 			count: document.querySelector('main .count')?.textContent ?? '',
 			basis: document.querySelector('main [data-basis]')?.textContent.trim() ?? '',
 			headsLine: (table?.querySelector('tr.heads-basis')?.textContent ?? '')
@@ -933,7 +942,10 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 	if (width > EVIDENCE_FOLDS_AT && !seen.rest.every((n) => BOX_NUMBER.test(n)))
 		faults.push(`rest of season ${seen.rest.join(' ')}`);
 	if (width <= EVIDENCE_FOLDS_AT && !seen.phoneRest) faults.push('no A game under a name');
-	if (seen.cards === 0 || seen.tinted !== seen.cards)
+	// The strip draws its pickups whatever card is chosen (review 305 L6), and the table tints each one
+	// at the chosen position.
+	if (seen.stripCards === 0) faults.push('the strip draws no pickup');
+	if (seen.tinted !== seen.cards)
 		faults.push(`${String(seen.tinted)} rows tinted for ${String(seen.cards)} cards`);
 	if (
 		width > PHONE.width &&
