@@ -21,7 +21,7 @@ from research.capsules.week.judge import QUESTION, judge_messages, says_start
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.write import MAX_CALLS_PER_READ, write_week_read
 from research.tests.test_week_read_rules import BYE_READ, REVIEW_START_PHRASINGS, STARTER_READ
-from research.tests.week_read_fixtures import on_bye, starter
+from research.tests.week_read_fixtures import main_sheet, on_bye, starter
 
 _JUDGE = Path(__file__).parent / "testdata" / "week_reads" / "judge.json"
 _USAGE = Usage(300, 1, 301, 0.00005)
@@ -154,3 +154,10 @@ def test_the_judge_refuses_each_phrasing_with_the_list_switched_off(
 @pytest.mark.parametrize("phrase", JUDGE_MISSES)
 def test_the_judges_misses_are_refused_by_the_list(phrase: str) -> None:
     assert any("recommends starting" in v for v in rules.week_rule_violations(judged_text(phrase), on_bye(), "hold"))
+
+
+@pytest.fixture(autouse=True)
+def _main_sheet() -> Iterator[None]:
+    """These tests pin main's reads, written from main's sheet (Lane 300's ordinary-rank rule is the angles')."""
+    with main_sheet():
+        yield
