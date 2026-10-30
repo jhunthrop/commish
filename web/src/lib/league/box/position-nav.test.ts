@@ -213,7 +213,15 @@ void test('the lead says the rank and the Need in words the guard passes', () =>
 	assert.match(lead.words, /^141\.0 against a 155\.6 median\. Rank is your starters'/);
 	const words = [
 		lead.words,
-		...Object.values(NAV).filter((v): v is string => typeof v === 'string'),
+		NAV.all,
+		NAV.freeAgents,
+		NAV.beat,
+		NAV.every,
+		NAV.pickup,
+		NAV.weekTag,
+		NAV.waits,
+		NAV.allHead,
+		NAV.allSays,
 		NAV.yours('TE'),
 		NAV.freeAt('TE'),
 		NAV.swapped('K')
