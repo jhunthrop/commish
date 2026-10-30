@@ -138,7 +138,13 @@ void test("the field's own lines are football, not a betting line: goal line, of
 		'he lined up in the slot'
 	])
 		assert.equal(bannedIn(said), null, said);
-	for (const said of ['the line moved', 'The line', 'his stat lines', 'a betting line', 'the line upset bettors'])
+	for (const said of [
+		'the line moved',
+		'The line',
+		'his stat lines',
+		'a betting line',
+		'the line upset bettors'
+	])
 		assert.notEqual(bannedIn(said), null, said);
 });
 
