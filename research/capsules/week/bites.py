@@ -63,7 +63,7 @@ def rank_bite_words(allowed: Allowed | None) -> str:
     """Whether the opponent's rank bites, in words for the sheet."""
     if rank_bites(allowed):
         return f"Within {RANK_EDGE} of either end of the league: it bites."
-    return "In the middle of the league: ordinary, it does not bite."
+    return "In the middle of the league: an ordinary matchup, it does not bite. Never state this rank in the read."
 
 
 def depth_words(sheet: WeekSheet) -> str:

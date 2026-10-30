@@ -235,7 +235,7 @@ def test_the_sheet_carries_every_fact_with_the_words_that_say_whether_it_bites()
     assert "Neither among the week's highest nor its lowest: ordinary, it does not bite." in text
     assert "Unchanged: ordinary, it does not bite." in text
     # 26th of 32 is outside the four either end; 29th of 32 is inside.
-    assert "In the middle of the league: ordinary, it does not bite." in text
+    assert "In the middle of the league: an ordinary matchup, it does not bite." in text
     biting = replace(_angled(), allowed=Allowed(29, 32, 41.3, "WR", 5, starter().written_at))
     assert "Within 4 of either end of the league: it bites." in render_week_sheet(biting)
     assert NO_ANGLE in render_week_sheet(starter())
@@ -483,3 +483,34 @@ def test_an_honest_paraphrase_of_an_angle_is_not_refused(honest: str) -> None:
     sheet = replace(_angled(), angles=(_TARGETS, _SNAP_TREND))
     result = validate_week_read(f"{honest} Start him in week 6 of 2026 against Arizona.", sheet, call="start")
     assert not any("usage fact" in v for v in result.violations), result.violations
+
+
+# --- fix round 3: the ordinary rank (the coordinator's ruling 1) -------------------------------------------------
+
+_MATCHUP = "Puka Nacua draws 32% of the Rams' targets in week 6 of 2026. {line} Start him."
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_an_ordinary_rank_stated_as_a_figure_is_refused() -> None:
+    read = _MATCHUP.format(line="Arizona sits 26th of 32 against receivers.")
+    violations = validate_week_read(read, _angled(), call="start").violations
+    assert any("where it does not bite" in v and "an ordinary matchup" in v for v in violations), violations
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_a_rank_that_bites_stays_allowed() -> None:
+    biting = replace(_angled(), allowed=Allowed(29, 32, 41.3, "WR", 5, starter().written_at))
+    read = _MATCHUP.format(line="Arizona sits 29th of 32 against receivers.")
+    assert not any("does not bite" in v for v in validate_week_read(read, biting, call="start").violations)
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_an_ordinary_matchup_in_plain_words_is_allowed() -> None:
+    read = _MATCHUP.format(line="Arizona is an ordinary matchup for him.")
+    assert not any("does not bite" in v for v in validate_week_read(read, _angled(), call="start").violations)
+
+
+@pytest.mark.usefixtures("angles_off")
+def test_with_the_angles_off_an_ordinary_rank_is_mains_to_judge() -> None:
+    read = _MATCHUP.format(line="Arizona sits 26th of 32 against receivers.")
+    assert not any("does not bite" in v for v in validate_week_read(read, _angled(), call="start").violations)
