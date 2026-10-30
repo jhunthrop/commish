@@ -56,6 +56,16 @@ _MATCHUP_ON_ANGLES: Final = (
     "Open on his first angle with its figure, set against this game and this opponent.\n"
     "Lean on what the angle means against this opponent this week.",
 )
+# The role voice's brief with his usage in full (fix round 2): his role is his share of the work, never a tour of
+# the depth chart; his place on it leads only when the sheet says it bites (pair h: the depth chart in 36% of
+# reads, mostly the role voice's openers).
+_ROLE_ON_ANGLES: Final = (
+    "Open on his status or on his work: the share of his club's snaps, targets or carries that says most about his "
+    "week. Plain, even sentences of about 15 words. Lean on his role as his usage facts state it; his place on the "
+    "depth chart only when the sheet says it bites.",
+    "Open on his status or on his work, the share that says most about his week.\n"
+    "Lean on his role as his usage states it; the depth chart only when it bites.",
+)
 # The verdict voice's angles brief (fix round 1): its clipped sentences ran reads with two angles to six and seven
 # sentences, so the brief holds them to four and gives the angle the reason's place.
 _VERDICT_ON_ANGLES: Final = (
@@ -98,6 +108,7 @@ VOICES: Final = (
         "status means for it this week. Name only the teammates and the slots the facts name.",
         "Open on his status or his place on his club's depth chart.\n"
         "Lean on his role: the work he gets and what his status means for it this week.",
+        *_ROLE_ON_ANGLES,
     ),
     Voice(
         "numbers",

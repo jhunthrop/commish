@@ -17,7 +17,7 @@ from research.capsules.render_depth import slot_word
 from research.capsules.render_season import week_list
 from research.capsules.render_words import IN_OUR_RECORDS, ordinal, week_of
 from research.capsules.week.angles import angles_on
-from research.capsules.week.bites import depth_words, expected_words, rank_bite_words, weather_words
+from research.capsules.week.bites import depth_words, expected_words, rank_bite_words, rank_bites, weather_words
 from research.capsules.week.cells import named_chance
 from research.capsules.week.rank_words import rank_words
 from research.capsules.week.report_day import report_words
@@ -247,6 +247,18 @@ def _with_words(line: str | None, words: str) -> str | None:
     return None if line is None else f"{line} {words}"
 
 
+def _rank_in_full(sheet: WeekSheet) -> str | None:
+    """The opponent's rank with its words. In the middle of the league it is one short line with no ask to say it
+    (pair i: the full line, with its "In words, say it as ..." and its season, drew the rank into 64% of reads,
+    38 of them where it did not bite)."""
+    a, game = sheet.allowed, sheet.game
+    if a is None or game is None or sheet.bye:
+        return None
+    if rank_bites(a):
+        return _with_words(_allowed_line(sheet), rank_bite_words(a))
+    return f"{game.opponent} against {a.position}s: {ordinal(a.rank)} of {a.of}. {rank_bite_words(a)}"
+
+
 def _in_full(sheet: WeekSheet) -> list[str | None]:
     """His facts in full, then the game's: the expected score, the forecast, the opponent's rank and the depth
     chart, each with the words that say whether it bites (`bites`, the coordinator's ruling 2 of fix round 2)."""
@@ -254,7 +266,7 @@ def _in_full(sheet: WeekSheet) -> list[str | None]:
         *_angles_lines(sheet),
         _with_words(_expected_line(sheet), expected_words(sheet)),
         _with_words(_weather_line(sheet), weather_words(sheet)),
-        _with_words(_allowed_line(sheet), rank_bite_words(sheet.allowed)),
+        _rank_in_full(sheet),
         _with_words(_depth_line(sheet), depth_words(sheet)),
     ]
 

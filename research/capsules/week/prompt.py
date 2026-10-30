@@ -74,7 +74,8 @@ _PICK_ANGLES: Final = (
     "Read every fact: his usage in full, each with how unusual it is, and the game's facts, each with whether it "
     "bites. Decide which one or two actually decide this player's week, lead with that, and say why it matters to "
     "this week's call. Leave out what is ordinary: a fact the sheet calls ordinary, or one that does not bite, earns "
-    "no sentence unless it decides the call. Never tour the list."
+    "no sentence unless it decides the call. The opponent's rank, the depth chart, the weather and the expected "
+    "score get a sentence only when the sheet says they bite. Never tour the list."
 )
 _CAP: Final = f"quote at most {MAX_FIGURES} figures in all"
 _CAP_ANGLES: Final = (
