@@ -3,14 +3,19 @@
 the card's figures, and a draft quoting another is refused by the figure guard, named first so the
 nightly's fallback line says why."""
 
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import date, timedelta
 
 import httpx
+import pytest
 
 from research.capsules.gateway import GatewayClient
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.validate import Grounding, validate_prose
+from research.capsules.week import angles
+from research.capsules.week.angle_candidates import AngleFigure, Measure
+from research.capsules.week.angles import Angle
 from research.capsules.week.collect import (
     expected_from_read,
     figures_at,
@@ -34,7 +39,7 @@ from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
 from research.capsules.week.write import WeekReadResult, write_week_read
 from research.nightly.week_reads import WeekReadSpend
-from research.tests.week_read_fixtures import BOARD, CAPTURED, FIGURES, KICKOFF, starter
+from research.tests.week_read_fixtures import BOARD, CAPTURED, FIGURES, KICKOFF, main_sheet, starter
 
 
 def allen() -> WeekSheet:
@@ -58,7 +63,20 @@ def allen() -> WeekSheet:
         played=(1, 2, 3, 4, 5),
         missed=(),
         board=BoardPlace(4, 1, 301.2, "rest_of_season", 6, BOARD),
+        # On the angles' sheet the expected score is an angle (the card still prints it in its cell).
+        angles=(_EXPECTED,),
     )
+
+
+_EXPECTED = Angle(
+    "expected",
+    "Expected score: the Bills' expected score is 29.5 points, the highest of the week.",
+    (AngleFigure(29.5, Measure.EXPECTED),),
+    (),
+    1.8,
+    None,
+    (("the highest", "of the week"),),
+)
 
 
 GOOD = (
@@ -75,7 +93,9 @@ def _figure_violations(result_violations: tuple[str, ...]) -> list[str]:
 def test_the_sheet_prints_the_cards_figures() -> None:
     sheet = render_week_sheet(allen())
     assert "26.4 points in PPR scoring" in sheet
-    assert "BUF 29.5 points, NYJ 24 points" in sheet
+    # Main's sheet prints the expected score's line; the angles' sheet states it as his angle.
+    expected = _EXPECTED.text if angles.angles_on() else "BUF 29.5 points, NYJ 24 points"
+    assert expected in sheet
     assert "17.5 PPR points" in sheet and "18.5 PPR points" in sheet
 
 
@@ -197,3 +217,17 @@ def test_the_sheet_prints_a_tie_as_the_page_does() -> None:
     assert points_text(9.45) == "9.5"
     moved = replace(allen(), projection=PublishedProjection(26.4, CAPTURED, 26.6, CAPTURED))
     assert moved.projection_change == -0.2  # noqa: PLR2004 - the card's tenths, 26.4 less 26.6
+
+
+@pytest.fixture(autouse=True, params=[False, True], ids=["angles-off", "angles-on"])
+def _both_sheets(request: pytest.FixtureRequest) -> Iterator[None]:
+    """The page's figures hold in both arms (Lane 300, the review's H3): every test runs on main's sheet and on
+    the angles' sheet, where Josh Allen's expected score is an angle (`allen` gives him one on that arm)."""
+    if request.param:
+        held = angles.ANGLES_ON
+        setattr(angles, "ANGLES_ON", True)  # noqa: B010 (a Final switch, set for the test)
+        yield
+        setattr(angles, "ANGLES_ON", held)  # noqa: B010
+    else:
+        with main_sheet():
+            yield

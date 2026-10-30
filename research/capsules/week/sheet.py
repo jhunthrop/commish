@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 from research.capsules.facts.team_names import team_name_forms
 from research.capsules.page_figures import page_tenth, page_tenth_text
 from research.capsules.season_voice import SeasonClock
+from research.capsules.week.angles import Angle
 
 CENTRAL: Final = ZoneInfo("America/Chicago")
 # The week's number is the published projection until the served path flips this (the founder's ruling:
@@ -248,6 +249,10 @@ class WeekSheet:
     last_read: LastRead | None = None
     lines_at: datetime | None = None
     basis: str = field(default=PROJECTION_BASIS)
+    # What sets his week apart, most unusual first (Lane 300, `angles`), and his depth slot on the release
+    # before the newest when it moved (`depth_moves`): empty and None while `ANGLES_ON` is off.
+    angles: tuple[Angle, ...] = ()
+    depth_moved_from: float | None = None
 
     def __post_init__(self) -> None:
         late = [name for name, at in self._stamped().items() if at > self.written_at]
@@ -311,10 +316,12 @@ def _rounded(value: float) -> float:
 
 
 def week_name_ledger(sheet: WeekSheet) -> tuple[str, ...]:
-    """Every name the read may print: his, his teammates on the chart, and every club the sheet names."""
+    """Every name the read may print: his, his teammates on the chart and in his angles, and every club the
+    sheet names."""
     clubs = {sheet.team, *(g.opponent for g in sheet.last_games)}
     if sheet.game is not None:
         clubs.add(sheet.game.opponent)
     teammates = () if sheet.depth is None else tuple(name for name, _ in sheet.depth.around)
+    teammates = (*teammates, *(name for angle in sheet.angles for name in angle.names))
     forms = [form for club in sorted(clubs) for form in team_name_forms(club)]
     return tuple(dict.fromkeys((sheet.name, *teammates, *forms)))

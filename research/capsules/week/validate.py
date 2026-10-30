@@ -44,8 +44,9 @@ _BARE_WEEK: Final = re.compile(
 
 
 def sheet_names(sheet: WeekSheet) -> tuple[str, ...]:
-    """The names a sheet lets its read print: his and his teammates' on the chart."""
-    return (sheet.name, *(() if sheet.depth is None else (name for name, _ in sheet.depth.around)))
+    """The names a sheet lets its read print: his and his teammates' on the chart and in his angles."""
+    around = () if sheet.depth is None else tuple(name for name, _ in sheet.depth.around)
+    return (sheet.name, *around, *(name for angle in sheet.angles for name in angle.names))
 
 
 def week_masks(sheets: Iterable[WeekSheet], players: Iterable[str] = ()) -> ShapeMasks:

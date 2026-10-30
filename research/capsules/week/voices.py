@@ -20,6 +20,8 @@ import hashlib
 from dataclasses import dataclass
 from typing import Final
 
+from research.capsules.week.angles import angles_on
+from research.capsules.week.bites import rank_bites
 from research.capsules.week.sheet import WeekSheet
 
 # The switch (Lane 266's ship bar): False and every ask goes out exactly as it did before the voices.
@@ -34,11 +36,45 @@ class Voice:
     key: str
     brief: str
     reminder: str
+    # With the angles on (Lane 300, fix round 1) an angle-led read sets the lead: a voice whose brief leans on a
+    # fact the sheet may no longer carry has its angles' brief and reminder, used on a sheet with angles.
+    angles_brief: str | None = None
+    angles_reminder: str | None = None
 
     @property
     def name(self) -> str:
         """The voice's name as the reminder says it ("table talk")."""
         return self.key.replace("_", " ")
+
+
+# The matchup voice's angles brief, when no matchup fact bites: the opponent's rank leaves the sheet outside the
+# four clubs either end (`bites.RANK_EDGE`), so it leans on his strongest angle, set against this game.
+_MATCHUP_ON_ANGLES: Final = (
+    "Open on the fact that decides his week, with its figure, set against this game: the opponent by name, home or away, the "
+    'expected score when it bites. Sentences of 14 to 18 words, each one clause joined by "and" or "but". '
+    "Lean on what that fact means against this opponent this week.",
+    "Open on the fact that decides his week, with its figure, set against this game and this opponent.\n"
+    "Lean on what that fact means against this opponent this week.",
+)
+# The role voice's brief with his usage in full (fix round 2): his role is his share of the work, never a tour of
+# the depth chart; his place on it leads only when the sheet says it bites (pair h: the depth chart in 36% of
+# reads, mostly the role voice's openers).
+_ROLE_ON_ANGLES: Final = (
+    "Open on his status or on his work: the share of his club's snaps, targets or carries that says most about his "
+    "week. Plain, even sentences of about 15 words. Lean on his role as his usage facts state it; his place on the "
+    "depth chart only when the sheet says it bites.",
+    "Open on his status or on his work, the share that says most about his week.\n"
+    "Lean on his role as his usage states it; the depth chart only when it bites.",
+)
+# The verdict voice's angles brief (fix round 1): its clipped sentences ran reads with two angles to six and seven
+# sentences, so the brief holds them to four and gives the angle the reason's place.
+_VERDICT_ON_ANGLES: Final = (
+    "Open on the move itself, the verb first, with the fact that decides his week as the reason in the same sentence. Four "
+    "sentences in all, 10 to 15 words each: the move and its fact, the next fact that matters, what he waits on if anything, "
+    "the move again in fewer words.",
+    "Open on the move itself, the verb first, with the fact that decides his week as its reason.\n"
+    "Four sentences in all: the move, the facts that decide it, the move again.",
+)
 
 
 # Each brief stays inside the read's rules: the first sentence carries the call, a figure or his status;
@@ -53,6 +89,7 @@ VOICES: Final = (
         "again in fewer words than you opened with.",
         "Open on the move itself, the verb first, with its reason in the same sentence.\n"
         "Lean on the manager's decision this week, in short, clipped sentences.",
+        *_VERDICT_ON_ANGLES,
     ),
     Voice(
         "matchup",
@@ -62,6 +99,7 @@ VOICES: Final = (
         "matchup matters for him.",
         "Open on the opponent by name and what it allows his position.\n"
         "Lean on the game around him, his own numbers as the reason the matchup matters.",
+        *_MATCHUP_ON_ANGLES,
     ),
     Voice(
         "role",
@@ -70,6 +108,7 @@ VOICES: Final = (
         "status means for it this week. Name only the teammates and the slots the facts name.",
         "Open on his status or his place on his club's depth chart.\n"
         "Lean on his role: the work he gets and what his status means for it this week.",
+        *_ROLE_ON_ANGLES,
     ),
     Voice(
         "numbers",
@@ -110,12 +149,22 @@ def voice_for(season: int, player_id: str) -> Voice:
     return VOICES[int.from_bytes(digest[:8], "big") % len(VOICES)]
 
 
+def _brief(voice: Voice, sheet: WeekSheet) -> tuple[str, str]:
+    """The voice's brief and reminder for `sheet`: its angles' pair on a sheet with angles (the matchup voice's
+    only when no matchup fact bites), else its own."""
+    held = voice.angles_brief is not None and voice.angles_reminder is not None
+    matchup_bites = voice.key == "matchup" and rank_bites(sheet.allowed)
+    if angles_on() and sheet.angles and held and not matchup_bites:
+        return voice.angles_brief or voice.brief, voice.angles_reminder or voice.reminder
+    return voice.brief, voice.reminder
+
+
 def voice_section(sheet: WeekSheet, on: bool | None = None) -> list[str]:
     """The ask's voice part for `sheet`'s player: his voice's brief, or nothing when the voices are off
     (`on`, read from `VOICES_ON` at the call when not given)."""
     if not (VOICES_ON if on is None else on):
         return []
-    return [f"{_HEADER}\n{voice_for(sheet.season, sheet.player_id).brief}"]
+    return [f"{_HEADER}\n{_brief(voice_for(sheet.season, sheet.player_id), sheet)[0]}"]
 
 
 def voice_reminder(sheet: WeekSheet, on: bool | None = None) -> list[str]:
@@ -124,4 +173,4 @@ def voice_reminder(sheet: WeekSheet, on: bool | None = None) -> list[str]:
     if not (VOICES_ON if on is None else on):
         return []
     voice = voice_for(sheet.season, sheet.player_id)
-    return [f"Keep the read in its voice, {voice.name}, inside every rule above.\n{voice.reminder}"]
+    return [f"Keep the read in its voice, {voice.name}, inside every rule above.\n{_brief(voice, sheet)[1]}"]

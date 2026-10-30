@@ -95,6 +95,10 @@ def player_spellings(names: Iterable[str]) -> tuple[str, ...]:
         bare = _without_suffix(name.split())
         if bare:
             spellings.update((" ".join(bare), bare[0], bare[-1]))
+            # A surname led by an abbreviation ("St. Brown") is one spelling: the splitter keeps it in one
+            # sentence since Lane 300 fix round 4, so "St. Brown's matchup" masks whole.
+            if len(bare) > 2 and bare[-2].endswith("."):  # noqa: PLR2004 - a first name and a two-word surname
+                spellings.add(" ".join(bare[-2:]))
     return tuple(sorted(spellings))
 
 

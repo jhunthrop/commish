@@ -20,8 +20,9 @@ from research.capsules.prompt import NEVER_ON_THE_PAGE
 from research.capsules.render_words import week_of
 from research.capsules.rule_notes import RuleNote
 from research.capsules.validate import word_count
+from research.capsules.week.angles import angles_on
 from research.capsules.week.render import render_week_sheet
-from research.capsules.week.rules import MAX_FIGURES, MAX_SENTENCES, MIN_SENTENCES, shown_week_words
+from research.capsules.week.rules import ANGLE_FIGURES, MAX_FIGURES, MAX_SENTENCES, MIN_SENTENCES, shown_week_words
 from research.capsules.week.sheet import PROJECTION_BASIS, WeekSheet
 from research.capsules.week.validate import WEEK_BAND
 from research.capsules.week.voices import voice_reminder, voice_section
@@ -41,8 +42,8 @@ _NUMBER_RULE: Final = {
     "published": (
         "- The week's number is a published projection, never ours. Never state it, its figure, its change or a "
         "judgment of it: the card prints it. Never name the card, a cell or a tile, and never \"the week's "
-        'number", "our projection", "our number", "our model" or "we project" for this week. Say what you see in '
-        "his status, his role, the matchup or his rate."
+        'number", "our projection", "our number", "our model" or "we project" for this week. '
+        "Say what you see in his status, his role, the matchup or his rate."
     ),
 }
 # The four calls, defined (the re-review's F4): the page shows the call beside the read.
@@ -64,7 +65,44 @@ def _quoted(words: Sequence[str]) -> str:
     return ", ".join(f'"{word}"' for word in words)
 
 
-WEEK_RULES: Final = f"""You write the week-ahead read on one player's page for a fantasy football manager setting his lineup for the week in front of him. You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
+# The parts of the rules the angles change (Lane 300): main's words, then the angles' (`week_rules`).
+_PICK: Final = (
+    "Pick the two or three facts that decide his week (his game, his status, the matchup, the weather, his role, his "
+    "rate) and build on those. Leave the rest unquoted."
+)
+_PICK_ANGLES: Final = (
+    "Read every fact: his usage in full, each with how unusual it is, and the game's facts, each with whether it "
+    "bites. Decide which one or two actually decide this player's week, lead with that, and say why it matters to "
+    "this week's call. Leave out what is ordinary: a fact the sheet calls ordinary, or one that does not bite, earns "
+    "no sentence unless it decides the call. The opponent's rank, the depth chart, the weather and the expected "
+    "score get a sentence only when the sheet says they bite. Never tour the list."
+)
+_CAP: Final = f"quote at most {MAX_FIGURES} figures in all"
+_CAP_ANGLES: Final = (
+    f"quote at most {MAX_FIGURES + ANGLE_FIGURES} figures in all, counting each angle's figures: when two angles "
+    "carry two figures each, say one of them in words"
+)
+_SAY: Final = "why his week looks the way it does (his status, his role, the matchup, the weather)"
+_SAY_ANGLES: Final = "what the facts that decide his week mean for this week's call"
+_SEE: Final = "Say what you see in his status, his role, the matchup or his rate."
+_SEE_ANGLES: Final = "Say what the facts that decide his week and his status tell you."
+_NAMED: Final = "Every figure in the facts is one the page prints as a cell: name it the way the cell does"
+_NAMED_ANGLES: Final = (
+    "Every figure in the facts is one the page prints as a cell or one his usage facts state: name a usage figure "
+    "the way its line does (\"32% of the Rams' targets\"), and a cell's the way the cell does"
+)
+
+
+def _rules(*, angles: bool) -> str:
+    """The system prompt, with the angles' words (Lane 300) or main's."""
+    text = _RULES_TEXT.replace(_PICK, _PICK_ANGLES) if angles else _RULES_TEXT
+    if angles:
+        text = text.replace(_SAY, _SAY_ANGLES).replace(_SEE, _SEE_ANGLES).replace(_NAMED, _NAMED_ANGLES)
+        text = text.replace(_CAP, _CAP_ANGLES)
+    return text
+
+
+_RULES_TEXT: Final = f"""You write the week-ahead read on one player's page for a fantasy football manager setting his lineup for the week in front of him. You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
 
 THE FOUR RULES READS BREAK MOST
 - One figure to a sentence. The opponent's rank, his points a game and his last game's points each get a sentence of their own.
@@ -100,6 +138,14 @@ NUMBERS, TIME AND WORDS
 - This read's own words: {_quoted(shown_week_words())}.
 
 {_RETURN}"""
+# Main's system prompt, and the angles' (Lane 300): `week_rules` picks by the switch at the call.
+WEEK_RULES: Final = _rules(angles=False)
+WEEK_RULES_ANGLES: Final = _rules(angles=True)
+
+
+def week_rules() -> str:
+    """The system prompt as the angles switch stands (`angles.ANGLES_ON`)."""
+    return WEEK_RULES_ANGLES if angles_on() else WEEK_RULES
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,6 +195,17 @@ def week_prompt(sheet: WeekSheet, avoid: Sequence[str]) -> str:
     )
 
 
+ANGLES_REMINDER: Final = (
+    "Keep the read built on the one or two facts that decide his week, with why they matter to this week's call; "
+    "leave out what is ordinary, and never tour the list."
+)
+
+
+def _angles_reminder(sheet: WeekSheet) -> list[str]:
+    """A correction's line on the angles (Lane 300): the correction writes most reads, so it carries them too."""
+    return [ANGLES_REMINDER] if angles_on() and sheet.angles and sheet.can_play else []
+
+
 def length_move(words: int) -> str | None:
     """What a read out of its band is told to do, counted for it (Lane 52's length correction): a writer told
     only the band kept a 137-word read at 137 words through three corrections in the recorded run. Over the
@@ -181,6 +238,7 @@ def week_correction(sheet: WeekSheet, body: str, ledger: Sequence[RuleNote], avo
             f"{ASKED_WORDS[1]} words and never more than {_HIGH}, keeping what was right. Every rule this read has broken so far, on this "
             "attempt and the ones before it. What you return breaks none of them and brings none of them back:"
             f"\n{lines}",
+            *_angles_reminder(sheet),
             *voice_reminder(sheet),
             _RETURN,
         ]

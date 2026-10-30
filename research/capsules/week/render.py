@@ -16,6 +16,15 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.render_depth import slot_word
 from research.capsules.render_season import week_list
 from research.capsules.render_words import IN_OUR_RECORDS, ordinal, week_of
+from research.capsules.week.angles import angles_on
+from research.capsules.week.bites import (
+    depth_bites,
+    depth_words,
+    expected_words,
+    rank_bite_words,
+    rank_bites,
+    weather_words,
+)
 from research.capsules.week.cells import named_chance
 from research.capsules.week.rank_words import rank_words
 from research.capsules.week.report_day import report_words
@@ -67,9 +76,20 @@ def _game_line(sheet: WeekSheet) -> str:
     return f"His game: {words}."
 
 
+def _report(sheet: WeekSheet) -> str:
+    """The injury report as the sheet names it. With the angles on (Lane 300, fix rounds 1 and 2) this week's
+    report is "this week's game status report": the angles' sheet drops the generic lines that named the season
+    first, so the report's "week 8's" was the first week a read named and went without its season (11 of the
+    angles arm's falls in pair d, 9 in pair f on the sheets the minimum score left with no angle)."""
+    words = report_words(sheet.status, sheet.written_at, sheet.game)
+    if angles_on() and sheet.game is not None and sheet.game.week == sheet.week:
+        return words.replace(f"week {sheet.week}'s game status report", "this week's game status report")
+    return words
+
+
 def _status_line(sheet: WeekSheet) -> str:
     status, this_week = sheet.status.status, week_of(sheet.week, sheet.season)
-    report = report_words(sheet.status, sheet.written_at, sheet.game)
+    report = _report(sheet)
     if status is None:
         return f"Injury report: no designation for him on {report}."
     returning = returning_words(sheet.status)
@@ -159,8 +179,19 @@ def _depth_line(sheet: WeekSheet) -> str | None:
         else "Listed with him: " + ", ".join(f"{name} {slot_word(slot)}" for name, slot in d.around) + "."
     )
     return (
-        f"Depth chart{_as_of(d.released_at)}: listed {slot_word(d.slot)} among {sheet.team} {sheet.position}s. {around}"
+        f"Depth chart{_as_of(d.released_at)}: listed {slot_word(d.slot)} among {sheet.team} {sheet.position}s"
+        f"{_move_words(sheet)}. {around}"
     )
+
+
+def _move_words(sheet: WeekSheet) -> str:
+    """His move since the chart before (Lane 300, review M3), the reason the line bites: ", up from second on the
+    chart before". The depth fact rule takes that place after "from" (`fact_rules.place_violations`)."""
+    d, before = sheet.depth, sheet.depth_moved_from
+    # The move is printed only when it bites (a release within the window), the final review's M2.
+    if d is None or before is None or before == d.slot or not angles_on() or not depth_bites(sheet):
+        return ""
+    return f", {'up' if d.slot < before else 'down'} from {slot_word(before)} on the chart before"
 
 
 def _season_line(sheet: WeekSheet) -> str:
@@ -204,8 +235,54 @@ def _board_line(sheet: WeekSheet) -> str | None:
     return f"Our preseason order, set before the season{_as_of(b.published_at)}: {place}. {say}"
 
 
+ANGLES_HEAD: Final = (
+    "His usage this week in full, the most unusual first, each with how unusual it is (read them all, lead with what "
+    "decides his week, leave out what is ordinary):"
+)
+NO_ANGLE: Final = "His usage this week: no usage fact of his clears its sample this week."
+
+
+def _angles_lines(sheet: WeekSheet) -> list[str]:
+    """His facts in full (Lane 300), one to a line, for a player who can play this week."""
+    if not sheet.can_play:
+        return []
+    if not sheet.angles:
+        return [NO_ANGLE]
+    return [ANGLES_HEAD, *(f"{n}. {angle.text}" for n, angle in enumerate(sheet.angles, start=1))]
+
+
+def _with_words(line: str | None, words: str) -> str | None:
+    return None if line is None else f"{line} {words}"
+
+
+def _rank_in_full(sheet: WeekSheet) -> str | None:
+    """The opponent's rank with its words. In the middle of the league it is one short line with no ask to say it
+    (pair i: the full line, with its "In words, say it as ..." and its season, drew the rank into 64% of reads,
+    38 of them where it did not bite)."""
+    a, game = sheet.allowed, sheet.game
+    if a is None or game is None or sheet.bye:
+        return None
+    if rank_bites(a):
+        return _with_words(_allowed_line(sheet), rank_bite_words(a))
+    return f"{game.opponent} against {a.position}s: {ordinal(a.rank)} of {a.of}. {rank_bite_words(a)}"
+
+
+def _in_full(sheet: WeekSheet) -> list[str | None]:
+    """His facts in full, then the game's: the expected score, the forecast, the opponent's rank and the depth
+    chart, each with the words that say whether it bites (`bites`, the coordinator's ruling 2 of fix round 2)."""
+    return [
+        *_angles_lines(sheet),
+        _with_words(_expected_line(sheet), expected_words(sheet)),
+        _with_words(_weather_line(sheet), weather_words(sheet)),
+        _rank_in_full(sheet),
+        _with_words(_depth_line(sheet), depth_words(sheet)),
+    ]
+
+
 def render_week_sheet(sheet: WeekSheet) -> str:
-    """The week's facts as the writer reads them, one fact to a line, each with its read."""
+    """The week's facts as the writer reads them, one fact to a line, each with its read: with the angles on
+    (Lane 300), his angles first after his status, and the weather, the opponent's rank and the depth chart only
+    where they bite; the expected score only as an angle."""
     this_week = week_of(sheet.week, sheet.season)
     reach = (
         f"no week's games are {IN_OUR_RECORDS} yet"
@@ -219,10 +296,11 @@ def render_week_sheet(sheet: WeekSheet) -> str:
         _game_line(sheet),
         _status_line(sheet),
         _projection_line(sheet),
-        _expected_line(sheet),
-        _weather_line(sheet),
-        _allowed_line(sheet),
-        _depth_line(sheet),
+        *(
+            _in_full(sheet)
+            if angles_on()
+            else (_expected_line(sheet), _weather_line(sheet), _allowed_line(sheet), _depth_line(sheet))
+        ),
         _season_line(sheet),
         _board_line(sheet),
     ]

@@ -11,7 +11,7 @@ server where the harness may create `parity_*` databases); skipped without it.""
 
 import json
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -26,12 +26,15 @@ from research.capsules.gateway import GatewayClient
 from research.capsules.gateway_ledger import ModelPrice
 from research.capsules.narrative import ShapeMasks
 from research.capsules.store import WRITTEN_SOURCE
+from research.capsules.week import angles as angles_module
 from research.capsules.week.cadence import central_day, status_rewrite_capped
 from research.capsules.week.collect import board_week
 from research.capsules.week.prompt import answer_json
+from research.capsules.week.render import render_week_facts_block
 from research.capsules.week.rollover import NIGHTS, ReadsDue, Rollover, next_nightly, night_of, reads_due, rollover
 from research.capsules.week.sheet import Status, WeekSheet
 from research.capsules.week.store import StoredWeekRead, replace_week_read, stored_week_reads, upsert_week_read
+from research.capsules.week.validate import validate_week_read
 from research.capsules.week.write import MAX_CALLS_PER_READ
 from research.db.engine import make_engine
 from research.db.schema import PLAYER_WEEK_READ_RUNS, PLAYER_WEEK_READS, PLAYERS
@@ -41,9 +44,10 @@ from research.nightly.reads.schedule import ClubWeek, Game, GameState
 from research.nightly.steps import StepRecord
 from research.nightly.week_read_demotion import demote_shared_keeping
 from research.parity import databases
+from research.tests.test_week_read_angles import _ACCEPTED, _angled
 from research.tests.test_week_read_rules import STARTER_READ
 from research.tests.test_week_read_store import _QUESTIONABLE_READ
-from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, questionable, starter
+from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, main_sheet, questionable, starter
 
 _DATABASE = "parity_test_week_read_rollover"
 _PRICE = ModelPrice("zai/glm-5.3-flash", 0.15, 0.50, "test", True)
@@ -806,3 +810,33 @@ def test_a_nightly_status_rewrite_is_asked_twice_and_leaves_the_day_one_hourly_r
     later = _MORNING + timedelta(hours=1)
     capped = _step(engine, monkeypatch, _on(moved, later), _Writer(asked=asked), hourly=True, at=later)
     assert len(asked) == 3 * MAX_CALLS_PER_READ and "0 reads due" in capped.summary
+
+
+def test_the_roll_over_writes_an_angle_led_read_with_the_angles_on(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review's H3: with the angles on, the pass's ask carries his angles, the read the stub writes in their
+    words passes the validator and is stored as written, and the facts block is the same as with them off."""
+    sheet = _angled()
+    asked: list[str] = []
+
+    def writer(request: httpx.Request) -> httpx.Response:
+        asked.append(json.loads(request.content)["messages"][-1]["content"])
+        return _completion(_ACCEPTED, "start")
+
+    monkeypatch.setattr(angles_module, "ANGLES_ON", True)
+    off_block = render_week_facts_block(sheet)
+    record = _step(engine, monkeypatch, [sheet], writer)  # type: ignore[arg-type]
+    stored = _reads(engine)[(sheet.player_id, _BOARD_WEEK)]
+    assert record.status == "ran" and stored.source == WRITTEN_SOURCE and stored.body == _ACCEPTED
+    assert sheet.angles[0].text in asked[0] and sheet.angles[1].text in asked[0]
+    assert validate_week_read(stored.body, sheet, call=stored.call).ok
+    assert render_week_facts_block(sheet) == off_block
+
+
+@pytest.fixture(autouse=True)
+def _main_sheet() -> Iterator[None]:
+    """These tests pin main's sheet, its lines and the reads written from it (Lane 300 turned the angles on; the
+    angles' sheet is `test_week_read_angles`'s)."""
+    with main_sheet():
+        yield

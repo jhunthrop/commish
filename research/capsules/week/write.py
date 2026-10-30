@@ -33,7 +33,7 @@ from research.capsules.week.judge import (
     judge_violation,
     says_start,
 )
-from research.capsules.week.prompt import WEEK_RULES, parse_week_answer, week_correction, week_prompt
+from research.capsules.week.prompt import parse_week_answer, week_correction, week_prompt, week_rules
 from research.capsules.week.render import render_week_facts_block
 from research.capsules.week.sheet import WeekSheet
 from research.capsules.week.validate import WEEK_BAND, validate_week_read
@@ -94,7 +94,7 @@ class WeekReadResult:
 
 
 def messages_for(user: str) -> list[dict[str, str]]:
-    return [{"role": "system", "content": WEEK_RULES}, {"role": "user", "content": user}]
+    return [{"role": "system", "content": week_rules()}, {"role": "user", "content": user}]
 
 
 def _facts(sheet: WeekSheet, usage: Usage | None, calls: int, attempts: list[WeekAttempt], why: str) -> WeekReadResult:

@@ -43,8 +43,12 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
+from research.capsules.week.angle_rules import figure_violations as angle_figure_violations
+from research.capsules.week.angle_rules import ordinary_rank_violations
 from research.capsules.week.cells import cell_figures, misnamed, misranked, quotable_figures
 from research.capsules.week.fact_rules import place_violations, weather_violations, week_figure_violations
+from research.capsules.week.place_rules import place_violations as angle_place_violations
+from research.capsules.week.place_rules import unusual_violations
 from research.capsules.week.rank_words import fits, rank_words, superlatives_in
 from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import STATUS_WORDS, WeekSheet
@@ -54,6 +58,9 @@ MIN_SENTENCES: Final = 3
 MAX_SENTENCES: Final = 5
 # The figures a read states at most (Lane 100, B44): the cells above it carry his numbers.
 MAX_FIGURES: Final = 3
+# A read built on its angles (Lane 300) may state one figure more: an angle's share and the one it is set
+# against are two figures, and the angles are in no cell, so the cap on retelling the cells is not what they spend.
+ANGLE_FIGURES: Final = 1
 # The writer's own call for its read, one word (H2): what it tells a manager who has him to do this week.
 START: Final = "start"
 CALLS: Final = (START, "sit", "hold", "none")
@@ -133,7 +140,11 @@ _RANK_WORD: Final = re.compile(r"\b\d+(?:st|nd|rd|th)\b", re.IGNORECASE)
 # "sits first among" or "play Arizona" (review LOW-11).
 _CALL_WORDS: Final = re.compile(
     r"\b(?:[Ss]tart|[Ss]it|[Bb]ench|[Kk]eep|[Hh]old|[Dd]rop|[Aa]dd|[Ff]lex|[Tt]rust)(?:s|ed|ing)? (?:him|them|[A-Z]\w+)\b|"
-    r"\bfill-in\b|\b[Pp]ick(?:s|ing)? (?:him )?up\b"
+    r"\bfill-in\b|\b[Pp]ick(?:s|ing)? (?:him )?up\b|"
+    # The call in the forms the writer uses for it (Lane 300 fix round 4): "Higgins starts this week", "he sits
+    # this week", "can't be started", "fire him up".
+    r"\b(?:starts|sits)\s+this\s+week\b|\b(?:can(?:'t|not)|shouldn't|should not|won't)\s+be\s+(?:started|benched)\b|"
+    r"\b[Ff]ire\s+(?:him|them|[A-Z]\w+)\s+up\b"
 )
 # His status as the sheet says it (`sheet.STATUS_WORDS`, the one source) and the words for a player with none.
 _STATUS_WORDS: Final = re.compile(
@@ -261,12 +272,18 @@ def _cell_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
                 )
             )
     count = sum(len(stated_figures(s, sheet.season)) for s in sentences)
-    if count > MAX_FIGURES:
+    cap = max_figures(sheet)
+    if count > cap:
         out.append(
-            f"The read states {count} figures. The cells above it carry his numbers: state at most {MAX_FIGURES}, "
+            f"The read states {count} figures. The cells above it carry his numbers: state at most {cap}, "
             "and say in words what the cells cannot, why his figure is what it is and what to do this week."
         )
     return out
+
+
+def max_figures(sheet: WeekSheet) -> int:
+    """The figures a read may state: `MAX_FIGURES`, and `ANGLE_FIGURES` more on a sheet with angles (Lane 300)."""
+    return MAX_FIGURES + (ANGLE_FIGURES if sheet.angles else 0)
 
 
 def _paragraph_violation(text: str) -> list[str]:
@@ -707,6 +724,10 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *place_violations(sentences, sheet),
         *week_figure_violations(sentences, sheet),
         *weather_violations(sentences, sheet),
+        *angle_figure_violations(sentences, sheet, _stated),
+        *angle_place_violations(sentences, sheet),
+        *ordinary_rank_violations(sentences, sheet),
+        *unusual_violations(sentences, sheet),
     ]
 
 
