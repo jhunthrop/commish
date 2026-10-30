@@ -315,6 +315,12 @@ def _rounded(value: float) -> float:
     return page_tenth(value)
 
 
+def sheet_names(sheet: WeekSheet) -> tuple[str, ...]:
+    """The names a sheet lets its read print: his and his teammates' on the chart and in his angles."""
+    around = () if sheet.depth is None else tuple(name for name, _ in sheet.depth.around)
+    return (sheet.name, *around, *(name for angle in sheet.angles for name in angle.names))
+
+
 def week_name_ledger(sheet: WeekSheet) -> tuple[str, ...]:
     """Every name the read may print: his, his teammates on the chart and in his angles, and every club the
     sheet names."""

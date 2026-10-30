@@ -18,7 +18,12 @@ This week's rulings and the Lane 72 review's, each a rule the validator reads:
 - A rank in our order says which order it is: "in our preseason order" or "in our rest-of-season order" (M2).
 - The season is named at most once; weeks after it are "week 5" (the coordinator's ruling on L5).
 - An injury report named by its day is the one the sheet names, the game status report the clubs had issued
-  by the write (`week.report_day`); never a day no report came out (Lane 96, B16).
+  by the write (`week.report_day`), or this week's game status report by the day the sheet states for it
+  (Lane 303, B307); never a day no report came out, and never a report still to come cited for what it says
+  (Lane 96, B16). The writer's season wording is mended before these rules read it (`season_words`, Lane 303).
+- The first sentence carries the call (in the writer's forms: "start him", "has no business in a lineup",
+  "rides the bench", "isn't startable"), a figure, his status, a backup's place on the chart ("third among
+  Colts backs"), or that he does not play; never a scene set first (Lane 139, C25; Lane 303).
 - Every figure is one the page draws as a cell, as the cell prints it (`cells`), and a read states at most
   `MAX_FIGURES` of them: the cells carry his numbers, the read says what they cannot (Lane 100, B17, B44).
 - One paragraph, three to five sentences.
@@ -40,6 +45,7 @@ from collections.abc import Sequence
 from typing import Final
 
 from research.capsules.facts.team_names import NFL_TEAM_NAMES
+from research.capsules.names import name_pattern
 from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
@@ -50,8 +56,9 @@ from research.capsules.week.fact_rules import place_violations, weather_violatio
 from research.capsules.week.place_rules import place_violations as angle_place_violations
 from research.capsules.week.place_rules import unusual_violations
 from research.capsules.week.rank_words import fits, rank_words, superlatives_in
-from research.capsules.week.report_day import report_words
-from research.capsules.week.sheet import STATUS_WORDS, WeekSheet
+from research.capsules.week.render import report_said
+from research.capsules.week.report_day import report_day, report_issued, report_out
+from research.capsules.week.sheet import STATUS_WORDS, WeekSheet, central_day_and_time, sheet_names
 from research.capsules.week.start_advice import start_advice_in
 
 MIN_SENTENCES: Final = 3
@@ -140,12 +147,32 @@ _RANK_WORD: Final = re.compile(r"\b\d+(?:st|nd|rd|th)\b", re.IGNORECASE)
 # "sits first among" or "play Arizona" (review LOW-11).
 _CALL_WORDS: Final = re.compile(
     r"\b(?:[Ss]tart|[Ss]it|[Bb]ench|[Kk]eep|[Hh]old|[Dd]rop|[Aa]dd|[Ff]lex|[Tt]rust)(?:s|ed|ing)? (?:him|them|[A-Z]\w+)\b|"
-    r"\bfill-in\b|\b[Pp]ick(?:s|ing)? (?:him )?up\b|"
+    r"\b[Pp]ick(?:s|ing)? (?:him )?up\b|"
     # The call in the forms the writer uses for it (Lane 300 fix round 4): "Higgins starts this week", "he sits
     # this week", "can't be started", "fire him up".
     r"\b(?:starts|sits)\s+this\s+week\b|\b(?:can(?:'t|not)|shouldn't|should not|won't)\s+be\s+(?:started|benched)\b|"
     r"\b[Ff]ire\s+(?:him|them|[A-Z]\w+)\s+up\b"
 )
+# The call's forms that say nothing of whom they are said (Lane 303 and its review's M3): they count only in a
+# sentence about him (`_said_of_him`). "Play Jayden Daniels", "has no business in a lineup", "rides the bench",
+# "isn't startable", "isn't worth a starting spot", "has no case to start", and main's "find a fill-in".
+_HIS_CALL: Final = re.compile(
+    r"\bPlay\s+(?P<played>him\b|[A-Z][\w'.-]*(?:\s+[A-Z][\w'.-]*)*)|\bfill-in\b|"
+    r"\b(?:in|into|out of)\s+(?:a|the|any)\s+(?:starting\s+)?lineup\b|"
+    r"\b(?:rides?|riding|stays?|belongs?)\s+(?:on\s+)?the\s+bench\b|\bstartable\b|"
+    r"\bworth\s+(?:a\s+)?start(?:ing|s)?\b|\b(?:case|reason)\s+to\s+(?:start|sit)\b"
+)
+# A backup's place on the club's depth chart in words, the fact that decides his week (Lane 303): "third among
+# Colts backs", "fourth among Chargers receivers", "second on Denver's depth chart", "third at quarterback".
+# A starter's "first among" decides nothing and sets a scene (review MEDIUM-1). Counted only of him, as `_HIS_CALL`.
+_DEPTH_PLACE: Final = re.compile(r"\b(?:second|third|fourth|fifth|sixth)\s+(?:among|on|at|in\s+line)\b", re.IGNORECASE)
+# His place on the injury list said without its designation: "sits on the injury list". Counted only of him.
+_ON_THE_LIST: Final = re.compile(r"\bon\s+the\s+injury\s+(?:list|report)\b", re.IGNORECASE)
+# What a sentence about him opens on: his name or surname (`_his_names`), He or His, or the call's imperative
+# ("Find a fill-in", "Keep him out of the lineup").
+_HE: Final = re.compile(r"(?:He|His)\b")
+_IMPERATIVE: Final = re.compile(r"(?:Find|Grab|Get|Use|Plug|Pick|Line|Slot|Start|Sit|Bench|Keep|Leave|Hold|Lock)\b")
+_SUFFIXES: Final = frozenset({"Jr.", "Sr.", "Jr", "Sr", "II", "III", "IV", "V"})
 # His status as the sheet says it (`sheet.STATUS_WORDS`, the one source) and the words for a player with none.
 _STATUS_WORDS: Final = re.compile(
     r"\b(?:"
@@ -164,10 +191,18 @@ def _sentence_violation(what: str, sentence: str, remedy: str) -> str:
     return f'The text {what} in the sentence "{sentence}". {remedy}'
 
 
-def _word_violations(sentences: Sequence[str]) -> list[str]:
+def _unnamed(sentence: str, names: Sequence[str]) -> str:
+    """`sentence` with each of `names` (his and his teammates', whole and case-sensitive, any accent) masked, so a
+    word rule never reads a name (Lane 303 fix round 1): "Tip Reiman" carries no tip, "KC Concepcion" no club code."""
+    for name in sorted(dict.fromkeys(names), key=len, reverse=True):
+        sentence = re.sub(rf"(?<![^\W\d_]){name_pattern(name)}(?![^\W\d_])", "Him", sentence)
+    return sentence
+
+
+def _word_violations(sentences: Sequence[str], names: Sequence[str] = ()) -> list[str]:
     out = []
     for rule in WEEK_NEVER_WORDS:
-        sentence = next((s for s in sentences if rule.pattern.search(s)), None)
+        sentence = next((s for s in sentences if rule.pattern.search(_unnamed(s, names))), None)
         if sentence is not None:
             out.append(_sentence_violation(f"carries {rule.name}", sentence, "Rewrite that sentence without it."))
     return out
@@ -407,10 +442,10 @@ def _wait_violation(text: str, sheet: WeekSheet, call: str | None) -> list[str]:
 _CLUB_CODE: Final = re.compile(r"\b(?:" + "|".join(sorted(NFL_TEAM_NAMES, key=len, reverse=True)) + r")\b")
 
 
-def _code_violations(sentences: Sequence[str]) -> list[str]:
+def _code_violations(sentences: Sequence[str], names: Sequence[str] = ()) -> list[str]:
     out = []
     for s in sentences:
-        found = _CLUB_CODE.search(s)
+        found = _CLUB_CODE.search(_unnamed(s, names))
         if found is not None:
             out.append(
                 _sentence_violation(
@@ -444,42 +479,119 @@ def _order_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
 
 
 # A report or a list named by its day (review L1): "Friday's report", "the Tuesday report", "Tuesday's
-# practice report", "Sunday's injury list".
+# practice report", "Sunday's injury list", and a week named with it (Lane 303 fix round 1): "Friday's week 9 report".
 _REPORT_DAY: Final = re.compile(
     r"\b(?:the\s+)?(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?:(?:'|\u2019)s)?\s+"
+    r"(?:week\s+(?P<week>\d{1,2})(?:\s+of\s+(?:19|20)\d\d)?(?:(?:'|\u2019)s)?\s+)?"
     r"(?:injury\s+|practice\s+|game status\s+)?(?:report|list)\b",
     re.IGNORECASE,
 )
 
 
 # The words between a day and its report that name no other report (review R1-L2): "Friday's injury
-# report" is the sheet's "Friday's report".
+# report" is the sheet's "Friday's report", and so is "Friday's week 8 report" once its week is checked.
 _KIND: Final = re.compile(r"\s(?:injury|practice|game status)\s")
+_WEEK_WORDS: Final = re.compile(r"\s+week\s+\d{1,2}(?:\s+of\s+\d{4})?(?:'s)?(?=\s)")
 
 
 def _named(text: str) -> set[str]:
-    """Each report or list named by its day, as one phrase: lower case, no leading "the", no kind word."""
+    """Each report or list named by its day, as one phrase: lower case, no leading "the", no week, no kind word."""
     return {
-        _KIND.sub(" ", m.group(0).lower().replace("\u2019", "'").removeprefix("the "))
+        _KIND.sub(" ", _WEEK_WORDS.sub("", m.group(0).lower().replace("\u2019", "'")).removeprefix("the "))
         for m in _REPORT_DAY.finditer(text)
     }
 
 
+# A report still to come (the review's H1): a forward cue in the clause before it ("before Friday's report", "if
+# Friday's game status report clears him", "until", "ahead of", "once", "pending"), or a future word after it
+# ("Friday's report will settle it", "is still to come", "decides whether he plays"). A report as the source of
+# what it says ("Friday's report cleared him", "has him Out", "is out") is never still to come.
+_FORWARD_BEFORE: Final = re.compile(
+    r"\b(?:before|until|till|unless|ahead of|if|when|once|into|heading into|awaiting|pending|"
+    r"wait(?:s|ing)? (?:for|on)|check|watch|let|see what|by the time)\b",
+    re.IGNORECASE,
+)
+# "by" is the agent as often as the deadline ("cleared by Friday's report", the re-review's M1): it is still to
+# come only with a forward word in its clause ("we will know by Friday's report", "by Friday's report it decides").
+_BY_BEFORE: Final = re.compile(r"\bby\s+$", re.IGNORECASE)
+_FORWARD_IN_CLAUSE: Final = re.compile(
+    r"\b(?:will|would|could|should|decides?|settles?|determines?|we know|we'll know|we will know)\b", re.IGNORECASE
+)
+_FORWARD_AFTER: Final = re.compile(
+    r"^(?:'s)?\s*(?:will|would|could|should|may|might|is due|comes?|lands?|is (?:still )?to come|still to come|"
+    r"(?:is )?still ahead|has yet to|is yet to|is not out|isn't out|has not come|hasn't come|"
+    r"(?:decides?|settles?|determines?) (?:whether|if|it|his|this|that))\b",
+    re.IGNORECASE,
+)
+_CITES_AFTER: Final = re.compile(
+    r"^(?:'s)?\s*(?:cleared|lists?|listed|has him|had him|shows?|showed|confirmed|named|ruled|put|gave|"
+    r"downgraded|upgraded|is out|came out|is in|says|said)\b",
+    re.IGNORECASE,
+)
+_CLAUSE_START: Final = re.compile(r"[,;:.]")
+
+
+def _still_to_come(sentence: str, found: re.Match[str]) -> bool:
+    """Whether a day-named report is named as still to come in `sentence` (the review's H1)."""
+    after = sentence[found.end() :]
+    if _CITES_AFTER.match(after):
+        return False
+    clause = _CLAUSE_START.split(sentence[: found.start()])[-1]
+    if _FORWARD_BEFORE.search(clause) is not None or _FORWARD_AFTER.match(after) is not None:
+        return True
+    rest = _CLAUSE_START.split(after)[0]
+    return _BY_BEFORE.search(clause) is not None and _FORWARD_IN_CLAUSE.search(f"{clause} {rest}") is not None
+
+
+def _report_day_words(sheet: WeekSheet) -> set[str]:
+    """This week's game status report by its day, as `_named` reads it ("friday's report", "friday report"), when
+    the sheet states the day (`report_day.report_day_line`)."""
+    day = report_day(sheet)
+    return set() if day is None else {f"{day.lower()}'s report", f"{day.lower()} report"}
+
+
+def _list_day_words(sheet: WeekSheet) -> set[str]:
+    """The injury list by the Central day his status was read (Lane 303 fix round 1): "Tuesday's injury list" is
+    the sheet's "the injury list as of Tuesday"; a list named by any other day is not."""
+    seen_at = sheet.status.seen_at(sheet.written_at)
+    if seen_at is None:
+        return set()
+    day = central_day_and_time(seen_at).split(" ", 1)[0].lower()
+    return {f"{day}'s list", f"{day} list"}
+
+
 def _report_day_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
-    """A report or a list named by its day is one the sheet's own words name (Lane 96, B16 and review
-    L1): never a day no report was issued on by the write."""
-    named = report_words(sheet.status, sheet.written_at, sheet.game)
-    allowed = _named(named)
+    """A report or a list named by its day is one the sheet's own words name (Lane 96, B16 and review L1), this
+    week's game status report by the day the sheet states for it (Lane 303, B307), or the injury list by the day
+    his status was read. Never a day no report was issued on by the write, and never a report for a week the read
+    is not for (a bye's "Friday's week 9 report"). This week's report by its day, as the write's clock and his
+    status's read date it (`report_day`, the review's H1 and M2): cited freely once his status was read after it;
+    before it is out, named only as still to come; out but his status read before it, not named by its day."""
+    named = report_said(sheet)
+    day_words = _report_day_words(sheet)
+    allowed = _named(named) | day_words | _list_day_words(sheet)
+    out_for_him, issued = report_out(sheet), report_issued(sheet)
     out: list[str] = []
     for s in sentences:
         for found in _REPORT_DAY.finditer(s):
-            if _named(found.group(0)) <= allowed:
-                continue
-            out.append(
-                _sentence_violation(
-                    f"names {found.group(0)}, a report the facts do not name", s, f'Name it as the facts do: "{named}".'
+            said = _named(found.group(0))
+            week = found.group("week")
+            if week is not None and int(week) != sheet.week:
+                what: str | None = "a report for a week this read is not for"
+            elif not said <= allowed:
+                what = "a report the facts do not name"
+            elif not said <= day_words or out_for_him or said <= _named(named):
+                what = None
+            elif issued:
+                what = "a report that came out after his status was read"
+            elif not _still_to_come(s, found):
+                what = "a report not out at the write, as if it were"
+            else:
+                what = None
+            if what is not None:
+                out.append(
+                    _sentence_violation(f"names {found.group(0)}, {what}", s, f'Name it as the facts do: "{named}".')
                 )
-            )
     return out
 
 
@@ -505,18 +617,52 @@ def _superlative_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[
     return out
 
 
-def _carries_the_point(text: str, season: int) -> bool:
-    """Whether a stretch of a read states a figure, a rank, the call, his status or that he does not play."""
+def _his_names(names: Sequence[str]) -> tuple[str, ...]:
+    """His full name and surname, the first of `names` (`sheet.sheet_names` puts his first); () with none."""
+    if not names:
+        return ()
+    words = [word for word in names[0].split() if word not in _SUFFIXES]
+    return tuple(dict.fromkeys((names[0], *(words[-1:] if len(words) > 1 else ()))))
+
+
+def _said_of_him(text: str, match: re.Match[str], his: Sequence[str]) -> bool:
+    """Whether a Lane 303 opener form in `text` is said of him (the review's M3): the sentence opens on it ("Third
+    on Philadelphia's quarterback chart, Cole Payton ..."), on his name, surname, He or His, or on the call's
+    imperative, or its own clause does after a leading phrase ("Behind Shipley, Nacua is startable", the
+    re-review's M2); and "Play" plays him."""
+    played = match.groupdict().get("played")
+    if played is not None:
+        return played == "him" or any(played.startswith(name) for name in his)
+    before = text[: match.start()].lstrip(" \"'\u201c")
+    clause = before.rsplit(",", 1)[-1].lstrip()
+    return (
+        before == ""
+        or any(
+            any(opening.startswith(name) for name in his) or _HE.match(opening) is not None
+            for opening in (before, clause)
+        )
+        or _IMPERATIVE.match(before) is not None
+    )
+
+
+def _of_him(pattern: re.Pattern[str], text: str, his: Sequence[str]) -> bool:
+    return any(_said_of_him(text, match, his) for match in pattern.finditer(text))
+
+
+def _carries_the_point(text: str, season: int, his: Sequence[str] = ()) -> bool:
+    """Whether a stretch of a read states a figure, a rank, the call, his status or that he does not play; the
+    Lane 303 forms (a call that names no one, a depth place, "on the injury list") only said of him."""
     return bool(
         stated_figures(text, season)
         or _RANK_WORD.search(text)
         or _CALL_WORDS.search(text)
         or _STATUS_WORDS.search(text)
         or _DOES_NOT_PLAY.search(text)
+        or any(_of_him(pattern, text, his) for pattern in (_HIS_CALL, _DEPTH_PLACE, _ON_THE_LIST))
     )
 
 
-def _set_up_head(first: str, season: int) -> str | None:
+def _set_up_head(first: str, season: int, his: Sequence[str] = ()) -> str | None:
     """The clause a read's first sentence sets up on, ended by a colon ("Bye week for Kittle"), else None. A
     first clause a colon ends is refused whatever it names (B282); a colon after the first clause is held to
     main's test (C25, the Lane 286 review's H2): refused unless the text before it carries the point. "For the
@@ -526,18 +672,18 @@ def _set_up_head(first: str, season: int) -> str | None:
     if colon is None:
         return None
     head = first[: colon.start()]
-    if _CLAUSE_END.search(head) and _carries_the_point(head, season):
+    if _CLAUSE_END.search(head) and _carries_the_point(head, season, his):
         return None
     return head.strip()
 
 
-def _opener_violation(sentences: Sequence[str], season: int) -> list[str]:
+def _opener_violation(sentences: Sequence[str], season: int, names: Sequence[str] = ()) -> list[str]:
     """The read leads with the verb or the fact (Lane 139, C25): its first sentence carries the call, a
     figure or his status, and it opens on no clause a colon ends that sets up the rest (`_set_up_head`)."""
     if not sentences:
         return []
-    first = sentences[0]
-    head = _set_up_head(first, season)
+    first, his = sentences[0], _his_names(names)
+    head = _set_up_head(first, season, his)
     if head is not None:
         return [
             _sentence_violation(
@@ -546,7 +692,7 @@ def _opener_violation(sentences: Sequence[str], season: int) -> list[str]:
                 "Lead with the call or the fact that decides his week, and drop the clause before the colon.",
             )
         ]
-    if not _carries_the_point(first, season):
+    if not _carries_the_point(first, season, his):
         return [
             _sentence_violation(
                 "opens without the call, a figure or his status",
@@ -700,11 +846,12 @@ def _call_violation(call: str | None) -> list[str]:
 def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none") -> list[str]:
     """Every week rule `text` breaks for `sheet`, given the writer's `call` for it; empty is clean."""
     sentences = split_sentences(text.strip())
+    names = sheet_names(sheet)
     return [
         *_paragraph_violation(text),
         *_count_violation(sentences),
         *_call_violation(call),
-        *_word_violations(sentences),
+        *_word_violations(sentences, names),
         *_projection_violations(sentences, sheet),
         *_cannot_start_violations(sentences, sheet, call),
         *_returning_violations(sentences, sheet),
@@ -715,9 +862,9 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_report_day_violations(sentences, sheet),
         *_season_violation(text, sheet.season),
         *_wait_violation(text, sheet, call),
-        *_code_violations(sentences),
+        *_code_violations(sentences, names),
         *_superlative_violations(sentences, sheet),
-        *_opener_violation(sentences, sheet.season),
+        *_opener_violation(sentences, sheet.season, names),
         *_twice_ranked_violations(sentences),
         *_addressed_violations(sentences),
         *_spelled_figure_violations(sentences, sheet),
@@ -731,23 +878,24 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
     ]
 
 
-def body_rule_violations(text: str, season: int) -> list[str]:
+def body_rule_violations(text: str, season: int, names: Sequence[str] = ()) -> list[str]:
     """The week rules `text` breaks that judge the body alone, never a sheet (the Lane 286 re-review): its
     paragraph and sentence count, the never words, the projection or card named, every figure's unit, the season
     named once, a club's code, the opener, a rank stated twice, the member addressed. The cadence's check on a
     stored read (`cadence.RULE_STALE`): a rule that reads today's sheet (the cells, the status, the report day,
-    a spelled number's cell) would refuse a read that was right when it was written."""
+    a spelled number's cell) would refuse a read that was right when it was written. `names` are his and his
+    teammates', masked before the word and code rules as the validator masks them."""
     sentences = split_sentences(text.strip())
     named = [] if not names_the_projection(text) else ["The read names the published projection or the card."]
     return [
         *_paragraph_violation(text),
         *_count_violation(sentences),
-        *_word_violations(sentences),
+        *_word_violations(sentences, names),
         *named,
         *_unit_violations(sentences, season),
         *_season_violation(text, season),
-        *_code_violations(sentences),
-        *_opener_violation(sentences, season),
+        *_code_violations(sentences, names),
+        *_opener_violation(sentences, season, names),
         *_twice_ranked_violations(sentences),
         *_addressed_violations(sentences),
     ]
