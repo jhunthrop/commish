@@ -13,7 +13,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Final
 from zoneinfo import ZoneInfo
 
-from research.capsules.week.sheet import Status, WeekGame, central_day_and_time
+from research.capsules.week.sheet import Status, WeekGame, WeekSheet, central_day_and_time
 
 EASTERN: Final = ZoneInfo("America/New_York")
 # The game status report's deadline on its day, Eastern.
@@ -56,3 +56,38 @@ def report_words(status: Status, written_at: datetime, game: WeekGame | None) ->
     if changed is not None and changed > issued and changed.astimezone(EASTERN).date() > issued.date():
         return f"{day}'s report, updated {changed.astimezone(EASTERN).strftime('%A')}"
     return f"{day}'s report"
+
+
+def this_weeks_game(sheet: WeekSheet) -> WeekGame | None:
+    """His game this week, the one this week's game status report is issued for; None on a bye or with none."""
+    game = sheet.game
+    return None if game is None or sheet.bye or game.week != sheet.week else game
+
+
+def report_day(sheet: WeekSheet) -> str | None:
+    """The day this week's game status report is issued ("Friday"), None with no game this week."""
+    game = this_weeks_game(sheet)
+    return None if game is None else status_report_issued(game.kickoff).strftime("%A")
+
+
+def report_out(sheet: WeekSheet) -> bool:
+    """Whether this week's game status report was out when his status was read, as `report_words` dates it."""
+    game, seen_at = this_weeks_game(sheet), sheet.status.seen_at(sheet.written_at)
+    return game is not None and seen_at is not None and seen_at >= status_report_issued(game.kickoff)
+
+
+def report_day_line(sheet: WeekSheet) -> str | None:
+    """The game status report's day as a fact of the sheet (Lane 303, B307), so a read may name it truthfully:
+    out by the write, or still to come and so never cited for what it says."""
+    game, day = this_weeks_game(sheet), report_day(sheet)
+    if game is None or day is None:
+        return None
+    clock = central_day_and_time(status_report_issued(game.kickoff)).split(" ", 1)[1]
+    # The day is the kickoff's, so the line carries the schedule's read as every line carries its own.
+    read = "" if game.scheduled_at is None else f" (as of {central_day_and_time(game.scheduled_at)} Central)"
+    if report_out(sheet):
+        return f"Game status report: this week's came out {day} by {clock} Central, {day}'s report{read}."
+    return (
+        f"Game status report: this week's comes out {day} by {clock} Central, after the injury list above was "
+        f'read{read}. A read may say it is still to come ("before {day}\'s report"), never what it says.'
+    )

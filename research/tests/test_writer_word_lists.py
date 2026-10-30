@@ -147,6 +147,10 @@ def test_prose_that_trips_the_site_trips_the_writer(text: str, found: str) -> No
 def test_the_fields_own_lines_and_a_word_already_refused_are_not_refused_twice() -> None:
     clean = "He runs behind the offensive line, scores from the goal line and the O-line holds the line of scrimmage."
     assert writer_only_hits(clean, ()) == []
+    # Lane 303: lining up is football, never the betting line.
+    for lining in ("Whoever lines up opposite him.", "Line up a fill-in.", "He lined up in the slot.", "They line up."):
+        assert writer_only_hits(lining, ()) == [], lining
+    assert [hit.found for hit in writer_only_hits("The line upset him.", ())] == ["line"]
     # "odds" is a betting word already: refused once, by its own rule.
     assert [hit.rule for hit in voice_rule_hits("The odds say he scores.", ())] == ["betting word (odds)"]
     assert writer_only_hits("The odds say he scores.", ()) == []

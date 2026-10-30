@@ -25,7 +25,7 @@
 		"shown": "line",
 		"sparedAfter": ["goal", "offensive", "defensive"],
 		"sparedSide": ["O", "D"],
-		"sparedBefore": ["of scrimmage"]
+		"sparedBefore": ["of scrimmage", "up\\b"]
 	},
 	"trading": {
 		"markets?": "market",
@@ -64,7 +64,7 @@
 			"a goal-line back",
 			"the O-line holds",
 			"the D-line",
-			"the line of scrimmage",
+			"the line of scrimmage", "whoever lines up opposite him",
 			"a hostile crowd",
 			"points over replacement",
 			"a buyer"

@@ -2,7 +2,8 @@
 
 One fact to a line, each with the read it came from ("as of Monday 9:03 pm Central"), so the writer and
 a reviewer see how old each fact is; the injury report is named by the day the clubs issued it ("on
-Friday's report", `week.report_day`), never by the day we read the list. His
+Friday's report", `week.report_day`), never by the day we read the list, and this week's game status report's
+day is a line of its own (`report_day.report_day_line`, Lane 303), so a read may name it by that day. His
 place on our board names which order it is, and the words a read must say it in ("in our preseason
 order", "in our rest-of-season order"). Every figure prints as the player card prints it (`page_figures`:
 the tenth, the game's expected points in half points), so a figure the read quotes is the page's, word for
@@ -27,7 +28,7 @@ from research.capsules.week.bites import (
 )
 from research.capsules.week.cells import named_chance
 from research.capsules.week.rank_words import rank_words
-from research.capsules.week.report_day import report_words
+from research.capsules.week.report_day import report_day_line, report_words
 from research.capsules.week.sheet import (
     CANNOT_PLAY,
     STATUS_WORDS,
@@ -76,7 +77,7 @@ def _game_line(sheet: WeekSheet) -> str:
     return f"His game: {words}."
 
 
-def _report(sheet: WeekSheet) -> str:
+def report_said(sheet: WeekSheet) -> str:
     """The injury report as the sheet names it. With the angles on (Lane 300, fix rounds 1 and 2) this week's
     report is "this week's game status report": the angles' sheet drops the generic lines that named the season
     first, so the report's "week 8's" was the first week a read named and went without its season (11 of the
@@ -89,7 +90,7 @@ def _report(sheet: WeekSheet) -> str:
 
 def _status_line(sheet: WeekSheet) -> str:
     status, this_week = sheet.status.status, week_of(sheet.week, sheet.season)
-    report = _report(sheet)
+    report = report_said(sheet)
     if status is None:
         return f"Injury report: no designation for him on {report}."
     returning = returning_words(sheet.status)
@@ -295,6 +296,7 @@ def render_week_sheet(sheet: WeekSheet) -> str:
         f"front of him, and {reach}.",
         _game_line(sheet),
         _status_line(sheet),
+        report_day_line(sheet),
         _projection_line(sheet),
         *(
             _in_full(sheet)

@@ -18,7 +18,12 @@ This week's rulings and the Lane 72 review's, each a rule the validator reads:
 - A rank in our order says which order it is: "in our preseason order" or "in our rest-of-season order" (M2).
 - The season is named at most once; weeks after it are "week 5" (the coordinator's ruling on L5).
 - An injury report named by its day is the one the sheet names, the game status report the clubs had issued
-  by the write (`week.report_day`); never a day no report came out (Lane 96, B16).
+  by the write (`week.report_day`), or this week's game status report by the day the sheet states for it
+  (Lane 303, B307); never a day no report came out, and never a report still to come cited for what it says
+  (Lane 96, B16). The writer's season wording is mended before these rules read it (`season_words`, Lane 303).
+- The first sentence carries the call (in the writer's forms: "start him", "has no business in a lineup",
+  "rides the bench", "isn't startable"), a figure, his status, a backup's place on the chart ("third among
+  Colts backs"), or that he does not play; never a scene set first (Lane 139, C25; Lane 303).
 - Every figure is one the page draws as a cell, as the cell prints it (`cells`), and a read states at most
   `MAX_FIGURES` of them: the cells carry his numbers, the read says what they cannot (Lane 100, B17, B44).
 - One paragraph, three to five sentences.
@@ -50,7 +55,8 @@ from research.capsules.week.fact_rules import place_violations, weather_violatio
 from research.capsules.week.place_rules import place_violations as angle_place_violations
 from research.capsules.week.place_rules import unusual_violations
 from research.capsules.week.rank_words import fits, rank_words, superlatives_in
-from research.capsules.week.report_day import report_words
+from research.capsules.week.render import report_said
+from research.capsules.week.report_day import report_day, report_out
 from research.capsules.week.sheet import STATUS_WORDS, WeekSheet
 from research.capsules.week.start_advice import start_advice_in
 
@@ -144,8 +150,20 @@ _CALL_WORDS: Final = re.compile(
     # The call in the forms the writer uses for it (Lane 300 fix round 4): "Higgins starts this week", "he sits
     # this week", "can't be started", "fire him up".
     r"\b(?:starts|sits)\s+this\s+week\b|\b(?:can(?:'t|not)|shouldn't|should not|won't)\s+be\s+(?:started|benched)\b|"
-    r"\b[Ff]ire\s+(?:him|them|[A-Z]\w+)\s+up\b"
+    r"\b[Ff]ire\s+(?:him|them|[A-Z]\w+)\s+up\b|"
+    # Lane 303's openers from the 2026-10-30 nightly: "Play Jayden Daniels" (the imperative alone, never "plays
+    # Arizona"), "has no business in a lineup", "rides the bench", "isn't startable", "isn't worth a starting
+    # spot", "has no case to start".
+    r"\bPlay\s+(?:him|them|[A-Z]\w+)\b|\b(?:in|into|out of)\s+(?:a|the|any)\s+(?:starting\s+)?lineup\b|"
+    r"\b(?:rides?|riding|stays?|belongs?)\s+(?:on\s+)?the\s+bench\b|\bstartable\b|"
+    r"\bworth\s+(?:a\s+)?start(?:ing|s)?\b|\b(?:case|reason)\s+to\s+(?:start|sit)\b"
 )
+# A backup's place on the club's depth chart in words, the fact that decides his week (Lane 303): "third among
+# Colts backs", "fourth among Chargers receivers", "second on Denver's depth chart", "third at quarterback".
+# A starter's "first among" decides nothing and sets a scene (review MEDIUM-1).
+_DEPTH_PLACE: Final = re.compile(r"\b(?:second|third|fourth|fifth|sixth)\s+(?:among|on|at|in\s+line)\b", re.IGNORECASE)
+# His place on the injury list said without its designation: "sits on the injury list".
+_ON_THE_LIST: Final = re.compile(r"\bon\s+the\s+injury\s+(?:list|report)\b", re.IGNORECASE)
 # His status as the sheet says it (`sheet.STATUS_WORDS`, the one source) and the words for a player with none.
 _STATUS_WORDS: Final = re.compile(
     r"\b(?:"
@@ -465,20 +483,37 @@ def _named(text: str) -> set[str]:
     }
 
 
+# What cites a report for what it says ("on Friday's report", "per Friday's report"), as against naming it still to
+# come ("before Friday's report", "if Friday's report clears him").
+_CITED_ON: Final = re.compile(r"\b(?:on|in|from|per|off|according to)\s+$", re.IGNORECASE)
+
+
+def _report_day_words(sheet: WeekSheet) -> set[str]:
+    """This week's game status report by its day, as `_named` reads it ("friday's report", "friday report"), when
+    the sheet states the day (`report_day.report_day_line`)."""
+    day = report_day(sheet)
+    return set() if day is None else {f"{day.lower()}'s report", f"{day.lower()} report"}
+
+
 def _report_day_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
-    """A report or a list named by its day is one the sheet's own words name (Lane 96, B16 and review
-    L1): never a day no report was issued on by the write."""
-    named = report_words(sheet.status, sheet.written_at, sheet.game)
-    allowed = _named(named)
+    """A report or a list named by its day is one the sheet's own words name (Lane 96, B16 and review L1), or this
+    week's game status report by the day the sheet states for it (Lane 303, B307): never a day no report was
+    issued on by the write, and never a report still to come cited for what it says."""
+    named = report_said(sheet)
+    day_words = _report_day_words(sheet)
+    allowed = _named(named) | day_words
     out: list[str] = []
     for s in sentences:
         for found in _REPORT_DAY.finditer(s):
-            if _named(found.group(0)) <= allowed:
+            said = _named(found.group(0))
+            cited = _CITED_ON.search(s[: found.start()]) is not None
+            if said <= allowed and not (said <= day_words and cited and not report_out(sheet)):
                 continue
+            what = (
+                "a report the facts do not name" if not said <= allowed else "a report not out when his status was read"
+            )
             out.append(
-                _sentence_violation(
-                    f"names {found.group(0)}, a report the facts do not name", s, f'Name it as the facts do: "{named}".'
-                )
+                _sentence_violation(f"names {found.group(0)}, {what}", s, f'Name it as the facts do: "{named}".')
             )
     return out
 
@@ -512,6 +547,8 @@ def _carries_the_point(text: str, season: int) -> bool:
         or _RANK_WORD.search(text)
         or _CALL_WORDS.search(text)
         or _STATUS_WORDS.search(text)
+        or _ON_THE_LIST.search(text)
+        or _DEPTH_PLACE.search(text)
         or _DOES_NOT_PLAY.search(text)
     )
 

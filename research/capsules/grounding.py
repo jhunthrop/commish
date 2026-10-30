@@ -216,8 +216,17 @@ _SENTENCE_VERBS: Final = frozenset(
         "Add",
         "Claim",
         "Rostering",
+        # Lane 303 (B306): the call's imperatives before a surname ("Keep Engram", "Leave Rudolph", "Bench
+        # Palmer", "Play Daniels").
+        "Keep",
+        "Leave",
+        "Bench",
+        "Play",
     ]
 )
+# Lane 303 (B306): an injury designation is a word of the report, never half a name ("He's Questionable" read
+# as "He Questionable"); it breaks a Titlecase run as a position code does.
+_DESIGNATIONS: Final = frozenset(["Questionable", "Doubtful", "Out", "Probable"])
 # A word of letters in any script, and the apostrophes, stops and hyphens a name holds; a name word is
 # one of these whose first letter is a capital (Lane 75: an ASCII class cut "Estimé" to "Estim").
 _WORD: Final = re.compile(r"\b[^\W\d_](?:[^\W\d_]|['\u2019.-])*")
@@ -250,7 +259,12 @@ def proper_name_phrases(text: str) -> list[str]:
         if not match.group(0)[0].isupper():
             continue
         bare = _CLITIC.sub("", match.group(0), count=1)
-        if bare == "" or _is_position_code(bare) or _FIRST_PERSON.match(bare):
+        if (
+            bare == ""
+            or _is_position_code(bare)
+            or bare.removesuffix(".") in _DESIGNATIONS
+            or _FIRST_PERSON.match(bare)
+        ):
             continue
         words.append((bare, match.start(), match.end()))
     phrases: dict[str, None] = {}
