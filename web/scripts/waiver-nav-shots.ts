@@ -8,8 +8,10 @@
 // the cards, and the strip's pickup at the chosen position marks its row. Prints the taps from landing
 // to an add. Then (review 305 H2) the answer a minute later holds a free agent at the chosen position on
 // the member's roster, claimed since: the list reads again and lists him as the member's alone. On a
-// phone the row shows a part of a card at its edge (it scrolls), the lead says the rank alone and the
-// comparison's first row clears the pinned verb (M3, M5).
+// phone the row shows a part of a card at its edge (it scrolls), the lead gives way to the chosen card
+// (drawn on All), the rank's meaning is said under the cards and the comparison's first row starts
+// above the pinned verb (M3, M5, round 2 N2 and N3). A minute's read whose position top-up fails keeps
+// the list and the open Add and says nothing (round 2 N1).
 //
 //   node scripts/waiver-nav-shots.ts [web origin] [out dir, from scripts/]
 // with the site built against PUBLIC_API_URL at the fixture API (API_ORIGIN, default 8799), started
@@ -125,14 +127,21 @@ function comparison(page: Page): Promise<{ yours: number; free: number; named: n
 	});
 }
 
-/** On a phone: whether the lead says more than its head, and where the comparison's first row ends
- * against the pinned verb's top. */
+/** Whether the lead over the comparison is drawn. */
+function leadShown(page: Page): Promise<boolean> {
+	return page.evaluate(() => {
+		const lead = document.querySelector<HTMLElement>('[data-lead]');
+		return lead !== null && lead.offsetParent !== null;
+	});
+}
+
+/** On a phone: whether the rank's meaning is said under the cards, and where the comparison's first
+ * row starts and ends against the pinned verb's top. */
 function phoneFold(
 	page: Page
-): Promise<{ leadWords: boolean; rowTop: number; rowBottom: number; pinTop: number }> {
+): Promise<{ explained: boolean; rowTop: number; rowBottom: number; pinTop: number }> {
 	return page.evaluate(() => {
-		const words = document.querySelector<HTMLElement>('[data-lead] span');
-		// Hidden whole on a phone where the chosen card says it, or its words hidden.
+		const under = document.querySelector<HTMLElement>('[data-nav="positions"] .explain.under');
 		const row = document
 			.querySelector('table.pool tbody.yours tr, table.pool tbody:not(.yours) tr[data-player]')
 			?.getBoundingClientRect();
@@ -140,7 +149,7 @@ function phoneFold(
 			.find((p) => p.offsetParent !== null)
 			?.getBoundingClientRect();
 		return {
-			leadWords: words !== null && words.offsetParent !== null,
+			explained: under !== null && under.offsetParent !== null && under.innerText.trim() !== '',
 			rowTop: row?.top ?? Infinity,
 			rowBottom: row?.bottom ?? Infinity,
 			pinTop: pin?.top ?? innerHeight
@@ -186,6 +195,55 @@ function claimed(answer: Answer, boardId: string): Answer {
 				: c
 		)
 	};
+}
+
+/** Round 2 N1: the minute's read brings a new answer but the chosen position's own read fails. The
+ * position's list stays as it was, the open Add stays open with its verb, and no line is said. */
+async function failedTopUp(page: Page, where: string): Promise<void> {
+	const before = await comparison(page);
+	let failed = 0;
+	let markFailed: () => void = () => undefined;
+	const failedOnce = new Promise<void>((resolve) => {
+		markFailed = resolve;
+	});
+	const answers = '**/leagues/attached/*/waivers*';
+	const fail = async (route: Route): Promise<void> => {
+		if (new URL(route.request().url()).searchParams.has('position')) {
+			failed += 1;
+			markFailed();
+			await route.fulfill({ status: 500, json: { ok: false, data: null, error: null } });
+			return;
+		}
+		// A new read of the league, so the page tops the position up.
+		const response = await route.fetch();
+		const body = (await response.json()) as { data: { read_at: string } | null };
+		const data =
+			body.data === null
+				? null
+				: { ...body.data, read_at: new Date(Date.parse(body.data.read_at) + 1000).toISOString() };
+		await route.fulfill({ response, json: { ...body, data } });
+	};
+	await page.route(answers, fail);
+	await page.clock.fastForward(60_000);
+	await page
+		.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null, null, {
+			timeout: READY_TIMEOUT_MS
+		})
+		.catch(() => undefined);
+	await Promise.race([failedOnce, page.waitForTimeout(READY_TIMEOUT_MS)]);
+	await page.waitForTimeout(300);
+	if (failed === 0) fault(where, 'the minute read no position top-up to fail');
+	const after = await comparison(page);
+	if (after.free !== before.free)
+		fault(
+			where,
+			`a failed top-up changed the list from ${String(before.free)} to ${String(after.free)}`
+		);
+	if ((await page.locator('table.pool .go button').count()) === 0)
+		fault(where, 'a failed top-up closed the open Add');
+	if ((await page.locator('main p[role="alert"]').count()) > 0)
+		fault(where, 'a failed top-up said a line over a list it kept');
+	await page.unrouteAll({ behavior: 'wait' });
 }
 
 /** H2: a free agent at the chosen position claimed since; the minute's read (the page's clock moved a
@@ -265,7 +323,9 @@ for (const [theme, width] of SHOTS) {
 	}
 	if (width === 390) {
 		const phone = await phoneFold(page);
-		if (phone.leadWords) fault(where, 'the lead says more than the rank on a phone');
+		// A position's card is the head on a phone: the lead gives way to it (round 2 N3).
+		if (await leadShown(page)) fault(where, 'the lead repeats the chosen card on a phone');
+		if (!phone.explained) fault(where, "the rank's meaning is said nowhere on a phone");
 		// The comparison starts above the pinned verb: its first row begins in view at landing.
 		if (phone.rowTop > phone.pinTop) {
 			fault(
@@ -302,6 +362,7 @@ for (const [theme, width] of SHOTS) {
 	const verb = page.locator('table.pool .go button');
 	if ((await verb.count()) === 0) fault(where, 'the Add opened no verb');
 	await shoot(page, `after-${tag}-qb-add`);
+	await failedTopUp(page, where);
 	await claimedSince(page, where);
 	await page.locator(`${NAV} [data-card="DEF"]`).click();
 	await settle(page);
@@ -316,6 +377,7 @@ for (const [theme, width] of SHOTS) {
 	await page.locator(`${NAV} [data-card="ALL"]`).click();
 	await settle(page);
 	if ((await comparison(page)).yours !== 0) fault(where, "All lists the member's players");
+	if (!(await leadShown(page))) fault(where, "All's lead is not drawn");
 	await shoot(page, `after-${tag}-all`);
 	process.stdout.write(
 		`${where}: opens on ${opened?.key ?? '-'}, ${String(landed.yours)} yours, ${String(landed.free)} free; taps to an add: strip 1, opening position 2 (${LINES.add}, verb), another position 3\n`

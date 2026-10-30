@@ -80,7 +80,8 @@
 				{:else}
 					<span class="figs"
 						><b class="figure">{card.figure}</b>{#if card.tag}<span class="tag">{card.tag}</span
-							>{/if}{#if card.need}<span class="need">{PANEL.need}</span>{/if}</span
+							>{/if}{#if card.need}<span class="need" title={PANEL.needSays}>{PANEL.need}</span
+							>{/if}</span
 					>
 					<span class="meter" aria-hidden="true"
 						>{#if card.meter}<span
@@ -94,6 +95,9 @@
 			</button>
 		{/each}
 	</div>
+	<!-- A phone's line for the rank's meaning, once a mode under the cards (the head holds the search
+	     there); a desk says it in the head (round 2 N2). -->
+	<p class="explain under">{PANEL.explain[mode]}</p>
 </section>
 
 <style>
@@ -116,6 +120,12 @@
 		min-width: 0;
 		font-size: var(--t-xs);
 		color: var(--ink-3);
+	}
+
+	.explain.under {
+		display: none;
+		margin: 0;
+		line-height: 1.25;
 	}
 
 	.tools {
@@ -367,8 +377,12 @@
 			padding: 0 4px;
 		}
 
-		.explain {
+		.head .explain {
 			display: none;
+		}
+
+		.explain.under {
+			display: block;
 		}
 
 		/* The search in the label's place, the toggle after it: one row (review 305 M5). */
@@ -385,8 +399,12 @@
 
 		/* A phone's cards, compact so the comparison starts above the pinned verb (review 305 M5):
 		   the position word and the figure a size down, the median beside the meter's tick. */
+		.nav {
+			gap: 6px;
+		}
+
 		.card {
-			padding: 6px var(--s-2);
+			padding: 5px var(--s-2);
 			gap: 0;
 		}
 
@@ -394,12 +412,16 @@
 			font-size: var(--t-lg);
 		}
 
+		.place {
+			font-size: var(--t-xs);
+		}
+
 		.figure {
 			font-size: var(--t-md);
 		}
 
 		.meter {
-			margin: 4px 0 2px;
+			margin: 3px 0 1px;
 		}
 	}
 </style>

@@ -168,7 +168,9 @@
 	/** The chosen position's rows from the first answer until its own read lands; its own read kept
 	 * while the next lands, less anyone the fresher answer has on the member's roster (review 305 H2). */
 	const shown = $derived(
-		narrowed ? withoutRostered(narrowed, advice.roster) : atPosition(advice, position ?? ALL)
+		narrowed
+			? { ...withoutRostered(narrowed, advice.roster), roster: advice.roster }
+			: atPosition(advice, position ?? ALL)
 	);
 	/** "Week 7 projections expected Thursday.", over the table while the week has no Proj (Lane 95). */
 	const arrives = $derived(arrivesPart(shown, addressedWeek(shown), memberZone()));
@@ -365,13 +367,16 @@
 		narrowed = answer;
 	}
 
-	/** The line a failed top-up leaves, so a later top-up that lands takes only its own line away. */
-	let toppedProblem: string | null = null;
+	/** The answer the last top-up was for (its read and the member's roster): the minute's read of an
+	 * unchanged league sends no narrowed read (round 2 N4); null once a top-up failed, so the next
+	 * answer tries again. */
+	let toppedFor: string | null = null;
 
 	/** The chosen position read again without dimming its rows or closing an open Add: on landing,
 	 * its rows from the first answer already listed (review 305 M6), and whenever the page's answer is
 	 * replaced, after a claim and on the minute's read, so the list is never older than the cards and
-	 * the member's players (H2). A failed top-up keeps the first answer's rows and says so briefly. */
+	 * the member's players (H2). A failed top-up keeps the position's own list where it has one, saying
+	 * nothing; with none yet, the first answer's rows stay and the line says so (round 2 N1). */
 	async function topUp(key: WaiverPosition, base: WaiverAdvice): Promise<void> {
 		const outcome = await narrowing.choose(key);
 		// Overtaken by a tap, a later answer's own top-up, or the card moved on: theirs to draw.
@@ -380,15 +385,19 @@
 		reading = false;
 		if (outcome.kind === 'answer') {
 			land(outcome.answer);
-			if (problem !== null && problem === toppedProblem) problem = null;
-			toppedProblem = null;
+			// The position's list landed: no earlier line about it stands (round 2 N5).
+			problem = null;
 			return;
 		}
 		if (outcome.kind === 'failed') {
-			narrowed = null;
-			toppedProblem = NAV.firstRead(positionWord(key));
-			problem = toppedProblem;
+			toppedFor = null;
+			if (narrowed === null) problem = NAV.firstRead(positionWord(key));
 		}
+	}
+
+	/** One answer's mark: when it was read and whose players the member holds. */
+	function answerMark(answer: WaiverAdvice): string {
+		return `${answer.read_at}|${answer.roster.map((l) => l.player.host_id).join(',')}`;
 	}
 
 	/** Each answer the page reads (the first one too) tops the chosen position's list up. A player page's
@@ -396,7 +405,10 @@
 	$effect(() => {
 		const answer = advice;
 		untrack(() => {
-			if (position !== null) void topUp(position, answer);
+			const mark = answerMark(answer);
+			if (position === null || mark === toppedFor) return;
+			toppedFor = mark;
+			void topUp(position, answer);
 		});
 	});
 
