@@ -314,7 +314,9 @@ def test_a_rescheduled_game_takes_its_latest_recorded_kickoff(engine: Engine) ->
         conn.execute(
             insert(TEAM_WEEK_OBSERVATIONS).values(
                 season=2026, week=6, team="CHI", source="nflverse_kickoff", metric="kickoff_instant", value=1.0,
-                as_of=_at(18, 20, 25), ingested_at=datetime(2026, 10, 30, tzinfo=UTC),
+                # Ingested after every fixture row (they take the real clock's now()): a fixed 2026-10-30 stamp
+                # stopped being the latest once the clock passed it (CI, 2026-10-30 00:10 UTC).
+                as_of=_at(18, 20, 25), ingested_at=datetime(2100, 1, 1, tzinfo=UTC),
             )
         )  # fmt: skip
         chicago = [k.at for k in stored_kickoffs(conn, 2026) if k.team == "CHI"]
