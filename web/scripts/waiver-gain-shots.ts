@@ -92,6 +92,12 @@ async function open(page: Page, path: string, text: string): Promise<void> {
 		.filter({ visible: true })
 		.first()
 		.waitFor({ timeout: READY_TIMEOUT_MS });
+	// Waivers opens on the weakest Need (Lane 305): these checks read every position, the All card.
+	const all = page.locator('[data-nav="positions"] [data-card="ALL"]');
+	if ((await all.count()) > 0) {
+		await all.click();
+		await page.locator('.rows[aria-busy="false"]').waitFor({ timeout: READY_TIMEOUT_MS });
+	}
 	await page.evaluate(() => document.fonts.ready);
 }
 

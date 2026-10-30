@@ -23,6 +23,7 @@
 		type Sort,
 		type SortKey
 	} from './waivers.ts';
+	import type { YoursRow } from './position-nav.ts';
 
 	/** The Waivers table (Lane 66f): the players free to add in the Lineup's columns (player, game,
 	 * Proj, Opp rank, Avg, Last, Δ Proj), then Rest of season and Beats, and an Add on each row, the
@@ -58,6 +59,9 @@
 		stashLine?: readonly string[];
 		/** A stash's verb where an open IR slot takes him: the platform's page with his name. */
 		onstash?: (row: PoolRow) => void;
+		/** A chosen position (Lane 305): the member's players there over the free agents, one
+		 * comparison in the same columns, each under its own head; null for every position. */
+		compare?: { yours: string; free: string; rows: readonly YoursRow[] } | null;
 	}
 
 	let {
@@ -76,7 +80,8 @@
 		projected = true,
 		stash = [],
 		stashLine = [],
-		onstash = () => undefined
+		onstash = () => undefined,
+		compare = null
 	}: Props = $props();
 
 	/** The week's two projection columns, left out while no projection is read. */
@@ -277,6 +282,35 @@
 			>
 		</tr>
 	</thead>
+	{#if compare}
+		<!-- The member's players at the chosen position, then the free agents there (Lane 305): their
+		     Beats cell holds their role, so a free agent's Beats reads against the row above. -->
+		<tbody>
+			<tr class="group"><th colspan={COLUMNS} scope="rowgroup">{compare.yours}</th></tr>
+		</tbody>
+		<tbody class="yours">
+			{#each compare.rows as mine (mine.key)}
+				<BoxLine
+					phoneFacts={false}
+					row={mine.row}
+					slotCell={false}
+					ptsCell={false}
+					evidence
+					phoneMore="{WAIVERS.rest} {boxNumber(mine.rest)}"
+					projCells={projected}
+				>
+					{#snippet tail()}
+						{@render restCell(mine.rest)}
+						<td class="n beats"><span class="role" class:on={mine.starts}>{mine.role}</span></td>
+						<td class="act"></td>
+					{/snippet}
+				</BoxLine>
+			{/each}
+		</tbody>
+		<tbody>
+			<tr class="group free-at"><th colspan={COLUMNS} scope="rowgroup">{compare.free}</th></tr>
+		</tbody>
+	{/if}
 	{#each groups.gaining as entry (entry.key)}
 		{@render entryRows(entry)}
 	{/each}
@@ -525,6 +559,45 @@
 		letter-spacing: var(--track-label);
 		color: var(--ink-3);
 		text-align: left;
+	}
+
+	/* The chosen position's comparison (Lane 305): the member's players under their head on a quieter
+	   ground, their role where a free agent's Beats is; the free agents' head under them. */
+	.group th {
+		padding: var(--s-3) var(--s-2) var(--s-1);
+		background: var(--bg);
+		border-bottom: 1px solid var(--line);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--ink);
+		text-align: left;
+	}
+
+	.yours :global(td) {
+		background: var(--surface-2);
+	}
+
+	.free-at th {
+		color: var(--gain-ink);
+	}
+
+	.role {
+		display: inline-block;
+		padding: 1px 8px;
+		border: 1px solid var(--line-strong);
+		border-radius: var(--r-pill);
+		font-family: var(--font-ui);
+		font-size: var(--t-xs);
+		font-weight: 600;
+		color: var(--ink-2);
+	}
+
+	.role.on {
+		background: var(--ink);
+		border-color: var(--ink);
+		color: var(--bg);
 	}
 
 	.none {
