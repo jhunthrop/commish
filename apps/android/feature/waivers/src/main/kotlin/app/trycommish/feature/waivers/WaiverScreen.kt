@@ -175,17 +175,19 @@ fun WaiverPositions(
 private fun panelActions(
     ui: WaiverUi,
     actions: WaiverActions,
-): PanelActions =
-    PanelActions(
-        cards = ui.panel,
+): PanelActions {
+    val cards = ui.panel
+    return PanelActions(
+        cards = cards,
         mode = ui.panelMode,
         hasWeek = ui.panelHasWeek,
-        opened = ui.openedCard,
+        opened = cards.firstOrNull { it.key == ui.openCard },
         choose = actions.choosePanelMode,
         toggle = actions.toggleCard,
         add = actions.addFromPanel,
         open = actions.open,
     )
+}
 
 private fun tableActions(
     ui: WaiverUi,

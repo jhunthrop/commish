@@ -162,9 +162,10 @@ public struct WaiverView: View {
     private func panel(_ model: WaiverModel) -> PanelActions {
         let viewModel = viewModel
         let leagueID = leagueID
+        let cards = viewModel.panel
         return PanelActions(
-            cards: viewModel.panel, mode: viewModel.panelMode, hasWeek: viewModel.panelHasWeek,
-            opened: viewModel.openedCard, choose: { viewModel.choose(panelMode: $0) },
+            cards: cards, mode: viewModel.panelMode, hasWeek: model.panelHasWeek,
+            opened: cards.first { $0.key == viewModel.openCard }, choose: { viewModel.choose(panelMode: $0) },
             toggle: { viewModel.toggle(card: $0) },
             add: { source in Task { await viewModel.addFromPanel(source, leagueID: leagueID) } },
             open: { sheet.open($0, offer: offer(model, $0)) }

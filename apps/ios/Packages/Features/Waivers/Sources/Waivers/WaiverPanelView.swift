@@ -19,12 +19,15 @@ struct PanelActions {
     var still = false
 }
 
-/// The phone's panel columns: the player taking the rest, the figure, Beats and the Add.
+/// The phone's panel columns: the player taking the rest, the figure, Beats and the Add. A card is at
+/// least 120 wide, as Android's, and grows rather than cut its rank.
 enum PanelColumn {
-    static let card: Double = 108
+    static let card: Double = 120
     static let figure: Double = 60
     static let beats: Double = 88
     static let act: Double = 44
+    /// The Add's tap target, the platform's minimum.
+    static let target: Double = 44
 }
 
 /// The Waivers screen's position panel (web PositionPanel.svelte at 390): "Your positions" with the
@@ -123,6 +126,7 @@ private struct PanelCardView: View {
                         .font(Faces.font(.ui, size: Tokens.TypeScale.xs))
                         .foregroundStyle(theme.color(Tokens.Color.ink2))
                         .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(card.figure)
@@ -138,7 +142,7 @@ private struct PanelCardView: View {
                     .monospacedDigit()
                     .foregroundStyle(theme.color(Tokens.Color.ink3))
             }
-            .frame(width: PanelColumn.card - Tokens.Space.s2 * 2, alignment: .leading)
+            .frame(minWidth: PanelColumn.card - Tokens.Space.s2 * 2, alignment: .leading)
             .padding(Tokens.Space.s2)
             .background(theme.color(open ? Tokens.Color.accentWash : Tokens.Color.surface))
             .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.md))
@@ -270,6 +274,9 @@ private struct PanelEntryRow: View {
                     .frame(minWidth: 30, minHeight: 30)
                     .background(RoundedRectangle(cornerRadius: Tokens.Radius.sm)
                         .strokeBorder(theme.color(Tokens.Color.lineStrong)))
+                    // The drawn square stays compact; the tap target is the 44 pt minimum.
+                    .frame(width: PanelColumn.target, height: PanelColumn.target, alignment: .trailing)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("\(Words.InSeason.add) \(entry.full)")

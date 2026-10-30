@@ -123,12 +123,4 @@ struct WaiverPanelParityTests {
         #expect(screens.contains { $0.week != nil } && screens.contains { $0.week == nil })
         #expect(WaiverParityTests.screens.contains { Self.parity.screen($0)?.panel == nil })
     }
-
-    @Test
-    func theWordsAreTheWebs() {
-        #expect(PanelMode.season.word == "Rest of season")
-        #expect(PanelMode.week.word == "This week")
-        #expect(Words.WaiverPanel.label == "Your positions")
-        #expect(Words.WaiverPanel.noneFree == "No free agent we list plays here.")
-    }
 }

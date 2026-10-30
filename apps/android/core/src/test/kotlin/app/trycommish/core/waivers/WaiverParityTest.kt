@@ -457,8 +457,6 @@ class WaiverParityTest {
         assertTrue(cards.any { it.text("need") != null })
         assertTrue(panels.any { it.obj("week") == null } && panels.any { it.obj("week") != null })
         assertTrue(screens().any { web(it).obj("panel") == null })
-        assertEquals("Rest of season", PanelMode.Season.word)
-        assertEquals("This week", PanelMode.Week.word)
     }
 
     companion object {

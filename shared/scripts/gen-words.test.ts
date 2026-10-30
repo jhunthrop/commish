@@ -109,6 +109,9 @@ void test("a member that is a table of strings is gathered as one string each, k
     explainSeason: "A",
     explainWeek: "B",
   });
+  // An empty table is not flattened away: it is kept, and the render names it.
+  const empty = gather({ P: { e: {} } }, ["P"], "m.ts");
+  assert.throws(() => renderTable(empty, "P"), /P\.e is a object/);
 });
 
 void test("gathering fails on an export missing, a keyed export not a string and a key twice", () => {

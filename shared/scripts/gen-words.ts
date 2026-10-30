@@ -848,6 +848,7 @@ const isStringTable = (
   typeof value === "object" &&
   value !== null &&
   !Array.isArray(value) &&
+  Object.keys(value).length > 0 &&
   Object.values(value).every((item) => typeof item === "string");
 
 /** A member that is a table of strings (the position panel's `explain: { season, week }`) as one

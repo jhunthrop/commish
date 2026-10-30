@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -61,12 +63,15 @@ private object PanelColumn {
     val card = 120.dp
     val figure = 60.dp
     val beats = 88.dp
-    val act = 44.dp
+    val act = 48.dp
 }
 
 private val PANEL_CHIP_HEIGHT = 28.dp
 private val PANEL_HEAD_HEIGHT = 28.dp
 private val ADD_SIDE = 30.dp
+
+/** The Add's tap target, the platform's minimum; the drawn square stays [ADD_SIDE]. */
+private val ADD_TARGET = 48.dp
 private val PLUS = listOf("M12 5v14", "M5 12h14")
 
 /** What the position panel draws and does (PositionPanel.svelte): the cards in the toggle's figures, the
@@ -163,7 +168,7 @@ private fun PanelCardView(
     val shape = RoundedCornerShape(Tokens.Radius.md.dp)
     Column(
         Modifier
-            .width(PanelColumn.card)
+            .widthIn(min = PanelColumn.card)
             .clip(shape)
             .background(if (open) c.accentWash else c.surface)
             .border(1.dp, if (open) c.accent else c.line, shape)
@@ -183,7 +188,7 @@ private fun PanelCardView(
             style = Faces.small,
             color = c.ink2,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
         )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(card.figure, style = Faces.number(NumWeight.Bold, Tokens.Type.lg.sp), color = c.ink)
@@ -300,11 +305,14 @@ private fun AddButton(
     val shape = RoundedCornerShape(Tokens.Radius.sm.dp)
     Box(
         Modifier
-            .sizeIn(minWidth = ADD_SIDE, minHeight = ADD_SIDE)
-            .clip(shape)
-            .border(1.dp, c.lineStrong, shape)
+            .size(ADD_TARGET)
             .clickable(role = Role.Button, onClick = add)
             .semantics { contentDescription = "${Words.InSeason.add} ${entry.full}" },
-        contentAlignment = Alignment.Center,
-    ) { StrokeGlyph(PLUS, 15.dp, if (gains) c.ink else c.ink3) }
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Box(
+            Modifier.sizeIn(minWidth = ADD_SIDE, minHeight = ADD_SIDE).clip(shape).border(1.dp, c.lineStrong, shape),
+            contentAlignment = Alignment.Center,
+        ) { StrokeGlyph(PLUS, 15.dp, if (gains) c.ink else c.ink3) }
+    }
 }
