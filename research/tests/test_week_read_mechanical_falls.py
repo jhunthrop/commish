@@ -21,9 +21,9 @@ from research.capsules.season_voice import SeasonClock, time_frame_hits
 from research.capsules.voice_rules import writer_only_hits
 from research.capsules.week.render import render_week_sheet
 from research.capsules.week.report_day import report_day, report_day_line, report_out
-from research.capsules.week.rules import week_rule_violations
+from research.capsules.week.rules import body_rule_violations, week_rule_violations
 from research.capsules.week.season_words import said_once
-from research.capsules.week.sheet import Status, WeekGame, WeekSheet
+from research.capsules.week.sheet import DepthPlace, Status, WeekGame, WeekSheet
 from research.capsules.week.validate import validate_week_read, with_season
 from research.tests.week_read_fixtures import on_bye, starter
 
@@ -260,3 +260,65 @@ def test_lining_up_is_never_the_sites_line(said: str) -> None:
 
 def test_the_line_itself_is_still_refused() -> None:
     assert [hit for hit in writer_only_hits("His work stays near the line.", ()) if hit.rule.startswith("site word")]
+
+
+# --- fix round 1 -----------------------------------------------------------------------------------------------
+
+
+def test_the_injury_list_by_the_day_his_status_was_read_passes() -> None:
+    """Ruling 3a: "Tuesday's injury list" is the sheet's "the injury list as of Tuesday"; any other day is not."""
+    tuesday = datetime(2026, 10, 27, 23, 0, tzinfo=UTC)  # Tuesday 6:00 pm Central
+    sheet = _week_eight(seen=tuesday)
+    assert "the injury list as of Tuesday 6:00 pm Central" in render_week_sheet(sheet)
+    # Jared Goff's and Bhayshul Tuten's falls in run p.
+    for said in (
+        "Jared Goff carries no designation on Tuesday's injury list, before Friday's report.",
+        "Bhayshul Tuten enters week 8 of 2026 clean on Tuesday's injury list.",
+    ):
+        assert _report_breaks(said, sheet) == [], said
+    assert _report_breaks("He is clean on Monday's injury list.", sheet)
+    # A list by its day is never a report by it: Tuesday's report is still no report the facts name.
+    assert _report_breaks("He is clean on Tuesday's report.", sheet)
+
+
+@pytest.mark.parametrize(
+    ("name", "team", "said", "rule"),
+    [
+        ("Tip Reiman", "CHI", "Tip Reiman does not play in week 8 of 2026, listed Out on the injury list.", "a tip"),
+        (
+            "KC Concepcion",
+            "CLE",
+            "KC Concepcion is down to 58% of Cleveland's offensive snaps over his last three games.",
+            "by its code",
+        ),
+    ],
+)
+def test_his_own_name_never_trips_a_word_rule(name: str, team: str, said: str, rule: str) -> None:
+    """Ruling 3b: his name and his teammates' are masked before the word rules (the nightly's Tip Reiman, run p's
+    KC Concepcion), and the rule's own word outside a name is still refused."""
+    sheet = replace(_week_eight(), name=name, team=team)
+    text = f"{said} Sit him this week. He has little to work with."
+    assert not [v for v in week_rule_violations(text, sheet, "sit") if rule in v]
+    assert not [v for v in body_rule_violations(text, SEASON, (name,)) if rule in v]
+    assert [v for v in body_rule_violations(text, SEASON) if rule in v]
+    outside = {"a tip": "Here is a tip for anyone.", "by its code": "KC is the club he faces."}[rule]
+    assert [v for v in week_rule_violations(f"{text} {outside}", sheet, "sit") if rule in v]
+
+
+def test_a_teammates_name_is_masked_too() -> None:
+    sheet = replace(_week_eight(), depth=DepthPlace(2.0, (("KC Concepcion", 1.0),)))
+    text = "He sits second behind KC Concepcion on the chart. Sit him this week. He has little to work with."
+    assert not [v for v in week_rule_violations(text, sheet, "sit") if "by its code" in v]
+
+
+def test_a_bye_names_no_report_for_another_week() -> None:
+    """Ruling 3c: on a bye a read names no report for a week it is not for (run p's Cam Skattebo and Deebo Samuel
+    Sr.: "Friday's week 9 report" on a week 8 bye), and a report named with its week is held to the read's week."""
+    bye = on_bye()
+    said = f"He's Questionable on the injury list, ahead of Friday's week {bye.week + 1} report on his status."
+    found = _report_breaks(said, bye)
+    assert len(found) == 1 and "a report for a week this read is not for" in found[0]
+    assert _report_breaks("He's Questionable ahead of Friday's report.", bye)
+    sheet = _week_eight()
+    assert _report_breaks("Hold him before Friday's week 8 game status report.", sheet) == []
+    assert _report_breaks("Hold him before Friday's week 9 report.", sheet)

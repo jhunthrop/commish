@@ -28,7 +28,7 @@ from research.capsules.narrative import ShapeMasks, held_shapes, shown_shape
 from research.capsules.validate import Grounding, ValidationResult, validate_prose
 from research.capsules.week.render import render_week_sheet
 from research.capsules.week.rules import week_rule_violations
-from research.capsules.week.sheet import WeekSheet, week_name_ledger
+from research.capsules.week.sheet import WeekSheet, sheet_names, week_name_ledger
 
 # The read's words: one paragraph of three to five short sentences, never more than 95 (Lane 100, B44, set at
 # 80; Lane 117 fix round 3, the coordinator's ruling: the writer's natural read on production sheets runs about
@@ -41,12 +41,6 @@ _BARE_WEEK: Final = re.compile(
     r"(?!\s*(?:of|in|,)\s*(?:19|20)\d\d)",
     re.IGNORECASE,
 )
-
-
-def sheet_names(sheet: WeekSheet) -> tuple[str, ...]:
-    """The names a sheet lets its read print: his and his teammates' on the chart and in his angles."""
-    around = () if sheet.depth is None else tuple(name for name, _ in sheet.depth.around)
-    return (sheet.name, *around, *(name for angle in sheet.angles for name in angle.names))
 
 
 def week_masks(sheets: Iterable[WeekSheet], players: Iterable[str] = ()) -> ShapeMasks:
