@@ -35,7 +35,7 @@ from research.capsules.week.rollover import NIGHTS, ReadsDue, Rollover, next_nig
 from research.capsules.week.sheet import Status, WeekSheet
 from research.capsules.week.store import StoredWeekRead, replace_week_read, stored_week_reads, upsert_week_read
 from research.capsules.week.validate import validate_week_read
-from research.capsules.week.write import MAX_CALLS_PER_READ
+from research.capsules.week.write import MAX_CALLS_PER_READ, WEEK_WRITER_VERSION
 from research.db.engine import make_engine
 from research.db.schema import PLAYER_WEEK_READ_RUNS, PLAYER_WEEK_READS, PLAYERS
 from research.db.url import sqlalchemy_url
@@ -464,10 +464,12 @@ def test_an_hourly_pass_writes_a_status_that_moved_before_a_read_still_unwritten
         (starter().player_id, _BOARD_WEEK): StoredWeekRead(
             starter().player_id, _SEASON, _BOARD_WEEK, FACTS_SOURCE, "Week: 6 of 2026", None,
             _PASS - timedelta(hours=2), None, {}, 18.4, starter().status.status, "first", None, _YESTERDAY, 1,
+            WEEK_WRITER_VERSION,
         ),
         (questionable().player_id, _BOARD_WEEK): StoredWeekRead(
             questionable().player_id, _SEASON, _BOARD_WEEK, WRITTEN_SOURCE, "A read.", "m/x",
             _PASS - timedelta(hours=2), None, {}, 15.2, "out", "first", "hold", _YESTERDAY, 1,
+            WEEK_WRITER_VERSION,
         ),
     }  # fmt: skip
     night = week_reads._Night(sheets, stored, _BOARD_WEEK, Rollover(_BOARD_WEEK, True), ShapeMasks.of(()))
@@ -604,7 +606,7 @@ def test_the_store_replaces_only_the_row_the_pass_read(engine: Engine) -> None:
     pid = starter().player_id
     first = StoredWeekRead(
         pid, _SEASON, _BOARD_WEEK, FACTS_SOURCE, "Week: 6 of 2026", None, _PASS, None, {}, 18.4, None, "first",
-        None, _YESTERDAY, 1,
+        None, _YESTERDAY, 1, WEEK_WRITER_VERSION,
     )  # fmt: skip
     written = replace(first, source=WRITTEN_SOURCE, body=STARTER_READ, written_at=_PASS + timedelta(hours=1))
     with engine.begin() as conn:
@@ -735,7 +737,7 @@ def _row(source: str, *, attempts: int = 1, day: date = date(2026, 10, 16)) -> S
     sheet = starter()
     return StoredWeekRead(
         sheet.player_id, _SEASON, sheet.week, source, STARTER_READ, "m/x", _PASS, None, {}, 18.4, None, "first",
-        "start", day, attempts,
+        "start", day, attempts, WEEK_WRITER_VERSION,
     )  # fmt: skip
 
 

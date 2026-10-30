@@ -29,6 +29,7 @@ from research.capsules.week.fact_rules import (
 from research.capsules.week.rules import week_rule_violations
 from research.capsules.week.sheet import Allowed, DepthPlace, GameLine, Status, Weather, WeekSheet
 from research.capsules.week.store import StoredWeekRead
+from research.capsules.week.write import WEEK_WRITER_VERSION
 from research.db.schema.boards import WEEK_READ_REASONS
 from research.nightly.build.player_season import SeasonContext
 from research.tests.week_read_fixtures import LINES, REPORT, WRITTEN_AT, starter
@@ -198,6 +199,7 @@ def _stored(body: str, **changes: object) -> StoredWeekRead:
         player_id="00-0036999", season=2026, week=6, source="llm", body=body, model="m/x",
         written_at=_NOW - timedelta(hours=2), facts_at=REPORT - timedelta(days=1), stamps={}, projection_points=11.2,
         status=None, reason="first", call="sit", attempt_day=date(2026, 10, 16), attempts=1,
+        writer_version=WEEK_WRITER_VERSION,
     )  # fmt: skip
     return replace(row, **changes)  # type: ignore[arg-type]
 

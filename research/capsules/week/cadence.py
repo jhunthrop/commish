@@ -32,6 +32,15 @@ behind a withhold until the nightly.
   players' places a night after the roll-over, and a few dozen reads quote a forecast figure before a game day,
   so about $0.10 to $0.15 a night with the rounds once the backlog is written.
 
+- The written read is a writer's older than the one on main (`WRITER`, Lane 306, the founder 2026-10-30: "why can
+  we not update all player reads at the same time?"): its `writer_version` below `write.WEEK_WRITER_VERSION`, so
+  bumping that constant rewrites the whole board on the next nightly, in the roll-over's rounds and with the
+  retry writer, and the board never mixes writers. Nightly only, never hourly. Last in `PRIORITY`: a night whose
+  other reasons and the writer's whole board pass `nightly.week_reads.NIGHTLY_BUDGET_USD` writes the others
+  first, and the budget's stop carries the rest to the next nightly. A rewrite that falls keeps the written read
+  (`kept_read`, its old version with it), so it stays due for the next nightly. No once-a-day gate: the nightly
+  is its only pass, and a held read's day marked by an hourly status fall never delays it.
+
 Anything else (a new projection, a forecast no read quotes, a chart that moves no place a read states) waits for
 one of those, so a quiet week costs nothing.
 """
@@ -46,6 +55,7 @@ from research.capsules.week.fact_rules import fact_violations
 from research.capsules.week.rules import body_rule_violations
 from research.capsules.week.sheet import CENTRAL, WeekSheet, sheet_names
 from research.capsules.week.store import StoredWeekRead
+from research.capsules.week.write import WEEK_WRITER_VERSION
 
 RETRY_GAP: Final = timedelta(hours=1)
 # Lane 276 (the founder, 2026-10-28: "we should always show a read"): a fallen read is asked every hour of a
@@ -68,8 +78,10 @@ UNWRITTEN: Final = "unwritten"
 STATUS_CHANGED: Final = "status"
 RULE_STALE: Final = "rule"
 FACT_STALE: Final = "fact"
-# The order a nightly writes its due reads in, so a budget stop leaves the rule-stale rewrites for the next night.
-PRIORITY: Final = (FIRST, UNWRITTEN, STATUS_CHANGED, FACT_STALE, RULE_STALE)
+WRITER: Final = "writer"
+# The order a nightly writes its due reads in, so a budget stop leaves the rule-stale rewrites, then the writer's
+# (Lane 306), for the next night.
+PRIORITY: Final = (FIRST, UNWRITTEN, STATUS_CHANGED, FACT_STALE, RULE_STALE, WRITER)
 # What an hourly pass writes: the reads whose status moved (the coordinator's M3), and a read still unwritten,
 # asked every hour until one is written (Lane 276).
 HOURLY_REASONS: Final = frozenset({STATUS_CHANGED, UNWRITTEN})
@@ -132,6 +144,11 @@ def _fact_stale(sheet: WeekSheet, stored: StoredWeekRead, now: datetime) -> bool
     )
 
 
+def writer_stale(stored: StoredWeekRead, version: int = WEEK_WRITER_VERSION) -> bool:
+    """A written read an older writer wrote than `version` (Lane 306)."""
+    return stored.source == WRITTEN_SOURCE and stored.writer_version < version
+
+
 def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None, now: datetime, *, hourly: bool = False) -> str | None:
     """Why `sheet`'s read is written at `now`, or None when the stored read for his week stands."""
     if stored is None or stored.season != sheet.season or stored.week != sheet.week:
@@ -144,6 +161,8 @@ def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None, now: datetime, *
         reason = FACT_STALE
     elif _rule_stale(stored, now, sheet_names(sheet)):
         reason = RULE_STALE
+    elif writer_stale(stored):
+        reason = WRITER
     else:
         reason = None
     return reason if not hourly or reason in HOURLY_REASONS else None

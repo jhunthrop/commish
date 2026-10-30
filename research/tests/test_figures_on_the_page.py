@@ -37,7 +37,7 @@ from research.capsules.week.sheet import (
 )
 from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
-from research.capsules.week.write import WeekReadResult, write_week_read
+from research.capsules.week.write import WEEK_WRITER_VERSION, WeekReadResult, write_week_read
 from research.nightly.week_reads import WeekReadSpend
 from research.tests.week_read_fixtures import BOARD, CAPTURED, FIGURES, KICKOFF, main_sheet, starter
 
@@ -206,7 +206,7 @@ def test_the_last_reads_projection_is_the_cards_tenth_as_the_comparison_reads_it
     last read", the figure the run and the web compare, never the plain tenth's 26.4."""
     row = StoredWeekRead(
         "00-0034857", 2026, 6, "llm", "A read.", "m/x", FIGURES, FIGURES, {}, 26.449, None, "first", "start",
-        date(2026, 10, 16), 1,
+        date(2026, 10, 16), 1, WEEK_WRITER_VERSION,
     )  # fmt: skip
     last = last_read_of(row)
     assert last is not None and last.projection_points == 26.5  # noqa: PLR2004 - the cents, then the tenth
