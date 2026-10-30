@@ -71,14 +71,22 @@ def report_day(sheet: WeekSheet) -> str | None:
 
 
 def report_out(sheet: WeekSheet) -> bool:
-    """Whether this week's game status report was out when his status was read, as `report_words` dates it."""
+    """Whether this week's game status report was out when his status was read, as `report_words` dates it: what a
+    read may cite the report for."""
     game, seen_at = this_weeks_game(sheet), sheet.status.seen_at(sheet.written_at)
     return game is not None and seen_at is not None and seen_at >= status_report_issued(game.kickoff)
 
 
+def report_issued(sheet: WeekSheet) -> bool:
+    """Whether this week's game status report was out by the write (the review's M2): the clock's, never the list's."""
+    game = this_weeks_game(sheet)
+    return game is not None and sheet.written_at >= status_report_issued(game.kickoff)
+
+
 def report_day_line(sheet: WeekSheet) -> str | None:
-    """The game status report's day as a fact of the sheet (Lane 303, B307), so a read may name it truthfully:
-    out by the write, or still to come and so never cited for what it says."""
+    """The game status report's day as a fact of the sheet (Lane 303, B307), true at the write (review M2): still to
+    come; out, with his status read after it (so citable); or out, with his status read before it or never read (so
+    neither still to come nor his status's source)."""
     game, day = this_weeks_game(sheet), report_day(sheet)
     if game is None or day is None:
         return None
@@ -87,7 +95,12 @@ def report_day_line(sheet: WeekSheet) -> str | None:
     read = "" if game.scheduled_at is None else f" (as of {central_day_and_time(game.scheduled_at)} Central)"
     if report_out(sheet):
         return f"Game status report: this week's came out {day} by {clock} Central, {day}'s report{read}."
+    if report_issued(sheet):
+        return (
+            f"Game status report: this week's came out {day} by {clock} Central{read}; his status above was read "
+            "before it, so never say what it says or that it is still to come."
+        )
     return (
-        f"Game status report: this week's comes out {day} by {clock} Central, after the injury list above was "
-        f'read{read}. A read may say it is still to come ("before {day}\'s report"), never what it says.'
+        f"Game status report: this week's comes out {day} by {clock} Central, after this read{read}. A read may say "
+        f'it is still to come ("before {day}\'s report"), never what it says.'
     )

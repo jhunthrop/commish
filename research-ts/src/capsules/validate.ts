@@ -254,7 +254,10 @@ const SENTENCE_VERB_WORDS = new Set([
 ]);
 
 /** Lane 303 (B306): an injury designation is a word of the report, never half a name ("He's
- *  Questionable" was read as the person "He Questionable"); it breaks a Titlecase run as a code does. */
+ *  Questionable" was read as the person "He Questionable"); it breaks a Titlecase run as a code does.
+ *  So "Fakename Out" leaves the lone surname "Fakename", which is never checked: the lone-word policy
+ *  of `extractProperNamePhrases` (a lower-case "out" never joined a run either), no new class (the
+ *  Lane 303 review's L4). */
 const DESIGNATIONS: ReadonlySet<string> = new Set(["Questionable", "Doubtful", "Out", "Probable"]);
 
 /** True when `word` alone equals the trailing word of some MULTI-word ledger entry — the exact

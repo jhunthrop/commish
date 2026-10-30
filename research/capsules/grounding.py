@@ -225,7 +225,9 @@ _SENTENCE_VERBS: Final = frozenset(
     ]
 )
 # Lane 303 (B306): an injury designation is a word of the report, never half a name ("He's Questionable" read
-# as "He Questionable"); it breaks a Titlecase run as a position code does.
+# as "He Questionable"); it breaks a Titlecase run as a position code does. So "Fakename Out" leaves the lone
+# surname "Fakename", which is never checked: the lone-word policy of `proper_name_phrases` (a lower-case "out" never
+# joined a run either), no new class (the Lane 303 review's L4).
 _DESIGNATIONS: Final = frozenset(["Questionable", "Doubtful", "Out", "Probable"])
 # A word of letters in any script, and the apostrophes, stops and hyphens a name holds; a name word is
 # one of these whose first letter is a capital (Lane 75: an ASCII class cut "Estimé" to "Estim").

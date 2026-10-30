@@ -20,7 +20,7 @@ from research.capsules.grounding import is_name_grounded, proper_name_phrases
 from research.capsules.season_voice import SeasonClock, time_frame_hits
 from research.capsules.voice_rules import writer_only_hits
 from research.capsules.week.render import render_week_sheet
-from research.capsules.week.report_day import report_day, report_day_line, report_out
+from research.capsules.week.report_day import report_day, report_day_line, report_issued, report_out
 from research.capsules.week.rules import body_rule_violations, week_rule_violations
 from research.capsules.week.season_words import said_once
 from research.capsules.week.sheet import DepthPlace, Status, WeekGame, WeekSheet
@@ -96,9 +96,12 @@ def test_a_prior_season_named_on_purpose_is_never_touched() -> None:
     # A week in a sentence about another season keeps its season even after the read named this one.
     both = "Sit him in week 8 of 2026. He scored in week 3 of 2025 and week 3 of 2026."
     assert said_once(both, SEASON) == both
-    # This season said any way but beside a week is the rule's to refuse, never dropped.
+    # This season said any way but beside a week is the rule's to refuse, never dropped; and a repeat followed by
+    # a word, not a possessive or clause punctuation, is the rule's too (the review's H2).
     other = "His best game of 2026 is 13.8 PPR points, and week 7 of 2026 brought 3.6 PPR points."
-    assert said_once(other, SEASON) == "His best game of 2026 is 13.8 PPR points, and week 7 brought 3.6 PPR points."
+    assert said_once(other, SEASON) == other
+    ended = "His best game of 2026 is 13.8 PPR points, and he had 3.6 PPR points in week 7 of 2026."
+    assert said_once(ended, SEASON) == "His best game of 2026 is 13.8 PPR points, and he had 3.6 PPR points in week 7."
 
 
 def test_the_written_read_is_the_one_said_once() -> None:
@@ -187,7 +190,7 @@ def test_another_day_and_a_report_not_out_cited_are_refused() -> None:
     assert len(thursday) == 1 and "a report the facts do not name" in thursday[0]
     # Friday's report is not out at the write: citing it for what it says is refused.
     cited = _report_breaks("He has no designation on Friday's report.", sheet)
-    assert len(cited) == 1 and "a report not out when his status was read" in cited[0]
+    assert len(cited) == 1 and "a report not out at the write" in cited[0]
     # The remedy quotes the sheet's own words, which name no bare week (the angles' "this week's").
     assert "this week's game status report on Friday" in cited[0] and "week 8's" not in cited[0]
     # Jahdae Walker's: a Monday game's report is Saturday's, and Friday's is no report.
@@ -201,44 +204,86 @@ def test_another_day_and_a_report_not_out_cited_are_refused() -> None:
 
 # --- the openers -----------------------------------------------------------------------------------------------
 
-# The nightly's twelve, verbatim. Eleven open on the call or on the fact that decides his week; Grant Calcaterra's
-# opens on the opponent and only then turns to him, a scene set first, which the rule rightly refuses.
+# The nightly's twelve, verbatim, each with its player. Eleven open on the call or on the fact that decides his
+# week; Grant Calcaterra's opens on the opponent and only then turns to him, a scene set first, which the rule
+# rightly refuses.
 TRUE_OPENERS = (
-    "Greg Dulcich sits on the injury list as of Thursday 11:00 pm Central, and week 8 of 2026's game status report on "
-    "Friday hasn't landed, so his Sunday is up in the air.",
-    "Adonai Mitchell has no business in a lineup in week 8 of 2026.",
-    "DJ Giddens is third among Colts backs behind Jonathan Taylor and Seth McGowan, and he has not played a snap "
-    "through week 7 of 2026.",
-    "KeAndre Lambert-Smith climbs to fourth among Chargers receivers, and that still leaves three wideouts ahead of him.",
-    "Play Jayden Daniels this week.",
-    "Gunnar Helm isn't worth a starting spot this week.",
-    "Coleman rides the bench in week 8 of 2026, because the move to second among Denver's backs still leaves J.K. "
-    "Dobbins in front of him.",
-    "Chris Bell shouldn't be in a lineup in week 8 of 2026.",
-    "Jonah Coleman isn't startable yet, even after climbing to second on Denver's depth chart.",
-    "Third on Philadelphia's quarterback chart, Cole Payton has no case to start in week 8 of 2026.",
-    "Andy Dalton is third at quarterback for Atlanta, and that settles his week before kickoff.",
+    (
+        "Greg Dulcich",
+        "Greg Dulcich sits on the injury list as of Thursday 11:00 pm Central, and week 8 of 2026's game status report "
+        "on Friday hasn't landed, so his Sunday is up in the air.",
+    ),
+    ("Adonai Mitchell", "Adonai Mitchell has no business in a lineup in week 8 of 2026."),
+    (
+        "DJ Giddens",
+        "DJ Giddens is third among Colts backs behind Jonathan Taylor and Seth McGowan, and he has not played a snap "
+        "through week 7 of 2026.",
+    ),
+    (
+        "KeAndre Lambert-Smith",
+        "KeAndre Lambert-Smith climbs to fourth among Chargers receivers, and that still leaves three wideouts ahead "
+        "of him.",
+    ),
+    ("Jayden Daniels", "Play Jayden Daniels this week."),
+    ("Gunnar Helm", "Gunnar Helm isn't worth a starting spot this week."),
+    (
+        "Jonah Coleman",
+        "Coleman rides the bench in week 8 of 2026, because the move to second among Denver's backs still leaves J.K. "
+        "Dobbins in front of him.",
+    ),
+    ("Chris Bell", "Chris Bell shouldn't be in a lineup in week 8 of 2026."),
+    ("Jonah Coleman", "Jonah Coleman isn't startable yet, even after climbing to second on Denver's depth chart."),
+    ("Cole Payton", "Third on Philadelphia's quarterback chart, Cole Payton has no case to start in week 8 of 2026."),
+    ("Andy Dalton", "Andy Dalton is third at quarterback for Atlanta, and that settles his week before kickoff."),
 )
 SCENE_SET = (
     "Washington allows the second most PPR points a game to tight ends, and Grant Calcaterra still can't use it."
 )
 
 
-def _opens(first: str) -> bool:
+def _opens(first: str, name: str = "Puka Nacua") -> bool:
     text = f"{first} He has little to work with. Leave him be."
-    return not [v for v in week_rule_violations(text, starter(), "sit") if "opens without" in v]
+    sheet = replace(starter(), name=name)
+    return not [v for v in week_rule_violations(text, sheet, "sit") if "opens without" in v]
 
 
-@pytest.mark.parametrize("first", TRUE_OPENERS)
-def test_a_true_opener_opens_the_read(first: str) -> None:
-    assert _opens(first)
+@pytest.mark.parametrize(("name", "first"), TRUE_OPENERS)
+def test_a_true_opener_opens_the_read(name: str, first: str) -> None:
+    assert _opens(first, name)
 
 
 def test_a_scene_set_first_is_still_refused() -> None:
-    assert not _opens(SCENE_SET)
+    assert not _opens(SCENE_SET, "Grant Calcaterra")
     # A starter's place sets a scene too (review MEDIUM-1), and "plays Arizona" is no call (review LOW-11).
     assert not _opens("Nacua sits first among Rams receivers as the week opens.")
     assert not _opens("The Rams play Arizona at home this week in a game that suits him.")
+
+
+@pytest.mark.parametrize(
+    ("name", "first"),
+    [
+        (
+            "Grant Calcaterra",
+            "Every tight end is startable against Washington, and Grant Calcaterra still can't use it.",
+        ),
+        (
+            "Grant Calcaterra",
+            "Washington's front puts a fill-in in the lineup most weeks, and Calcaterra can't use it.",
+        ),
+        ("Puka Nacua", "The Rams are second on the schedule's toughest list, and Nacua faces them."),
+        ("Puka Nacua", "Play Arizona's defense as a soft spot this week, and Nacua sees plenty of it."),
+    ],
+)
+def test_a_lane_303_form_said_of_someone_else_opens_nothing(name: str, first: str) -> None:
+    """The review's M3: the forms that name no one count only in a sentence about him."""
+    assert not _opens(first, name)
+
+
+def test_the_forms_said_of_him_by_pronoun_or_imperative_open() -> None:
+    assert _opens("He is startable only in the deepest leagues.")
+    assert _opens("His place is out of the lineup until Shipley is back.")
+    assert _opens("Find a fill-in for him this week.")
+    assert _opens("Nacua rides the bench this week.")
 
 
 # --- lining up is football --------------------------------------------------------------------------------------
@@ -322,3 +367,110 @@ def test_a_bye_names_no_report_for_another_week() -> None:
     sheet = _week_eight()
     assert _report_breaks("Hold him before Friday's week 8 game status report.", sheet) == []
     assert _report_breaks("Hold him before Friday's week 9 report.", sheet)
+
+
+# --- fix round 2 (the review) ----------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "Friday's report cleared him, so start him.",
+        "Friday's report lists him as Questionable, so hold him.",
+        "Friday's game status report has him Out, so sit him.",
+        "Friday's report confirmed he is healthy.",
+        "The Friday report is out and he is clear.",
+    ],
+)
+def test_a_report_not_out_is_never_cited_as_its_subject(said: str) -> None:
+    """The review's H1: before the report is out, a day-named report passes only as still to come."""
+    found = _report_breaks(said, _week_eight())
+    assert len(found) == 1 and "a report not out at the write" in found[0], found
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "Hold him before Friday's report.",
+        "Keep him on the bench, and only worry about a change if Friday's game status report clears him.",
+        "Friday's report will settle whether he plays.",
+        "He carries no designation, with Friday's report still to come.",
+        "Friday's report decides whether he plays.",
+    ],
+)
+def test_a_report_still_to_come_passes(said: str) -> None:
+    assert _report_breaks(said, _week_eight()) == []
+
+
+def test_the_report_days_tense_is_the_writes() -> None:
+    """The review's M2: a Saturday write with his status read Thursday, or never read, is past the report: the line
+    says it came out, and the read may neither cite it nor call it still to come."""
+    saturday = datetime(2026, 10, 31, 20, 0, tzinfo=UTC)
+    for status in (Status(None, THURSDAY_LIST), Status(None, None)):
+        sheet = replace(_week_eight(), written_at=saturday, status=status)
+        assert (report_out(sheet), report_issued(sheet)) == (False, True)
+        line = report_day_line(sheet) or ""
+        assert "came out Friday by 3:00 pm Central" in line and "read before it" in line and "comes out" not in line
+        assert _report_breaks("Hold him before Friday's report.", sheet)
+        assert _report_breaks("He has no designation on Friday's report.", sheet)
+    # Read after the report: it may be cited.
+    after = replace(_week_eight(seen=SATURDAY_LIST), written_at=saturday)
+    assert _report_breaks("Friday's report cleared him, so start him.", after) == []
+
+
+@pytest.mark.parametrize(
+    "written",
+    [
+        "Sit him in week 8 of 2026. He had 9 in week 7 of the 2026 season.",
+        "Sit him in week 8 of 2026. He had 14 in week 7, 2026 his best year so far.",
+        "Sit him in week 8 of 2026. He scored 20 in week 7 in 2026 dollars.",
+    ],
+)
+def test_a_season_said_in_another_form_is_never_cut(written: str) -> None:
+    """The review's H2: only the remedy's own forms are dropped; anything else is the rule's to refuse."""
+    assert said_once(written, SEASON) == written
+
+
+@pytest.mark.parametrize(
+    ("written", "said"),
+    [
+        (
+            "He has 12 PPR points over weeks 5 to 7. Sit him in week 8 of 2026.",
+            "He has 12 PPR points over weeks 5 to 7 of 2026. Sit him in week 8.",
+        ),
+        ("He sat out weeks 3-5. Sit him in week 8.", "He sat out weeks 3-5 of 2026. Sit him in week 8."),
+        (
+            "He sat out weeks 3 through 5. Sit him in week 8.",
+            "He sat out weeks 3 through 5 of 2026. Sit him in week 8.",
+        ),
+    ],
+)
+def test_a_range_takes_the_season_after_its_last_week(written: str, said: str) -> None:
+    """The review's H3: a range at a sentence's end, with a hyphen or "through", is one span here and in the
+    validator's `with_season`."""
+    assert said_once(written, SEASON) == said
+    assert _season_hits(said) == []
+
+
+@pytest.mark.parametrize(
+    "written",
+    [
+        "He had 25 PPR points in week 3 of his career.",
+        "He had 25 PPR points in week 3 as a rookie.",
+        "He scored twice in week 2 of the playoffs.",
+        "He had 30 PPR points in week 5 in college.",
+    ],
+)
+def test_a_week_outside_this_season_is_left_for_the_rule(written: str) -> None:
+    """The review's M1: the season is never added to a career, rookie, playoff or college week."""
+    assert said_once(written, SEASON) == written
+
+
+def test_quoted_words_and_this_weeks_report() -> None:
+    """The review's L1 and L2."""
+    quoted = 'Sit him in week 8 of 2026. "Week 9 of 2026 is the one," his coach said.'
+    assert said_once(quoted, SEASON) == quoted
+    report = "He has no designation before week 8's game status report on Friday. Start him."
+    assert said_once(report, SEASON, 8) == (
+        "He has no designation before this week's game status report on Friday. Start him."
+    )

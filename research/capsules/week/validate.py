@@ -36,8 +36,9 @@ from research.capsules.week.sheet import WeekSheet, sheet_names, week_name_ledge
 WEEK_BAND: Final = (40, 95)
 SHARED_SENTENCE: Final = "The text carries a sentence shaped like one another page carries this week"
 _BARE_WEEK: Final = re.compile(
-    # A joined number is a week only when it is no figure ("week 5 and 41.4 PPR points" joins nothing).
-    r"\bweeks?\s+\d{1,2}(?:\s*(?:,|and|or|to|through|-)\s*\d{1,2}(?![\d.]))*\b(?![.]\d)"
+    # A joined number is a week only when it is no figure ("week 5 and 41.4 PPR points" joins nothing); a range's
+    # last week may end a sentence ("weeks 3-5.", Lane 303 review H3, as `season_words._WEEK` reads it).
+    r"\bweeks?\s+\d{1,2}(?:\s*(?:,|and|or|to|through|-)\s*\d{1,2}(?!\d|\.\d))*\b(?!\.\d)"
     r"(?!\s*(?:of|in|,)\s*(?:19|20)\d\d)",
     re.IGNORECASE,
 )

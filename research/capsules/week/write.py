@@ -208,7 +208,7 @@ def _writer_read(
             continue  # an empty or cut answer is an ask spent: ask again while asks remain
         usage = add_usage(usage, completion.usage)
         answer = parse_week_answer(completion.content)
-        text = said_once(answer.read or "", sheet.season)
+        text = said_once(answer.read or "", sheet.season, None if sheet.bye else sheet.week)
         result = validate_week_read(text, sheet, taken, answer.call)
         if asks.count_over(result):
             attempts.append(WeekAttempt(text, answer.call, result.violations))
@@ -286,7 +286,7 @@ def _retry_writer_read(  # noqa: PLR0913 - the read's parts
         return done(block, FACTS_SOURCE, None, fallen.fallback)
     usage = add_usage(usage, completion.usage)
     answer = parse_week_answer(completion.content)
-    text = said_once(answer.read or "", sheet.season)
+    text = said_once(answer.read or "", sheet.season, None if sheet.bye else sheet.week)
     violations = validate_week_read(text, sheet, taken, answer.call).violations
     if not violations and not sheet.may_start:
         try:
