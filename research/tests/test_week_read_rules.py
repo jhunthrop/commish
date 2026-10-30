@@ -829,6 +829,11 @@ def test_a_suffix_before_a_capital_still_ends_its_sentence() -> None:
         "Demercado can't be started this week.",
         "Fire him up against the Titans.",
         "Chimere Dike sits this week, and it is not close.",
+        # Lane 302's run: the decided call said as what he is, and a name led by initials.
+        "Sit A.J. Brown this week.",
+        "Higgins is a start this week, and the air yards are why.",
+        "Parker Washington is a start in week 8 of 2026 at home against Indianapolis.",
+        "Justin Herbert is in the lineup this week.",
     ],
 )
 def test_the_opener_knows_the_calls_forms(opener: str) -> None:

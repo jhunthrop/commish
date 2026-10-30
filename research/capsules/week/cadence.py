@@ -16,7 +16,8 @@ rewrite only the reads whose week moved.
   place in our order crossed his position's starter line, or a Doubtful player's game status report came out. The
   call is the read's headline, so a crossing alone rewrites it, nightly (the order is published nightly) and hourly
   (the report comes out mid-afternoon), held like a status rewrite (`STATUS_REWRITES_A_DAY`). With every stored call
-  decided, a crossing moves a handful of board players a night, about $0.01 to $0.03 a night.
+  decided, a crossing moves the few board players beside a line a night; at an estimated ten a night (unmeasured: the
+  copy keeps one published board) and 1.48 attempts at $0.0023, about $0.03 a night.
 - The written read breaks a rule the writer holds reads to now (`RULE_STALE`, Lane 275 fix round 1: a read
   written while the rules asked for the published projection names it; Lane 286: every rule of the body alone,
   `rules.body_rule_violations`, so a read that says "your roster" is written again), nightly only and at most
