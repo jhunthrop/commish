@@ -69,10 +69,11 @@ func weekKickedOff(games []boards.TeamWeek, team string, week int, now time.Time
 
 // liveWeekRead is his newest written read for the board week (the week
 // of the next game still to be played), as the run would serve it: nil
-// with no store, no written read, a read that failed, or once his game of
+// with no store, no club (a read is about the club that let him go,
+// Lane 301), no written read, a read that failed, or once his game of
 // that week has kicked off.
 func (s *Service) liveWeekRead(ctx context.Context, games []boards.TeamWeek, bp boards.Player, now time.Time) *apitypes.PlayerWeekRead {
-	if s.WeekReads == nil {
+	if s.WeekReads == nil || bp.Team == "" {
 		return nil
 	}
 	week := nextWeek(games)
