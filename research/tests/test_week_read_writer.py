@@ -406,7 +406,7 @@ def _stored(sheet_week: int = 6, **changes: object) -> StoredWeekRead:
         projection_points=15.2,
         status="questionable",
         reason=FIRST,
-        call="hold",
+        call="start",  # his decided call (Lane 302): Questionable on Friday's report, inside the line
         attempt_day=date(2026, 10, 16),
         attempts=1,
     )

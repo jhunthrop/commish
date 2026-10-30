@@ -45,7 +45,7 @@ from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
 from research.capsules.week.angle_rules import figure_violations as angle_figure_violations
 from research.capsules.week.angle_rules import ordinary_rank_violations
-from research.capsules.week.call import HOLD, NONE, SIT, START, week_call
+from research.capsules.week.call import HOLD, NONE, QUESTIONABLE, SIT, START, week_call
 from research.capsules.week.cells import cell_figures, misnamed, misranked, quotable_figures
 from research.capsules.week.fact_rules import place_violations, weather_violations, week_figure_violations
 from research.capsules.week.place_rules import place_violations as angle_place_violations
@@ -400,7 +400,9 @@ def _returning_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[st
 
 
 def _wait_violation(text: str, sheet: WeekSheet, call: str | None) -> list[str]:
-    if call != START or _WAITS.search(text) is None:
+    # A Questionable player inside the line is a start once his game status report is out (Lane 302 fix round 1):
+    # his read may still say what his start waits on ("if he is active").
+    if call != START or sheet.status.status == QUESTIONABLE or _WAITS.search(text) is None:
         return []
     return [
         f"The read waits on {sheet.name}'s status before saying start, but the call is start: nothing on his "

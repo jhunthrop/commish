@@ -108,7 +108,7 @@ def test_the_nights_pool_lands_each_read_with_its_stamps_call_and_attempt(engine
         user = json.loads(request.content)["messages"][-1]["content"]
         asked.append(user)
         puka = "Puka Nacua" in user.split("\n", 2)[1]
-        return _completion(STARTER_READ, "start") if puka else _completion(_QUESTIONABLE_READ, "hold")
+        return _completion(STARTER_READ, "start") if puka else _completion(_QUESTIONABLE_READ, "start")
 
     first, second = starter(), questionable()
     spend = WeekReadSpend()

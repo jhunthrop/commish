@@ -640,11 +640,14 @@ def test_the_list_refuses_every_start_phrasing_the_re_review_found(advice: str, 
 
 def test_a_wait_and_see_read_calls_itself_hold() -> None:
     """The re-review's F4: Lamb's "Wait on his status ... before you start him" is a hold. Since Lane 302 the
-    call is decided: a Questionable player's is hold, so a start is refused as another call, and a start read for
-    a player nothing holds never waits on his status."""
+    call is decided: a Questionable player's inside the line before his game status report is hold, so a start is
+    refused as another call, and a start read for a player nothing holds never waits on his status."""
     text = "Wait on his status right up to Sunday night before you start him."
-    assert any('the call for him this week is "hold"' in v for v in week_rule_violations(text, questionable(), "start"))
-    assert not any("the call for him" in v for v in week_rule_violations(text, questionable(), "hold"))
+    before = replace(questionable(), status=Status("questionable", datetime(2026, 10, 15, 18, 0, tzinfo=UTC)))
+    assert any('the call for him this week is "hold"' in v for v in week_rule_violations(text, before, "start"))
+    assert not any("the call for him" in v for v in week_rule_violations(text, before, "hold"))
+    # On or after the report he is a start, and his read may say what the start waits on.
+    assert not any("wait on his status" in v for v in week_rule_violations(text, questionable(), "start"))
     assert any("never wait on his status" in v for v in week_rule_violations(text, starter(), "start"))
 
 

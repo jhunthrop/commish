@@ -13,11 +13,12 @@ rewrite only the reads whose week moved.
   `STATUS_REWRITES_A_DAY` a Central day (`status_rewrite_capped`, fix round 2), and a written read's attempts restart at one, so a success never
   spends the next change's tries. A capped read is asked again at the first pass of the next Central day.
 - Its call is no longer the one decided for tonight's sheet (`CALL_CHANGED`, Lane 302, `call.week_call`): his
-  place in our order crossed his position's starter line, or a Doubtful player's game status report came out. The
-  call is the read's headline, so a crossing alone rewrites it, nightly (the order is published nightly) and hourly
-  (the report comes out mid-afternoon), held like a status rewrite (`STATUS_REWRITES_A_DAY`). With every stored call
-  decided, a crossing moves the few board players beside a line a night; at an estimated ten a night (unmeasured: the
-  copy keeps one published board) and 1.48 attempts at $0.0023, about $0.03 a night.
+  place this week (the published projection's order at his position, fix round 1) crossed his position's starter
+  line, or a Questionable player's game status report came out. The call is the read's headline, so a crossing alone
+  rewrites it, nightly and hourly (a new projection capture and the report both land mid-week), held like a status
+  rewrite (`STATUS_REWRITES_A_DAY`). The read itself never states the projection, so this is the call moving, not
+  the read standing through a projection move (Lane 275). Week 7's seven later captures crossed a line for 18, 10,
+  6, 11, 2, 2 and 0 board players, 49 in the week: at 1.48 attempts and $0.0023 a read, about $0.17 a week.
 - The written read breaks a rule the writer holds reads to now (`RULE_STALE`, Lane 275 fix round 1: a read
   written while the rules asked for the published projection names it; Lane 286: every rule of the body alone,
   `rules.body_rule_violations`, so a read that says "your roster" is written again), nightly only and at most
@@ -142,8 +143,8 @@ def _fact_stale(sheet: WeekSheet, stored: StoredWeekRead, now: datetime) -> bool
 
 
 def call_moved(sheet: WeekSheet, stored: StoredWeekRead) -> bool:
-    """Whether a written read's call is no longer the one decided for tonight's sheet (Lane 302): his place in our
-    order crossed his position's starter line, or a Doubtful player's game status report came out."""
+    """Whether a written read's call is no longer the one decided for tonight's sheet (Lane 302): his place this week
+    crossed his position's starter line, or a Questionable player's game status report came out."""
     return stored.source == WRITTEN_SOURCE and stored.call != week_call(sheet).call
 
 

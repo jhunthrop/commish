@@ -253,6 +253,9 @@ class WeekSheet:
     # before the newest when it moved (`depth_moves`): empty and None while `ANGLES_ON` is off.
     angles: tuple[Angle, ...] = ()
     depth_moved_from: float | None = None
+    # His place among the board players at his position by the week's published projection (Lane 302 fix round 1,
+    # `call.week_ranks`), 1 the most points; None with no published projection for him this week. The call reads it.
+    week_rank: int | None = None
 
     def __post_init__(self) -> None:
         late = [name for name, at in self._stamped().items() if at > self.written_at]
