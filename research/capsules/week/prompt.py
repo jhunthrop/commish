@@ -1,13 +1,22 @@
-"""THE WEEK READ'S INSTRUCTIONS: the writer's voice and word lists (`capsules.prompt`), the week's own rules.
+"""THE WEEK READ'S INSTRUCTIONS (Lane 307): an analyst's playbook, the hard limits, and the check pass's ask.
+
+The founder, 2026-10-30, after iterating one read live (Josh Downs, week 8): the reads must "feel like humans
+actually wrote them who love fantasy football and have novel and unique thoughts", reached by giving the model
+"the tools to do so without giving it bland rules". So the system prompt is the iteration harness's
+(`reads-iteration/harness/playbook_test.py`): a voice, how a good fantasy analyst thinks, what makes a read
+worth reading, and the hard limits, the accuracy rules the validator holds the read to among them. The wording
+rules the checklist writer was given (the four rules reads break most, a figure to a sentence, the opener, the
+sentence count, the cap on figures, the voices desk) are gone with the checks that enforced them.
 
 One system prompt for every week read, so a correction is held to what the draft was. The request is the
-week's facts (`render.render_week_sheet`), the sentences other pages already carry this week, and the ask;
-a correction quotes the attempt, how far it is from its length, and every rule broken on any attempt so
-far, each with its sentence (`rule_notes`, Lane 52). The prompt states the week, the kickoff (on the
-sheet), and that the week's number is a published projection, never ours, while `sheet.PROJECTION_BASIS`
-says so. The read never states it (Lane 275, the founder 2026-10-28): the card prints it, and a read
-that quoted it went stale the moment it moved. The answer is one JSON object: the read, and the writer's own call for it in one word (`CALLS`),
-which the rules hold to the sheet (a player who may not be started is never "start", the review's H2).
+week's facts (`render.render_week_sheet`), the sentences other pages already carry this week, and the ask; a
+correction quotes the attempt, how far it is from its length, and every rule broken on any attempt so far, each
+with its sentence (`rule_notes`, Lane 52). The read never states the week's published projection (Lane 275).
+The answer is one JSON object: the read, and the writer's own call for it in one word (`CALLS`), which the rules
+hold to the sheet (a player who may not be started is never "start", the review's H2).
+
+THE CHECK PASS (`CHECK_RULES`, `check_messages`): after every draft the same model checks each number and claim
+against the facts and fixes only what fails, before the validator reads it (`write`).
 """
 
 import json
@@ -20,30 +29,23 @@ from research.capsules.prompt import NEVER_ON_THE_PAGE
 from research.capsules.render_words import week_of
 from research.capsules.rule_notes import RuleNote
 from research.capsules.validate import word_count
-from research.capsules.week.angles import angles_on
 from research.capsules.week.render import render_week_sheet
-from research.capsules.week.rules import ANGLE_FIGURES, MAX_FIGURES, MAX_SENTENCES, MIN_SENTENCES, shown_week_words
+from research.capsules.week.rules import shown_week_words
 from research.capsules.week.sheet import PROJECTION_BASIS, WeekSheet
 from research.capsules.week.validate import WEEK_BAND
-from research.capsules.week.voices import voice_reminder, voice_section
 
 _LOW, _HIGH = WEEK_BAND
-# The words to aim at, well under the cap (80 at Lane 100, B44; 95 since Lane 117 fix round 3): the recorded model ran 91 to 104 words
-# against a target of 80, and the first nightly with the cap at 80 and a target of 60 ran 114 of 354 reads
-# to 81 to 91 words (Lane 117, B95). The prompt asks for a range inside the band, and its middle.
-TARGET_WORDS: Final = 60
-ASKED_WORDS: Final = (45, 70)
-# The shape that lands near the target: a writer told a sentence's length keeps to it better than one told a
-# total (the Lane 117 replay).
-SENTENCE_WORDS: Final = 15
-# Lane 275 (the founder, 2026-10-28): the read never names the published projection, its figure or its move.
-# The card prints it, and the read stands when it moves; the read never names the card (fix round 2).
+# The words a read is asked for (Lane 307), inside the band: on the first 15 production sheets Sonnet asked for 70
+# to 110 wrote 110 to 129 words on 13 of its first drafts, so the ask sits under the cap, and an overrun is asked
+# back to the target.
+ASKED_WORDS: Final = (75, 95)
+TARGET_WORDS: Final = 90
 _NUMBER_RULE: Final = {
     "published": (
-        "- The week's number is a published projection, never ours. Never state it, its figure, its change or a "
-        "judgment of it: the card prints it. Never name the card, a cell or a tile, and never \"the week's "
-        'number", "our projection", "our number", "our model" or "we project" for this week. '
-        "Say what you see in his status, his role, the matchup or his rate."
+        "- Never state the published projection, its figure, its change or a judgment of it: the card above the "
+        'read prints it. Never name the card, a cell or a tile, and never "our projection", "our number", '
+        '"our model" or "we project" for this week: the week\'s number is never ours. Never predict how many '
+        "points, targets or touches he will get."
     ),
 }
 # The four calls, defined (the re-review's F4): the page shows the call beside the read.
@@ -56,7 +58,7 @@ CALL_MEANINGS: Final = (
 _RETURN: Final = (
     'Return ONE JSON object and nothing else: {"read": "<the read>", "call": "<one word>"}. "call" is what '
     "your read tells a manager who has him to do this week, one word: "
-    + "; ".join(f'"{call}" means {meaning}' for call, meaning in CALL_MEANINGS)
+    + ", ".join(f'"{call}" means {meaning}' for call, meaning in CALL_MEANINGS)
     + '. A read that waits on his status before saying start calls itself "hold".'
 )
 
@@ -65,87 +67,69 @@ def _quoted(words: Sequence[str]) -> str:
     return ", ".join(f'"{word}"' for word in words)
 
 
-# The parts of the rules the angles change (Lane 300): main's words, then the angles' (`week_rules`).
-_PICK: Final = (
-    "Pick the two or three facts that decide his week (his game, his status, the matchup, the weather, his role, his "
-    "rate) and build on those. Leave the rest unquoted."
-)
-_PICK_ANGLES: Final = (
-    "Read every fact: his usage in full, each with how unusual it is, and the game's facts, each with whether it "
-    "bites. Decide which one or two actually decide this player's week, lead with that, and say why it matters to "
-    "this week's call. Leave out what is ordinary: a fact the sheet calls ordinary, or one that does not bite, earns "
-    "no sentence unless it decides the call. The opponent's rank, the depth chart, the weather and the expected "
-    "score get a sentence only when the sheet says they bite. Never tour the list."
-)
-_CAP: Final = f"quote at most {MAX_FIGURES} figures in all"
-_CAP_ANGLES: Final = (
-    f"quote at most {MAX_FIGURES + ANGLE_FIGURES} figures in all, counting each angle's figures: when two angles "
-    "carry two figures each, say one of them in words"
-)
-_SAY: Final = "why his week looks the way it does (his status, his role, the matchup, the weather)"
-_SAY_ANGLES: Final = "what the facts that decide his week mean for this week's call"
-_SEE: Final = "Say what you see in his status, his role, the matchup or his rate."
-_SEE_ANGLES: Final = "Say what the facts that decide his week and his status tell you."
-_NAMED: Final = "Every figure in the facts is one the page prints as a cell: name it the way the cell does"
-_NAMED_ANGLES: Final = (
-    "Every figure in the facts is one the page prints as a cell or one his usage facts state: name a usage figure "
-    "the way its line does (\"32% of the Rams' targets\"), and a cell's the way the cell does"
-)
+# The one sentence the coordinator added to the harness's playbook (Lane 307 phase 1).
+OWN_ROLE: Final = "Describe the matchup in his own role's numbers."
+_RULES_TEXT: Final = f"""You write the weekly read on one fantasy football player for a site whose readers love the game. Write like a sharp fantasy analyst talking to a friend who plays: opinionated, specific, plain spoken.
 
+How a good fantasy analyst thinks (use what applies, never walk the list):
+- Opportunity beats efficiency. Targets, carries, snaps and red-zone work predict next week better than yards per touch. Touchdowns on thin volume rarely last.
+- Role changes are the loudest signal. A teammate hurt, returning or added changes who gets the work. Ask who absorbs it.
+- Game script drives volume. Teams expected to trail throw more as the game goes on. Teams expected to lead run late. The expected score says how many scoring chances there are.
+- Matchups work at the role level. A defense that stops the run pushes offenses to throw, which helps pass catchers and hurts the lead back. A soft pass defense helps whoever gets the targets.
+- Separate noise from signal. One bad game on low team volume is the game plan, not the player. A share falling for three weeks is a trend.
+- Floor and ceiling matter. Steady volume makes a safe flex. Boom-or-bust players win some weeks and lose others.
+- Talk about him in his own role. A receiver's week is his targets, routes and where he lines up. A back's week is his carries, catches and goal-line work. Open on his work, then bring in the team and the matchup as the reason it changes. {OWN_ROLE}
+- The decision sets the read. For a locked-in starter, skip whether to start him and go straight to what sets his ceiling or his risk this week. For a borderline player make the full case.
 
-def _rules(*, angles: bool) -> str:
-    """The system prompt, with the angles' words (Lane 300) or main's."""
-    text = _RULES_TEXT.replace(_PICK, _PICK_ANGLES) if angles else _RULES_TEXT
-    if angles:
-        text = text.replace(_SAY, _SAY_ANGLES).replace(_SEE, _SEE_ANGLES).replace(_NAMED, _NAMED_ANGLES)
-        text = text.replace(_CAP, _CAP_ANGLES)
-    return text
+What makes a read worth reading:
+- Find the one thing that decides his week and build the read around it. Connect facts the stat line alone does not connect.
+- If the obvious read is wrong, say so and show why.
+- Say what would change the call if something specific happens.
+- Leave out anything ordinary. Do not tour the facts.
+- Open on the fact itself, never on a frame about the read ("the question is", "the week turns on", "he's a lock, so").
 
-
-_RULES_TEXT: Final = f"""You write the week-ahead read on one player's page for a fantasy football manager setting his lineup for the week in front of him. You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
-
-THE FOUR RULES READS BREAK MOST
-- One figure to a sentence. The opponent's rank, his points a game and his last game's points each get a sentence of their own.
-- Never the published projection, its figure or its change: the card prints it. Never a sentence another player's page could carry with the names and numbers swapped.
-- The season once, with the first week you name ("week 7 of 2026"), every later week without it. Never the year twice, never a week before the year is named.
-- The injury list in the facts' own words for it ("Friday's report"), never a day or a name the facts do not give.
-
-THE READ
-- {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, {ASKED_WORDS[0]} to {ASKED_WORDS[1]} words in all, about {TARGET_WORDS}, and never more than {_HIGH}: four sentences of about {SENTENCE_WORDS} words each is the shape. Count the words before you answer. One paragraph, about the week the facts name and nothing else. Pick the two or three facts that decide his week (his game, his status, the matchup, the weather, his role, his rate) and build on those. Leave the rest unquoted.
-- The read sits under his player card, whose cells already print his numbers: the published projection and its change, the opponent's rank, his points a game, each game's points, his rest-of-season points, the expected score and the weather. The published projection and its change are the card's alone: never quote them. Say what those cells cannot: why his week looks the way it does (his status, his role, the matchup, the weather) and what a manager who has him does this week. Never retell the cells: quote at most {MAX_FIGURES} figures in all.
-- Open on the fact that matters most for him this week: the first sentence carries the call, a figure or his status. Never open with a scene-setting clause (no "runs into the kind of matchup" before a colon), a greeting, a question, or his name followed by a verdict. Name him in the read.
-- Every read on this site is written from facts like these, and no sentence may sit on two players' pages, even with the names and numbers swapped: build each sentence your own way for this player, never a sentence shape that would fit another player.
-- End on what a manager who has him does this week, in his own terms: start him, sit him, keep him on the bench, find a fill-in for the week.
-- A player who may not be started this week (on his bye, Out, Doubtful, on a season-long list) is never recommended to start, in any wording: his call is sit, hold or none. If he cannot play, say he does not play and what that means for a roster that has him: who fills the spot this week, whether he stays on the roster, his next game.
-- A Questionable player: say what a manager waits on before his kickoff, in words of your own.
-
-THE NUMBER
+Hard limits:
+- Every number you state must come from the facts given, exactly as they give it. Never invent a stat, a ranking, a quote, a teammate or an injury, and never a figure you worked out yourself.
+- A rank, a place among his peers or how unusual a fact is, only as the facts state it and of the fact that states it. His place on the depth chart only as the facts list it. A game's points only for the week the facts give them.
 {_NUMBER_RULE[PROJECTION_BASIS]}
 - His place in our order says which order it is: "in our preseason order" or "in our rest-of-season order", as the facts name it.
-
-NUMBERS, TIME AND WORDS
-- Use ONLY the numbers and names in the facts. Never invent a stat, an injury, a teammate or any figure. Quote a number exactly as the facts give it, never a rounding of it and never a figure you worked out. Every figure in the facts is one the page prints as a cell: name it the way the cell does ("242.5 PPR points for the rest of the season", "30.7 PPR points a game this season", "37.7 points in his last game", "26th of 32 against receivers"). The published projection is the one figure in the facts the read never quotes. On his bye this week has no figure, and the week after it has none in the facts.
-- Every figure carries its unit right after it: "32 points", "19.5 points", "25.9 PPR points a game", "28th of 32 against receivers", "61 degrees", "14 mph", "a 30% chance". Never a bare figure, never "32 to 19.5".
-- A rank against his position reads as the facts give it, 1st allowed the fewest, said the way a person would, never a code. "The most" is only the last rank and "the fewest" only the first: say a rank in the words the facts give for it.
-- Name the season once, with the first week you name ("week 6 of 2026"), and every week after it without the year ("week 5", "week 7"). Never the year twice. "This week" is fine. Never a date or the name of a month. A week still to play is only looked ahead to.
-- The injury report is the one the facts name, by the day the facts give ("on Friday's report"), never "the latest" and never another day. Before a game's status report is out, say so as the facts do.
-- Name clubs by name as the facts give them beside the code ("the Cardinals", "Arizona"), never by their code ("ARI").
-- Fantasy football words, never a trading or a betting word. The game's expected points are an expected score and nothing more. Never a provider, a data source or a rival product by name. Never a tip and never "remember to".
-- Speak for the board as "we" when you need to, never "I", "me" or "my". The facts are yours alone: never mention a sheet.
-- Write like you talk. Contractions are welcome. Never an em-dash, never a semicolon.
+- A player who may not be started this week (on his bye, Out, Doubtful, on a season-long list) is never recommended to start, in any wording: his call is sit, hold or none. If he cannot play, say he does not play and what that means for a roster that has him. A Questionable player: say what a manager waits on before his kickoff.
+- The injury report only as the facts name it, by the day they give ("on Friday's report"). Before this week's game status report is out, name it only as still to come ("once Friday's report is out"), never for what it says. The kickoff forecast only as the facts give it.
+- Weeks as "week 7". Never a date or the name of a month. A week still to play is only looked ahead to.
+- Fantasy words, never a trading word or a betting word: no line, spread, favorite, favored or underdog. The game's expected points are an expected score.
+- Never a data provider or a rival product by name. Name clubs by name, never by their code. Speak for the site as "we" when you need to, never "I", "I'd" or "me". Never mention the facts or a sheet.
+- No semicolons. No em dashes or en dashes.
+- One paragraph of {ASKED_WORDS[0]} to {ASKED_WORDS[1]} words, never more than {_HIGH}. Count them before you answer.
 
 {NEVER_ON_THE_PAGE}
 - This read's own words: {_quoted(shown_week_words())}.
 
 {_RETURN}"""
-# Main's system prompt, and the angles' (Lane 300): `week_rules` picks by the switch at the call.
-WEEK_RULES: Final = _rules(angles=False)
-WEEK_RULES_ANGLES: Final = _rules(angles=True)
+WEEK_RULES: Final = _RULES_TEXT
 
 
 def week_rules() -> str:
-    """The system prompt as the angles switch stands (`angles.ANGLES_ON`)."""
-    return WEEK_RULES_ANGLES if angles_on() else WEEK_RULES
+    """The week read's system prompt."""
+    return WEEK_RULES
+
+
+# THE CHECK PASS (Lane 307, the harness's CHECK): the writer's own model reads its draft against the facts and
+# fixes only the words a fact does not support.
+CHECK_RULES: Final = (
+    "You check a fantasy football read against its facts. For every number and every factual claim in the read, "
+    "find the fact line that supports it. A claim fails if no line supports it, if it puts a figure in the wrong "
+    'week or window, or if it turns "none recently" into "none all season". If every claim holds, return the read '
+    "unchanged. If any fails, fix only those words, keep the voice, keep the call, keep it under "
+    f"{_HIGH} words, no semicolons, no dashes. Return only the read."
+)
+
+
+def check_messages(sheet: WeekSheet, read: str) -> list[dict[str, str]]:
+    """The check pass's ask on one draft: the facts the draft was written from, and the draft."""
+    return [
+        {"role": "system", "content": CHECK_RULES},
+        {"role": "user", "content": f"FACTS:\n{render_week_sheet(sheet)}\n\nREAD:\n{read}"},
+    ]
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,21 +173,9 @@ def week_prompt(sheet: WeekSheet, avoid: Sequence[str]) -> str:
         [
             f"Facts for the week:\n{render_week_sheet(sheet)}",
             *_avoid_section(avoid),
-            *voice_section(sheet),
             f"Write the week-ahead read for {sheet.name} for {week_of(sheet.week, sheet.season)}. {_RETURN}",
         ]
     )
-
-
-ANGLES_REMINDER: Final = (
-    "Keep the read built on the one or two facts that decide his week, with why they matter to this week's call; "
-    "leave out what is ordinary, and never tour the list."
-)
-
-
-def _angles_reminder(sheet: WeekSheet) -> list[str]:
-    """A correction's line on the angles (Lane 300): the correction writes most reads, so it carries them too."""
-    return [ANGLES_REMINDER] if angles_on() and sheet.angles and sheet.can_play else []
 
 
 def length_move(words: int) -> str | None:
@@ -224,8 +196,8 @@ def length_move(words: int) -> str | None:
 
 def week_correction(sheet: WeekSheet, body: str, ledger: Sequence[RuleNote], avoid: Sequence[str]) -> str:
     """A rewrite: the facts, the attempt, how far it is from its length, every rule broken so far with its
-    sentence, his voice's reminder once (Lane 282, `voices.voice_reminder`), the answer's shape. The retry
-    writer's ask on a written draft is this correction."""
+    sentence, and the answer's shape, under the same system prompt as the first ask. The retry writer's ask on a
+    written draft is this correction."""
     lines = "\n".join(note.line() for note in ledger)
     move = length_move(word_count(body))
     return "\n\n".join(
@@ -234,12 +206,10 @@ def week_correction(sheet: WeekSheet, body: str, ledger: Sequence[RuleNote], avo
             *_avoid_section(avoid),
             f'You wrote this read:\n"""{body}"""',
             *([] if move is None else [move]),
-            f"Write it again, {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, {ASKED_WORDS[0]} to "
-            f"{ASKED_WORDS[1]} words and never more than {_HIGH}, keeping what was right. Every rule this read has broken so far, on this "
-            "attempt and the ones before it. What you return breaks none of them and brings none of them back:"
-            f"\n{lines}",
-            *_angles_reminder(sheet),
-            *voice_reminder(sheet),
+            f"Write it again in your own voice, one paragraph of {ASKED_WORDS[0]} to {ASKED_WORDS[1]} words and never more than "
+            f"{_HIGH}, keeping what was right. "
+            "Every rule this read has broken so far, on this attempt and the ones before it. What you return breaks "
+            f"none of them and brings none of them back:\n{lines}",
             _RETURN,
         ]
     )

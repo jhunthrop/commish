@@ -29,7 +29,7 @@ from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.week import angles as angles_module
 from research.capsules.week.cadence import central_day, status_rewrite_capped
 from research.capsules.week.collect import board_week
-from research.capsules.week.prompt import answer_json
+from research.capsules.week.prompt import CHECK_RULES, answer_json
 from research.capsules.week.render import render_week_facts_block
 from research.capsules.week.rollover import NIGHTS, ReadsDue, Rollover, next_nightly, night_of, reads_due, rollover
 from research.capsules.week.sheet import Status, WeekSheet
@@ -207,6 +207,13 @@ def _completion(read: str, call: str) -> httpx.Response:
     return httpx.Response(200, json={"choices": [choice], "usage": usage})
 
 
+def _checked(user: str) -> httpx.Response:
+    """The check pass's answer (Lane 307): the draft unchanged, never one of the script's answers."""
+    usage = {"prompt_tokens": 2000, "completion_tokens": 120, "total_tokens": 2120, "cost": 0.0004}
+    choice = {"message": {"content": user.rsplit("\n\nREAD:\n", 1)[1]}, "finish_reason": "stop"}
+    return httpx.Response(200, json={"choices": [choice], "usage": usage})
+
+
 @dataclass
 class _Writer:
     """The stub gateway's answers by the player asked about; Puka Nacua's first `fail_first` asks quote a
@@ -220,6 +227,8 @@ class _Writer:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
         user = body["messages"][-1]["content"]
+        if body["messages"][0]["content"] == CHECK_RULES:
+            return _checked(user)
         who = user.split("\n", 2)[1]
         (self.asked if self.asked is not None else []).append(who)
         (self.models if self.models is not None else []).append(body["model"])
@@ -351,7 +360,8 @@ def test_an_hourly_pass_the_budget_cut_short_says_what_it_left_before_the_names(
     rewrite that falls keeps the written read (held) and one the budget stopped keeps it too: neither landed,
     so both are named for the next pass."""
     _step(engine, monkeypatch, [starter(), questionable()], _Writer())
-    monkeypatch.setattr(week_reads, "HOURLY_BUDGET_USD", week_reads.worst_read_usd(_PRICE) + 0.0001)
+    # Each draft's check settles on the budget too (Lane 307).
+    monkeypatch.setattr(week_reads, "HOURLY_BUDGET_USD", week_reads.worst_read_usd(_PRICE) + 0.0012)
     moved = [
         replace(starter(), status=Status("questionable", REPORT)),
         replace(questionable(), status=Status("out", REPORT)),
@@ -448,7 +458,7 @@ def test_an_hourly_pass_at_the_days_cap_stops_asking_and_says_so(
     writer.asked = asked
     hour = _step(engine, monkeypatch, sheets, writer, retry=_RETRY, hourly=True, at=_PASS + timedelta(hours=1))
     assert asked == [] and "1 stopped by the budget" in hour.summary
-    assert "1 unwritten reads not asked, the retries' share of the day's hourly $1.50 spent" in hour.summary
+    assert "1 unwritten reads not asked, the retries' share of the day's hourly $22.50 spent" in hour.summary
     assert "reads left unread" not in hour.summary  # the game-day alert's count is the status rewrites' alone
     assert _reads(engine)[(starter().player_id, _BOARD_WEEK)].source == FACTS_SOURCE
     _hourly_spent(engine, 0.001, _PASS + timedelta(minutes=65))
@@ -530,13 +540,17 @@ def test_retries_that_spent_their_share_leave_a_late_status_rewrite_funded(
     assert "1 unwritten reads not asked, the retries' share" in late.summary
 
 
+# The week writer's list price (Lane 307), the one the hourly dollars are sized at.
+_SONNET = ModelPrice("anthropic/claude-sonnet-5.5", 2.0, 10.0, "test", True)
+
+
 def test_the_status_share_covers_a_game_days_status_rewrites_at_their_worst_case() -> None:
-    worst = week_reads.worst_read_usd(_PRICE)
+    worst = week_reads.worst_read_usd(_SONNET)
     assert week_reads.GAME_DAY_STATUS_READS * worst <= week_reads.HOURLY_STATUS_RESERVE_USD
     assert week_reads.HOURLY_STATUS_RESERVE_USD < week_reads.HOURLY_DAY_USD
-    assert week_reads.retry_share_usd(0.0) == pytest.approx(0.50)
-    assert week_reads.retry_share_usd(0.49) == pytest.approx(0.01)
-    assert week_reads.retry_share_usd(1.20) == 0.0
+    assert week_reads.retry_share_usd(0.0) == pytest.approx(7.50)
+    assert week_reads.retry_share_usd(7.49) == pytest.approx(0.01)
+    assert week_reads.retry_share_usd(18.00) == 0.0
 
 
 def test_a_retry_model_the_gateways_list_does_not_carry_turns_the_retry_writer_off_with_one_warning(
@@ -627,7 +641,7 @@ def test_a_retry_model_listed_with_no_price_turns_the_retry_writer_off_with_one_
     lines: list[str] = []
     record = _step(engine, monkeypatch, [starter(), questionable()], _Writer(models=models), retry=_RETRY, lines=lines)
     assert record.status == "ran" and "the retry writer off" in record.summary and _RETRY not in models
-    assert "budget $2.50" in record.summary  # dollars, never calls
+    assert "budget $30.00" in record.summary  # dollars, never calls
     warnings = [line for line in lines if "RETRY_WRITER_MODEL" in line]
     assert len(warnings) == 1 and "carries with no price" in warnings[0]
 

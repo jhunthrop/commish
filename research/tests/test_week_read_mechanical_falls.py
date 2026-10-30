@@ -202,90 +202,6 @@ def test_another_day_and_a_report_not_out_cited_are_refused() -> None:
     assert _report_breaks("He has no designation on Friday's report.", out) == []
 
 
-# --- the openers -----------------------------------------------------------------------------------------------
-
-# The nightly's twelve, verbatim, each with its player. Eleven open on the call or on the fact that decides his
-# week; Grant Calcaterra's opens on the opponent and only then turns to him, a scene set first, which the rule
-# rightly refuses.
-TRUE_OPENERS = (
-    (
-        "Greg Dulcich",
-        "Greg Dulcich sits on the injury list as of Thursday 11:00 pm Central, and week 8 of 2026's game status report "
-        "on Friday hasn't landed, so his Sunday is up in the air.",
-    ),
-    ("Adonai Mitchell", "Adonai Mitchell has no business in a lineup in week 8 of 2026."),
-    (
-        "DJ Giddens",
-        "DJ Giddens is third among Colts backs behind Jonathan Taylor and Seth McGowan, and he has not played a snap "
-        "through week 7 of 2026.",
-    ),
-    (
-        "KeAndre Lambert-Smith",
-        "KeAndre Lambert-Smith climbs to fourth among Chargers receivers, and that still leaves three wideouts ahead "
-        "of him.",
-    ),
-    ("Jayden Daniels", "Play Jayden Daniels this week."),
-    ("Gunnar Helm", "Gunnar Helm isn't worth a starting spot this week."),
-    (
-        "Jonah Coleman",
-        "Coleman rides the bench in week 8 of 2026, because the move to second among Denver's backs still leaves J.K. "
-        "Dobbins in front of him.",
-    ),
-    ("Chris Bell", "Chris Bell shouldn't be in a lineup in week 8 of 2026."),
-    ("Jonah Coleman", "Jonah Coleman isn't startable yet, even after climbing to second on Denver's depth chart."),
-    ("Cole Payton", "Third on Philadelphia's quarterback chart, Cole Payton has no case to start in week 8 of 2026."),
-    ("Andy Dalton", "Andy Dalton is third at quarterback for Atlanta, and that settles his week before kickoff."),
-)
-SCENE_SET = (
-    "Washington allows the second most PPR points a game to tight ends, and Grant Calcaterra still can't use it."
-)
-
-
-def _opens(first: str, name: str = "Puka Nacua") -> bool:
-    text = f"{first} He has little to work with. Leave him be."
-    sheet = replace(starter(), name=name)
-    return not [v for v in week_rule_violations(text, sheet, "sit") if "opens without" in v]
-
-
-@pytest.mark.parametrize(("name", "first"), TRUE_OPENERS)
-def test_a_true_opener_opens_the_read(name: str, first: str) -> None:
-    assert _opens(first, name)
-
-
-def test_a_scene_set_first_is_still_refused() -> None:
-    assert not _opens(SCENE_SET, "Grant Calcaterra")
-    # A starter's place sets a scene too (review MEDIUM-1), and "plays Arizona" is no call (review LOW-11).
-    assert not _opens("Nacua sits first among Rams receivers as the week opens.")
-    assert not _opens("The Rams play Arizona at home this week in a game that suits him.")
-
-
-@pytest.mark.parametrize(
-    ("name", "first"),
-    [
-        (
-            "Grant Calcaterra",
-            "Every tight end is startable against Washington, and Grant Calcaterra still can't use it.",
-        ),
-        (
-            "Grant Calcaterra",
-            "Washington's front puts a fill-in in the lineup most weeks, and Calcaterra can't use it.",
-        ),
-        ("Puka Nacua", "The Rams are second on the schedule's toughest list, and Nacua faces them."),
-        ("Puka Nacua", "Play Arizona's defense as a soft spot this week, and Nacua sees plenty of it."),
-    ],
-)
-def test_a_lane_303_form_said_of_someone_else_opens_nothing(name: str, first: str) -> None:
-    """The review's M3: the forms that name no one count only in a sentence about him."""
-    assert not _opens(first, name)
-
-
-def test_the_forms_said_of_him_by_pronoun_or_imperative_open() -> None:
-    assert _opens("He is startable only in the deepest leagues.")
-    assert _opens("His place is out of the lineup until Shipley is back.")
-    assert _opens("Find a fill-in for him this week.")
-    assert _opens("Nacua rides the bench this week.")
-
-
 # --- lining up is football --------------------------------------------------------------------------------------
 
 
@@ -329,7 +245,6 @@ def test_the_injury_list_by_the_day_his_status_was_read_passes() -> None:
 @pytest.mark.parametrize(
     ("name", "team", "said", "rule"),
     [
-        ("Tip Reiman", "CHI", "Tip Reiman does not play in week 8 of 2026, listed Out on the injury list.", "a tip"),
         (
             "KC Concepcion",
             "CLE",
@@ -346,7 +261,7 @@ def test_his_own_name_never_trips_a_word_rule(name: str, team: str, said: str, r
     assert not [v for v in week_rule_violations(text, sheet, "sit") if rule in v]
     assert not [v for v in body_rule_violations(text, SEASON, (name,)) if rule in v]
     assert [v for v in body_rule_violations(text, SEASON) if rule in v]
-    outside = {"a tip": "Here is a tip for anyone.", "by its code": "KC is the club he faces."}[rule]
+    outside = {"by its code": "KC is the club he faces."}[rule]
     assert [v for v in week_rule_violations(f"{text} {outside}", sheet, "sit") if rule in v]
 
 
@@ -497,9 +412,3 @@ def test_by_alone_never_makes_a_report_still_to_come(said: str) -> None:
 )
 def test_by_with_a_forward_word_passes(said: str) -> None:
     assert _report_breaks(said, _week_eight()) == []
-
-
-def test_a_depth_phrase_may_lead_an_opener_about_him() -> None:
-    """The re-review's M2: his own clause after a leading phrase opens on him."""
-    assert _opens("Behind Shipley, Nacua is startable only in deep leagues.")
-    assert _opens("With Adams out, he is worth a start this week.")

@@ -67,7 +67,7 @@ def _stored(sheet: WeekSheet, *, version: int = _OLD, source: str = WRITTEN_SOUR
 
 def test_a_read_an_older_writer_wrote_is_due_on_the_nightly_and_never_the_hourly() -> None:
     sheet = starter()
-    assert WEEK_WRITER_VERSION == 1
+    assert WEEK_WRITER_VERSION == 2  # noqa: PLR2004 - Lane 307's writer
     assert due_reason(sheet, _stored(sheet, version=_OLD), _NEXT_NIGHT) == WRITER
     assert due_reason(sheet, _stored(sheet, version=WEEK_WRITER_VERSION), _NEXT_NIGHT) is None
     assert due_reason(sheet, _stored(sheet, version=_OLD), _NEXT_NIGHT, hourly=True) is None
@@ -183,8 +183,8 @@ def test_a_writer_rewrite_that_falls_keeps_the_written_read_and_stays_due(engine
 
 
 def test_a_budget_stop_carries_the_writers_rewrite_to_the_next_night(engine: Engine) -> None:
-    """One call left: the fact-stale rewrite ahead of it in `PRIORITY` lands, the writer's is stopped and its read
-    stands, still due."""
+    """Two calls left, one read's draft and its check (Lane 307): the fact-stale rewrite ahead of it in `PRIORITY`
+    lands, the writer's is stopped and its read stands, still due."""
     fact, stale = starter(), questionable()
     rows = {
         (fact.player_id, _WEEK): replace(_stored(fact, version=WEEK_WRITER_VERSION), body="A fact-stale read."),
@@ -194,7 +194,7 @@ def test_a_budget_stop_carries_the_writers_rewrite_to_the_next_night(engine: Eng
         for row in rows.values():
             upsert_week_read(conn, row)
     due = sorted([(stale, WRITER), (fact, FACT_STALE)], key=lambda item: PRIORITY.index(item[1]))
-    gateway = _gateway(STARTER_READ).with_budget(RunBudget.of(calls=1))
+    gateway = _gateway(STARTER_READ).with_budget(RunBudget.of(calls=2))
     spend = WeekReadSpend()
     _write(engine, gateway, rows, due, room=lambda: True, spend=spend, masks=_MASKS)
     after = _week(engine)

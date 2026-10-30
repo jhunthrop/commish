@@ -23,7 +23,7 @@ from research.capsules.narrative import ShapeMasks
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.run_budget import RunBudget
 from research.capsules.week.cadence import FACT_STALE, FIRST, RULE_STALE, STATUS_CHANGED, falls_since_written
-from research.capsules.week.prompt import answer_json
+from research.capsules.week.prompt import CHECK_RULES, answer_json
 from research.capsules.week.store import (
     StoredWeekRead,
     WeekReadRun,
@@ -51,7 +51,8 @@ _DATABASE = "parity_test_week_reads"
 _QUESTIONABLE_READ = (
     "Bijan Robinson is Questionable on Friday's report, so whether he plays in week 6 of 2026 against Chicago is "
     "not settled until Sunday. He leads the Atlanta backfield when he plays. The Bears rank 9th of 32 against running backs, and the Falcons are expected "
-    "to score 25 points. If he is active, Bijan Robinson plays ahead of a lesser back."
+    "to score 25 points. If he is active, Bijan Robinson plays ahead of a lesser back, and the work that comes "
+    "with that role is the reason to wait on his status rather than reach for a fill-in today."
 )
 _SHARED = "The Rams lean on him every single week."
 _MASKS = ShapeMasks.of(("Puka Nacua", "Bijan Robinson"))
@@ -90,8 +91,12 @@ def _empty(request: pytest.FixtureRequest) -> None:
 
 
 def _completion(read: str, call: str) -> httpx.Response:
+    return _plain(answer_json(read, call))
+
+
+def _plain(content: str) -> httpx.Response:
     usage = {"prompt_tokens": 2000, "completion_tokens": 120, "total_tokens": 2120, "cost": 0.0004}
-    choice = {"message": {"content": answer_json(read, call)}, "finish_reason": "stop"}
+    choice = {"message": {"content": content}, "finish_reason": "stop"}
     return httpx.Response(200, json={"choices": [choice], "usage": usage})
 
 
@@ -106,7 +111,10 @@ def test_the_nights_pool_lands_each_read_with_its_stamps_call_and_attempt(engine
     asked: list[str] = []
 
     def answer(request: httpx.Request) -> httpx.Response:
-        user = json.loads(request.content)["messages"][-1]["content"]
+        messages = json.loads(request.content)["messages"]
+        user = messages[-1]["content"]
+        if messages[0]["content"] == CHECK_RULES:  # the check pass (Lane 307): the draft back unchanged
+            return _plain(user.rsplit("\n\nREAD:\n", 1)[1])
         asked.append(user)
         puka = "Puka Nacua" in user.split("\n", 2)[1]
         return _completion(STARTER_READ, "start") if puka else _completion(_QUESTIONABLE_READ, "hold")

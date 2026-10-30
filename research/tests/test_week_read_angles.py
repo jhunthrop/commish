@@ -20,15 +20,8 @@ from research.capsules.week.angles import (
     unusual_words,
 )
 from research.capsules.week.bites import RANK_EDGE, depth_bites, rank_bites, weather_bites
-from research.capsules.week.prompt import (
-    ANGLES_REMINDER,
-    WEEK_RULES,
-    WEEK_RULES_ANGLES,
-    week_correction,
-    week_rules,
-)
+from research.capsules.week.prompt import WEEK_RULES
 from research.capsules.week.render import ANGLES_HEAD, NO_ANGLE, render_week_sheet
-from research.capsules.week.rules import ANGLE_FIGURES, MAX_FIGURES, max_figures
 from research.capsules.week.sheet import Allowed, DepthPlace, Status, Weather, WeekSheet, week_name_ledger
 from research.capsules.week.usage_reads import UsageWeek
 from research.capsules.week.validate import validate_week_read
@@ -256,31 +249,12 @@ def test_an_angles_figures_and_names_are_the_reads_to_quote() -> None:
     read = (
         "Puka Nacua draws 32% of the Rams' targets, and that is before the bump. Tutu Atwell is Out this week, "
         "and his 20% of the Rams' targets has to go somewhere in week 6 of 2026. Nacua is the obvious home for it "
-        "against Arizona. Start him."
+        "against Arizona. The Rams keep running their passing game through him on the downs that matter, and "
+        "nothing on the chart behind him has moved since the season opened. Start him."
     )
     assert validate_week_read(read, sheet, call="start").ok
     made_up = read.replace("32%", "37%")
     assert not validate_week_read(made_up, sheet, call="start").ok
-
-
-def test_a_sheet_with_angles_may_state_one_figure_more() -> None:
-    assert max_figures(starter()) == MAX_FIGURES
-    assert max_figures(_angled()) == MAX_FIGURES + ANGLE_FIGURES
-
-
-@pytest.mark.usefixtures("angles_on")
-def test_the_prompt_and_the_correction_carry_the_angles() -> None:
-    assert week_rules() == WEEK_RULES_ANGLES
-    assert "Never tour the list." in WEEK_RULES_ANGLES and "Never tour the list." not in WEEK_RULES
-    assert "Pick the two or three facts" not in WEEK_RULES_ANGLES
-    correction = week_correction(_angled(), "A read.", (), ())
-    assert ANGLES_REMINDER in correction and _TARGETS.text in correction
-
-
-@pytest.mark.usefixtures("angles_off")
-def test_with_the_switch_off_the_prompt_is_mains() -> None:
-    assert week_rules() == WEEK_RULES
-    assert ANGLES_REMINDER not in week_correction(_angled(), "A read.", (), ())
 
 
 def test_a_player_who_cannot_play_gets_no_angle_line() -> None:
@@ -349,7 +323,7 @@ def test_the_heaviest_correction_with_the_full_summary_stays_inside_the_prompt_b
     playing = Status("questionable", heaviest().status.captured_at)
     sheet = replace(heaviest(), status=playing, angles=tuple(_long_angle(n) for n in range(_FULL_SUMMARY)))
     system, user = worst_correction(sheet)
-    assert system == WEEK_RULES_ANGLES and ANGLES_REMINDER in user and _long_angle(_FULL_SUMMARY - 1).text in user
+    assert system == WEEK_RULES and _long_angle(_FULL_SUMMARY - 1).text in user
     tokens = (len(system) + len(user)) / CHARS_PER_TOKEN
     assert tokens <= (1 - BOUND_MARGIN) * WORST_PROMPT_TOKENS, tokens
 
@@ -359,7 +333,8 @@ def test_the_heaviest_correction_with_the_full_summary_stays_inside_the_prompt_b
 _ACCEPTED = (
     "Puka Nacua draws 32% of the Rams' targets, the 3rd-highest among the wide receivers we rank, in week 6 of "
     "2026. Tutu Atwell is Out this week, and his 20% of the Rams' targets has to go somewhere. Nacua is the obvious "
-    "home for it against Arizona. Start him."
+    "home for it against Arizona. The Rams keep running their passing game through him on the downs that matter, "
+    "and nothing on the chart behind him has moved since the season opened. Start him."
 )
 # The review's H1: each variant quotes an angle's figure as another measure, a share as a count, or a place among
 # his peers no angle states.
@@ -496,13 +471,6 @@ def test_an_honest_paraphrase_of_an_angle_is_not_refused(honest: str) -> None:
 # --- fix round 3: the ordinary rank (the coordinator's ruling 1) -------------------------------------------------
 
 _MATCHUP = "Puka Nacua draws 32% of the Rams' targets in week 6 of 2026. {line} Start him."
-
-
-@pytest.mark.usefixtures("angles_on")
-def test_an_ordinary_rank_stated_as_a_figure_is_refused() -> None:
-    read = _MATCHUP.format(line="Arizona sits 26th of 32 against receivers.")
-    violations = validate_week_read(read, _angled(), call="start").violations
-    assert any("where it does not bite" in v and "an ordinary matchup" in v for v in violations), violations
 
 
 @pytest.mark.usefixtures("angles_on")

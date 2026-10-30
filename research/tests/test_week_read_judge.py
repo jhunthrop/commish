@@ -5,7 +5,6 @@ refused by the judge with the phrase list switched off, not by the list alone.""
 
 import copy
 import json
-import re
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any, Self
@@ -21,7 +20,7 @@ from research.capsules.week.judge import QUESTION, judge_messages, says_start
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.write import MAX_CALLS_PER_READ, write_week_read
 from research.tests.test_week_read_rules import BYE_READ, REVIEW_START_PHRASINGS, STARTER_READ
-from research.tests.week_read_fixtures import main_sheet, on_bye, starter
+from research.tests.week_read_fixtures import echoed_check, main_sheet, on_bye, starter
 
 _JUDGE = Path(__file__).parent / "testdata" / "week_reads" / "judge.json"
 _USAGE = Usage(300, 1, 301, 0.00005)
@@ -59,6 +58,8 @@ class _Script:
     def complete(
         self, messages: list[dict[str, str]], max_tokens: int, min_words: int = 20, ask: AskWaits | None = None
     ) -> Completion:
+        if (checked := echoed_check(messages)) is not None:
+            return checked
         self.calls += 1
         self.asked.append(messages)
         return Completion(next(self.answers), _USAGE, "provider", "stop")
@@ -136,12 +137,10 @@ def test_the_judge_refuses_each_phrasing_with_the_list_switched_off(
     phrase: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The writer's own path, the list never firing: the recorded verdict alone refuses the read. The
-    recorded text runs past the 40 to 95 band (WEEK_BAND), so the cap is lifted here as the list is, and it
-    keeps him "on your roster", so that rule is off too."""
+    recorded text is shorter than the band (WEEK_BAND, 70 to 110 since Lane 307), so the floor is lifted here as
+    the list is."""
     monkeypatch.setattr(rules, "start_advice_in", lambda sentence, name: None)
-    monkeypatch.setattr(week_validate, "WEEK_BAND", (40, 100))
-    # The recorded text predates B282's rule on addressing the member's roster (Lane 286): off here as the list.
-    monkeypatch.setattr(rules, "_ADDRESSES_THE_MEMBER", re.compile(r"(?!)"))
+    monkeypatch.setattr(week_validate, "WEEK_BAND", (40, 110))
     verdict = next(v for v in _verdicts() if v["phrase"] == phrase)
     text = judged_text(phrase)
     assert verdict["text"] == text

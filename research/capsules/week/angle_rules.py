@@ -21,8 +21,6 @@ from typing import Final
 
 from research.capsules.page_figures import page_tenth
 from research.capsules.week.angle_candidates import AngleFigure, Measure
-from research.capsules.week.angles import angles_on
-from research.capsules.week.bites import RANK_EDGE, rank_bites
 from research.capsules.week.cells import card_figures, named_chance
 from research.capsules.week.sheet import WeekSheet
 
@@ -132,29 +130,3 @@ def figure_violations(sentences: Sequence[str], sheet: WeekSheet, stated: Stated
             if why is not None:
                 out.append(_violation(why, s, _SAY_ITS_MEASURE))
     return out
-
-
-# The opponent's rank as a figure: "16th of 32", "16th against receivers", "the 16th-fewest", "16th in points
-# allowed" (Lane 300 fix round 3).
-_OPPONENT_RANK: Final = re.compile(
-    r"\b\d+(?:st|nd|rd|th)\b(?:\s+of\s+\d+|\s+against\b|\s+in\s+(?:ppr\s+)?points\s+allowed\b|"
-    r"[- ](?:fewest|most|best|worst|toughest|softest)\b(?![^.]*\bwe\s+rank\b))",
-    re.IGNORECASE,
-)
-_ORDINARY_RANK: Final = (
-    f"The opponent's rank is in the middle of the league (outside the {RANK_EDGE} clubs at either end), so the "
-    'matchup is ordinary: say so in words without the rank ("an ordinary matchup"), or leave it out.'
-)
-
-
-def ordinary_rank_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
-    """An editorial rule with the angles on (Lane 300 fix round 3, the coordinator's ruling), like the
-    addressed-member rule: a sentence stating the opponent's rank figure is refused when the rank does not bite
-    (`bites.rank_bites`); a rank that bites stays allowed, and plain words for an ordinary matchup always are."""
-    if not angles_on() or sheet.allowed is None or sheet.bye or rank_bites(sheet.allowed):
-        return []
-    return [
-        _violation(f'states the opponent\'s rank ("{m.group(0)}") where it does not bite', s, _ORDINARY_RANK)
-        for s in sentences
-        if (m := _OPPONENT_RANK.search(s)) is not None
-    ]
