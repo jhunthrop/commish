@@ -100,6 +100,17 @@ void test("a table gathered from a module: an object export spread, a string exp
   });
 });
 
+void test("a member that is a table of strings is gathered as one string each, keyed by both keys", () => {
+  const module = {
+    PANEL: { need: "Need", explain: { season: "A", week: "B" } },
+  };
+  assert.deepEqual(gather(module, ["PANEL"], "m.ts"), {
+    need: "Need",
+    explainSeason: "A",
+    explainWeek: "B",
+  });
+});
+
 void test("gathering fails on an export missing, a keyed export not a string and a key twice", () => {
   assert.throws(() => gather({}, ["BOX"], "m.ts"), /m\.ts exports no BOX/);
   assert.throws(
@@ -172,6 +183,7 @@ void test("the tables: the League home's, the box score's, then the shell's and 
       "Waivers",
       "WaiverHeads",
       "Stash",
+      "WaiverPanel",
       "Season",
       "Strip",
       "Trades",
