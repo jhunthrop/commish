@@ -58,7 +58,7 @@ import app.trycommish.feature.boxscore.wrapCenter
 
 /** The phone's panel columns: the player taking the rest, the figure, Beats and the Add. */
 private object PanelColumn {
-    val card = 108.dp
+    val card = 120.dp
     val figure = 60.dp
     val beats = 88.dp
     val act = 44.dp
