@@ -23,6 +23,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from research.capsules.week.angle_candidates import Measure
 from research.capsules.week.angle_rules import _clause, _named
 from research.capsules.week.angles import Angle
 from research.capsules.week.sheet import WeekSheet
@@ -31,18 +32,30 @@ _HIGH: Final = ("highest", "deepest", "most", "heaviest", "biggest", "largest")
 _LOW: Final = ("lowest", "shortest", "fewest", "least", "lightest", "smallest")
 _WORD_ORDINALS: Final = {"second": 2, "third": 3, "fourth": 4, "fifth": 5}
 _NUMBER_WORDS: Final = {"two": 2, "three": 3, "four": 4, "five": 5, "ten": 10}
+# An end said of him; never "at least", "most of the week", "most of his snaps" (the round 5 re-review's H1).
 _END: Final = re.compile(
-    r"\b(?:(\d+)(?:st|nd|rd|th)[- ]|(second|third|fourth|fifth)[- ])?(" + "|".join((*_HIGH, *_LOW)) + r")\b",
+    r"(?<!\bat )\b(?:(\d+)(?:st|nd|rd|th)[- ]|(second|third|fourth|fifth)[- ])?(" + "|".join((*_HIGH, *_LOW)) + r")\b"
+    r"(?!\s+of\b)",
     re.IGNORECASE,
 )
-_ORDINAL_AMONG: Final = re.compile(r"\b(\d+)(?:st|nd|rd|th)\s+among\b", re.IGNORECASE)
+# "6th among the receivers we rank" (a rank among his club's receivers, "2nd among the Rams' receivers", is his
+# depth-chart place, Lane 299's to judge: the round 5 re-review's M1).
+_ORDINAL_AMONG: Final = re.compile(r"\b(\d+)(?:st|nd|rd|th)\s+among\b(?=[^.]*\bwe\s+rank\b)", re.IGNORECASE)
 _TOP: Final = re.compile(r"\btop[- ](\d+|two|three|four|five|ten)\b", re.IGNORECASE)
 _FIRST: Final = re.compile(r"\bleads?\s+all\b|\bmore\s+than\s+any\b", re.IGNORECASE)
 _AMONG_RANKED: Final = re.compile(r"\bamong\s+(?:all\s+)?(?:the\s+)?([a-z][a-z ]*?)\s+we\s+rank\b", re.IGNORECASE)
+# A peer group: players at his position ("among the wide receivers", "than any receiver", "leads all backs") or
+# "we rank"; never a bare "among", "of the week" or "in the league" (the round 5 re-review's H1). A club's players
+# ("among the Rams' receivers") are his depth chart, never his peers.
+_POSITIONS: Final = r"(?:wide receivers?|receivers?|wideouts?|running backs?|backs?|tight ends?|quarterbacks?|players?)"
 _PEERS: Final = re.compile(
-    r"\bamong\b|\bwe rank\b|\bof the week\b|\bin the league\b|\bon our board\b|\bthan any\b|\bleads? all\b",
-    re.IGNORECASE,
+    r"\b[Ww]e rank\b|\bon our board\b|"
+    rf"\b[Aa]mong\s+(?:all\s+)?(?:the\s+)?(?:[a-z-]+\s+)?{_POSITIONS}\b|"
+    rf"\b[Tt]han\s+any(?:\s+other)?\s+(?:[a-z-]+\s+)?{_POSITIONS}\b|"
+    rf"\b[Ll]eads?\s+all\s+(?:the\s+)?(?:[a-z-]+\s+)?{_POSITIONS}\b",
 )
+# The week's clubs, for the expected score's place ("the highest expected score of the week").
+_WEEK_PEERS: Final = re.compile(r"\bexpected\b[^.]*\bof the week\b|\bof the week\b[^.]*\bexpected\b", re.IGNORECASE)
 _ALLOWS: Final = re.compile(
     r"\b(?:allow\w*|gives? up|giving up|gave up|surrender\w*|generous|stingy|stingiest)\b", re.IGNORECASE
 )
@@ -73,8 +86,22 @@ def _stated(words: str) -> Place | None:
     return Place(rank, m.group(3) in _HIGH)
 
 
+# A fact's measure by its key, for a fact that carries places but no figure (the round 5 re-review's L3).
+_KEY_MEASURES: Final = {
+    "snap": Measure.SNAPS,
+    "target_depth": Measure.DEPTH,
+    "target": Measure.TARGETS,
+    "carry": Measure.CARRIES,
+    "air_yards": Measure.AIR_YARDS,
+    "red_zone": Measure.RED_ZONE,
+    "expected": Measure.EXPECTED,
+}
+
+
 def _measure(angle: Angle) -> str | None:
-    return angle.figures[0].measure if angle.figures else None
+    if angle.figures:
+        return angle.figures[0].measure
+    return next((m for prefix, m in _KEY_MEASURES.items() if angle.key.startswith(prefix)), None)
 
 
 def _bound(sentence: str, start: int, end: int, sheet: WeekSheet) -> list[Angle]:
@@ -127,7 +154,8 @@ def place_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
     groups = _groups(sheet)
     out = []
     for s in sentences:
-        if not _PEERS.search(s) or _ALLOWS.search(s):
+        expected = any(a.key == "expected" for a in sheet.angles) and _WEEK_PEERS.search(s)
+        if not (_PEERS.search(s) or expected) or _ALLOWS.search(s):
             continue
         bad = [said for said, claim, start, end in _claims(s) if not _held(claim, _bound(s, start, end, sheet))]
         said_groups = (g.group(1).lower().strip() for g in _AMONG_RANKED.finditer(s))
@@ -149,7 +177,11 @@ def unusual_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
     for s in sentences:
         for m in _LEVELS.finditer(s):
             said = m.group(1).lower()
-            if not any(_level(a) == said for a in _bound(s, m.start(), m.end(), sheet)):
+            # With no measure named, any fact graded so; "out of the ordinary" is true of a "far" fact too (the
+            # round 5 re-review's M2).
+            facts = _bound(s, m.start(), m.end(), sheet) or list(sheet.angles)
+            held = {_level(a) for a in facts}
+            if said not in held and not (said == "out of the ordinary" and "far out of the ordinary" in held):
                 out.append(
                     _violation(
                         f'calls a fact "{said}" where the fact it is about is not graded so',

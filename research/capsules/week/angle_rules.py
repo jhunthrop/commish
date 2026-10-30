@@ -45,9 +45,7 @@ _PERCENT_AFTER: Final = re.compile(r"^(?:%|\s+percent\b)", re.IGNORECASE)
 # said as a share of his routes.
 _UNHELD: Final = re.compile(r"\broutes?\b|\broute participation\b", re.IGNORECASE)
 # His touchdowns are every touchdown in the red-zone share's games, never his red-zone touchdowns.
-_RED_ZONE_TOUCHDOWNS: Final = re.compile(
-    r"\bred[- ]zone\b|\bthere\b|\binside the (?:ten|10|twenty|20)\b", re.IGNORECASE
-)
+_RED_ZONE_TOUCHDOWNS: Final = re.compile(r"\bred[- ]zone\b|\binside the (?:ten|10|twenty|20)\b", re.IGNORECASE)
 Stated = Callable[[str, int], list[tuple[str, float, str, str]]]
 
 
@@ -99,7 +97,8 @@ def _said_as(raw: str, matching: Sequence[AngleFigure], before: str, after: str)
     if _UNHELD.search(clause):
         return f'says "{raw}" of his routes, which the facts do not hold'
     touchdowns = any(f.measure == Measure.TOUCHDOWNS for f in matching)
-    if touchdowns and _RED_ZONE_TOUCHDOWNS.search(after.split(".", maxsplit=1)[0][:40]):
+    # The touchdowns' own clause names the red zone (never a bare "there", the round 5 re-review's L2).
+    if touchdowns and _RED_ZONE_TOUCHDOWNS.search(clause):
         return f'says "{raw}" as red-zone touchdowns, where the fact counts every touchdown in those games'
     named = _named(clause)
     measures = {f.measure for f in matching}

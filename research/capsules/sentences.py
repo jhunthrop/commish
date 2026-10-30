@@ -16,11 +16,22 @@ _INSIDE_A_NAME: Final = re.compile(r"(?:^|[\s(\"'])(?:St|(?:[A-Z]\.)+[A-Z])\.$")
 _RUNS_ON: Final = re.compile(r"^[a-z]")
 
 
+# Spaced initials ("T. J. Hockenson", "A. J. Brown"): a lone capital beside another never ends a sentence (the round
+# 5 re-review's L1).
+_LONE_INITIAL: Final = re.compile(r"(?:^|\s)[A-Z]\.$")
+_NEXT_INITIAL: Final = re.compile(r"^[A-Z]\.(?:\s|$)")
+
+
 def _ends_here(before: str, after: str) -> bool:
-    """Whether a full stop and the space after it end a sentence: never inside a name, never after a name's
-    suffix the text runs on from."""
+    """Whether a full stop and the space after it end a sentence: never inside a name (spaced initials included),
+    never after a name's suffix the text runs on from."""
     if _INSIDE_A_NAME.search(before):
         return False
+    if _LONE_INITIAL.search(before):
+        words = before.split()
+        prior_initial = len(words) > 1 and re.fullmatch(r"[A-Z]\.", words[-2]) is not None
+        if prior_initial or _NEXT_INITIAL.match(after):
+            return False
     return not (_SUFFIX.search(before) and _RUNS_ON.match(after))
 
 

@@ -623,7 +623,7 @@ def test_unusualness_is_said_only_as_its_fact_grades_it() -> None:
     "claim",
     [
         "He runs routes on 71% of the Rams' offensive snaps.",
-        "He has 4 touchdowns there in his games this season.",
+        "He has 4 red-zone touchdowns in his games this season.",
     ],
 )
 def test_a_measure_the_store_does_not_hold_is_refused(claim: str) -> None:
@@ -698,3 +698,84 @@ def test_a_return_says_it_is_a_return_and_carries_no_grade() -> None:
     back = AnglePlayer("00-0000079", "Back Receiver", "WR", "LAR", usage, tuple((w, 8.0) for w in weeks), (4, 5))
     fact = next(a for a in board_angles([*_board(), back], {}, 9)[back.player_id] if a.key == "return")
     assert "a return from missed games" in fact.text and "ordinary" not in fact.text
+
+
+# --- fix round 6: the round 5 re-review's H1, M1, M2 and L1 to L3 --------------------------------------------------
+
+
+@pytest.mark.usefixtures("angles_on")
+@pytest.mark.parametrize(
+    "true_sentence",
+    [
+        "He was limited in practice for most of the week.",
+        "That is the biggest game of the week for the Rams.",
+        "He is at least a flex play, among the safer ones in the league.",
+    ],
+)
+def test_a_superlative_with_no_peer_group_is_no_place(true_sentence: str) -> None:
+    """H1: a place needs a peer group at his position or "we rank", never a bare "most" or "of the week"."""
+    assert not _place_refused(true_sentence, _two_places())
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_a_rank_among_his_clubs_receivers_is_his_depth_place() -> None:
+    """M1: "2nd among the Rams' receivers on the depth chart" is a depth statement, the depth fact rule's."""
+    sheet = replace(_two_places(), depth=DepthPlace(2.0, (("Davante Adams", 1.0),), starter().written_at))
+    read = "Puka Nacua is listed 2nd among the Rams' receivers on the depth chart. Start him in week 6 of 2026."
+    violations = validate_week_read(read, sheet, call="start").violations
+    assert not any("among his peers" in v for v in violations), violations
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_a_grade_with_no_measure_named_is_held_to_the_sheets_grades() -> None:
+    """M2: with no measure named, a grade any fact carries is accepted; "out of the ordinary" is true of "far"."""
+    graded = replace(_TARGETS, text=_TARGETS.text.removesuffix(".") + " (far out of the ordinary for a wide receiver).")
+    sheet = replace(_two_places(), angles=(graded, _SNAPS))
+    for read in (
+        "That share is far out of the ordinary for a receiver. Start him in week 6 of 2026.",
+        "He draws 32% of the Rams' targets, out of the ordinary. Start him in week 6 of 2026.",
+    ):
+        assert not any("not graded so" in v for v in validate_week_read(read, sheet, call="start").violations)
+    plain = replace(_two_places(), angles=(_SNAPS,))
+    read = "That share is far out of the ordinary. Start him in week 6 of 2026."
+    assert any("not graded so" in v for v in validate_week_read(read, plain, call="start").violations)
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_touchdowns_there_with_no_red_zone_named_is_not_refused() -> None:
+    """L2: the red-zone refusal needs "red zone" in the touchdowns' clause, never a bare "there"."""
+    red_zone = Angle(
+        "red_zone",
+        "Red zone: 30% of the Rams' red-zone carries and targets in his games this season, and 4 touchdowns in those "
+        "games (out of the ordinary for a wide receiver).",
+        (AngleFigure(30.0, Measure.RED_ZONE), AngleFigure(4.0, Measure.TOUCHDOWNS)),
+        (),
+        1.0,
+        Basis(5, 12, "red-zone carries and targets"),
+    )
+    sheet = replace(_angled(), angles=(red_zone,), games_played=6)
+    read = "He has 4 touchdowns in those games, and he scores there. Start him in week 6 of 2026."
+    assert not any("red-zone touchdowns" in v for v in validate_week_read(read, sheet, call="start").violations)
+
+
+def test_spaced_initials_never_end_a_sentence() -> None:
+    """L1: "T. J. Hockenson" and "A. J. Brown" are one name; a lone capital elsewhere still ends a sentence."""
+    from research.capsules.sentences import split_sentences  # noqa: PLC0415 - local to the test
+
+    assert split_sentences("Start T. J. Hockenson. He is back.") == ["Start T. J. Hockenson.", "He is back."]
+    assert split_sentences("A. J. Brown runs. Start him.") == ["A. J. Brown runs.", "Start him."]
+    assert split_sentences("Go to plan B. He is out.") == ["Go to plan B.", "He is out."]
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_a_place_only_fact_binds_by_its_measure_words() -> None:
+    """L3: a fact that states a place but carries no figure is bound by its key's measure."""
+    bare = replace(_TARGETS, figures=())
+    sheet = replace(_angled(), angles=(bare,))
+    read = "His target share is the 3rd-highest among the wide receivers we rank. Start him in week 6 of 2026."
+    assert not _place_refused(read.split(" Start", maxsplit=1)[0], sheet)
+    assert all(
+        a.figures or a.key in {"return"}
+        for a in board_angles([*_board(), _receiver(78, 9)], {}, 8)["00-0000078"]
+        if a.places
+    )
