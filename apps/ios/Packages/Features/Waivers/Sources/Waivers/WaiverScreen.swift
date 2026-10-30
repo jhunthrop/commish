@@ -13,6 +13,7 @@ public struct WaiverScreen: View {
     let chooseCard: (String) -> Void
     let actions: TableActions
     let filters: FiltersView
+    let panel: PanelActions
 
     public var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s4) {
@@ -26,7 +27,7 @@ public struct WaiverScreen: View {
     func partView(_ part: WaiverPart) -> WaiverPartView {
         WaiverPartView(
             part: part, model: model, stamp: stamp, chosenCard: chosenCard, chooseCard: chooseCard, actions: actions,
-            filters: filters
+            filters: filters, panel: panel
         )
     }
 }
@@ -34,7 +35,7 @@ public struct WaiverScreen: View {
 /// The screen's runs, top to bottom: each a snapshot of its own, so no reference grows past what a
 /// repository keeps.
 enum WaiverPart: CaseIterable {
-    /// The strip and the rows that gain.
+    /// The strip, the position panel and the rows that gain.
     case top
     /// The rest under the divider, the Stash group and the basis.
     case foot
@@ -48,12 +49,14 @@ struct WaiverPartView: View {
     let chooseCard: (String) -> Void
     let actions: TableActions
     let filters: FiltersView
+    let panel: PanelActions
 
     var body: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.s4) {
             switch part {
             case .top:
                 WaiverStripView(model: model, stamp: stamp, chosen: chosenCard, choose: chooseCard)
+                WaiverPanelView(panel: panel)
                 filters
                 if let arrives = model.arrives {
                     BasisText(arrives)
@@ -101,7 +104,8 @@ public struct WaiverView: View {
                                 Task { await viewModel.choose(position: position, leagueID: leagueID) }
                             },
                             query: viewModel.query, find: { viewModel.find($0) }, problem: viewModel.problem
-                        )
+                        ),
+                        panel: panel(model)
                     )
                 }
                 .refreshable { await viewModel.load(leagueID: leagueID) }
@@ -151,6 +155,20 @@ public struct WaiverView: View {
         return SheetOffer(label: said.label, line: said.line, lineup: false) {
             Task { await viewModel.claimFromSheet(row: row.key, leagueID: leagueID) }
         }
+    }
+
+    /// The position panel's cards and controls: a free agent's Add is the screen's one verb with the
+    /// advice's drop; a name opens his sheet, with the table's verb where the table lists him.
+    private func panel(_ model: WaiverModel) -> PanelActions {
+        let viewModel = viewModel
+        let leagueID = leagueID
+        return PanelActions(
+            cards: viewModel.panel, mode: viewModel.panelMode, hasWeek: viewModel.panelHasWeek,
+            opened: viewModel.openedCard, choose: { viewModel.choose(panelMode: $0) },
+            toggle: { viewModel.toggle(card: $0) },
+            add: { source in Task { await viewModel.addFromPanel(source, leagueID: leagueID) } },
+            open: { sheet.open($0, offer: offer(model, $0)) }
+        )
     }
 
     private func actions(_ model: WaiverModel) -> TableActions {

@@ -132,7 +132,34 @@ public struct WaiverModel: Equatable, Sendable {
 
     /// The players an add could replace, the advice's drop first.
     public func drops(_ row: PoolRow) -> [DropRow] {
-        WaiverRows.drops(row.source, roster: shown.roster, zone: zone, now: now)
+        drops(row.source)
+    }
+
+    func drops(_ source: WaiverRow) -> [DropRow] {
+        WaiverRows.drops(source, roster: shown.roster, zone: zone, now: now)
+    }
+
+    // MARK: the position panel (Lane 291 on the web)
+
+    /// The position panel's cards in the mode, from the page's answer; none from an answer without it.
+    public func panel(_ mode: PanelMode) -> [PanelCard] {
+        WaiverPanel.cards(advice, mode: mode, zone: zone, now: now)
+    }
+
+    /// Whether the panel's toggle is drawn: a card reads this week.
+    public var panelHasWeek: Bool {
+        WaiverPanel.hasWeek(advice)
+    }
+
+    /// What a panel Add does, in the table's words: "Add on ESPN", or "Open ESPN waivers".
+    public func panelVerb(_ source: WaiverRow) -> String {
+        WaiverWords.addVerb(advice.moves, hostID: source.add.player.hostId, platform: platform)
+    }
+
+    /// The panel's Add (WaiverScreen.svelte addFromPanel): the add with the advice's drop, the pair the
+    /// shelf and the table's verb act on.
+    func panelPair(_ source: WaiverRow) -> WaiverRow {
+        WaiverRows.with(source, drop: drops(source).first)
     }
 
     /// The drop panel's head and lead: "Drop one for Mason Taylor", "+4.8 Proj this week with any of them.
