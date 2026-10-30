@@ -17,11 +17,18 @@ import pytest
 
 from research.capsules.narrative import NAMES_KIND, WORDS_KIND, ShapeMasks
 from research.capsules.season_voice import SeasonClock, time_frame_hits
+from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.rank_words import rank_words
 from research.capsules.week.render import render_week_facts_block, render_week_sheet
-from research.capsules.week.rules import WEEK_NEVER_WORDS, names_the_projection, stated_figures, week_rule_violations
+from research.capsules.week.rules import (
+    WEEK_NEVER_WORDS,
+    _opener_violation,
+    names_the_projection,
+    stated_figures,
+    week_rule_violations,
+)
 from research.capsules.week.sheet import (
     Allowed,
     BoardPlace,
@@ -784,3 +791,46 @@ def _main_sheet() -> Iterator[None]:
     angles' sheet is `test_week_read_angles`'s)."""
     with main_sheet():
         yield
+
+
+# Lane 300 fix round 4: a name's suffix or initials never end a sentence, and the opener knows the call's forms.
+@pytest.mark.parametrize(
+    ("text", "first"),
+    [
+        (
+            "Harold Fannin Jr. is listed first for the Browns. Start him.",
+            "Harold Fannin Jr. is listed first for the Browns.",
+        ),
+        ("Kyle Pitts Sr. leads the Falcons in targets. Sit him.", "Kyle Pitts Sr. leads the Falcons in targets."),
+        ("Michael Pittman Jr. is on injured reserve. Find a fill-in.", "Michael Pittman Jr. is on injured reserve."),
+        ("Aaron Jones Sr. carries 60% of the work. Start him.", "Aaron Jones Sr. carries 60% of the work."),
+        ("J.K. Dobbins runs for the Broncos. Start him.", "J.K. Dobbins runs for the Broncos."),
+        ("Amon-Ra St. Brown draws the targets. Start him.", "Amon-Ra St. Brown draws the targets."),
+    ],
+)
+def test_a_names_suffix_or_initials_never_end_a_sentence(text: str, first: str) -> None:
+    assert split_sentences(text)[0] == first
+
+
+def test_a_suffix_before_a_capital_still_ends_its_sentence() -> None:
+    assert split_sentences("Start Michael Pittman Jr. He is back this week.") == [
+        "Start Michael Pittman Jr.",
+        "He is back this week.",
+    ]
+
+
+@pytest.mark.parametrize(
+    "opener",
+    [
+        "Tee Higgins starts this week, and the deep work is why.",
+        "Demercado can't be started this week.",
+        "Fire him up against the Titans.",
+        "Chimere Dike sits this week, and it is not close.",
+    ],
+)
+def test_the_opener_knows_the_calls_forms(opener: str) -> None:
+    assert not _opener_violation(split_sentences(opener), 2026)
+
+
+def test_an_opener_with_no_call_figure_or_status_is_still_refused() -> None:
+    assert _opener_violation(["The Titans come to town on a cold afternoon."], 2026)

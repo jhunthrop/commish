@@ -139,7 +139,11 @@ _RANK_WORD: Final = re.compile(r"\b\d+(?:st|nd|rd|th)\b", re.IGNORECASE)
 # "sits first among" or "play Arizona" (review LOW-11).
 _CALL_WORDS: Final = re.compile(
     r"\b(?:[Ss]tart|[Ss]it|[Bb]ench|[Kk]eep|[Hh]old|[Dd]rop|[Aa]dd|[Ff]lex|[Tt]rust)(?:s|ed|ing)? (?:him|them|[A-Z]\w+)\b|"
-    r"\bfill-in\b|\b[Pp]ick(?:s|ing)? (?:him )?up\b"
+    r"\bfill-in\b|\b[Pp]ick(?:s|ing)? (?:him )?up\b|"
+    # The call in the forms the writer uses for it (Lane 300 fix round 4): "Higgins starts this week", "he sits
+    # this week", "can't be started", "fire him up".
+    r"\b(?:starts|sits)\s+this\s+week\b|\b(?:can(?:'t|not)|shouldn't|should not|won't)\s+be\s+(?:started|benched)\b|"
+    r"\b[Ff]ire\s+(?:him|them|[A-Z]\w+)\s+up\b"
 )
 # His status as the sheet says it (`sheet.STATUS_WORDS`, the one source) and the words for a player with none.
 _STATUS_WORDS: Final = re.compile(
