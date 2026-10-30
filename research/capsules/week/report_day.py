@@ -97,8 +97,8 @@ def report_day_line(sheet: WeekSheet) -> str | None:
         return f"Game status report: this week's came out {day} by {clock} Central, {day}'s report{read}."
     if report_issued(sheet):
         return (
-            f"Game status report: this week's came out {day} by {clock} Central{read}; his status above was read "
-            "before it, so never say what it says or that it is still to come."
+            f"Game status report: this week's came out {day} by {clock} Central{read}; his status above was not "
+            "read after it, so never say what it says or that it is still to come."
         )
     return (
         f"Game status report: this week's comes out {day} by {clock} Central, after this read{read}. A read may say "

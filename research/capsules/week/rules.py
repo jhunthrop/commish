@@ -507,13 +507,20 @@ def _named(text: str) -> set[str]:
 # ("Friday's report will settle it", "is still to come", "decides whether he plays"). A report as the source of
 # what it says ("Friday's report cleared him", "has him Out", "is out") is never still to come.
 _FORWARD_BEFORE: Final = re.compile(
-    r"\b(?:before|until|till|ahead of|if|when|once|by|into|heading into|awaiting|pending|wait(?:s|ing)? (?:for|on)|"
-    r"check|watch|let|see what)\b",
+    r"\b(?:before|until|till|unless|ahead of|if|when|once|into|heading into|awaiting|pending|"
+    r"wait(?:s|ing)? (?:for|on)|check|watch|let|see what|by the time)\b",
     re.IGNORECASE,
+)
+# "by" is the agent as often as the deadline ("cleared by Friday's report", the re-review's M1): it is still to
+# come only with a forward word in its clause ("we will know by Friday's report", "by Friday's report it decides").
+_BY_BEFORE: Final = re.compile(r"\bby\s+$", re.IGNORECASE)
+_FORWARD_IN_CLAUSE: Final = re.compile(
+    r"\b(?:will|would|could|should|decides?|settles?|determines?|we know|we'll know|we will know)\b", re.IGNORECASE
 )
 _FORWARD_AFTER: Final = re.compile(
     r"^(?:'s)?\s*(?:will|would|could|should|may|might|is due|comes?|lands?|is (?:still )?to come|still to come|"
-    r"(?:is )?still ahead|has yet to|is yet to|(?:decides?|settles?|determines?) (?:whether|if|it|his|this|that))\b",
+    r"(?:is )?still ahead|has yet to|is yet to|is not out|isn't out|has not come|hasn't come|"
+    r"(?:decides?|settles?|determines?) (?:whether|if|it|his|this|that))\b",
     re.IGNORECASE,
 )
 _CITES_AFTER: Final = re.compile(
@@ -530,7 +537,10 @@ def _still_to_come(sentence: str, found: re.Match[str]) -> bool:
     if _CITES_AFTER.match(after):
         return False
     clause = _CLAUSE_START.split(sentence[: found.start()])[-1]
-    return _FORWARD_BEFORE.search(clause) is not None or _FORWARD_AFTER.match(after) is not None
+    if _FORWARD_BEFORE.search(clause) is not None or _FORWARD_AFTER.match(after) is not None:
+        return True
+    rest = _CLAUSE_START.split(after)[0]
+    return _BY_BEFORE.search(clause) is not None and _FORWARD_IN_CLAUSE.search(f"{clause} {rest}") is not None
 
 
 def _report_day_words(sheet: WeekSheet) -> set[str]:
@@ -618,15 +628,19 @@ def _his_names(names: Sequence[str]) -> tuple[str, ...]:
 def _said_of_him(text: str, match: re.Match[str], his: Sequence[str]) -> bool:
     """Whether a Lane 303 opener form in `text` is said of him (the review's M3): the sentence opens on it ("Third
     on Philadelphia's quarterback chart, Cole Payton ..."), on his name, surname, He or His, or on the call's
-    imperative; and "Play" plays him."""
+    imperative, or its own clause does after a leading phrase ("Behind Shipley, Nacua is startable", the
+    re-review's M2); and "Play" plays him."""
     played = match.groupdict().get("played")
     if played is not None:
         return played == "him" or any(played.startswith(name) for name in his)
     before = text[: match.start()].lstrip(" \"'\u201c")
+    clause = before.rsplit(",", 1)[-1].lstrip()
     return (
         before == ""
-        or any(before.startswith(name) for name in his)
-        or _HE.match(before) is not None
+        or any(
+            any(opening.startswith(name) for name in his) or _HE.match(opening) is not None
+            for opening in (before, clause)
+        )
         or _IMPERATIVE.match(before) is not None
     )
 

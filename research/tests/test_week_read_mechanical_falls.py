@@ -410,7 +410,7 @@ def test_the_report_days_tense_is_the_writes() -> None:
         sheet = replace(_week_eight(), written_at=saturday, status=status)
         assert (report_out(sheet), report_issued(sheet)) == (False, True)
         line = report_day_line(sheet) or ""
-        assert "came out Friday by 3:00 pm Central" in line and "read before it" in line and "comes out" not in line
+        assert "came out Friday by 3:00 pm Central" in line and "not read after it" in line and "comes out" not in line
         assert _report_breaks("Hold him before Friday's report.", sheet)
         assert _report_breaks("He has no designation on Friday's report.", sheet)
     # Read after the report: it may be cited.
@@ -474,3 +474,32 @@ def test_quoted_words_and_this_weeks_report() -> None:
     assert said_once(report, SEASON, 8) == (
         "He has no designation before this week's game status report on Friday. Start him."
     )
+
+
+# --- fix round 3 (the re-review) -------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("said", ["He was cleared by Friday's report, so start him.", "He is Out by Friday's report."])
+def test_by_alone_never_makes_a_report_still_to_come(said: str) -> None:
+    """The re-review's M1: "by" is the agent as often as the deadline."""
+    found = _report_breaks(said, _week_eight())
+    assert len(found) == 1 and "a report not out at the write" in found[0], found
+
+
+@pytest.mark.parametrize(
+    "said",
+    [
+        "We will know by Friday's report whether he plays.",
+        "His status should be settled by Friday's report.",
+        "By the time Friday's report lands, hold him.",
+        "Hold him unless Friday's report clears him.",
+    ],
+)
+def test_by_with_a_forward_word_passes(said: str) -> None:
+    assert _report_breaks(said, _week_eight()) == []
+
+
+def test_a_depth_phrase_may_lead_an_opener_about_him() -> None:
+    """The re-review's M2: his own clause after a leading phrase opens on him."""
+    assert _opens("Behind Shipley, Nacua is startable only in deep leagues.")
+    assert _opens("With Adams out, he is worth a start this week.")
