@@ -135,7 +135,11 @@ def test_the_prompt_states_the_week_the_kickoff_and_that_the_number_is_published
     assert "Pick the two or three facts that decide his week" in WEEK_RULES
     assert "quote at most 3 figures" in WEEK_RULES and "Never retell the cells" in WEEK_RULES
     assert '"in our preseason order" or "in our rest-of-season order"' in WEEK_RULES
-    assert '"call"' in WEEK_RULES and '"hold" means no change' in WEEK_RULES and 'calls itself "hold"' in WEEK_RULES
+    assert (
+        '"call"' in WEEK_RULES
+        and '"hold" means no change' in WEEK_RULES
+        and "word for word, never another" in WEEK_RULES
+    )
     for word in ("odds", "underdog", "favoured", "line", "spread", "bet", "the books"):
         assert f'"{word}"' in WEEK_RULES
 
@@ -301,7 +305,7 @@ def test_a_spent_budget_ends_the_read_at_its_facts_block_named_for_the_budget() 
 
 def test_a_bye_read_is_written_and_never_recommends_him() -> None:
     judged_no = Completion("No", _USAGE, "provider", "stop")
-    result = write_week_read(on_bye(), _StubGateway([_answer(BYE_READ, "hold"), judged_no]))  # type: ignore[arg-type]
+    result = write_week_read(on_bye(), _StubGateway([_answer(BYE_READ, "sit"), judged_no]))  # type: ignore[arg-type]
     assert result.source == "llm" and result.calls == _A_DRAFT_AND_ONE_MORE, result.attempts
 
 

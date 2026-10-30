@@ -6,8 +6,9 @@ a correction quotes the attempt, how far it is from its length, and every rule b
 far, each with its sentence (`rule_notes`, Lane 52). The prompt states the week, the kickoff (on the
 sheet), and that the week's number is a published projection, never ours, while `sheet.PROJECTION_BASIS`
 says so. The read never states it (Lane 275, the founder 2026-10-28): the card prints it, and a read
-that quoted it went stale the moment it moved. The answer is one JSON object: the read, and the writer's own call for it in one word (`CALLS`),
-which the rules hold to the sheet (a player who may not be started is never "start", the review's H2).
+that quoted it went stale the moment it moved. The answer is one JSON object: the read, and its call in one word (`CALLS`). The call is decided in code
+before the ask (Lane 302, `call.week_call`) and given as a fact the read argues (`call_section`); the rules
+refuse an answer whose call is another.
 """
 
 import json
@@ -21,6 +22,7 @@ from research.capsules.render_words import week_of
 from research.capsules.rule_notes import RuleNote
 from research.capsules.validate import word_count
 from research.capsules.week.angles import angles_on
+from research.capsules.week.call import week_call
 from research.capsules.week.render import render_week_sheet
 from research.capsules.week.rules import ANGLE_FIGURES, MAX_FIGURES, MAX_SENTENCES, MIN_SENTENCES, shown_week_words
 from research.capsules.week.sheet import PROJECTION_BASIS, WeekSheet
@@ -54,11 +56,20 @@ CALL_MEANINGS: Final = (
     ("none", "no lineup call"),
 )
 _RETURN: Final = (
-    'Return ONE JSON object and nothing else: {"read": "<the read>", "call": "<one word>"}. "call" is what '
-    "your read tells a manager who has him to do this week, one word: "
+    'Return ONE JSON object and nothing else: {"read": "<the read>", "call": "<one word>"}. "call" is the call '
+    "the ask gives you for him this week, word for word, never another: "
     + "; ".join(f'"{call}" means {meaning}' for call, meaning in CALL_MEANINGS)
-    + '. A read that waits on his status before saying start calls itself "hold".'
+    + ". Your read argues that call and ends on it."
 )
+
+
+def call_section(sheet: WeekSheet) -> str:
+    """The decided call as a fact the writer argues (Lane 302, `call.week_call`): it never picks the call."""
+    decided = week_call(sheet)
+    return (
+        f'The call, decided before you write: {decided.words} Your answer\'s "call" is "{decided.call}". Argue it '
+        "from the facts that decide his week, and never quote where our starter line falls."
+    )
 
 
 def _quoted(words: Sequence[str]) -> str:
@@ -190,6 +201,7 @@ def week_prompt(sheet: WeekSheet, avoid: Sequence[str]) -> str:
             f"Facts for the week:\n{render_week_sheet(sheet)}",
             *_avoid_section(avoid),
             *voice_section(sheet),
+            call_section(sheet),
             f"Write the week-ahead read for {sheet.name} for {week_of(sheet.week, sheet.season)}. {_RETURN}",
         ]
     )
@@ -240,6 +252,7 @@ def week_correction(sheet: WeekSheet, body: str, ledger: Sequence[RuleNote], avo
             f"\n{lines}",
             *_angles_reminder(sheet),
             *voice_reminder(sheet),
+            call_section(sheet),
             _RETURN,
         ]
     )

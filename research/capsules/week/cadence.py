@@ -12,6 +12,11 @@ rewrite only the reads whose week moved.
   the status rewrites that fell since that read was written (Lane 293: never a rule-stale one's) are capped at
   `STATUS_REWRITES_A_DAY` a Central day (`status_rewrite_capped`, fix round 2), and a written read's attempts restart at one, so a success never
   spends the next change's tries. A capped read is asked again at the first pass of the next Central day.
+- Its call is no longer the one decided for tonight's sheet (`CALL_CHANGED`, Lane 302, `call.week_call`): his
+  place in our order crossed his position's starter line, or a Doubtful player's game status report came out. The
+  call is the read's headline, so a crossing alone rewrites it, nightly (the order is published nightly) and hourly
+  (the report comes out mid-afternoon), held like a status rewrite (`STATUS_REWRITES_A_DAY`). With every stored call
+  decided, a crossing moves a handful of board players a night, about $0.01 to $0.03 a night.
 - The written read breaks a rule the writer holds reads to now (`RULE_STALE`, Lane 275 fix round 1: a read
   written while the rules asked for the published projection names it; Lane 286: every rule of the body alone,
   `rules.body_rule_violations`, so a read that says "your roster" is written again), nightly only and at most
@@ -41,6 +46,7 @@ from datetime import date, datetime, timedelta
 from typing import Final
 
 from research.capsules.store import WRITTEN_SOURCE
+from research.capsules.week.call import week_call
 from research.capsules.week.fact_rules import fact_violations
 from research.capsules.week.rules import body_rule_violations
 from research.capsules.week.sheet import CENTRAL, WeekSheet
@@ -65,13 +71,16 @@ STATUS_REWRITES_A_DAY: Final = 3
 FIRST: Final = "first"
 UNWRITTEN: Final = "unwritten"
 STATUS_CHANGED: Final = "status"
+CALL_CHANGED: Final = "call"
 RULE_STALE: Final = "rule"
 FACT_STALE: Final = "fact"
 # The order a nightly writes its due reads in, so a budget stop leaves the rule-stale rewrites for the next night.
-PRIORITY: Final = (FIRST, UNWRITTEN, STATUS_CHANGED, FACT_STALE, RULE_STALE)
+PRIORITY: Final = (FIRST, UNWRITTEN, STATUS_CHANGED, CALL_CHANGED, FACT_STALE, RULE_STALE)
 # What an hourly pass writes: the reads whose status moved (the coordinator's M3), and a read still unwritten,
 # asked every hour until one is written (Lane 276).
-HOURLY_REASONS: Final = frozenset({STATUS_CHANGED, UNWRITTEN})
+HOURLY_REASONS: Final = frozenset({STATUS_CHANGED, CALL_CHANGED, UNWRITTEN})
+# The reasons whose rewrites that fall count toward `STATUS_REWRITES_A_DAY`: the read's headline moved under it.
+HEADLINE_REASONS: Final = frozenset({STATUS_CHANGED, CALL_CHANGED})
 
 
 def central_day(instant: datetime) -> date:
@@ -131,12 +140,20 @@ def _fact_stale(sheet: WeekSheet, stored: StoredWeekRead, now: datetime) -> bool
     )
 
 
+def call_moved(sheet: WeekSheet, stored: StoredWeekRead) -> bool:
+    """Whether a written read's call is no longer the one decided for tonight's sheet (Lane 302): his place in our
+    order crossed his position's starter line, or a Doubtful player's game status report came out."""
+    return stored.source == WRITTEN_SOURCE and stored.call != week_call(sheet).call
+
+
 def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None, now: datetime, *, hourly: bool = False) -> str | None:
     """Why `sheet`'s read is written at `now`, or None when the stored read for his week stands."""
     if stored is None or stored.season != sheet.season or stored.week != sheet.week:
         reason: str | None = FIRST
     elif stored.status != sheet.status.status:
         reason = None if status_rewrite_capped(stored, now) else STATUS_CHANGED
+    elif call_moved(sheet, stored):
+        reason = None if status_rewrite_capped(stored, now) else CALL_CHANGED
     elif stored.source != WRITTEN_SOURCE and _retry_allowed(stored, now):
         reason = UNWRITTEN
     elif _fact_stale(sheet, stored, now):

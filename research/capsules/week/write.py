@@ -4,7 +4,8 @@ counted fallback.
 The ask is the season writer's (`generate.ask`, Lane 52): a rate limit or a transport failure waits and
 asks again with the same prompt and never spends one of the read's asks; a call the run's budget refuses
 (`run_budget`, the step attaches one) ends the read at once, named for the budget. An empty or cut answer
-is an ask spent. The answer is the read and the writer's call for it (`prompt.parse_week_answer`). A draft
+is an ask spent. The answer is the read and its call (`prompt.parse_week_answer`), which must be the call decided
+before the ask (Lane 302, `call.week_call`); the result always carries the decided call, a facts block's too. A draft
 that breaks a rule is handed back with every rule broken so far and its sentence (`rule_notes`), up to
 `MAX_CALLS_PER_READ` asks in all. A read whose writer's asks are spent without a written read is asked once
 more of the retry writer (Lane 276, `retry_model`, the setting `config.RETRY_WRITER_MODEL`): the correction of
@@ -25,6 +26,7 @@ from research.capsules.page_figures import fallback_violation
 from research.capsules.rule_notes import notes_of
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.validate import ValidationResult
+from research.capsules.week.call import week_call
 from research.capsules.week.judge import (
     JUDGE_MAX_TOKENS,
     JUDGE_MIN_WORDS,
@@ -99,7 +101,7 @@ def messages_for(user: str) -> list[dict[str, str]]:
 
 def _facts(sheet: WeekSheet, usage: Usage | None, calls: int, attempts: list[WeekAttempt], why: str) -> WeekReadResult:
     block = render_week_facts_block(sheet)
-    return WeekReadResult(block, FACTS_SOURCE, None, None, usage, calls, tuple(attempts), why)
+    return WeekReadResult(block, FACTS_SOURCE, week_call(sheet).call, None, usage, calls, tuple(attempts), why)
 
 
 def _gateway_why(error: GenerationError) -> str:
@@ -230,7 +232,8 @@ def _writer_read(
         attempts.append(WeekAttempt(text, answer.call, violations))
         if not violations:
             calls = made()
-            return WeekReadResult(text, WRITTEN_SOURCE, answer.call, gateway.model, usage, calls, tuple(attempts), None)
+            decided = week_call(sheet).call
+            return WeekReadResult(text, WRITTEN_SOURCE, decided, gateway.model, usage, calls, tuple(attempts), None)
         ledger = notes_of([(attempt.body, attempt.violations) for attempt in attempts])
         user = week_correction(sheet, text, ledger, avoid)
     return _facts(sheet, usage, made(), attempts, _validation_why(attempts))
@@ -267,10 +270,11 @@ def _retry_writer_read(  # noqa: PLR0913 - the read's parts
     judge_before = judge.calls
     attempts, usage = list(fallen.attempts), fallen.usage
 
-    def done(text: str, source: str, call: str | None, why: str | None) -> WeekReadResult:
+    def done(text: str, source: str, why: str | None) -> WeekReadResult:
         calls = fallen.calls + retrier.calls + judge.calls - judge_before
         model = retrier.model if why is None else None
-        return WeekReadResult(text, source, call, model, usage, calls, tuple(attempts), why, RETRY_WRITER_DRAFTS)
+        decided = week_call(sheet).call
+        return WeekReadResult(text, source, decided, model, usage, calls, tuple(attempts), why, RETRY_WRITER_DRAFTS)
 
     block = render_week_facts_block(sheet)
     try:
@@ -279,7 +283,7 @@ def _retry_writer_read(  # noqa: PLR0913 - the read's parts
         # A refusal at the retry ask (the budget's above all, Lane 276 review M1) keeps the writer's own fall: his
         # facts block lands and stays due, never a read the budget stopped with no row.
         usage = add_usage(usage, error.billed)
-        return done(block, FACTS_SOURCE, None, fallen.fallback)
+        return done(block, FACTS_SOURCE, fallen.fallback)
     usage = add_usage(usage, completion.usage)
     answer = parse_week_answer(completion.content)
     text = answer.read or ""
@@ -290,10 +294,10 @@ def _retry_writer_read(  # noqa: PLR0913 - the read's parts
         except GenerationError as error:
             usage = add_usage(usage, error.billed)
             attempts.append(WeekAttempt(text, answer.call, ()))
-            return done(block, FACTS_SOURCE, None, fallen.fallback)
+            return done(block, FACTS_SOURCE, fallen.fallback)
         usage = add_usage(usage, judged)
         violations = (judge_violation(sheet),) if says else ()
     attempts.append(WeekAttempt(text, answer.call, violations))
     if violations:
-        return done(block, FACTS_SOURCE, None, _validation_why(attempts))
-    return done(text, WRITTEN_SOURCE, answer.call, None)
+        return done(block, FACTS_SOURCE, _validation_why(attempts))
+    return done(text, WRITTEN_SOURCE, None)

@@ -172,7 +172,7 @@ def test_an_honest_starter_read_passes() -> None:
 
 
 def test_an_honest_bye_read_passes_and_says_he_does_not_play() -> None:
-    result = validate_week_read(BYE_READ, on_bye(), call="hold")
+    result = validate_week_read(BYE_READ, on_bye(), call="sit")
     assert result.ok, result.violations
 
 
@@ -342,7 +342,7 @@ def test_a_rank_in_our_order_says_which_order() -> None:
 def test_the_season_is_named_once_and_weeks_after_it_go_bare() -> None:
     twice = STARTER_READ.replace("so nothing about", "in week 6 of 2026, so nothing about")
     assert any("names the season 2 times" in v for v in week_rule_violations(twice, starter()))
-    assert validate_week_read(BYE_READ, on_bye(), call="hold").ok
+    assert validate_week_read(BYE_READ, on_bye(), call="sit").ok
 
 
 def test_a_bare_week_before_the_season_is_named_is_refused() -> None:
@@ -639,10 +639,13 @@ def test_the_list_refuses_every_start_phrasing_the_re_review_found(advice: str, 
 
 
 def test_a_wait_and_see_read_calls_itself_hold() -> None:
-    """The re-review's F4: Lamb's "Wait on his status ... before you start him" is a hold."""
+    """The re-review's F4: Lamb's "Wait on his status ... before you start him" is a hold. Since Lane 302 the
+    call is decided: a Questionable player's is hold, so a start is refused as another call, and a start read for
+    a player nothing holds never waits on his status."""
     text = "Wait on his status right up to Sunday night before you start him."
-    assert any("calls itself hold" in v for v in week_rule_violations(text, questionable(), "start"))
-    assert not any("calls itself hold" in v for v in week_rule_violations(text, questionable(), "hold"))
+    assert any('the call for him this week is "hold"' in v for v in week_rule_violations(text, questionable(), "start"))
+    assert not any("the call for him" in v for v in week_rule_violations(text, questionable(), "hold"))
+    assert any("never wait on his status" in v for v in week_rule_violations(text, starter(), "start"))
 
 
 def test_a_club_is_named_by_name_never_by_its_code() -> None:

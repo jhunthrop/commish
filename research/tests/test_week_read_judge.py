@@ -88,21 +88,21 @@ def test_the_judge_asks_one_question_about_the_text_alone() -> None:
 
 
 def test_a_read_the_judge_clears_is_written_with_the_judges_call_counted() -> None:
-    gateway = _Script([answer_json(BYE_READ, "hold"), "no"])
+    gateway = _Script([answer_json(BYE_READ, "sit"), "no"])
     result = write_week_read(on_bye(), gateway)  # type: ignore[arg-type]
     assert result.source == "llm" and result.calls == 2  # noqa: PLR2004 - the draft and the judge
     assert gateway.asked[1][-1]["content"].endswith(QUESTION)
 
 
 def test_a_yes_refuses_the_read_and_the_correction_says_why() -> None:
-    gateway = _Script([answer_json(BYE_READ, "hold"), "yes", answer_json(BYE_READ, "hold"), "no"])
+    gateway = _Script([answer_json(BYE_READ, "sit"), "yes", answer_json(BYE_READ, "sit"), "no"])
     result = write_week_read(on_bye(), gateway)  # type: ignore[arg-type]
     assert result.source == "llm" and result.calls == MAX_CALLS_PER_READ
     assert "A reader would take this read as telling them to start him" in gateway.asked[2][-1]["content"]
 
 
 def test_the_judges_call_is_one_of_the_four() -> None:
-    script = [answer_json(BYE_READ, "hold"), "yes"] * 2
+    script = [answer_json(BYE_READ, "sit"), "yes"] * 2
     result = write_week_read(on_bye(), _Script(script))  # type: ignore[arg-type]
     assert result.source == "facts" and result.calls == MAX_CALLS_PER_READ
 
@@ -145,7 +145,7 @@ def test_the_judge_refuses_each_phrasing_with_the_list_switched_off(
     verdict = next(v for v in _verdicts() if v["phrase"] == phrase)
     text = judged_text(phrase)
     assert verdict["text"] == text
-    gateway = _Script([answer_json(text, "hold"), verdict["answer"], answer_json(BYE_READ, "hold"), "no"])
+    gateway = _Script([answer_json(text, "sit"), verdict["answer"], answer_json(BYE_READ, "sit"), "no"])
     result = write_week_read(on_bye(), gateway)  # type: ignore[arg-type]
     assert result.text == BYE_READ, result.attempts
     assert result.attempts[0].violations and result.attempts[0].violations[0].startswith("A reader would take")
@@ -153,7 +153,7 @@ def test_the_judge_refuses_each_phrasing_with_the_list_switched_off(
 
 @pytest.mark.parametrize("phrase", JUDGE_MISSES)
 def test_the_judges_misses_are_refused_by_the_list(phrase: str) -> None:
-    assert any("recommends starting" in v for v in rules.week_rule_violations(judged_text(phrase), on_bye(), "hold"))
+    assert any("recommends starting" in v for v in rules.week_rule_violations(judged_text(phrase), on_bye(), "sit"))
 
 
 @pytest.fixture(autouse=True)

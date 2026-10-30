@@ -11,6 +11,7 @@ server where the harness may create `parity_*` databases); skipped without it.""
 
 import json
 import os
+import re
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
@@ -207,6 +208,10 @@ def _completion(read: str, call: str) -> httpx.Response:
     return httpx.Response(200, json={"choices": [choice], "usage": usage})
 
 
+# The call the ask gives the writer (`prompt.call_section`).
+_GIVEN_CALL = re.compile(r'Your answer\'s "call" is "(\w+)"')
+
+
 @dataclass
 class _Writer:
     """The stub gateway's answers by the player asked about; Puka Nacua's first `fail_first` asks quote a
@@ -223,12 +228,14 @@ class _Writer:
         who = user.split("\n", 2)[1]
         (self.asked if self.asked is not None else []).append(who)
         (self.models if self.models is not None else []).append(body["model"])
+        # The writer gives the call its ask decides (Lane 302): a Puka Nacua listed Questionable mid-week is a hold.
+        call = _GIVEN_CALL.findall(user)[-1]
         if "Puka Nacua" in who:
             if self.fail_first > 0:
                 self.fail_first -= 1
-                return _completion(STARTER_READ.replace("25.9 PPR points", "25.6 PPR points"), "start")
-            return _completion(STARTER_READ, "start")
-        return _completion(_QUESTIONABLE_READ, "hold")
+                return _completion(STARTER_READ.replace("25.9 PPR points", "25.6 PPR points"), call)
+            return _completion(STARTER_READ, call)
+        return _completion(_QUESTIONABLE_READ, call)
 
 
 @dataclass

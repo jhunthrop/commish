@@ -45,6 +45,7 @@ from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
 from research.capsules.week.angle_rules import figure_violations as angle_figure_violations
 from research.capsules.week.angle_rules import ordinary_rank_violations
+from research.capsules.week.call import HOLD, NONE, SIT, START, week_call
 from research.capsules.week.cells import cell_figures, misnamed, misranked, quotable_figures
 from research.capsules.week.fact_rules import place_violations, weather_violations, week_figure_violations
 from research.capsules.week.place_rules import place_violations as angle_place_violations
@@ -61,9 +62,9 @@ MAX_FIGURES: Final = 3
 # A read built on its angles (Lane 300) may state one figure more: an angle's share and the one it is set
 # against are two figures, and the angles are in no cell, so the cap on retelling the cells is not what they spend.
 ANGLE_FIGURES: Final = 1
-# The writer's own call for its read, one word (H2): what it tells a manager who has him to do this week.
-START: Final = "start"
-CALLS: Final = (START, "sit", "hold", "none")
+# The call's four words (H2), the API's enum: the call is decided in code (Lane 302, `call.week_call`), and the
+# answer's "call" must be that one.
+CALLS: Final = (START, SIT, HOLD, NONE)
 # The words a week read never carries beyond the writer's lists: each a named rule, shown to the writer.
 WEEK_NEVER_WORDS: Final = (
     named_rule(
@@ -399,9 +400,34 @@ def _wait_violation(text: str, sheet: WeekSheet, call: str | None) -> list[str]:
     if call != START or _WAITS.search(text) is None:
         return []
     return [
-        f"The read waits on {sheet.name}'s status before saying start, but its call is start. A read that waits "
-        "on his status calls itself hold."
+        f"The read waits on {sheet.name}'s status before saying start, but the call is start: nothing on his "
+        "status holds him. Argue the start, and never wait on his status."
     ]
+
+
+def _decided_call_violations(sentences: Sequence[str], sheet: WeekSheet, call: str | None) -> list[str]:
+    """Lane 302: the answer's call is the decided one (`call.week_call`), and a read whose call is sit for a
+    player who may play never tells a manager to start him (a player who may not be started has his own guard,
+    `_cannot_start_violations`). A hold's read may say when it turns to a start ("if he's cleared, start him")."""
+    decided = week_call(sheet)
+    out = []
+    if call in CALLS and call != decided.call:
+        out.append(
+            f'The answer\'s call is "{call}", but the call for him this week is "{decided.call}". {decided.words} '
+            f'Give "call" as "{decided.call}" and write the read that argues it.'
+        )
+    if decided.call == SIT and sheet.may_start:
+        for s in sentences:
+            found = start_advice_in(s, sheet.name)
+            if found is not None:
+                out.append(
+                    _sentence_violation(
+                        f'tells a manager to start him ("{found}") when the call is sit',
+                        s,
+                        f"{decided.words} Argue the sit: never recommend him for this week.",
+                    )
+                )
+    return out
 
 
 _CLUB_CODE: Final = re.compile(r"\b(?:" + "|".join(sorted(NFL_TEAM_NAMES, key=len, reverse=True)) + r")\b")
@@ -704,6 +730,7 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_paragraph_violation(text),
         *_count_violation(sentences),
         *_call_violation(call),
+        *_decided_call_violations(sentences, sheet, call),
         *_word_violations(sentences),
         *_projection_violations(sentences, sheet),
         *_cannot_start_violations(sentences, sheet, call),
