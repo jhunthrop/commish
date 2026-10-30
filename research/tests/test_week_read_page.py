@@ -17,6 +17,7 @@ from research.nightly.build.pages import (
     ReadClock,
     ServedWeek,
     _promised,
+    _week_read,
     reads_due_json,
     week_read_json,
 )
@@ -120,3 +121,18 @@ def test_the_promise_is_only_for_a_page_the_pass_will_write() -> None:
     assert _promised(_who("ram"), False, inputs) is None
     assert _promised(_who("free"), True, inputs) is None
     assert _promised(_who("hawk"), True, inputs) is None
+
+
+def test_a_released_player_has_no_read_for_a_club_that_let_him_go() -> None:
+    """Lane 301 (B298): a stored read about a club he no longer plays for is not a read of his week; a
+    free agent's page serves none, a club player's page serves his."""
+    at = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
+    games = {"LAR": [Game(6, "ARI", False, datetime(2026, 11, 5, 1, 15, tzinfo=UTC))]}
+    stored = {"u1": replace(_read(), week=6)}
+    inputs = replace(
+        _inputs(ReadsDue(6, at), {}, games, at),
+        week=ServedWeek(stored, {"ram": "questionable", "free": "questionable"}, at),
+    )
+    assert _week_read(_who("ram"), "u1", inputs) is not None
+    free = replace(_who("free"), team="FA")
+    assert _week_read(free, "u1", inputs) is None
