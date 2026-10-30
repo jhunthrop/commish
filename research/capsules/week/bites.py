@@ -73,6 +73,10 @@ def depth_words(sheet: WeekSheet) -> str:
         return "He shares his spot: it bites."
     if depth_bites(sheet):
         return "His place moved: it bites."
+    if d is not None and sheet.depth_moved_from is not None and sheet.depth_moved_from != d.slot:
+        # A move on a chart older than the window (or with no release stamp) is no news: never "Unchanged" with a
+        # move (the final review's M2).
+        return "Moved on an older chart: it does not bite."
     return "Unchanged: ordinary, it does not bite."
 
 

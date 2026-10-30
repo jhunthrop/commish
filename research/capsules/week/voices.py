@@ -50,11 +50,11 @@ class Voice:
 # The matchup voice's angles brief, when no matchup fact bites: the opponent's rank leaves the sheet outside the
 # four clubs either end (`bites.RANK_EDGE`), so it leans on his strongest angle, set against this game.
 _MATCHUP_ON_ANGLES: Final = (
-    "Open on his first angle with its figure, set against this game: the opponent by name, home or away, the "
-    'expected score when it is an angle. Sentences of 14 to 18 words, each one clause joined by "and" or "but". '
-    "Lean on what the angle means against this opponent this week.",
-    "Open on his first angle with its figure, set against this game and this opponent.\n"
-    "Lean on what the angle means against this opponent this week.",
+    "Open on the fact that decides his week, with its figure, set against this game: the opponent by name, home or away, the "
+    'expected score when it bites. Sentences of 14 to 18 words, each one clause joined by "and" or "but". '
+    "Lean on what that fact means against this opponent this week.",
+    "Open on the fact that decides his week, with its figure, set against this game and this opponent.\n"
+    "Lean on what that fact means against this opponent this week.",
 )
 # The role voice's brief with his usage in full (fix round 2): his role is his share of the work, never a tour of
 # the depth chart; his place on it leads only when the sheet says it bites (pair h: the depth chart in 36% of
@@ -69,11 +69,11 @@ _ROLE_ON_ANGLES: Final = (
 # The verdict voice's angles brief (fix round 1): its clipped sentences ran reads with two angles to six and seven
 # sentences, so the brief holds them to four and gives the angle the reason's place.
 _VERDICT_ON_ANGLES: Final = (
-    "Open on the move itself, the verb first, with his first angle as the reason in the same sentence. Four "
-    "sentences in all, 10 to 15 words each: the move and its angle, the second angle, what he waits on if anything, "
+    "Open on the move itself, the verb first, with the fact that decides his week as the reason in the same sentence. Four "
+    "sentences in all, 10 to 15 words each: the move and its fact, the next fact that matters, what he waits on if anything, "
     "the move again in fewer words.",
-    "Open on the move itself, the verb first, with his first angle as its reason.\n"
-    "Four sentences in all: the move, the angles, the move again.",
+    "Open on the move itself, the verb first, with the fact that decides his week as its reason.\n"
+    "Four sentences in all: the move, the facts that decide it, the move again.",
 )
 
 

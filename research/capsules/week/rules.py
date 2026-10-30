@@ -45,9 +45,10 @@ from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
 from research.capsules.week.angle_rules import figure_violations as angle_figure_violations
 from research.capsules.week.angle_rules import ordinary_rank_violations
-from research.capsules.week.angle_rules import place_violations as angle_place_violations
 from research.capsules.week.cells import cell_figures, misnamed, misranked, quotable_figures
 from research.capsules.week.fact_rules import place_violations, weather_violations, week_figure_violations
+from research.capsules.week.place_rules import place_violations as angle_place_violations
+from research.capsules.week.place_rules import unusual_violations
 from research.capsules.week.rank_words import fits, rank_words, superlatives_in
 from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import STATUS_WORDS, WeekSheet
@@ -726,6 +727,7 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *angle_figure_violations(sentences, sheet, _stated),
         *angle_place_violations(sentences, sheet),
         *ordinary_rank_violations(sentences, sheet),
+        *unusual_violations(sentences, sheet),
     ]
 
 

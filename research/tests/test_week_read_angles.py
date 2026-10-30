@@ -6,6 +6,7 @@ from dataclasses import replace
 
 import pytest
 
+from research.capsules.week import angle_candidates
 from research.capsules.week import angles as angles_module
 from research.capsules.week.angle_candidates import AngleFigure, Basis, Measure
 from research.capsules.week.angles import (
@@ -335,13 +336,20 @@ def _long_angle(n: int) -> Angle:
     return Angle("vacated", text, (AngleFigure(33.0, Measure.TARGETS),), (mate,), 3.0, Basis(7, 80, "targets"))
 
 
+# The most usage facts a receiver, tight end or back can carry (the final review's L3): four shares and three
+# trends, target depth, red zone, spread, vacated work, a return and the expected score, less the one family a
+# position never has.
+_FULL_SUMMARY = 11
+
+
 @pytest.mark.usefixtures("angles_on")
-def test_the_heaviest_correction_with_three_angles_stays_inside_the_prompt_bound() -> None:
-    """Ruling 3: the correction carries the angles inside `WORST_PROMPT_TOKENS`, at the bound's margin."""
+def test_the_heaviest_correction_with_the_full_summary_stays_inside_the_prompt_bound() -> None:
+    """Ruling 3 and the final review's L3: the correction carries his facts in full inside `WORST_PROMPT_TOKENS`,
+    at the bound's margin."""
     playing = Status("questionable", heaviest().status.captured_at)
-    sheet = replace(heaviest(), status=playing, angles=tuple(_long_angle(n) for n in range(3)))
+    sheet = replace(heaviest(), status=playing, angles=tuple(_long_angle(n) for n in range(_FULL_SUMMARY)))
     system, user = worst_correction(sheet)
-    assert system == WEEK_RULES_ANGLES and ANGLES_REMINDER in user and _long_angle(2).text in user
+    assert system == WEEK_RULES_ANGLES and ANGLES_REMINDER in user and _long_angle(_FULL_SUMMARY - 1).text in user
     tokens = (len(system) + len(user)) / CHARS_PER_TOKEN
     assert tokens <= (1 - BOUND_MARGIN) * WORST_PROMPT_TOKENS, tokens
 
@@ -514,3 +522,179 @@ def test_an_ordinary_matchup_in_plain_words_is_allowed() -> None:
 def test_with_the_angles_off_an_ordinary_rank_is_mains_to_judge() -> None:
     read = _MATCHUP.format(line="Arizona sits 26th of 32 against receivers.")
     assert not any("does not bite" in v for v in validate_week_read(read, _angled(), call="start").violations)
+
+
+# --- fix round 5: the final review's H1, M1 to M3, L1, L2 and L6 ----------------------------------------------------
+
+_SNAPS = Angle(
+    "snap_share",
+    "Offensive snaps: 71% of the Rams' offensive snaps in his games this season, the 20th-lowest among the wide "
+    "receivers we rank (ordinary for a wide receiver).",
+    (AngleFigure(71.0, Measure.SNAPS),),
+    (),
+    0.4,
+    Basis(5, 300, "snaps"),
+    (("the 20th-lowest", "among the wide receivers we rank"),),
+)
+
+
+def _two_places() -> WeekSheet:
+    return replace(_angled(), angles=(_TARGETS, _SNAPS))
+
+
+def _place_refused(sentence: str, sheet: WeekSheet) -> bool:
+    read = f"{sentence} Start him in week 6 of 2026 against Arizona."
+    return any("among his peers" in v for v in validate_week_read(read, sheet, call="start").violations)
+
+
+@pytest.mark.usefixtures("angles_on")
+@pytest.mark.parametrize(
+    "misbound",
+    [
+        "He plays 71% of the Rams' offensive snaps, the 3rd-highest among the wide receivers we rank.",
+        "His target share is the 20th-lowest among the receivers we rank.",
+    ],
+)
+def test_a_place_said_of_another_facts_measure_is_refused(misbound: str) -> None:
+    assert _place_refused(misbound, _two_places())
+
+
+@pytest.mark.usefixtures("angles_on")
+@pytest.mark.parametrize(
+    "paraphrase",
+    [
+        "Puka Nacua draws 32% of the Rams' targets, the 2nd-most among the wide receivers we rank.",
+        "Puka Nacua draws 32% of the Rams' targets, the heaviest share among the wide receivers we rank.",
+        "Puka Nacua draws 32% of the Rams' targets, a top-two share among the wide receivers we rank.",
+        "Puka Nacua draws 32% of the Rams' targets, more than any receiver in the league.",
+        "Puka Nacua draws 32% of the Rams' targets, which leads all receivers.",
+    ],
+)
+def test_a_place_paraphrase_no_fact_states_is_refused(paraphrase: str) -> None:
+    assert _place_refused(paraphrase, _two_places())
+
+
+_TOP_TARGETS = replace(
+    _TARGETS,
+    text="Targets: 32% of the Rams' targets in his games this season, the highest among the wide receivers we rank.",
+    places=(("the highest", "among the wide receivers we rank"),),
+)
+
+
+@pytest.mark.usefixtures("angles_on")
+@pytest.mark.parametrize(
+    ("sentence", "targets"),
+    [
+        ("Puka Nacua draws 32% of the Rams' targets, the 3rd-highest among the wide receivers we rank.", _TARGETS),
+        ("Puka Nacua draws 32% of the Rams' targets, 3rd among the receivers we rank.", _TARGETS),
+        ("Puka Nacua draws 32% of the Rams' targets, a top-three share among the wide receivers we rank.", _TARGETS),
+        ("Puka Nacua draws 32% of the Rams' targets, the most among the wide receivers we rank.", _TOP_TARGETS),
+        ("Puka Nacua draws 32% of the Rams' targets, more than any receiver we rank.", _TOP_TARGETS),
+        ("His 32% of the Rams' targets leads all the receivers we rank.", _TOP_TARGETS),
+    ],
+)
+def test_a_place_its_fact_states_is_accepted(sentence: str, targets: Angle) -> None:
+    sheet = replace(_angled(), angles=(targets, _SNAPS))
+    assert not _place_refused(sentence, sheet)
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_the_most_among_peers_is_the_place_rules_not_the_opponents_rank() -> None:
+    """The final review's L2: "the 2nd-most among the wide receivers we rank" is a usage place, never an ordinary
+    rank."""
+    read = "Puka Nacua draws 32% of the Rams' targets, the 2nd-most among the wide receivers we rank. Start him."
+    assert not any("does not bite" in v for v in validate_week_read(read, _two_places(), call="start").violations)
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_unusualness_is_said_only_as_its_fact_grades_it() -> None:
+    """The final review's L6: the snap share is graded ordinary, so it is never "far out of the ordinary"."""
+    sheet = _two_places()
+    read = "He plays 71% of the Rams' offensive snaps, far out of the ordinary. Start him in week 6 of 2026."
+    assert any("not graded so" in v for v in validate_week_read(read, sheet, call="start").violations)
+    graded = replace(_TARGETS, text=_TARGETS.text.removesuffix(".") + " (far out of the ordinary for a wide receiver).")
+    ok = "He draws 32% of the Rams' targets, far out of the ordinary. Start him in week 6 of 2026."
+    with_grade = replace(sheet, angles=(graded, _SNAPS))
+    assert not any("not graded so" in v for v in validate_week_read(ok, with_grade, call="start").violations)
+
+
+@pytest.mark.usefixtures("angles_on")
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "He runs routes on 71% of the Rams' offensive snaps.",
+        "He has 4 touchdowns there in his games this season.",
+    ],
+)
+def test_a_measure_the_store_does_not_hold_is_refused(claim: str) -> None:
+    """The final review's M3: no route counts are stored, and the touchdowns are every one in those games."""
+    red_zone = Angle(
+        "red_zone",
+        "Red zone: 30% of the Rams' red-zone carries and targets in his games this season, and 4 touchdowns in those "
+        "games (out of the ordinary for a wide receiver).",
+        (AngleFigure(30.0, Measure.RED_ZONE), AngleFigure(4.0, Measure.TOUCHDOWNS)),
+        (),
+        1.0,
+        Basis(5, 12, "red-zone carries and targets"),
+    )
+    sheet = replace(_angled(), angles=(_SNAPS, red_zone), games_played=6)
+    read = f"{claim} Start him in week 6 of 2026 against Arizona."
+    assert any(
+        "routes" in v or "red-zone touchdowns" in v for v in validate_week_read(read, sheet, call="start").violations
+    )
+    own = "He has 4 touchdowns in those games. Start him in week 6 of 2026 against Arizona."
+    assert not any("red-zone touchdowns" in v for v in validate_week_read(own, sheet, call="start").violations)
+
+
+def test_an_ordinary_spread_carries_no_direction_word() -> None:
+    """The final review's M1: "Steady" or "Boom or bust" only past ordinary; else "Week to week"."""
+    spread = angle_candidates.spread([10.0, 12.0, 14.0, 16.0])
+    assert spread is not None
+    pool = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    ordinary = angles_module._scored(replace(spread, measure=0.5), pool, "WR")
+    steady = angles_module._scored(replace(spread, measure=0.05), pool, "WR")
+    assert ordinary is not None and ordinary.text.startswith("Week to week:")
+    assert steady is not None and steady.text.startswith("Steady week to week:")
+
+
+def test_vacated_work_says_heir_and_never_an_ordinariness_grade() -> None:
+    gone = _receiver(97, 12, team="LAR", out="Out")
+    heir, other = _receiver(96, 8, team="LAR"), _receiver(95, 4, team="LAR")
+    got = board_angles([*_board(), gone, heir, other], {}, 8)
+    lead = next(a for a in got[heir.player_id] if a.key == "vacated")
+    scaled = next(a for a in got[other.player_id] if a.key == "vacated")
+    assert lead.text.endswith("(he is the likely heir).") and scaled.text.endswith("(a smaller share of it is his).")
+    assert "ordinary" not in lead.text and "ordinary" not in scaled.text
+
+
+@pytest.mark.usefixtures("angles_on")
+@pytest.mark.parametrize("released_days_before", [9, None])
+def test_a_move_outside_the_window_is_never_printed_as_news(released_days_before: int | None) -> None:
+    """The final review's M2: a stale move or one with no release stamp prints no move and never "Unchanged"."""
+    from datetime import timedelta  # noqa: PLC0415 - local to the test
+
+    written = starter().written_at
+    released = None if released_days_before is None else written - timedelta(days=released_days_before)
+    depth = DepthPlace(2.0, (("Davante Adams", 1.0),), released)
+    text = render_week_sheet(replace(_angled(), depth=depth, depth_moved_from=1.0))
+    assert "from first on the chart before" not in text
+    assert "Moved on an older chart: it does not bite." in text and "Unchanged" not in text
+
+
+def test_a_lone_capital_or_a_suffix_before_a_figure_ends_its_sentence() -> None:
+    from research.capsules.sentences import split_sentences  # noqa: PLC0415 - local to the test
+
+    assert split_sentences("Start Marvin Harrison Jr. 22 PPR points came last week.") == [
+        "Start Marvin Harrison Jr.",
+        "22 PPR points came last week.",
+    ]
+    assert split_sentences("Go to plan B. He is out.") == ["Go to plan B.", "He is out."]
+
+
+def test_a_return_says_it_is_a_return_and_carries_no_grade() -> None:
+    """The final review's M1: a return's fixed score is no measure of how unusual it is."""
+    weeks = (1, 2, 3, 6, 7, 8)
+    usage = tuple(_week(w, snaps=40 if w > 5 else 60) for w in weeks)  # noqa: PLR2004 - back from week 6
+    back = AnglePlayer("00-0000079", "Back Receiver", "WR", "LAR", usage, tuple((w, 8.0) for w in weeks), (4, 5))
+    fact = next(a for a in board_angles([*_board(), back], {}, 9)[back.player_id] if a.key == "return")
+    assert "a return from missed games" in fact.text and "ordinary" not in fact.text

@@ -17,7 +17,14 @@ from research.capsules.render_depth import slot_word
 from research.capsules.render_season import week_list
 from research.capsules.render_words import IN_OUR_RECORDS, ordinal, week_of
 from research.capsules.week.angles import angles_on
-from research.capsules.week.bites import depth_words, expected_words, rank_bite_words, rank_bites, weather_words
+from research.capsules.week.bites import (
+    depth_bites,
+    depth_words,
+    expected_words,
+    rank_bite_words,
+    rank_bites,
+    weather_words,
+)
 from research.capsules.week.cells import named_chance
 from research.capsules.week.rank_words import rank_words
 from research.capsules.week.report_day import report_words
@@ -181,7 +188,8 @@ def _move_words(sheet: WeekSheet) -> str:
     """His move since the chart before (Lane 300, review M3), the reason the line bites: ", up from second on the
     chart before". The depth fact rule takes that place after "from" (`fact_rules.place_violations`)."""
     d, before = sheet.depth, sheet.depth_moved_from
-    if d is None or before is None or before == d.slot or not angles_on():
+    # The move is printed only when it bites (a release within the window), the final review's M2.
+    if d is None or before is None or before == d.slot or not angles_on() or not depth_bites(sheet):
         return ""
     return f", {'up' if d.slot < before else 'down'} from {slot_word(before)} on the chart before"
 

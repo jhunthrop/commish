@@ -36,7 +36,6 @@ from research.capsules.week.angle_candidates import (
     RECEIVERS,
     RED_ZONE,
     RETURN_GAMES_BACK,
-    RETURN_GAMES_BEFORE,
     RUNNERS,
     SHARE_KINDS,
     SNAPS,
@@ -91,8 +90,9 @@ VACATED_RECENT_WEEKS: Final = 3
 VACATED_SHARE_PER_SCORE: Final = 0.10
 # The club's expected score is an angle at the week's top or bottom three clubs alone.
 EXPECTED_EDGE: Final = 3
-# A return from missed games scores this: it decides how a manager reads his last games. Its games back are its
-# basis, so it reaches the sheet only after three games back (the thin rule).
+# A return from missed games is ordered at this score among his facts (it decides how a manager reads his last
+# games); its line carries no unusualness words, only that it is a return (the final review's M1). Its games back
+# are its basis, so it reaches the sheet only at three games back (the thin rule).
 RETURN_SCORE_FLOOR: Final = 1.5
 # The club's expected score is the club's fact more than his: its z-score among the week's clubs counts at this
 # weight against his own usage's.
@@ -181,7 +181,7 @@ def _returned(player: AnglePlayer, weeks: Sequence[UsageWeek]) -> Candidate | No
     back = [w for w in weeks if w.week > last_missed]
     before = [w for w in weeks if w.week < min(player.missed)]
     missed = [m for m in player.missed if not back or m < back[0].week]
-    if not 1 <= len(back) <= RETURN_GAMES_BACK or len(before) < RETURN_GAMES_BEFORE:
+    if not 1 <= len(back) <= RETURN_GAMES_BACK or len(before) < THIN_GAMES:
         return None
     now = share_of(back, lambda w: (w.snaps, w.team_snaps))
     then = share_of(before, lambda w: (w.snaps, w.team_snaps))
@@ -189,8 +189,9 @@ def _returned(player: AnglePlayer, weeks: Sequence[UsageWeek]) -> Candidate | No
         return None
     games = "game" if len(missed) == 1 else "games"
     text = (
-        f"Back in the lineup: since the {games} he missed, he has played {percent_text(now[0] / now[1])} of "
-        f"{club_possessive(player.team)} offensive snaps, against {percent_text(then[0] / then[1])} before"
+        f"Back in the lineup, a return from missed games: since the {games} he missed, he has played "
+        f"{percent_text(now[0] / now[1])} of {club_possessive(player.team)} offensive snaps, against "
+        f"{percent_text(then[0] / then[1])} before"
     )
     figures = (
         AngleFigure(percent(now[0] / now[1]), Measure.SNAPS),
@@ -198,7 +199,7 @@ def _returned(player: AnglePlayer, weeks: Sequence[UsageWeek]) -> Candidate | No
     )
     # Each window is a basis on his own snaps: the thinner one is the angle's.
     basis = Basis(min(len(back), len(before)), min(now[0], then[0]), SNAPS)
-    return Candidate("return", "return", None, text, figures, basis, fixed=RETURN_SCORE_FLOOR)
+    return Candidate("return", "return", None, text, figures, basis, fixed=RETURN_SCORE_FLOOR, graded=False)
 
 
 def vacated(player: AnglePlayer, teammates: Sequence[AnglePlayer], week: int) -> Candidate | None:
@@ -218,14 +219,16 @@ def vacated(player: AnglePlayer, teammates: Sequence[AnglePlayer], week: int) ->
             share = held[0] / held[1]
             heirs = [t for t in teammates if t.out_words is None and _vacated_kinds(t.position, mate.position)]
             weight = _heir_weight(player, heirs, pick)
+            # The heir's words, never an ordinariness grade (the final review's M1).
+            heir = "he is the likely heir" if weight >= 1 else "a smaller share of it is his"
             text = (
                 f"Vacated work: {mate.name} is {mate.out_words} this week, and he drew {percent_text(share)} of "
-                f"{club_possessive(player.team)} {noun} in his games this season"
+                f"{club_possessive(player.team)} {noun} in his games this season ({heir})"
             )
             found = Candidate(
                 "vacated", "vacated", None, text, (AngleFigure(percent(share), measure),),
                 Basis(len(held_weeks(weeks, pick)), held[0], unit),
-                names=(mate.name,), fixed=weight * share / VACATED_SHARE_PER_SCORE,
+                names=(mate.name,), fixed=weight * share / VACATED_SHARE_PER_SCORE, graded=False,
             )  # fmt: skip
             if best is None or (found.fixed or 0.0) > (best.fixed or 0.0):
                 best = found
@@ -335,7 +338,7 @@ def _ended(text: str, score: float, position: str, *, club: bool = False) -> str
 
 def _scored(c: Candidate, pool: Sequence[float], position: str) -> Angle | None:
     if c.fixed is not None:
-        text = _ended(c.text, c.fixed, position, club=c.key == "expected")
+        text = _ended(c.text, c.fixed, position, club=c.key == "expected") if c.graded else f"{c.text}."
         return Angle(c.key, text, c.figures, c.names, round(c.fixed, 2), c.basis, _expected_places(c))
     z = None if c.measure is None else _z(c.measure, pool)
     if z is None:
@@ -345,7 +348,9 @@ def _scored(c: Candidate, pool: Sequence[float], position: str) -> Angle | None:
         words, group = place_words(c.measure, pool, c.ends), f"among the {POSITION_WORDS[position]} we rank"
         text, places = f"{text}, {words} {group}", ((words, group),)
     if c.key == "spread":
-        text = f"{'Boom or bust' if z > 0 else 'Steady week to week'}: {text}"
+        # A direction only past ordinary (the final review's M1): an ordinary spread is "Week to week".
+        label = "Week to week" if abs(z) < ORDINARY_UNDER else ("Boom or bust" if z > 0 else "Steady week to week")
+        text = f"{label}: {text}"
     return Angle(c.key, _ended(text, abs(z), position), c.figures, c.names, round(abs(z), 2), c.basis, places)
 
 

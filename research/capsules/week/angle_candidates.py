@@ -31,9 +31,10 @@ BEFORE_GAMES: Final = 3
 # The spread needs this many games and this many points a game: under them a range is a game or two of noise.
 SPREAD_GAMES: Final = 4
 SPREAD_MIN_POINTS: Final = 5.0
-# A return is a stretch of missed games just before at most this many games back, with this many before it.
+# A return is a stretch of missed games just before at most this many games back. Each window, the games back
+# and the games before, must clear the thin floor of three games (`angles.THIN_GAMES`), so in practice a return
+# reaches the sheet only at exactly three games back (the final review's L5).
 RETURN_GAMES_BACK: Final = 3
-RETURN_GAMES_BEFORE: Final = 2
 
 PASS_CATCHERS: Final = frozenset({"RB", "WR", "TE"})
 RECEIVERS: Final = frozenset({"WR", "TE"})
@@ -109,6 +110,9 @@ class Candidate:
     ends: tuple[str, str] | None = None
     # His touchdowns over the red-zone share's weeks (the red-zone gap's input; a zero is no figure to quote).
     touchdowns: float = 0.0
+    # Whether its line ends on its unusualness: a fact whose score is no peer z (a return, vacated work) says
+    # what it is in its own words instead (the final review's M1).
+    graded: bool = True
 
 
 # The words for a level's ends, the high one first.

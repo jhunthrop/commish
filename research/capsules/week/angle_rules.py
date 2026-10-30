@@ -41,24 +41,13 @@ MEASURE_WORDS: Final = {
 # A clause's edges: a figure's measure is named inside its own clause.
 _CLAUSE_EDGE: Final = re.compile(r"[,;:.()]|\s(?:and|but|while|so|after|before|with)\s|\s-\s")
 _PERCENT_AFTER: Final = re.compile(r"^(?:%|\s+percent\b)", re.IGNORECASE)
-# A place among peers: "the 3rd-highest", "the second-highest", "the highest"; "2nd among"; "among the X we rank".
-_PLACE: Final = re.compile(
-    r"\b(?:the\s+)?((?:\d+(?:st|nd|rd|th)-|second-|third-)?(?:highest|lowest|deepest|shortest))\b", re.IGNORECASE
+# Measures the store does not hold (the final review's M3): no route counts are stored, so a figure is never
+# said as a share of his routes.
+_UNHELD: Final = re.compile(r"\broutes?\b|\broute participation\b", re.IGNORECASE)
+# His touchdowns are every touchdown in the red-zone share's games, never his red-zone touchdowns.
+_RED_ZONE_TOUCHDOWNS: Final = re.compile(
+    r"\bred[- ]zone\b|\bthere\b|\binside the (?:ten|10|twenty|20)\b", re.IGNORECASE
 )
-# "6th among the receivers we rank": a digit ordinal among his ranked peers (a word ordinal among his club's backs,
-# "first among Colts backs", is his place on the depth chart, Lane 299's to judge).
-_ORDINAL_AMONG: Final = re.compile(r"\b(\d+(?:st|nd|rd|th))\s+among\b(?=[^.]*\bwe\s+rank\b)", re.IGNORECASE)
-# "the most among the receivers we rank": the plain words for a high or low end, among his ranked peers.
-_END_AMONG: Final = re.compile(r"\bthe\s+(most|fewest|least)\b(?=[^.]*\bamong\b[^.]*\bwe\s+rank\b)", re.IGNORECASE)
-_END_SYNONYMS: Final = {
-    "most": ("highest", "deepest"),
-    "fewest": ("lowest", "shortest"),
-    "least": ("lowest", "shortest"),
-}
-_AMONG_RANKED: Final = re.compile(r"\bamong\s+(?:all\s+)?(?:the\s+)?([a-z][a-z ]*?)\s+we\s+rank\b", re.IGNORECASE)
-# What makes a superlative a place among peers, not a plain word ("his highest game" is his own figure's).
-_PEERS: Final = re.compile(r"\bamong\b|\bwe rank\b|\bof the week\b|\bin the league\b|\bon our board\b", re.IGNORECASE)
-
 Stated = Callable[[str, int], list[tuple[str, float, str, str]]]
 
 
@@ -87,30 +76,47 @@ _SAY_ITS_MEASURE: Final = (
 )
 
 
-def _figure_violation(raw: str, value: float, before: str, after: str, sheet: WeekSheet) -> str | None:
-    """Why one stated figure misnames an angle's figure, or None. Its measure is named in its clause, or, with
-    no other measure in its clause, anywhere in its sentence ("61% of the snaps lately, down from 94% before")."""
+def _matching(raw: str, value: float, after: str, sheet: WeekSheet) -> list[AngleFigure] | str | None:
+    """The angle figures a stated figure can be (a percent only a share, a count never a share); None when no
+    angle's rule applies to it (the weather's chance, a cell's figure), or why it can be none."""
     figures = _figures(sheet)
-    percent = raw.endswith("%") or bool(_PERCENT_AFTER.match(after))
-    if percent:
+    if raw.endswith("%") or _PERCENT_AFTER.match(after):
         if value == named_chance_of(sheet):
             return None
-        matching = [f for f in figures if f.percent and f.value == value]
-        if not matching:
-            return f'states "{raw}" as a share no usage fact states'
-    else:
-        if value in card_figures(sheet):
-            return None
-        matching = [f for f in figures if not f.percent and f.value == value]
-        if not matching:
-            shares = [f for f in figures if f.percent and f.value == value]
-            return None if not shares else f'states "{raw}", a usage fact\'s share, as a count'
-    named = _named(_clause(before, after))
+        shares = [f for f in figures if f.percent and f.value == value]
+        return shares or f'states "{raw}" as a share no usage fact states'
+    if value in card_figures(sheet):
+        return None
+    counts = [f for f in figures if not f.percent and f.value == value]
+    if counts:
+        return counts
+    return f'states "{raw}", a usage fact\'s share, as a count' if any(f.value == value for f in figures) else None
+
+
+def _said_as(raw: str, matching: Sequence[AngleFigure], before: str, after: str) -> str | None:
+    """Why a figure that can only be `matching` is said as something else, or None."""
+    clause = _clause(before, after)
+    if _UNHELD.search(clause):
+        return f'says "{raw}" of his routes, which the facts do not hold'
+    touchdowns = any(f.measure == Measure.TOUCHDOWNS for f in matching)
+    if touchdowns and _RED_ZONE_TOUCHDOWNS.search(after.split(".", maxsplit=1)[0][:40]):
+        return f'says "{raw}" as red-zone touchdowns, where the fact counts every touchdown in those games'
+    named = _named(clause)
     measures = {f.measure for f in matching}
     if named & measures or (not named - measures and _named(before + after) & measures):
         return None
     said = ", ".join(sorted(named)) or "no measure"
     return f'names "{raw}" as {said}, where the usage fact that states it measures {matching[0].measure}'
+
+
+def _figure_violation(raw: str, value: float, before: str, after: str, sheet: WeekSheet) -> str | None:
+    """Why one stated figure misnames an angle's figure, or None. Its measure is named in its clause, or, with
+    no other measure in its clause, anywhere in its sentence ("61% of the snaps lately, down from 94% before");
+    never routes, which the store does not hold, and touchdowns never as red-zone touchdowns (final review M3)."""
+    matching = _matching(raw, value, after, sheet)
+    if matching is None or isinstance(matching, str):
+        return matching
+    return _said_as(raw, matching, before, after)
 
 
 def named_chance_of(sheet: WeekSheet) -> float | None:
@@ -133,7 +139,7 @@ def figure_violations(sentences: Sequence[str], sheet: WeekSheet, stated: Stated
 # allowed" (Lane 300 fix round 3).
 _OPPONENT_RANK: Final = re.compile(
     r"\b\d+(?:st|nd|rd|th)\b(?:\s+of\s+\d+|\s+against\b|\s+in\s+(?:ppr\s+)?points\s+allowed\b|"
-    r"[- ](?:fewest|most|best|worst|toughest|softest)\b)",
+    r"[- ](?:fewest|most|best|worst|toughest|softest)\b(?![^.]*\bwe\s+rank\b))",
     re.IGNORECASE,
 )
 _ORDINARY_RANK: Final = (
@@ -153,45 +159,3 @@ def ordinary_rank_violations(sentences: Sequence[str], sheet: WeekSheet) -> list
         for s in sentences
         if (m := _OPPONENT_RANK.search(s)) is not None
     ]
-
-
-def _stated_places(sheet: WeekSheet) -> tuple[set[str], set[str]]:
-    words = {w.lower().removeprefix("the ") for a in sheet.angles for w, _ in a.places}
-    groups = {g.lower() for a in sheet.angles for _, g in a.places}
-    return words, groups
-
-
-def _remedy(sheet: WeekSheet) -> str:
-    said = [f"{w} {g}" for a in sheet.angles for w, g in a.places]
-    if not said:
-        return "The facts place him among no peers: say nothing of where he ranks among them."
-    return "Say his place among his peers only as his usage facts do: " + "; ".join(f'"{p}"' for p in said) + "."
-
-
-def _group_stated(said: str, groups: set[str]) -> bool:
-    """Whether "among the <said> we rank" is an angle's group, its position said in full or by its last words
-    ("receivers" for "wide receivers")."""
-    said = said.lower().strip()
-    stated = (g.removeprefix("among the ").removesuffix(" we rank") for g in groups)
-    return any(g == said or g.endswith(f" {said}") for g in stated)
-
-
-def place_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
-    """Each place among his peers no angle on the sheet states, in its words and its group."""
-    words, groups = _stated_places(sheet)
-    out = []
-    for s in sentences:
-        bad = [
-            m.group(0) for m in _PLACE.finditer(s) if _PEERS.search(s[m.end() :]) and m.group(1).lower() not in words
-        ]
-        bad += [
-            m.group(0)
-            for m in _ORDINAL_AMONG.finditer(s)
-            if not {f"{m.group(1).lower()}-highest", f"{m.group(1).lower()}-deepest"} & words
-        ]
-        bad += [m.group(0) for m in _END_AMONG.finditer(s) if not set(_END_SYNONYMS[m.group(1).lower()]) & words]
-        bad += [m.group(0) for m in _AMONG_RANKED.finditer(s) if not _group_stated(m.group(1), groups)]
-        if bad:
-            quoted = ", ".join(f'"{b}"' for b in dict.fromkeys(bad))
-            out.append(_violation(f"places him among his peers as no usage fact does ({quoted})", s, _remedy(sheet)))
-    return out
