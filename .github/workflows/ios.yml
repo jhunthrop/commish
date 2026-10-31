@@ -290,9 +290,12 @@ jobs:
         with: { node-version: 24 }
       - name: Draw and check the screenshots
         run: node apps/ios/scripts/store-shots.ts
+      # The PNGs and each shot's scene strings, which the check reads for a platform's name (Lane 310).
       - name: The screenshots
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: app-store-graphics
-          path: docs/store/app-store-graphics/*.png
+          path: |
+            docs/store/app-store-graphics/*.png
+            docs/store/app-store-graphics/scene-strings/*.json
           if-no-files-found: error
