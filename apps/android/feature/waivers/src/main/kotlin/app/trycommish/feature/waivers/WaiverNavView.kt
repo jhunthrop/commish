@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +57,7 @@ import app.trycommish.design.Tokens
 import app.trycommish.design.Words
 import app.trycommish.feature.boxscore.HEAD_TRACKING
 import app.trycommish.feature.boxscore.wrapCenter
+import kotlinx.coroutines.flow.first
 
 /** The card's measures: at least 120 wide (Lane 304 widened it so a rank is never cut), growing rather
  * than cut; the meter's height; the chosen card's pointer down to the comparison. */
@@ -96,10 +98,7 @@ class NavActions(
 internal fun WaiverNavView(nav: NavActions) {
     if (nav.cards.isEmpty()) return
     val c = CommishTheme.colors
-    Column(
-        Modifier.semantics { contentDescription = Words.WaiverPanel.label },
-        verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp),
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
         NavHead(nav)
         NavRow(nav)
         Text(nav.mode.explain, style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp), color = c.ink3)
@@ -126,7 +125,12 @@ private fun NavRow(nav: NavActions) {
     }
     val scroll = rememberScrollState()
     val lefts = remember(nav.cards.size) { IntArray(nav.cards.size) }
-    LaunchedEffect(nav.chosen, scroll.maxValue) { bringIntoView(scroll, lefts, chosenIndex) }
+    LaunchedEffect(nav.chosen) {
+        // Once the row is laid out (its scroll has a range), never again on a refresh or a toggle: a hand
+        // scroll stands until another card is chosen (review 308 L4).
+        snapshotFlow { scroll.maxValue }.first { it > 0 }
+        bringIntoView(scroll, lefts, chosenIndex)
+    }
     CardRow(nav, nav.cards, Modifier.horizontalScroll(scroll)) { index, left -> lefts[index] = left }
 }
 
@@ -176,10 +180,9 @@ private fun NavHead(nav: NavActions) {
         )
         Spacer(Modifier.weight(1f))
         if (nav.hasWeek) {
-            Row(
-                Modifier.semantics { contentDescription = Words.WaiverNav.figuresFor },
-                horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp),
-            ) { PanelMode.entries.forEach { mode -> ModeChip(mode, nav.mode == mode) { nav.chooseMode(mode) } } }
+            Row(horizontalArrangement = Arrangement.spacedBy(Tokens.Space.s2.dp)) {
+                PanelMode.entries.forEach { mode -> ModeChip(mode, nav.mode == mode) { nav.chooseMode(mode) } }
+            }
         } else {
             Text(Words.WaiverPanel.season, style = Faces.label.copy(fontWeight = FontWeight.Normal, letterSpacing = 0.sp), color = c.ink3)
         }
@@ -198,7 +201,11 @@ private fun ModeChip(
         Modifier
             .heightIn(min = NavMeasure.target)
             .clickable(role = Role.Button, onClick = choose)
-            .semantics { selected = lit },
+            .semantics {
+                // The chip names its group, as the web's ChipGroup label does: "Figures for This week".
+                contentDescription = "${Words.WaiverNav.figuresFor} ${mode.word}"
+                selected = lit
+            },
         contentAlignment = Alignment.Center,
     ) {
         Text(

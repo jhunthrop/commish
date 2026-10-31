@@ -41,6 +41,9 @@ public final class WaiverViewModel {
     /// The answer the last top-up was for (WaiverScreen.svelte toppedFor): an unchanged answer reads the
     /// chosen position no second time; nil once a top-up failed, so the next answer tries again.
     var toppedFor: String?
+    /// The opening card: whether a fresh answer has set it yet, and whether the member has chosen a card since.
+    var openedFresh = false
+    var userChose = false
     /// The chosen position's own read and its instant, which its rows draw at (WaiverScreen's narrowedAt).
     var narrowed: (advice: WaiverAdvice, at: Date)?
     /// Which position read is the latest: an earlier one's answer is overtaken (state.ts Narrowing).
@@ -346,13 +349,14 @@ public final class WaiverViewModel {
         ]]
     }
 
-    /// An answer on screen; the first one sets the card the screen opens on (the weakest Need, else All).
+    /// An answer on screen; the first one, and the first fresh one after a saved one, set the card the screen
+    /// opens on (the weakest Need, else All) until the member chooses a card.
     private func show(_ advice: WaiverAdvice, stamp: Date, stale: Bool) {
-        let first = answer == nil
+        let opens = answer == nil || (!stale && !openedFresh)
         answer = (advice, clock.now)
-        if first {
-            let opening = WaiverNav.opening(advice)
-            position = opening == WaiverNav.all ? nil : WaiverPosition(rawValue: opening)
+        openedFresh = openedFresh || !stale
+        if opens, !userChose {
+            open(on: advice)
         }
         redraw(stamp: stamp, stale: stale)
     }

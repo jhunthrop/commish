@@ -78,6 +78,11 @@ class WaiverViewModel(
      * chosen position no second time; null once a top-up failed, so the next answer tries again. */
     private var toppedFor: String? = null
 
+    /** The opening card: whether a fresh answer has set it yet, and whether the member has chosen a card
+     * since (review 308 M1). */
+    private var openedFresh = false
+    private var userChose = false
+
     /** The claim as last planned: the one the token makes, whatever is typed meanwhile. */
     private var planned: HostMoveInput? = null
     private var claiming: WaiverRow? = null
@@ -243,7 +248,10 @@ class WaiverViewModel(
     fun chooseNav(
         key: String,
         leagueId: String,
-    ): Job? = choosePosition(WaiverPosition.entries.firstOrNull { it.query == key }, leagueId)
+    ): Job? {
+        userChose = true
+        return choosePosition(WaiverPosition.entries.firstOrNull { it.query == key }, leagueId)
+    }
 
     /** The chosen position read again without dimming its rows or closing an open Add (WaiverScreen.svelte
      * topUp): once a page's answer lands, after a claim too. An unchanged answer reads it no second time. A
@@ -411,12 +419,16 @@ class WaiverViewModel(
         stamp: Instant,
         stale: Boolean,
     ) {
-        val first = answer == null
+        // The first answer, and the first fresh one after a saved one, set the card the screen opens on (the
+        // weakest Need, else All) until the member chooses a card.
+        val opens = answer == null || (!stale && !openedFresh)
         answer = Read(advice, clock.now())
-        if (first) {
-            // The first answer sets the card the screen opens on: the weakest Need, else All.
+        openedFresh = openedFresh || !stale
+        if (opens && !userChose) {
             val opening = WaiverNav.opening(advice)
-            mutableUi.update { ui -> ui.copy(position = WaiverPosition.entries.firstOrNull { it.query == opening }) }
+            val next = WaiverPosition.entries.firstOrNull { it.query == opening }
+            if (next != ui.value.position) narrowed = null
+            mutableUi.update { ui -> ui.copy(position = next) }
         }
         draw(stamp, stale)
     }

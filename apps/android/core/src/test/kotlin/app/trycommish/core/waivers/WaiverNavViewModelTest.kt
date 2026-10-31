@@ -2,6 +2,8 @@ package app.trycommish.core.waivers
 
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.WaiverAdvice
+import app.trycommish.api.models.WaiverStanding
+import app.trycommish.core.Cached
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
 import app.trycommish.core.SessionEnd
@@ -201,4 +203,91 @@ class WaiverNavViewModelTest {
                     .toSet(),
             )
         }
+
+    /** The page with RB the weakest Need in place of TE (a saved answer from before the league moved). */
+    private fun runningBacksNeed(page: WaiverAdvice): WaiverAdvice =
+        page.copy(
+            positions =
+                page.positions.orEmpty().map { card ->
+                    val key = card.position.value
+                    card.copy(
+                        need = key == "RB" || key == "QB",
+                        restOfSeason = if (key == "RB") WaiverStanding(11, 400.0, 500.0) else card.restOfSeason,
+                    )
+                },
+        )
+
+    private fun warm(
+        saved: WaiverAdvice,
+        reads: WaiverReads,
+    ): WaiverViewModel {
+        val cache = MemoryCache()
+        cache.write(WaiverKeys.waivers(league), Cached(envelopeOf(saved), StartFixtures.instant(WaiverFixtures.WEEK)))
+        return WaiverViewModel(
+            reads,
+            cache,
+            FixedClock(StartFixtures.instant(WaiverFixtures.WEEK)),
+            Fixtures.zone,
+            LeagueHost.espn,
+            copy = { true },
+            openPage = {},
+            sessionEnd =
+                object : SessionEnd {
+                    override fun signedOut() = Unit
+                },
+        )
+    }
+
+    @Test
+    fun `a warm start opens on the fresh answer's Need, not the saved one's`() =
+        runTest(main) {
+            val page = page()
+            val saved = runningBacksNeed(page)
+            assertEquals("RB", WaiverNav.opening(saved))
+            val vm = warm(saved, WaiverStub(page, positions = mapOf(WaiverPosition.TE to tightEnds(page))))
+            open(vm)
+            assertEquals("TE", vm.ui.value.navKey)
+            assertTrue(
+                vm.ui.value.table.rows
+                    .all { it.source.add.player.position == "TE" },
+            )
+        }
+
+    @Test
+    fun `a card the member chose stands when the fresh answer lands`() =
+        runTest(main) {
+            val page = page()
+            val stub = WaiverStub(page).apply { failsPage = true }
+            val vm = warm(runningBacksNeed(page), stub)
+            open(vm)
+            assertEquals("RB", vm.ui.value.navKey, "the saved answer opens on its own Need")
+            vm.chooseNav("QB", league)
+            advanceUntilIdle()
+            stub.failsPage = false
+            open(vm)
+            assertEquals("QB", vm.ui.value.navKey, "the fresh answer never moves a card the member chose")
+        }
+
+    @Test
+    fun `the opening is the weakest Need, the first on a tie`() {
+        val page = page()
+
+        fun withRanks(
+            quarterbacks: Int,
+            tightEnds: Int,
+        ) = page.copy(
+            positions =
+                page.positions.orEmpty().map { card ->
+                    when (card.position.value) {
+                        "QB" -> card.copy(need = true, restOfSeason = WaiverStanding(quarterbacks, 248.0, 264.0))
+                        "TE" -> card.copy(need = true, restOfSeason = WaiverStanding(tightEnds, 141.0, 155.0))
+                        else -> card
+                    }
+                },
+        )
+        // A second Need with a weaker rank wins over the first.
+        assertEquals("TE", WaiverNav.opening(withRanks(8, 9)))
+        // On a tie, the first card in the panel's order wins.
+        assertEquals("QB", WaiverNav.opening(withRanks(8, 8)))
+    }
 }

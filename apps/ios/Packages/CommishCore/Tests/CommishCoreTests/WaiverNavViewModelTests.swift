@@ -119,4 +119,71 @@ struct WaiverNavViewModelTests {
         #expect(!here.isEmpty)
         #expect(Set(viewModel.table.rows.map(\.key)) == here)
     }
+
+    /// The page with RB the weakest Need in place of TE (a saved answer from before the league moved).
+    static func runningBacksNeed(_ page: WaiverAdvice) throws -> WaiverAdvice {
+        var saved = page
+        saved.positions = try #require(page.positions).map { card in
+            var card = card
+            let key = WaiverNav.position(card)
+            card.need = key == "RB" || key == "QB"
+            if key == "RB" {
+                card.restOfSeason = .init(value1: .init(rank: 11, points: 400, median: 500))
+            }
+            return card
+        }
+        return saved
+    }
+
+    private func warm(_ saved: WaiverAdvice, api: any WaiversAPI) async -> WaiverViewModel {
+        let cache = FileCache(folder: folder)
+        await cache.write(saved, route: WaiverViewModel.route(Self.league), stamp: WaiverViewModelTests.saturday)
+        return WaiverViewModel(
+            api: api, cache: cache, clock: FixedClock(WaiverViewModelTests.saturday),
+            host: WaiverViewModelTests.espn, zone: Fixtures.zone, copy: { _ in }
+        )
+    }
+
+    @Test func aWarmStartOpensOnTheFreshAnswersNeedNotTheSavedOnes() async throws {
+        let page = try Self.page()
+        let saved = try Self.runningBacksNeed(page)
+        #expect(WaiverNav.opening(saved) == "RB")
+        let viewModel = await warm(saved, api: WaiverStub(advice: page, positions: [.te: Self.tightEnds(page)]))
+        await viewModel.load(leagueID: Self.league)
+        #expect(viewModel.navKey == "TE")
+        #expect(viewModel.table.rows.allSatisfy { $0.source.add.player.position == "TE" })
+    }
+
+    @Test func aCardTheMemberChoseStandsWhenTheFreshAnswerLands() async throws {
+        let page = try Self.page()
+        let stub = WaiverStub(advice: page)
+        await stub.failPage()
+        let viewModel = try await warm(Self.runningBacksNeed(page), api: stub)
+        await viewModel.load(leagueID: Self.league)
+        #expect(viewModel.navKey == "RB", "the saved answer opens on its own Need")
+        await viewModel.choose(nav: "QB", leagueID: Self.league)
+        await stub.failPage(false)
+        await viewModel.load(leagueID: Self.league)
+        #expect(viewModel.navKey == "QB", "the fresh answer never moves a card the member chose")
+    }
+
+    @Test func theOpeningIsTheWeakestNeedAndTheFirstOnATie() throws {
+        let page = try Self.page()
+        var cards = try #require(page.positions)
+        let index = { (key: String) in cards.firstIndex { WaiverNav.position($0) == key } }
+        let quarterbacks = try #require(index("QB"))
+        let tightEnd = try #require(index("TE"))
+        // A second Need with a weaker rank wins over the first.
+        cards[quarterbacks].need = true
+        cards[quarterbacks].restOfSeason = .init(value1: .init(rank: 8, points: 248, median: 264))
+        cards[tightEnd].need = true
+        cards[tightEnd].restOfSeason = .init(value1: .init(rank: 9, points: 141, median: 155))
+        var advice = page
+        advice.positions = cards
+        #expect(WaiverNav.opening(advice) == "TE")
+        // On a tie, the first card in the panel's order wins.
+        cards[tightEnd].restOfSeason = .init(value1: .init(rank: 8, points: 141, median: 155))
+        advice.positions = cards
+        #expect(WaiverNav.opening(advice) == "QB")
+    }
 }

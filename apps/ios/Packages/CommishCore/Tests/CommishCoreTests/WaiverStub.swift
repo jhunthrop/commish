@@ -15,6 +15,7 @@ actor WaiverStub: WaiversAPI {
     /// A position's own read, by position: the page's rows at that position where none is given.
     private var positions: [WaiverPosition: WaiverAdvice]
     private var failsPosition = false
+    private var failsPage = false
     private(set) var asked: [WaiverPosition?] = []
     private let plan: HostMovePlan?
     private let result: HostMoveResult?
@@ -37,6 +38,11 @@ actor WaiverStub: WaiversAPI {
         failsMake = true
     }
 
+    /// The page's read fails (no signal) while set; a position's read is unchanged.
+    func failPage(_ fails: Bool = true) {
+        failsPage = fails
+    }
+
     func failPosition(_ fails: Bool = true) {
         failsPosition = fails
     }
@@ -54,6 +60,9 @@ actor WaiverStub: WaiversAPI {
         asked.append(position)
         guard let position else {
             reads += 1
+            if failsPage {
+                throw URLError(.notConnectedToInternet)
+            }
             return advice
         }
         if failsPosition {

@@ -28,6 +28,8 @@ The script runs `./gradlew :storeshots:testDebugUnitTest -PstoreGraphics=<this f
 | `phone-7-mock-room.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 7 | "Our call at every pick": a mock draft against bots at pick 5.05, our call above the pool, full screen as the app draws the room |
 | `phone-8-player-page.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 8 | "Every number with its basis": a player's page, his week's game and figures, the projection and where drafters take him |
 
+Last drawn: `phone-2-waivers.png` on 2026-10-31 in Lane 308 (the position cards); every other file on 2026-10-27 in Lane 255. A full redraw today also moves phone-1 and phone-3 by a few bytes, so redraw one file at a time and keep the rest.
+
 Upload the eight phone shots in this order: the captions are drawn into each image, so the order is the listing's §1.2.
 
 ## What the shots hold

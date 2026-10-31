@@ -591,6 +591,9 @@ internal class WaiverStub(
     private val result: HostMoveResult? = null,
 ) : WaiverReads {
     var failsPosition = false
+
+    /** The page's read fails (no signal) while set; a position's read is unchanged. */
+    var failsPage = false
     var failsMake = false
     var makeError: Exception? = null
     var reads = 0
@@ -605,6 +608,7 @@ internal class WaiverStub(
         asked += position
         if (position == null) {
             reads++
+            if (failsPage) throw IOException("no signal")
             return envelopeOf(advice)
         }
         if (failsPosition) throw IOException("no signal")

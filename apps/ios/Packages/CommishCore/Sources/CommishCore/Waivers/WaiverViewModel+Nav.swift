@@ -60,7 +60,19 @@ public extension WaiverViewModel {
 
     /// A card chosen: All, or a position read of its own.
     func choose(nav key: String, leagueID: String) async {
+        userChose = true
         await choose(position: key == WaiverNav.all ? nil : WaiverPosition(rawValue: key), leagueID: leagueID)
+    }
+
+    /// The card the screen opens on: the answer's weakest Need, else All. A saved answer's opening gives way
+    /// to the fresh one's (review 308 M1).
+    func open(on advice: WaiverAdvice) {
+        let opening = WaiverNav.opening(advice)
+        let next = opening == WaiverNav.all ? nil : WaiverPosition(rawValue: opening)
+        if next != position {
+            narrowed = nil
+        }
+        position = next
     }
 
     /// The toggle: the cards' figures and the list's order together (ruling 4).
