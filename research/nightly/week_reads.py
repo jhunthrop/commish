@@ -746,7 +746,10 @@ def run_week_read_step(  # noqa: PLR0913 - the pass's parts
             judge = judge_model(os.environ)
             checked = _checked_retry(http, key, settings, log)
             spend.retry_model = checked.model
-            prices = [checked_price(http, key, replace(settings, model=m)) for m in (settings.model, judge)]
+            prices = [
+                checked_price(http, key, settings, CAPSULE_CONFIG.gateway.week_model_variable),
+                checked_price(http, key, replace(settings, model=judge)),
+            ]
             price = dearest_price([*prices, *checked.prices])
             worst = worst_read_usd(price)
             budgets.append(step_budget(price, usd))

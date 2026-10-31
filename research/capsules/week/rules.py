@@ -28,8 +28,9 @@ Each violation names its sentence in the writer's form (`the sentence "..."`), s
 back word for word (`rule_notes`).
 
 Lane 307 retired the rules that refused a true sentence for its wording (the sentence count, the opener, a
-figure's unit, the cap on figures, a rank said twice, the member addressed, a figure spelled out, the ordinary
-matchup's rank, the tip words) with the checklist prompt that asked for them.
+figure's unit, the cap on figures, a rank said twice, the member addressed, the ordinary matchup's rank, the tip
+words) with the checklist prompt that asked for them. A cell figure spelled out stays refused (the phase 1
+review's M1): the figure rules read digits.
 """
 
 import re
@@ -510,6 +511,52 @@ def _superlative_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[
     return out
 
 
+# A figure spelled out (B282, kept by Lane 307's review M1: the cell, misnamed, week-tie and measure rules read
+# digits, so a spelled figure would pass them all): a number word with a figure's unit after it, whose value a
+# cell or a usage fact prints
+# ("Fourteen PPR points" where his Avg is 14). A count no cell prints ("his last three games") stays words,
+# as the cell rule asks of its digits (the Lane 286 review's H1), so one of the two forms always stands. Zero
+# is never a figure ("he scores zero points" on a bye).
+_ONES: Final = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
+_TEENS: Final = ("ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen")
+_TENS: Final = ("twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
+_WORD_VALUES: Final = {
+    **{word: n for n, word in enumerate(_ONES, 1)},
+    **{word: n for n, word in enumerate((*_TEENS, "nineteen"), 10)},
+    **{word: 10 * n for n, word in enumerate(_TENS, 2)},
+}
+_SPELLED_FIGURE: Final = re.compile(
+    rf"\b((?:{'|'.join(_TENS)})(?:-(?:{'|'.join(_ONES)}))?|{'|'.join((*_TEENS, 'nineteen', *_ONES))})[\s-]+"
+    r"(?:(?:half-)?ppr\s+)?(?:fantasy\s+)?"
+    r"(?:points?|pts|a game|per game|games?|degrees|mph|percent|touchdowns?|tds?|targets?|carries|"
+    r"receptions?|catches|yards?|snaps?)\b",
+    re.IGNORECASE,
+)
+
+
+def spelled_value(word: str) -> int:
+    """A number word's value: "fourteen" 14, "twenty-five" 25."""
+    return sum(_WORD_VALUES[part] for part in word.lower().split("-"))
+
+
+def _spelled_figure_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
+    """Every figure a cell prints is digits, as the cell prints it (B282): never "Fourteen PPR points" for his
+    Avg's 14."""
+    cells = cell_figures(sheet)
+    out = []
+    for s in sentences:
+        found = next((m for m in _SPELLED_FIGURE.finditer(s) if float(spelled_value(m.group(1))) in cells), None)
+        if found is not None:
+            out.append(
+                _sentence_violation(
+                    f'spells out a figure ("{found.group(0)}")',
+                    s,
+                    'Write every figure a cell prints in digits, as the cell prints it: "14 PPR points", "5 games".',
+                )
+            )
+    return out
+
+
 def _season_violation(text: str, season: int) -> list[str]:
     count = len(re.findall(rf"\b{season}\b", text))
     if count <= 1:
@@ -548,9 +595,10 @@ def _punctuation_violations(sentences: Sequence[str]) -> list[str]:
 def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none") -> list[str]:
     """Every week rule `text` breaks for `sheet`, given the writer's `call` for it; empty is clean. Lane 307
     retired the rules that refused a true sentence for its wording (the sentence count, the opener, a figure's
-    unit, the cap on figures, a rank said twice, the member addressed, a figure spelled out, the ordinary
-    matchup's rank, the tip words): every rule left binds a figure, a place, a depth place, a week, a forecast,
-    a status or the call to its fact, or keeps a word off the page."""
+    unit, the cap on figures, a rank said twice, the member addressed, the ordinary matchup's rank, the tip
+    words). Every rule left binds a figure, a place, a depth place, a week, a forecast, a status or the call to
+    its fact, or keeps a word off the page; a figure spelled out stays refused so those rules read it in digits
+    (the phase 1 review's M1)."""
     sentences = split_sentences(text.strip())
     names = sheet_names(sheet)
     return [
@@ -569,6 +617,7 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_wait_violation(text, sheet, call),
         *_code_violations(sentences, names),
         *_superlative_violations(sentences, sheet),
+        *_spelled_figure_violations(sentences, sheet),
         *place_violations(sentences, sheet),
         *week_figure_violations(sentences, sheet),
         *weather_violations(sentences, sheet),

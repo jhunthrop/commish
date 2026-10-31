@@ -16,6 +16,7 @@ Every answer's read has its season said once (`season_words.said_once`, Lane 303
 and that is the read stored and the draft a correction hands back.
 """
 
+import re
 from collections.abc import Sequence, Set
 from dataclasses import dataclass
 from typing import Final
@@ -27,7 +28,7 @@ from research.capsules.generate import BUDGET_SPENT, THROTTLED, ask, gateway_fai
 from research.capsules.page_figures import fallback_violation
 from research.capsules.rule_notes import notes_of
 from research.capsules.store import WRITTEN_SOURCE
-from research.capsules.validate import ValidationResult
+from research.capsules.validate import ValidationResult, word_count
 from research.capsules.week.judge import (
     JUDGE_MAX_TOKENS,
     JUDGE_MIN_WORDS,
@@ -69,6 +70,8 @@ MAX_ASKS_PER_READ: Final = MAX_CALLS_PER_READ + OVERRUN_RETRIES + OVERRUN_JUDGE_
 RETRY_WRITER_DRAFTS: Final = 1
 RETRY_WRITER_JUDGE_ASKS: Final = 1
 MAX_ASKS_WITH_RETRY: Final = MAX_ASKS_PER_READ + RETRY_WRITER_DRAFTS + RETRY_WRITER_JUDGE_ASKS
+# Since Lane 307 every draft also carries its check call (never an ask), so a read's HTTP ceiling is about twice
+# its drafts: size a cap on calls, not asks.
 # The retry writer's one draft that stopped mid-sentence: never checked, the read falls to its facts block.
 UNFINISHED: Final = "The read stops mid-sentence."
 # The placeholder a draft carries when it passed and no ask was left for the judge: never a rule it broke.
@@ -81,7 +84,7 @@ MAX_TOKENS: Final = 600
 # stops mid-sentence (cut at its token limit, the gateway's refusal, or no closing punctuation) is never checked
 # or patched: it is asked again, an ask spent.
 CHECK_MAX_TOKENS: Final = 600
-_CLOSING: Final = (".", "!", "?", '"', "\u201d", "'", "\u2019")
+_CLOSING: Final = (".", "!", "?", '"', "\u201d")
 # THE WRITER VERSION (Lane 306, the founder 2026-10-30: "why can we not update all player reads at the same
 # time?"). Every stored read records the version that wrote it (`player_week_reads.writer_version`, revision
 # 0026; a row from before it reads as 0), and the next nightly rewrites every written read of the board week
@@ -201,12 +204,36 @@ def _checked_text(content: str) -> str:
     return text
 
 
+# What a check answer says about the read instead of being one (the phase 1 review's M2): "Every claim holds.",
+# "All claims check out.", "No changes needed.", "Returned unchanged."
+_META: Final = re.compile(
+    r"\b(?:every|all|each) (?:claims?|numbers?|figures?|facts?)\b|\bclaims? (?:holds?|checks? out|fails?)\b|"
+    r"\bchecks? out\b|\bno (?:changes?|fixes?|edits?|corrections?)(?: (?:are |were )?(?:needed|required|made))?\b|"
+    r"\bunchanged\b|\bfact lines?\b|\bthe read (?:holds|is (?:accurate|correct))\b",
+    re.IGNORECASE,
+)
+
+
+def is_a_read(checked: str, draft: str, name: str) -> bool:
+    """Whether a check answer can stand as the read (the phase 1 review's M2): finished, one paragraph, inside the
+    word band, no word about the check itself, and naming him whenever the draft did (his surname)."""
+    surname = name.rsplit(maxsplit=1)[-1] if name.split() else name
+    low, high = WEEK_BAND
+    return (
+        finished(checked)
+        and "\n" not in checked.strip()
+        and low <= word_count(checked) <= high
+        and _META.search(checked) is None
+        and (surname not in draft or surname in checked)
+    )
+
+
 def _check(sheet: WeekSheet, draft: str, gateway: GatewayClient) -> tuple[str, Usage | None]:
-    """The check pass on one finished draft (`CHECK_MAX_TOKENS`): the checked read, or the draft itself when the
-    check's answer is empty or stops mid-sentence. A gateway refusal raises, for the caller to judge."""
+    """The check pass on one finished draft (`CHECK_MAX_TOKENS`): the checked read when it can stand as one
+    (`is_a_read`), else the draft itself, for the validator to judge. A gateway refusal raises, for the caller."""
     answer = ask(gateway, check_messages(sheet, draft), CHECK_MAX_TOKENS)
     checked = _checked_text(answer.content)
-    return (checked if checked and finished(checked) else draft), answer.usage
+    return (checked if is_a_read(checked, draft, sheet.name) else draft), answer.usage
 
 
 def _checked_or_draft(

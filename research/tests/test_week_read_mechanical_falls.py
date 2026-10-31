@@ -51,26 +51,18 @@ def _season_hits(text: str) -> list[str]:
 
 
 @pytest.mark.parametrize(
-    ("written", "said"),
+    "written",
     [
-        (
-            "The injury list as of Thursday 11:00 pm Central carries no designation for him, before week 8's game "
-            "status report on Friday.",
-            "The injury list as of Thursday 11:00 pm Central carries no designation for him, before week 8 of 2026's "
-            "game status report on Friday.",
-        ),
-        ("Keep Nailor on the bench for week 8.", "Keep Nailor on the bench for week 8 of 2026."),
-        (
-            "He put up 0 PPR points in week 7 and averages 1.9 PPR points a game this season.",
-            "He put up 0 PPR points in week 7 of 2026 and averages 1.9 PPR points a game this season.",
-        ),
+        "Keep Nailor on the bench for week 8.",
+        "He put up 0 PPR points in week 7 and averages 1.9 PPR points a game this season.",
+        "He had 12 PPR points last week.",
     ],
 )
-def test_the_first_week_takes_the_season(written: str, said: str) -> None:
-    """Ashton Jeanty's, Jalen Nailor's and Mo Alie-Cox's falls: the rule refuses the bare week, the pass mends it."""
-    assert _season_hits(written) == ["time frame (a week without its season)"]
-    assert said_once(written, SEASON) == said
-    assert _season_hits(said_once(written, SEASON)) == []
+def test_a_bare_week_stands_with_no_season(written: str) -> None:
+    """Lane 307 retired the season on every week: the pass never adds one, and the validator reads a bare week as
+    this season's, so "week 8" and "last week" are a read's own words."""
+    assert said_once(written, SEASON) == written
+    assert _season_hits(with_season(written, SEASON)) == []
 
 
 def test_a_repeated_season_after_the_first_is_dropped() -> None:
@@ -81,9 +73,9 @@ def test_a_repeated_season_after_the_first_is_dropped() -> None:
     assert _season_hits(said) == []
 
 
-def test_a_week_before_the_first_season_takes_it_and_the_later_one_is_dropped() -> None:
+def test_a_week_before_the_first_season_stands_and_the_later_one_keeps_its_season() -> None:
     written = "It produced nothing in week 7. He has 3.6 PPR points in week 6 of 2026."
-    assert said_once(written, SEASON) == "It produced nothing in week 7 of 2026. He has 3.6 PPR points in week 6."
+    assert said_once(written, SEASON) == written
 
 
 def test_a_prior_season_named_on_purpose_is_never_touched() -> None:
@@ -104,17 +96,15 @@ def test_a_prior_season_named_on_purpose_is_never_touched() -> None:
     assert said_once(ended, SEASON) == "His best game of 2026 is 13.8 PPR points, and he had 3.6 PPR points in week 7."
 
 
-def test_the_written_read_is_the_one_said_once() -> None:
-    """The pass runs before the validator: a read the rule would have refused for its bare week passes."""
+def test_the_written_read_with_a_bare_week_passes() -> None:
+    """Lane 307: a read that names no season passes, the bare week read as this season's."""
     sheet = _week_eight()
     read = (
         "Puka Nacua has 25.9 PPR points a game, the best of his career. He has no designation before week 8's game "
         "status report on Friday. Start him at home against Minnesota, where the dome keeps the weather out of it."
     )
-    raw = validate_week_read(read, sheet, call="start").violations
-    mended = validate_week_read(said_once(read, SEASON), sheet, call="start").violations
-    assert any("a week without its season" in v for v in raw)
-    assert not any("a week without its season" in v or "names the season" in v for v in mended), mended
+    violations = validate_week_read(said_once(read, SEASON), sheet, call="start").violations
+    assert not any("a week without its season" in v or "names the season" in v for v in violations), violations
 
 
 # --- the name check (B306) -------------------------------------------------------------------------------------
@@ -156,7 +146,9 @@ def test_the_sheet_states_the_report_day_and_whether_it_is_out() -> None:
     assert (report_day(before), report_out(before)) == ("Friday", False)
     line = report_day_line(before)
     assert line is not None and "comes out Friday by 3:00 pm Central" in line and "before Friday's report" in line
-    assert line in render_week_sheet(before)
+    # Lane 307: the sheet prints the line for a designation alone; no designation is one short line.
+    assert line in render_week_sheet(replace(before, status=Status("questionable", THURSDAY_LIST)))
+    assert line not in render_week_sheet(before) and "No injury designation." in render_week_sheet(before)
     # A Monday game's report is Saturday's; once his status is read after it, the line says it came out.
     after = _week_eight(MONDAY, datetime(2026, 11, 1, 2, 0, tzinfo=UTC))
     assert (report_day(after), report_out(after)) == ("Saturday", True)
@@ -230,7 +222,8 @@ def test_the_injury_list_by_the_day_his_status_was_read_passes() -> None:
     """Ruling 3a: "Tuesday's injury list" is the sheet's "the injury list as of Tuesday"; any other day is not."""
     tuesday = datetime(2026, 10, 27, 23, 0, tzinfo=UTC)  # Tuesday 6:00 pm Central
     sheet = _week_eight(seen=tuesday)
-    assert "the injury list as of Tuesday 6:00 pm Central" in render_week_sheet(sheet)
+    listed = replace(sheet, status=Status("questionable", tuesday))
+    assert "the injury list as of Tuesday 6:00 pm Central" in render_week_sheet(listed)
     # Jared Goff's and Bhayshul Tuten's falls in run p.
     for said in (
         "Jared Goff carries no designation on Tuesday's injury list, before Friday's report.",
@@ -347,24 +340,18 @@ def test_a_season_said_in_another_form_is_never_cut(written: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("written", "said"),
+    "written",
     [
-        (
-            "He has 12 PPR points over weeks 5 to 7. Sit him in week 8 of 2026.",
-            "He has 12 PPR points over weeks 5 to 7 of 2026. Sit him in week 8.",
-        ),
-        ("He sat out weeks 3-5. Sit him in week 8.", "He sat out weeks 3-5 of 2026. Sit him in week 8."),
-        (
-            "He sat out weeks 3 through 5. Sit him in week 8.",
-            "He sat out weeks 3 through 5 of 2026. Sit him in week 8.",
-        ),
+        "He has 12 PPR points over weeks 5 to 7. Sit him in week 8.",
+        "He sat out weeks 3-5. Sit him in week 8.",
+        "He sat out weeks 3 through 5. Sit him in week 8.",
     ],
 )
-def test_a_range_takes_the_season_after_its_last_week(written: str, said: str) -> None:
-    """The review's H3: a range at a sentence's end, with a hyphen or "through", is one span here and in the
-    validator's `with_season`."""
-    assert said_once(written, SEASON) == said
-    assert _season_hits(said) == []
+def test_a_range_is_read_as_this_seasons_as_one_span(written: str) -> None:
+    """The review's H3: a range at a sentence's end, with a hyphen or "through", is one span in the validator's
+    `with_season` (Lane 307: read as this season's, never written so)."""
+    assert said_once(written, SEASON) == written
+    assert _season_hits(with_season(written, SEASON)) == []
 
 
 @pytest.mark.parametrize(

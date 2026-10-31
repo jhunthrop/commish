@@ -19,7 +19,6 @@ _RETIRED: Final = (
     "states the rank",
     "addresses the member's sheet",
     "opens on a set-up clause",
-    "spells out a figure",
     "opens without",
 )
 
@@ -32,12 +31,25 @@ _RETIRED: Final = (
         "The 49ers don't play in week 6, so he puts zero points on your sheet this week.",
         "Keep him on your roster and fill the spot this week.",
         "He is a fine play in your flex this week.",
-        "Fourteen PPR points a game over 5 games is a quiet season for Jefferson.",
     ],
 )
 def test_a_retired_wording_rule_refuses_nothing(sample: str) -> None:
     violations = week_rule_violations(f"{_OPEN} {sample} Start him.", _JEFFERSON, "start")
     assert not [v for v in violations if any(rule in v for rule in _RETIRED)], violations
+
+
+@pytest.mark.parametrize(
+    ("spelled", "digits"),
+    [
+        ("Fourteen PPR points a game over 5 games is a quiet season for Jefferson.", "14 PPR points a game over 5"),
+        ("He put up five PPR points in week 7.", "He put up 5 PPR points in week 7."),
+    ],
+)
+def test_a_cell_figure_spelled_out_is_still_refused(spelled: str, digits: str) -> None:
+    """The phase 1 review's M1: the figure, week-tie and measure rules read digits, so a figure a cell prints is
+    refused spelled out and read in digits (his Avg 14 and his 5 games here)."""
+    violations = week_rule_violations(f"{_OPEN} {spelled} Start him.", _JEFFERSON, "start")
+    assert [v for v in violations if "spells out a figure" in v], violations
 
 
 def test_an_opening_set_up_on_a_colon_is_taken() -> None:

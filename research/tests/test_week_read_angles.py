@@ -90,11 +90,9 @@ def test_a_receiver_far_above_his_peers_leads_on_his_target_share() -> None:
     got = board_angles([*_board(), star], {}, 8)[star.player_id]
     assert got and got[0].key in {"target_share", "air_yards_share", "snap_share"}
     lead = next(a for a in got if a.key == "target_share")
-    assert (
-        "39% of the Rams' targets in his games this season, the highest among the wide receivers we rank" in lead.text
-    )
+    assert "39% of the Rams' targets in his games this season, the highest among wide receivers" in lead.text
     assert AngleFigure(39.0, Measure.TARGETS) in lead.figures  # 14 of 36 targets
-    assert lead.places == (("the highest", "among the wide receivers we rank"),)
+    assert lead.places == (("the highest", "among wide receivers"),)
 
 
 def test_a_thin_basis_is_never_carried() -> None:
@@ -199,12 +197,12 @@ def test_the_depth_chart_bites_on_a_split_or_a_fresh_move() -> None:
 
 _TARGETS = Angle(
     "target_share",
-    "Targets: 32% of the Rams' targets in his games this season, the 3rd-highest among the wide receivers we rank.",
+    "Targets: 32% of the Rams' targets in his games this season, the 3rd-highest among wide receivers.",
     (AngleFigure(32.0, Measure.TARGETS),),
     (),
     2.2,
     Basis(5, 48, "targets"),
-    (("the 3rd-highest", "among the wide receivers we rank"),),
+    (("the 3rd-highest", "among wide receivers"),),
 )
 _VACATED = Angle(
     "vacated",
@@ -747,3 +745,27 @@ def test_a_place_only_fact_binds_by_its_measure_words() -> None:
         for a in board_angles([*_board(), _receiver(78, 9)], {}, 8)["00-0000078"]
         if a.places
     )
+
+
+@pytest.mark.usefixtures("angles_on")
+@pytest.mark.parametrize(
+    ("said", "held"),
+    [
+        ("the 3rd-highest among wide receivers", True),
+        ("the 3rd-highest share among receivers", True),
+        ("the 2nd-highest among wide receivers", False),
+        ("6th among wide receivers", False),
+    ],
+)
+def test_a_place_in_the_sheets_words_is_held_to_its_fact(said: str, held: bool) -> None:
+    """Lane 307: the sheet says a place "among wide receivers", never "we rank", and the place rule reads that form
+    as it read Lane 300's."""
+    read = _ACCEPTED.replace("the 3rd-highest among the wide receivers we rank", said)
+    violations = validate_week_read(read, _angled(), call="start").violations
+    assert (not any("places him among his peers" in v for v in violations)) is held, violations
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_no_sheet_line_says_we_rank() -> None:
+    sheet = replace(heaviest(), angles=(_TARGETS, _VACATED))
+    assert "we rank" not in render_week_sheet(sheet)

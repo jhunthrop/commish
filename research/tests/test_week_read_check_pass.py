@@ -17,7 +17,7 @@ from research.capsules.run_budget import BudgetSpentError
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.week.prompt import CHECK_RULES, answer_json, check_messages
 from research.capsules.week.rules import body_rule_violations, week_rule_violations
-from research.capsules.week.write import WEEK_WRITER_VERSION, finished, write_week_read
+from research.capsules.week.write import WEEK_WRITER_VERSION, finished, is_a_read, write_week_read
 from research.tests.test_week_read_rules import STARTER_READ
 from research.tests.week_read_fixtures import starter
 
@@ -110,7 +110,10 @@ def test_the_check_ask_carries_the_facts_and_the_read() -> None:
     assert user["content"].startswith("FACTS:\nPlayer: Puka Nacua") and user["content"].endswith(STARTER_READ)
 
 
-@pytest.mark.parametrize(("text", "done"), [("Start him.", True), ('He said "go."', True), ("Start him with", False)])
+@pytest.mark.parametrize(
+    ("text", "done"),
+    [("Start him.", True), ('He said "go."', True), ("Start him with", False), ("Start the Jaguars'", False)],
+)
 def test_a_draft_is_finished_on_closing_punctuation(text: str, done: bool) -> None:
     assert finished(text) is done
 
@@ -132,3 +135,27 @@ def test_the_week_writer_is_sonnet_unless_its_setting_names_another() -> None:
     # The season writer's setting never moves the week writer.
     assert week_writer_settings({"CAPSULE_MODEL": "m/season"}).model == WEEK_WRITER_MODEL
     assert WEEK_WRITER_VERSION == 2  # noqa: PLR2004 - Lane 307's writer
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "Every claim holds.",
+        f"All claims check out. {STARTER_READ}",
+        f"No changes needed. {STARTER_READ}",
+        STARTER_READ.replace("Puka Nacua", "He").replace("Nacua", "him"),
+        f"{STARTER_READ}\n\nThe read holds.",
+        " ".join([STARTER_READ, STARTER_READ]),
+    ],
+)
+def test_a_check_answer_that_is_no_read_keeps_the_draft(answer: str) -> None:
+    """The phase 1 review's M2: commentary, a meta sentence, a read that drops his name, a second paragraph or an
+    answer past the band never replaces the draft; the validator judges the draft."""
+    assert not is_a_read(answer, _SLIP, "Puka Nacua")
+    gateway = _Checked([_draft(STARTER_READ)], [_check(answer)])
+    result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
+    assert (result.source, result.text) == ("llm", STARTER_READ)
+
+
+def test_a_fixed_read_is_a_read() -> None:
+    assert is_a_read(STARTER_READ, _SLIP, "Puka Nacua")

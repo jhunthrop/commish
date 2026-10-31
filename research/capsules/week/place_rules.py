@@ -1,7 +1,7 @@
 """A PLACE AMONG HIS PEERS, AND HOW UNUSUAL A FACT IS, ONLY AS ITS OWN FACT STATES THEM (Lane 300, the final review's
 H1 and L6).
 
-A read may say where he ranks among his position's peers ("the 3rd-highest among the wide receivers we rank") or
+A read may say where he ranks among his position's peers ("the 3rd-highest among wide receivers") or
 how unusual a fact is ("far out of the ordinary") only as the usage fact it is about states it. Each claim is
 bound to its fact the way an angle's figure is (`angle_rules._figure_violation`): by the measure its clause names,
 or, when its clause names none, the measures its sentence names. A claim no bound fact states is refused, so the
@@ -10,7 +10,7 @@ snap share's place is never said of the target share, and a place no fact holds 
 A place is read in every form the writer uses (the final review's probes and pairs j to l):
 - an end with an optional ordinal: highest, lowest, deepest, shortest, and their plain words most, fewest, least,
   heaviest, lightest, biggest, largest, smallest ("the 2nd-most", "the heaviest share");
-- an ordinal among his ranked peers ("6th among the receivers we rank");
+- an ordinal among his peers ("6th among wide receivers", "6th among the receivers we rank");
 - a top group ("a top-two share", "top 5");
 - the first place said in words ("leads all receivers", "more than any receiver").
 
@@ -40,14 +40,22 @@ _END: Final = re.compile(
 )
 # "6th among the receivers we rank" (a rank among his club's receivers, "2nd among the Rams' receivers", is his
 # depth-chart place, Lane 299's to judge: the round 5 re-review's M1).
-_ORDINAL_AMONG: Final = re.compile(r"\b(\d+)(?:st|nd|rd|th)\s+among\b(?=[^.]*\bwe\s+rank\b)", re.IGNORECASE)
 _TOP: Final = re.compile(r"\btop[- ](\d+|two|three|four|five|ten)\b", re.IGNORECASE)
 _FIRST: Final = re.compile(r"\bleads?\s+all\b|\bmore\s+than\s+any\b", re.IGNORECASE)
-_AMONG_RANKED: Final = re.compile(r"\bamong\s+(?:all\s+)?(?:the\s+)?([a-z][a-z ]*?)\s+we\s+rank\b", re.IGNORECASE)
 # A peer group: players at his position ("among the wide receivers", "than any receiver", "leads all backs") or
 # "we rank"; never a bare "among", "of the week" or "in the league" (the round 5 re-review's H1). A club's players
 # ("among the Rams' receivers") are his depth chart, never his peers.
 _POSITIONS: Final = r"(?:wide receivers?|receivers?|wideouts?|running backs?|backs?|tight ends?|quarterbacks?|players?)"
+# "6th among wide receivers", and Lane 300's "6th among the receivers we rank": a position's peers, never his club's
+# ("2nd among the Rams' receivers" is his depth-chart place, Lane 299's to judge: the round 5 re-review's M1).
+_ORDINAL_AMONG: Final = re.compile(
+    rf"\b(\d+)(?:st|nd|rd|th)\s+[Aa]mong\s+(?:all\s+)?(?:the\s+)?(?:[a-z-]+\s+)?{_POSITIONS}\b"
+)
+# The peer group a place is said among (Lane 307: "among wide receivers", the sheet's words, or Lane 300's "among
+# the wide receivers we rank").
+_AMONG_RANKED: Final = re.compile(
+    rf"\b[Aa]mong\s+(?:all\s+)?(?:the\s+)?((?:[a-z-]+\s+)?{_POSITIONS})(?:\s+we\s+rank)?\b"
+)
 _PEERS: Final = re.compile(
     r"\b[Ww]e rank\b|\bon our board\b|"
     rf"\b[Aa]mong\s+(?:all\s+)?(?:the\s+)?(?:[a-z-]+\s+)?{_POSITIONS}\b|"
@@ -135,7 +143,11 @@ def _claims(sentence: str) -> list[tuple[str, Place, int, int]]:
 
 
 def _groups(sheet: WeekSheet) -> set[str]:
-    return {g.lower().removeprefix("among the ").removesuffix(" we rank") for a in sheet.angles for _, g in a.places}
+    return {
+        g.lower().removeprefix("among ").removeprefix("the ").removesuffix(" we rank")
+        for a in sheet.angles
+        for _, g in a.places
+    }
 
 
 def _violation(what: str, sentence: str, remedy: str) -> str:
@@ -159,7 +171,7 @@ def place_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
             continue
         bad = [said for said, claim, start, end in _claims(s) if not _held(claim, _bound(s, start, end, sheet))]
         said_groups = (g.group(1).lower().strip() for g in _AMONG_RANKED.finditer(s))
-        bad += [f"among the {g} we rank" for g in said_groups if not any(x == g or x.endswith(f" {g}") for x in groups)]
+        bad += [f"among {g}" for g in said_groups if not any(x == g or x.endswith(f" {g}") for x in groups)]
         if bad:
             quoted = ", ".join(f'"{b}"' for b in dict.fromkeys(bad))
             out.append(_violation(f"places him among his peers as no usage fact does ({quoted})", s, _remedy(sheet)))

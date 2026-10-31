@@ -203,7 +203,7 @@ def test_the_sheets_carry_angles_from_the_stored_usage(engine: Engine) -> None:
     top = sheets["Back Number10"]
     carries = next(a for a in top.angles if a.key == "carry_share")
     assert carries.text == (
-        "Carries: 40% of the Texans' carries in his games this season, the highest among the running backs we rank "
+        "Carries: 40% of the Texans' carries in his games this season, the highest among running backs "
         "(far out of the ordinary for a running back)."
     )
     assert carries.figures == (AngleFigure(40.0, Measure.CARRIES),)
@@ -262,4 +262,4 @@ def test_after_thursdays_kickoff_the_peers_still_count_the_club_that_played(engi
     sheets = {s.name: s for s in collect_week_sheets(facts, subjects, {})}
     assert name not in sheets
     carries = next(a for a in sheets["Back Number10"].angles if a.key == "carry_share")
-    assert carries.places == (("the 2nd-highest", "among the running backs we rank"),)
+    assert carries.places == (("the 2nd-highest", "among running backs"),)

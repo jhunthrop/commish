@@ -103,9 +103,11 @@ def test_every_line_carries_its_stamp_and_the_report_its_day() -> None:
     )
     text = render_week_sheet(sheet)
     for line in text.splitlines()[2:]:
-        if not line.startswith("Injury report"):
+        if not line.startswith("Injury report") and line != "No injury designation.":
             assert "(as of " in line, line
-    assert "on Friday's report" in text
+    # Lane 307: no designation is one short line, no stamp and no report day; a designation keeps both.
+    assert "No injury designation." in text and "Friday's report" not in text
+    assert "on Friday's report" in render_week_sheet(replace(sheet, status=Status("questionable", REPORT)))
     assert set(sheet.stamps()) >= {"schedule", "projection", "status", "expected", "allowed", "board", "stat_lines"}
     assert set(sheet.stamps()) >= {"depth_chart"}
 
@@ -339,9 +341,10 @@ def test_the_season_is_named_once_and_weeks_after_it_go_bare() -> None:
     assert validate_week_read(BYE_READ, on_bye(), call="hold").ok
 
 
-def test_a_bare_week_before_the_season_is_named_is_refused() -> None:
-    text = STARTER_READ.replace("in week 6 of 2026", "in week 6").replace("Start him", "Start him in 2026")
-    assert not validate_week_read(text, starter(), call="start").ok
+def test_a_bare_week_with_no_season_named_passes() -> None:
+    """Lane 307 retired the season on every week: "week 6" with no season is this season's."""
+    text = STARTER_READ.replace("in week 6 of 2026", "in week 6")
+    assert validate_week_read(text, starter(), call="start").ok
 
 
 def test_a_sentence_shaped_like_one_on_another_page_is_refused() -> None:

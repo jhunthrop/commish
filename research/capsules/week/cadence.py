@@ -68,6 +68,8 @@ RETRY_GAP: Final = timedelta(hours=1)
 # share of the day hold to $0.50 (`week_reads.HOURLY_DAY_USD` $1.50, unchanged, less the status share
 # `HOURLY_STATUS_RESERVE_USD` $1.00 the retries never draw on). The day expected: about 2 reads in 100 fall on
 # the roll-over night, 11 of 536, at the dearest night's $0.0021 a read for 20 passes, $0.46.
+# Those are GLM's prices. Since Lane 307 the writer is Sonnet ($2 in, $10 out) with a check call per draft, so the
+# same day is held by the re-priced caps in `week_reads` ($0.75 a pass, $22.50 a day, $15.00 of it for status).
 RETRIES_A_DAY: Final = 24
 # A written read's status rewrites that fell (Lane 275 fix round 2), its own cap: a held read's row keeps its
 # written instant, so no gap holds its rewrites to one an hour, and the quarter-hour game-day passes would ask it
