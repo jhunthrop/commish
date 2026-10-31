@@ -284,7 +284,7 @@ extension WaiverViewModelTests {
         #expect(viewModel.table.rows.contains { $0.cells.row.name == "Jahan Dotson" } == false)
         #expect(viewModel.model?.positions.map(\.word) == ["QB", "WR", "TE", "D/ST"])
         await viewModel.choose(position: .wr, leagueID: Fixtures.league)
-        #expect(await stub.asked == [nil, .wr])
+        #expect(await stub.asked == [nil, .te, .wr], "the screen opened on the TE Need, read quietly")
         #expect(viewModel.reading == false)
         viewModel.find("dotson")
         let found = viewModel.table.rows
@@ -299,15 +299,16 @@ extension WaiverViewModelTests {
     }
 
     @Test func aPositionThatCannotBeReadSaysSoAndTheLastReadStands() async throws {
-        let stub = try WaiverStub(advice: Fixtures.waivers(Fixtures.league, Fixtures.week))
+        let page = try Fixtures.waivers(Fixtures.league, Fixtures.week)
+        let stub = WaiverStub(advice: page)
         await stub.failPosition()
         let viewModel = model(stub, host: Self.ffpc)
         await viewModel.load(leagueID: Fixtures.league)
-        let before = viewModel.table.rows.count
         await viewModel.choose(position: .qb, leagueID: Fixtures.league)
         #expect(viewModel.problem == "These could not be read just now. The last read stands.")
         #expect(viewModel.reading == false)
-        #expect(viewModel.table.rows.count == before)
+        // The page's own quarterbacks stand.
+        #expect(viewModel.table.rows.count == page.rows.count { $0.add.player.position == "QB" })
     }
 
     @Test func aHeadChosenSortsTheTableAndTurnsAroundWhenChosenAgain() async throws {

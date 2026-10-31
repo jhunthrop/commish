@@ -16,13 +16,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.trycommish.api.models.WaiverRow
 import app.trycommish.core.AppWords
 import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.waivers.PanelMode
 import app.trycommish.core.waivers.WaiverModel
 import app.trycommish.core.waivers.WaiverPin
-import app.trycommish.core.waivers.WaiverPosition
 import app.trycommish.core.waivers.WaiverSortKey
 import app.trycommish.core.waivers.WaiverState
 import app.trycommish.core.waivers.WaiverUi
@@ -31,21 +29,19 @@ import app.trycommish.design.Tokens
 import app.trycommish.feature.boxscore.BasisText
 import app.trycommish.feature.boxscore.ScreenFailed
 
-/** What the screen's controls do: a row's name opens the player sheet by the row's key, a card is
- * chosen, a row's button opens its drop panel, a drop is chosen, a position chip reads its position, the
- * search finds, a head sorts; the position panel's toggle, a card opened and a free agent's Add; the
+/** What the screen's controls do: a row's name opens the player sheet by the row's key, a strip card is
+ * chosen, a row's button opens its drop panel, a drop is chosen, a position card reads its position (All
+ * the page's rows), the toggle sets the cards and the list's order, the search finds, a head sorts; the
  * pin's verb, confirmation, way out and bid; a pull reads again. */
 class WaiverActions(
     val open: (SheetPlayer) -> Unit = {},
     val chooseCard: (String) -> Unit = {},
     val tapRow: (String) -> Unit = {},
     val chooseDrop: (String) -> Unit = {},
-    val choosePosition: (WaiverPosition?) -> Unit = {},
+    val chooseNav: (String) -> Unit = {},
     val find: (String) -> Unit = {},
     val sortBy: (WaiverSortKey) -> Unit = {},
     val choosePanelMode: (PanelMode) -> Unit = {},
-    val toggleCard: (String) -> Unit = {},
-    val addFromPanel: (WaiverRow) -> Unit = {},
     val refresh: () -> Unit = {},
     val pin: WaiverPinActions = WaiverPinActions(),
 )
@@ -53,7 +49,7 @@ class WaiverActions(
 /** The screen's runs, top to bottom: each a snapshot of its own, so no reference grows past what a
  * repository keeps. */
 enum class WaiverPart {
-    /** The strip, the position panel, the chips and the search, and the rows that gain. */
+    /** The strip, the position cards, the search, and the rows that gain. */
     Top,
 
     /** The rest under the divider, the Stash group and the basis. */
@@ -61,8 +57,9 @@ enum class WaiverPart {
 }
 
 /**
- * The Waivers screen (web WaiverScreen.svelte at 390): the strip, the position chips and the search, the
- * line when the week's projection is still to come, the table, the basis once at the foot, in the web's
+ * The Waivers screen (web WaiverScreen.svelte at 390): the strip, the position cards that navigate it with
+ * the chosen card's line, the search, the line when the week's projection is still to come, the table (the
+ * member's players at the chosen position over the free agents there), the basis once at the foot, in the web's
  * order, and the one verb pinned above the bar. Pull down to read again. The screen decides nothing: the
  * state, the stamp and the pin are the view model's.
  */
@@ -75,6 +72,8 @@ fun WaiverScreen(
     refreshing: Boolean,
     actions: WaiverActions,
     modifier: Modifier = Modifier,
+    /** Draws the cards and the search at rest (a store shot, which draws one frame and no scroll). */
+    still: Boolean = false,
 ) {
     Column(modifier.fillMaxSize().background(CommishTheme.colors.bg)) {
         PullToRefreshBox(isRefreshing = refreshing, onRefresh = actions.refresh, modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -90,6 +89,7 @@ fun WaiverScreen(
                         actions,
                         WaiverPart.entries,
                         Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                        still,
                     )
             }
         }
@@ -121,12 +121,9 @@ fun WaiverPage(
             when (part) {
                 WaiverPart.Top -> {
                     WaiverStrip(model, stamp, ui.card?.key, actions.chooseCard)
-                    WaiverPanelView(panelActions(ui, actions))
+                    WaiverNavView(navActions(ui, actions, still))
                     Filters(
                         WaiverControls(
-                            model.positions,
-                            ui.position,
-                            actions.choosePosition,
                             ui.query,
                             actions.find,
                             ui.problem,
@@ -160,34 +157,21 @@ fun WaiverOpenRow(
     }
 }
 
-/** The position panel alone with its card open (the snapshot's positions part). */
-@Composable
-fun WaiverPositions(
+private fun navActions(
     ui: WaiverUi,
     actions: WaiverActions,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier.background(CommishTheme.colors.bg).padding(horizontal = Tokens.Space.s3.dp, vertical = Tokens.Space.s4.dp)) {
-        WaiverPanelView(panelActions(ui, actions))
-    }
-}
-
-private fun panelActions(
-    ui: WaiverUi,
-    actions: WaiverActions,
-): PanelActions {
-    val cards = ui.panel
-    return PanelActions(
-        cards = cards,
+    still: Boolean,
+): NavActions =
+    NavActions(
+        cards = ui.nav,
+        chosen = ui.navKey,
         mode = ui.panelMode,
-        hasWeek = ui.panelHasWeek,
-        opened = cards.firstOrNull { it.key == ui.openCard },
-        choose = actions.choosePanelMode,
-        toggle = actions.toggleCard,
-        add = actions.addFromPanel,
-        open = actions.open,
+        hasWeek = ui.navHasWeek,
+        lead = ui.lead,
+        choose = actions.chooseNav,
+        chooseMode = actions.choosePanelMode,
+        still = still,
     )
-}
 
 private fun tableActions(
     ui: WaiverUi,
@@ -207,5 +191,7 @@ private fun tableActions(
         sort = ui.sort,
         onSort = actions.sortBy,
         reading = ui.reading,
+        compare = ui.compare,
+        empty = ui.empty,
     )
 }

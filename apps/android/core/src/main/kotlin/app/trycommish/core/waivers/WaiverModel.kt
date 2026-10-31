@@ -25,7 +25,8 @@ enum class WaiverPosition(
     DEF("DEF"),
 }
 
-/** A position chip over the table (WaiverScreen.svelte): the route's position and its word. */
+/** A position the page's adds hold (WaiverScreen.svelte POSITIONS): the route's position and its word, a
+ * count card's where the answer carries no panel. */
 data class PositionChip(
     val position: WaiverPosition,
     val word: String,
@@ -54,9 +55,9 @@ data class DropHead(
 
 /**
  * The Waivers screen at one clock (WaiverScreen.svelte at 390): the strip with a card for each pickup
- * worth making, the position chips, the line under the heads, the players free to add (the rows that
+ * worth making, the position cards, the line under the heads, the players free to add (the rows that
  * gain, then the rest under one divider, then the Stash group with its line) in any sort and search, the
- * basis once, and what the one verb acts on. The page's answer carries the strip and the chips; the
+ * basis once, and what the one verb acts on. The page's answer carries the strip and the cards; the
  * answer shown (the page's, or a position's own read) carries the table, drawn at its read's instant.
  * Every rule is the API's: the pickup rule, the order, whom an add beats, whether the claim is made from
  * here. Nothing is computed but the words and the sort.
@@ -67,6 +68,8 @@ class WaiverModel(
     host: LeagueHost,
     private val now: Instant,
     private val zone: ZoneId,
+    /** The page's clock, which the cards and the member's players are drawn at (WaiverScreen's pageNow). */
+    private val pageNow: Instant = now,
 ) {
     /** The answer the table is drawn from: a position's own read, else the page's. */
     val shown: WaiverAdvice = shown ?: advice
@@ -132,20 +135,36 @@ class WaiverModel(
 
     private fun drops(source: WaiverRow): List<DropRow> = WaiverRows.drops(source, shown.roster, zone, now)
 
-    // The position panel (Lane 291 on the web).
+    // The position cards (Lane 305 on the web).
 
-    /** The position panel's cards in the mode, from the page's answer; none from an answer without it. */
-    fun panel(mode: PanelMode): List<PanelCard> = WaiverPanel.cards(advice, mode, zone, now)
+    /** The cards in the mode (position-nav.ts navCards over the page's answer): the All card counts every
+     * free agent of the page's answer, a count card a position where the answer carries no panel. */
+    fun nav(mode: PanelMode): List<NavCard> {
+        val all = WaiverRows.pool(advice, advice.pickups, zone, pageNow)
+        val byPosition =
+            positions.map { chip ->
+                chip.position.query to WaiverNav.counts(all.filter { it.source.add.player.position == chip.position.query })
+            }
+        return WaiverNav.cards(advice, mode, WaiverNav.counts(all), byPosition)
+    }
 
-    /** Whether the panel's toggle is drawn: a card reads this week. */
-    val panelHasWeek: Boolean get() = WaiverPanel.hasWeek(advice)
+    /** The card the screen opens on: the weakest Need, else All. */
+    val opening: String get() = WaiverNav.opening(advice)
 
-    /** What a panel Add does, in the table's words: "Add on ESPN", or "Open ESPN waivers". */
-    fun panelVerb(source: WaiverRow): String = WaiverWords.addVerb(advice.moves, source.add.player.hostId, platform)
+    /** Whether the toggle is drawn: a card reads this week. */
+    val navHasWeek: Boolean get() = advice.positions.orEmpty().any { it.week != null }
 
-    /** The panel's Add (WaiverScreen.svelte addFromPanel): the add with the advice's drop, the pair the
-     * shelf and the table's verb act on. */
-    fun panelPair(source: WaiverRow): WaiverRow = WaiverRows.with(source, drops(source).firstOrNull())
+    /** The line over the comparison for the chosen card. */
+    fun lead(
+        key: String,
+        mode: PanelMode,
+    ): NavLead = WaiverNav.lead(advice, key, mode)
+
+    /** The member's players at the chosen position, starters first in the mode's lineup. */
+    fun yours(
+        key: String,
+        mode: PanelMode,
+    ): List<YoursRow> = WaiverNav.yours(advice, key, mode, zone, pageNow)
 
     /** The drop panel's head and lead: "Drop one for Mason Taylor", "+4.8 Proj this week with any of
      * them. The one you lose least by comes first." */

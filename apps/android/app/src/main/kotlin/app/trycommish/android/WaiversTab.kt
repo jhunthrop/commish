@@ -72,7 +72,17 @@ private fun LeagueWaivers(
     val uri = LocalUriHandler.current
     val id = league.id
     LaunchedEffect(id) { if (vm.shown != id) vm.load(id) }
-    LaunchedEffect(ui.state) { (ui.state as? WaiverState.Loaded)?.let { sheet.parentRefreshed(it.model.sheetPlayers) } }
+    LaunchedEffect(ui.state) {
+        (ui.state as? WaiverState.Loaded)?.let {
+            sheet.parentRefreshed(
+                it.model.sheetPlayers +
+                    ui.compare
+                        ?.rows
+                        .orEmpty()
+                        .mapNotNull { r -> r.sheetPlayer },
+            )
+        }
+    }
     WaiverScreen(
         ui = ui,
         stamp = vm.stampWords(ui),
@@ -84,12 +94,10 @@ private fun LeagueWaivers(
                 chooseCard = vm::chooseCard,
                 tapRow = vm::tapRow,
                 chooseDrop = vm::chooseDrop,
-                choosePosition = { vm.choosePosition(it, id) },
+                chooseNav = { vm.chooseNav(it, id) },
                 find = vm::find,
                 sortBy = vm::sortBy,
                 choosePanelMode = vm::choosePanelMode,
-                toggleCard = vm::toggleCard,
-                addFromPanel = { vm.addFromPanel(it, id) },
                 refresh = { vm.load(id) },
                 pin =
                     WaiverPinActions(

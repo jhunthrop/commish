@@ -36,14 +36,19 @@ public final class WaiverViewModel {
     /// The table's sort and search.
     public internal(set) var sort: WaiverSort = .initial
     public internal(set) var query = ""
-    /// The position panel's figures and its open card, by position (none open at first).
+    /// The toggle: the cards and the list read for the rest of the season or this week.
     public internal(set) var panelMode: PanelMode = .season
-    public internal(set) var openCard: String?
+    /// The answer the last top-up was for (WaiverScreen.svelte toppedFor): an unchanged answer reads the
+    /// chosen position no second time; nil once a top-up failed, so the next answer tries again.
+    var toppedFor: String?
+    /// The opening card: whether a fresh answer has set it yet, and whether the member has chosen a card since.
+    var openedFresh = false
+    var userChose = false
     /// The chosen position's own read and its instant, which its rows draw at (WaiverScreen's narrowedAt).
     var narrowed: (advice: WaiverAdvice, at: Date)?
     /// Which position read is the latest: an earlier one's answer is overtaken (state.ts Narrowing).
     var latestNarrowing = 0
-    /// The page's answer and the instant it was read, which the strip and the chips are drawn from.
+    /// The page's answer and the instant it was read, which the strip and the cards are drawn from.
     private var answer: (advice: WaiverAdvice, at: Date)?
 
     let api: any WaiversAPI
@@ -168,6 +173,7 @@ public final class WaiverViewModel {
             let stamp = clock.now
             await cache.write(fresh, route: route, stamp: stamp)
             show(fresh, stamp: stamp, stale: false)
+            await topUp(leagueID: leagueID)
         } catch where APIError.signsOut(error) {
             state = .failed(AppWords.Failure.signedOut)
             onSignedOut()
@@ -343,8 +349,15 @@ public final class WaiverViewModel {
         ]]
     }
 
+    /// An answer on screen; the first one, and the first fresh one after a saved one, set the card the screen
+    /// opens on (the weakest Need, else All) until the member chooses a card.
     private func show(_ advice: WaiverAdvice, stamp: Date, stale: Bool) {
+        let opens = answer == nil || (!stale && !openedFresh)
         answer = (advice, clock.now)
+        openedFresh = openedFresh || !stale
+        if opens, !userChose {
+            open(on: advice)
+        }
         redraw(stamp: stamp, stale: stale)
     }
 
@@ -360,9 +373,16 @@ public final class WaiverViewModel {
             return
         }
         let model = WaiverModel(
-            advice: answer.advice, shown: narrowed?.advice, host: host, now: narrowed?.at ?? answer.at, zone: zone
+            advice: answer.advice, shown: shownAnswer(answer.advice), host: host, now: narrowed?.at ?? answer.at,
+            zone: zone,
+            pageNow: answer.at
         )
         state = .loaded(model, stamp: stamp, stale: stale)
+    }
+
+    /// The page's answer, for the top-up's mark.
+    var pageAdvice: WaiverAdvice? {
+        answer?.advice
     }
 
     /// A refused token: the screen signs out.

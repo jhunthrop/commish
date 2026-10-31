@@ -11,10 +11,11 @@ actor WaiverStub: WaiversAPI {
         let token: String
     }
 
-    private let advice: WaiverAdvice
+    private var advice: WaiverAdvice
     /// A position's own read, by position: the page's rows at that position where none is given.
-    private let positions: [WaiverPosition: WaiverAdvice]
+    private var positions: [WaiverPosition: WaiverAdvice]
     private var failsPosition = false
+    private var failsPage = false
     private(set) var asked: [WaiverPosition?] = []
     private let plan: HostMovePlan?
     private let result: HostMoveResult?
@@ -37,14 +38,31 @@ actor WaiverStub: WaiversAPI {
         failsMake = true
     }
 
-    func failPosition() {
-        failsPosition = true
+    /// The page's read fails (no signal) while set; a position's read is unchanged.
+    func failPage(_ fails: Bool = true) {
+        failsPage = fails
+    }
+
+    func failPosition(_ fails: Bool = true) {
+        failsPosition = fails
+    }
+
+    /// The league as read from now on: the page's answer, and a position's own read.
+    func answer(_ advice: WaiverAdvice, at position: WaiverPosition? = nil) {
+        if let position {
+            positions[position] = advice
+        } else {
+            self.advice = advice
+        }
     }
 
     func waivers(id _: String, position: WaiverPosition?) async throws -> WaiverAdvice {
         asked.append(position)
         guard let position else {
             reads += 1
+            if failsPage {
+                throw URLError(.notConnectedToInternet)
+            }
             return advice
         }
         if failsPosition {

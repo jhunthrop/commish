@@ -152,7 +152,7 @@ internal object WaiverRows {
         now: Instant,
     ): RowCells = RowCells.of(null, StartRows.row(line, "", zone, now, ranked = false), reserve)
 
-    private fun evidence(
+    fun evidence(
         cells: RowCells,
         rest: Double?,
     ): String = "${cells.evidence}, ${Words.Waivers.rest} ${StartWords.number(rest)}"

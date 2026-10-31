@@ -307,6 +307,39 @@ void test("the Waivers at every clock, each ESPN stand-in's with its claim made 
 	assert.ok(espn?.results.some((r) => r.words.includes('processes it Wed 2:00 am')));
 });
 
+void test("the Waivers' position cards hold every state the apps' parity reads (Lane 308)", async () => {
+	interface NavCard {
+		key: string;
+		place: string | null;
+		tag: string | null;
+		waits: string | null;
+		need: boolean;
+	}
+	interface Nav {
+		opening: string;
+		hasWeek: boolean;
+		season: { cards: NavCard[]; yours: Record<string, { role: string }[]> };
+	}
+	const parity = JSON.parse((await generate()).get(WAIVERS_OUTPUT) ?? '{}') as {
+		clocks: Record<string, { nav: Nav }>;
+		stashed: Record<string, { screen: { nav: Nav } }>;
+	};
+	const navs = Object.values(parity.clocks).map((c) => c.nav);
+	const cards = navs.flatMap((n) => n.season.cards);
+	// Opens on the weakest Need; the D/ST card ranks this week's Proj on Rest of season, or waits.
+	assert.ok(navs.every((n) => n.opening === 'TE'));
+	assert.ok(cards.some((c) => c.key === 'DEF' && c.tag === 'this week'));
+	assert.ok(cards.some((c) => c.key === 'DEF' && c.waits !== null && c.place === null));
+	assert.ok(cards.some((c) => c.need));
+	assert.ok(navs.some((n) => n.hasWeek) && navs.some((n) => !n.hasWeek));
+	assert.ok(navs.every((n) => (n.season.yours.QB?.length ?? 0) > 0));
+	// An answer without the panel opens on All and navigates by count cards.
+	const bare = parity.stashed.withSlot?.screen.nav;
+	assert.equal(bare?.opening, 'ALL');
+	assert.ok((bare?.season.cards.length ?? 0) > 1);
+	assert.ok(bare?.season.cards.every((c) => c.place?.endsWith('free agents')));
+});
+
 void test("the Trades at every clock: the ideas row in the finder's order, the strip's checks scored", async () => {
 	interface Place {
 		kind: string;

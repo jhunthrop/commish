@@ -12,6 +12,7 @@ import app.trycommish.api.models.LineupSlot
 import app.trycommish.api.models.ScoringPreset
 import app.trycommish.api.models.TradeCheck
 import app.trycommish.api.models.TradeCheckInput
+import app.trycommish.api.models.WaiverAdvice
 import app.trycommish.core.FixedClock
 import app.trycommish.core.MemoryCache
 import app.trycommish.core.SessionEnd
@@ -49,6 +50,7 @@ import app.trycommish.core.trades.TradeMe
 import app.trycommish.core.trades.TradeReads
 import app.trycommish.core.trades.TradesViewModel
 import app.trycommish.core.waivers.WaiverFixtures
+import app.trycommish.core.waivers.WaiverNav
 import app.trycommish.core.waivers.WaiverPosition
 import app.trycommish.core.waivers.WaiverReads
 import app.trycommish.core.waivers.WaiverViewModel
@@ -167,7 +169,7 @@ internal fun everySlotFilled(advice: LineupAdvice): LineupAdvice {
 /** Saturday noon, the wire before it clears: the best add first, the claim pinned. */
 private fun waivers(scheduler: TestCoroutineScheduler): @Composable () -> Unit {
     val league = WaiverFixtures.PENDING
-    val reads = FixtureWaivers(envelopeOf(WaiverFixtures.waivers(league)))
+    val reads = FixtureWaivers(WaiverFixtures.waivers(league))
     val clock = FixedClock(StartFixtures.instant(WaiverFixtures.WEEK))
     val vm = WaiverViewModel(reads, MemoryCache(), clock, Fixtures.zone, storeLeague.host, { true }, {}, {})
     vm.load(league)
@@ -175,7 +177,7 @@ private fun waivers(scheduler: TestCoroutineScheduler): @Composable () -> Unit {
     val ui = vm.ui.value
     val stamp = vm.stampWords(ui)
     val pin = vm.pin(ui)
-    return { WaiverScreen(ui, stamp, pin, refreshing = false, actions = WaiverActions()) }
+    return { WaiverScreen(ui, stamp, pin, refreshing = false, actions = WaiverActions(), still = true) }
 }
 
 /** Saturday noon, the builder with our best idea loaded into its ticks. */
@@ -259,12 +261,14 @@ private const val PLAYER = "rome-odunze"
 
 /** The waiver read as the fixture answers it; no claim is made in a store shot. */
 private class FixtureWaivers(
-    private val body: String,
+    private val advice: WaiverAdvice,
 ) : WaiverReads {
+    /** The page, or a position's own read as the API answers it: that position's rows (the screen opens on
+     * the weakest Need and reads it). */
     override suspend fun waivers(
         leagueId: String,
         position: WaiverPosition?,
-    ): String = body
+    ): String = envelopeOf(position?.let { WaiverNav.atPosition(advice, it.query) } ?: advice)
 
     override suspend fun planMove(
         leagueId: String,

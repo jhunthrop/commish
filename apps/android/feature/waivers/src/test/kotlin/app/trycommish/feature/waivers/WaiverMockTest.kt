@@ -2,6 +2,7 @@ package app.trycommish.feature.waivers
 
 import app.trycommish.core.waivers.PanelMode
 import app.trycommish.core.waivers.WaiverPosition
+import app.trycommish.design.Words
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -52,24 +53,15 @@ class WaiverMockTest {
         val narrowed = viewModelAt(WaiverSnapshotTest.Scene.Narrowed).ui.value
         assertEquals(WaiverPosition.DEF, narrowed.position)
         assertTrue(narrowed.table.rows.isNotEmpty() && narrowed.table.rows.all { it.cells.row.position == "D/ST" })
-        val positions = viewModelAt(WaiverSnapshotTest.Scene.Positions).ui.value
-        assertTrue(positions.openedCard?.need == true)
-        assertEquals(5, positions.openedCard?.free?.size)
-        val week = viewModelAt(WaiverSnapshotTest.Scene.PositionsWeek).ui.value
+        assertEquals(Words.WaiverNav.weekTag, narrowed.nav.first { it.key == "DEF" }.tag)
+        val before = viewModelAt(WaiverSnapshotTest.Scene.Before).ui.value
+        assertEquals("TE", before.navKey)
+        assertTrue(before.compare?.rows?.isNotEmpty() == true)
+        assertTrue(before.nav.first { it.key == "TE" }.need)
+        val week = viewModelAt(WaiverSnapshotTest.Scene.Week).ui.value
         assertEquals(PanelMode.Week, week.panelMode)
-        assertEquals("TE rank 12 of 12", week.openedCard?.rank)
-        assertTrue(
-            viewModelAt(WaiverSnapshotTest.Scene.PositionsEmpty)
-                .ui.value.openedCard
-                ?.free
-                ?.isEmpty() == true,
-        )
-        assertEquals(
-            null,
-            viewModelAt(WaiverSnapshotTest.Scene.PositionsDefense)
-                .ui.value.openedCard
-                ?.median,
-        )
+        assertEquals("TE rank 12 of 12", week.lead?.head)
+        assertEquals(null, viewModelAt(WaiverSnapshotTest.Scene.All).ui.value.compare)
     }
 
     @Test

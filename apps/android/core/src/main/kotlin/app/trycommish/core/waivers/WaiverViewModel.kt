@@ -18,6 +18,7 @@ import app.trycommish.core.leaguehome.ValueWords
 import app.trycommish.core.start.FootRun
 import app.trycommish.core.start.MoveKind
 import app.trycommish.core.start.MoveStep
+import app.trycommish.core.start.StartRows
 import app.trycommish.design.Words
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -73,6 +74,15 @@ class WaiverViewModel(
     /** Which position read is the latest: an earlier one's answer is overtaken (state.ts Narrowing). */
     private var latestNarrowing = 0
 
+    /** The answer the last top-up was for (WaiverScreen.svelte toppedFor): an unchanged answer reads the
+     * chosen position no second time; null once a top-up failed, so the next answer tries again. */
+    private var toppedFor: String? = null
+
+    /** The opening card: whether a fresh answer has set it yet, and whether the member has chosen a card
+     * since (review 308 M1). */
+    private var openedFresh = false
+    private var userChose = false
+
     /** The claim as last planned: the one the token makes, whatever is typed meanwhile. */
     private var planned: HostMoveInput? = null
     private var claiming: WaiverRow? = null
@@ -125,6 +135,7 @@ class WaiverViewModel(
             val stamp = clock.now()
             cache.write(key, Cached(body, stamp))
             show(fresh, stamp, stale = false)
+            topUp(leagueId)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Unauthorized) {
@@ -228,26 +239,50 @@ class WaiverViewModel(
      * page opened. Nothing while the waivers shown are a saved read or a claim is open. */
     fun press(leagueId: String): Job? = ui.value.target?.let { act(it, leagueId) }
 
-    /** The position panel's toggle: its figures for the rest of the season or this week. */
+    /** The toggle: the cards' figures and the list's order together (ruling 4). */
     fun choosePanelMode(mode: PanelMode) {
-        mutableUi.update { it.copy(panelMode = mode) }
+        mutableUi.update { it.copy(panelMode = mode, sort = WaiverNav.sort(mode)) }
     }
 
-    /** A panel card tapped: its list opened under the row, or closed when it was the one open. */
-    fun toggleCard(key: String) {
-        mutableUi.update { it.copy(openCard = if (it.openCard == key) null else key) }
-    }
-
-    /** A free agent's Add on the panel (WaiverScreen.svelte addFromPanel): the add with the advice's
-     * drop, through the screen's one verb (the claim planned here, else the platform's page with his
-     * name). */
-    fun addFromPanel(
-        source: WaiverRow,
+    /** A card chosen: All, or a position read of its own. */
+    fun chooseNav(
+        key: String,
         leagueId: String,
     ): Job? {
-        val model = ui.value.model ?: return null
-        mutableUi.update { it.copy(openRow = null) }
-        return act(model.panelPair(source), leagueId)
+        userChose = true
+        return choosePosition(WaiverPosition.entries.firstOrNull { it.query == key }, leagueId)
+    }
+
+    /** The chosen position read again without dimming its rows or closing an open Add (WaiverScreen.svelte
+     * topUp): once a page's answer lands, after a claim too. An unchanged answer reads it no second time. A
+     * failed top-up keeps the position's own list where it has one, saying nothing; with none yet, the
+     * page's rows there stay and the line says so. */
+    private suspend fun topUp(leagueId: String) {
+        val key = ui.value.position ?: return
+        val page = answer?.advice ?: return
+        val mark = WaiverNav.mark(page)
+        if (mark == toppedFor) return
+        toppedFor = mark
+        latestNarrowing += 1
+        val mine = latestNarrowing
+        try {
+            val advice = decodeEnvelope<WaiverAdvice>(reads.waivers(leagueId, key))
+            if (mine != latestNarrowing || ui.value.position != key) return
+            narrowed = Read(advice, clock.now())
+            mutableUi.update { it.copy(reading = false, problem = null) }
+            redraw()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Unauthorized) {
+            signOut()
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            if (mine != latestNarrowing || ui.value.position != key) return
+            toppedFor = null
+            val said = if (narrowed == null) WaiverNav.firstRead(StartRows.positionWord(key.query)) else null
+            mutableUi.update { it.copy(reading = false, problem = said ?: it.problem) }
+        }
     }
 
     /** The one verb on an add (WaiverScreen.svelte act): the claim planned where it is made from here,
@@ -384,7 +419,17 @@ class WaiverViewModel(
         stamp: Instant,
         stale: Boolean,
     ) {
+        // The first answer, and the first fresh one after a saved one, set the card the screen opens on (the
+        // weakest Need, else All) until the member chooses a card.
+        val opens = answer == null || (!stale && !openedFresh)
         answer = Read(advice, clock.now())
+        openedFresh = openedFresh || !stale
+        if (opens && !userChose) {
+            val opening = WaiverNav.opening(advice)
+            val next = WaiverPosition.entries.firstOrNull { it.query == opening }
+            if (next != ui.value.position) narrowed = null
+            mutableUi.update { ui -> ui.copy(position = next) }
+        }
         draw(stamp, stale)
     }
 
@@ -400,8 +445,16 @@ class WaiverViewModel(
     ) {
         val page = answer ?: return
         val shownRead = narrowed
-        val model = WaiverModel(page.advice, shownRead?.advice, league, shownRead?.at ?: page.at, zone)
+        val model = WaiverModel(page.advice, shown(page.advice), league, shownRead?.at ?: page.at, zone, page.at)
         mutableUi.update { it.copy(state = WaiverState.Loaded(model, stamp, stale)) }
+    }
+
+    /** The answer the table draws (WaiverScreen.svelte shown): the chosen position's own read, less anyone
+     * the page's fresher answer has on the member's roster; until it lands the page's rows at the position;
+     * the page's own for All. */
+    private fun shown(page: WaiverAdvice): WaiverAdvice? {
+        narrowed?.let { return WaiverNav.withoutRostered(it.advice, page.roster).copy(roster = page.roster) }
+        return ui.value.position?.let { WaiverNav.atPosition(page, it.query) }
     }
 
     private fun signOut() {

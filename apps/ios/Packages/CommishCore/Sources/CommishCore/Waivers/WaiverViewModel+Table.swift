@@ -2,7 +2,7 @@ import CommishAPI
 import CommishDesign
 import Foundation
 
-/// The table's controls (WaiverScreen.svelte): the position chips, each a read of its own past the page's
+/// The table's controls (WaiverScreen.svelte): the position cards, each a read of its own past the page's
 /// first 60 rows; the name search; the sortable heads.
 public extension WaiverViewModel {
     /// The table as the sort and the search draw it, empty before an answer.

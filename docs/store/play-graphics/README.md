@@ -20,13 +20,15 @@ The script runs `./gradlew :storeshots:testDebugUnitTest -PstoreGraphics=<this f
 | `icon-512.png` | 512 x 512 | 32-bit PNG, RGBA | App icon | `web/static/icons/icon-512.png` pixel for pixel, re-saved with an alpha channel (opaque) |
 | `feature-graphic.png` | 1024 x 500 | 24-bit PNG, no alpha | Feature graphic | The whistle (the `Mark` composable) and "Commish" in Outfit on the dark page colour |
 | `phone-1-lineup.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 1 | "The lineup to start, every week": Lineup, Saturday noon, four changes filling every slot and the verb that makes them |
-| `phone-2-waivers.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 2 | "Your best add on waivers": Waivers, the two pickups with the best first and the claim pinned |
+| `phone-2-waivers.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 2 | "Your best add on waivers": Waivers, the two pickups with the best first, the position cards opening on the weakest Need (TE), and the claim pinned |
 | `phone-3-trades.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 3 | "Trades that help both teams": Trades, two trades worth proposing with each side's gain |
 | `phone-4-matchup.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 4 | "Your game, kept up to date": Matchup, Sunday afternoon with points coming in |
 | `phone-5-rankings.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 5 | "Our rest-of-season order": Rankings, every position with week 6's game beside each player |
 | `phone-6-board.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 6 | "The board in every format": the PPR draft board from its top, over replacement and the gap to ADP |
 | `phone-7-mock-room.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 7 | "Our call at every pick": a mock draft against bots at pick 5.05, our call above the pool, full screen as the app draws the room |
 | `phone-8-player-page.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 8 | "Every number with its basis": a player's page, his week's game and figures, the projection and where drafters take him |
+
+Last drawn: `phone-2-waivers.png` on 2026-10-31 in Lane 308 (the position cards); every other file on 2026-10-27 in Lane 255. A full redraw today also moves phone-1 and phone-3 by a few bytes, so redraw one file at a time and keep the rest.
 
 Upload the eight phone shots in this order: the captions are drawn into each image, so the order is the listing's §1.2.
 
