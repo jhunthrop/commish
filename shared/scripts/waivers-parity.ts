@@ -66,6 +66,7 @@ import type {
 import {
   bidLabel,
   bidProblem,
+  addKey,
   claimsAdd,
   claimsOnHost,
   hostSaid,
@@ -79,11 +80,19 @@ import {
 import { LINES, verbWords } from "../../web/src/lib/league/inseason/words.ts";
 import {
   PANEL,
-  panelCards,
-  panelExplain,
   panelHasWeek,
   type PanelMode,
 } from "../../web/src/lib/league/box/positions.ts";
+import {
+  atPosition,
+  navCards,
+  navCounts,
+  navLead,
+  navSort,
+  openingKey,
+  yoursRows,
+  type NavKey,
+} from "../../web/src/lib/league/box/position-nav.ts";
 import { cells } from "./lineup-parity.ts";
 
 export const WAIVERS_OUTPUT = "shared/fixtures/parity/waivers.json";
@@ -207,65 +216,83 @@ function tableKeys(
   };
 }
 
-/** What the panel's figures are, said once in each clock's panel: an app holds the words and the
- * rules, never the stand-in's numbers (Lane 291 review M6). */
-const PANEL_FIGURES =
-  "Panel figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.";
+/** What the cards' figures are, said once in each screen's nav: an app holds the words and the rules,
+ * never the stand-in's numbers (Lane 291 review M6). */
+const NAV_FIGURES =
+  "Card figures come from the fixture's stand-in (web/scripts/inseason-fixture/positions.ts): hold the words and rules, not the numbers. The fixture's board places no defense, so its D/ST card ranks the member's defense against teams given none.";
 
-/** The position panel as the web draws it (positions.ts, Lane 291; the apps draw it, the web now navigates by position-nav.ts, Lane 305): for each
- * figure the toggle reads, each card's words and its ranked list, each free agent's Beats words and
- * verb; null on an answer without the panel. */
-function panelOf(
-  advice: WaiverAdvice,
-  host: LeagueHost,
-  zone: string,
-  at: number,
-): unknown {
-  if (advice.positions === undefined) return null;
+/** The position cards as the web's Waivers navigates by them (position-nav.ts, Lane 305): the card it
+ * opens on, whether the toggle is drawn, and for each figure the toggle reads the row of cards (All
+ * first, then a card a position, or a count card a position the rows hold where the answer carries no
+ * panel), the line over the comparison and the member's players for every card, and the list's sort;
+ * then the page answer's rows at each card, by key, until the position's own read lands. */
+function navOf(advice: WaiverAdvice, zone: string, at: number): unknown {
+  const all = poolRows(
+    { rows: advice.rows, pickups: advice.pickups, roster: advice.roster },
+    zone,
+    at,
+  );
+  const byPosition = new Map(
+    POSITIONS.map(
+      (p) =>
+        [
+          p,
+          navCounts(all.filter((r) => r.source.add.player.position === p)),
+        ] as const,
+    ).filter(([, c]) => c.free > 0),
+  );
   const modes: readonly PanelMode[] = panelHasWeek(advice)
     ? ["season", "week"]
     : ["season"];
+  const keys: NavKey[] = navCards(
+    advice,
+    "season",
+    navCounts(all),
+    byPosition,
+  ).map((c) => c.key);
   const byMode = Object.fromEntries(
-    modes.map((mode) => {
-      const cards = panelCards(advice, mode, zone, at);
-      return [
-        mode,
-        {
-          explain: panelExplain(mode, cards),
-          cards: cards.map((c) => ({
-            key: c.key,
-            rank: c.rank,
-            figure: c.figure,
-            median: c.standing === null ? null : `${c.median} ${PANEL.median}`,
-            need: c.need ? PANEL.need : null,
-            mine: c.mine.map((e) => ({
-              name: e.name,
-              team: e.team,
-              mark: `${PANEL.yours}, ${e.mark}`,
-              figure: e.figure,
+    modes.map((mode) => [
+      mode,
+      {
+        explain: PANEL.explain[mode],
+        sort: navSort(mode),
+        cards: navCards(advice, mode, navCounts(all), byPosition),
+        leads: Object.fromEntries(
+          keys.map((key) => [key, navLead(advice, key, mode)]),
+        ),
+        yours: Object.fromEntries(
+          keys.map((key) => [
+            key,
+            yoursRows(advice, key, mode, zone, at).map((r) => ({
+              key: r.key,
+              name: r.row.name,
+              rest: r.rest,
+              role: r.role,
+              starts: r.starts,
             })),
-            free: c.free.map((e) => ({
-              key: e.key,
-              name: e.name,
-              team: e.team,
-              mark: e.mark,
-              figure: e.figure,
-              beats: e.beats,
-              verb: LINES.add,
-              move: e.pool
-                ? addVerbWords(
-                    advice.moves,
-                    e.pool.source.add.player.host_id,
-                    host,
-                  )
-                : null,
-            })),
-          })),
-        },
-      ];
-    }),
+          ]),
+        ),
+      },
+    ]),
   );
-  return { figures: PANEL_FIGURES, ...byMode };
+  return {
+    figures: NAV_FIGURES,
+    opening: openingKey(advice),
+    hasWeek: panelHasWeek(advice),
+    ...byMode,
+    atPosition: Object.fromEntries(
+      keys.map((key) => {
+        const here = atPosition(advice, key);
+        return [
+          key,
+          {
+            rows: here.rows.map((r) => addKey(r)),
+            stash: (here.stash ?? []).map((r) => addKey(r)),
+          },
+        ];
+      }),
+    ),
+  };
 }
 
 /** The Waivers at one clock, as the web's phone draws it: `advice` the page's answer, `shown` the
@@ -312,7 +339,7 @@ export function waiversAt(
     positions: POSITIONS.filter((p) =>
       advice.rows.some((r) => r.add.player.position === p),
     ).map((p) => ({ position: p, word: positionWord(p) })),
-    panel: panelOf(advice, host, zone, at),
+    nav: navOf(advice, zone, at),
     projected: weekProjected(shown),
     arrives: arrivesPart(shown, addressedWeek(shown), zone),
     heads: headBasisText(
