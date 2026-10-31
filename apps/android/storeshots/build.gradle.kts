@@ -9,8 +9,9 @@ plugins {
     alias(libs.plugins.paparazzi)
 }
 
-// The shared fixtures with the recorded league's names replaced (store-names.json says why).
-val storeNames = file("store-names.json")
+// The shared fixtures with the recorded league's names replaced (shared/store/store-names.json says why;
+// the App Store shots read the same file, apps/ios/scripts/store-shots.ts).
+val storeNames = rootDir.resolve("../../shared/store/store-names.json")
 
 @Suppress("UNCHECKED_CAST")
 val namePairs: List<List<String>> =

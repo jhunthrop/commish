@@ -16,6 +16,8 @@ public struct SnapshotDevice: Sendable, Equatable {
 
     public static let iPhone15 = SnapshotDevice(name: "iPhone15", width: 393, height: 852, scale: 3)
     public static let iPhone17Pro = SnapshotDevice(name: "iPhone17Pro", width: 402, height: 874, scale: 3)
+    /// The 6.9-inch class the App Store's large screenshots are sized for (1320 x 2868 at 3x).
+    public static let iPhone17ProMax = SnapshotDevice(name: "iPhone17ProMax", width: 440, height: 956, scale: 3)
     public static let iPhoneSE = SnapshotDevice(name: "iPhoneSE", width: 375, height: 667, scale: 2)
     public static let all = [iPhone15, iPhoneSE]
     /// The two phones the screens plan draws every screen at (plan 2026-10-24-mobile-screens).
@@ -155,7 +157,8 @@ public enum Snapshot {
         return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
 
-    static func write(_ image: CGImage, to url: URL) -> Bool {
+    /// Writes `image` as an opaque 24-bit PNG (no alpha channel), its folder made as needed.
+    public static func write(_ image: CGImage, to url: URL) -> Bool {
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         guard let opaque = opaque(image),
               let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)

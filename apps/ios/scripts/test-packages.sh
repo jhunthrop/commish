@@ -10,7 +10,7 @@ source scripts/toolchain.sh
 cd Packages
 packages=("$@")
 if [ ${#packages[@]} -eq 0 ]; then
-  packages=(CommishAPI CommishDesign CommishCore Features/LeagueHome Features/Shell Features/Start Features/Matchup Features/Board Features/Waivers Features/Player Features/Trades Features/Rankings Features/Record Features/Account Features/Reference Features/Companion Features/MockRoom Features/Sheet)
+  packages=(CommishAPI CommishDesign CommishCore Features/LeagueHome Features/Shell Features/Start Features/Matchup Features/Board Features/Waivers Features/Player Features/Trades Features/Rankings Features/Record Features/Account Features/Reference Features/Companion Features/MockRoom Features/Sheet StoreShots)
 fi
 flags=()
 developer_dir="$(xcode-select -p)"

@@ -12,8 +12,15 @@ public struct RunFixture: Sendable {
     /// The stand-in, shared/fixtures/standin-run: the PPR board of the full season, before the draft.
     public static let standIn = RunFixture(folder: "standin-run")
 
-    /// The repository's shared/fixtures, found from this file's place in it.
-    static let fixtures = URL(fileURLWithPath: #filePath)
+    /// The environment variable naming a folder that stands in for shared/fixtures: the App Store
+    /// screenshots read a copy with the recorded league's names replaced (apps/ios/scripts/store-shots.ts).
+    public static let fixturesVariable = "COMMISH_FIXTURES"
+
+    /// The repository's shared/fixtures, found from this file's place in it, or the folder
+    /// `COMMISH_FIXTURES` names.
+    public static let fixtures = ProcessInfo.processInfo.environment[fixturesVariable]
+        .map { URL(fileURLWithPath: $0).standardized }
+        ?? URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .appendingPathComponent("../../../../../../shared/fixtures")
         .standardized

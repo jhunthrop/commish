@@ -34,11 +34,11 @@ Required for an iPhone-only app: at least one, at most ten, for "iPhone with Dyn
 
 | Display | Required | Size to render (portrait) | Count |
 | --- | --- | --- | --- |
-| iPhone with Dynamic Island, medium (6.3-inch class) | Yes | 1206 x 2622 (1179 x 2556 also accepted) | 8 |
-| iPhone with Dynamic Island, large (6.9-inch class) | Recommended | 1320 x 2868 (1290 x 2796, 1260 x 2736 also accepted) | 8 |
+| iPhone with Dynamic Island, medium (6.3-inch class) | Yes | 1206 x 2622 (1179 x 2556 also accepted): `docs/store/app-store-graphics/medium-1-lineup.png` to `medium-8-player-page.png` (Lane 309) | 8 |
+| iPhone with Dynamic Island, large (6.9-inch class) | Recommended | 1320 x 2868 (1290 x 2796, 1260 x 2736 also accepted): `docs/store/app-store-graphics/large-1-lineup.png` to `large-8-player-page.png` (Lane 309) | 8 |
 | iPad 13-inch | No | The app is iPhone only | 0 |
 
-The eight shots and captions are the Play file's §1.2, in the same order, so the two listings read as one: the lineup to start, waivers, trades, matchup, rankings, board, mock room, player page. Rendered from fixtures in the dark theme. The iOS snapshot suite records on CI (macos-26, Xcode 26.6), so the store shots come from a simulator at the sizes above, not from the snapshot files.
+The eight shots and captions are the Play file's §1.2, in the same order, so the two listings read as one: the lineup to start, waivers, trades, matchup, rankings, board, mock room, player page. Rendered from fixtures in the dark theme, on CI: ios.yml's `store_shots` dispatch draws the app's own screens (the `StoreShots` package) with the renderer the snapshot suite uses, on macos-26 with the pinned Xcode, at the exact sizes above, PNG with no alpha. How they are drawn, what each shows and how to redraw them: `docs/store/app-store-graphics/README.md`.
 
 ## 3. Age rating questionnaire
 
@@ -150,8 +150,8 @@ The last sentence holds from the build that carries Lane 237's Delete account (�
 | Asset | Size | Exists | Where |
 | --- | --- | --- | --- |
 | App icon | 1024 x 1024 PNG, no alpha | Yes, 1024 x 1024 RGB | `apps/ios/Commish/Assets.xcassets/AppIcon.appiconset/AppIcon.png` |
-| Screenshots, medium Dynamic Island | 1206 x 2622, no alpha | **Missing** | Render from fixtures on a simulator, add §2 captions |
-| Screenshots, large Dynamic Island | 1320 x 2868, no alpha | **Missing** | As above |
+| Screenshots, medium Dynamic Island | 1206 x 2622, no alpha | Yes, 8 (Lane 309) | `docs/store/app-store-graphics/medium-*.png`, §2 captions drawn in |
+| Screenshots, large Dynamic Island | 1320 x 2868, no alpha | Yes, 8 (Lane 309) | `docs/store/app-store-graphics/large-*.png`, §2 captions drawn in |
 | iPad screenshots | | Not needed | iPhone only |
 | App preview | | Not needed | |
 
