@@ -32,6 +32,8 @@ Each shot comes in two sizes, the same image laid out at each phone's width: `me
 | `medium-7-mock-room.png`, `large-7-mock-room.png` | Screenshot 7 | "Our call at every pick": a mock draft against bots at pick 5.05, our call above the pool, full screen as the app draws the room |
 | `medium-8-player-page.png`, `large-8-player-page.png` | Screenshot 8 | "Every number with its basis": a player's page, his week's game and figures, the projection and where drafters take him |
 
+Last drawn: every file on 2026-10-31 in Lane 309, ios.yml store_shots run 41234635794 (macos-26, Xcode 26.6).
+
 Upload the eight at each size in this order: the captions are drawn into each image, so the order is the Play listing's §1.2, which the App Store listing follows.
 
 ## What the shots hold
