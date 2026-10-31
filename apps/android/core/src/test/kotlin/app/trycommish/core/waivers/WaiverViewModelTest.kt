@@ -49,7 +49,7 @@ import java.io.IOException
  * a transport that throws); the claim's round trip against a stub over the fixture API's own answers
  * (plan, the bid planned again once it rests, confirm, done, refused and pending); the platform's page
  * with his name copied where the claim is not made here; a row's drop panel and the pair the verb then
- * makes; the position chips as reads of their own, the search and the sortable heads.
+ * makes; the position cards as reads of their own, the search and the sortable heads.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WaiverViewModelTest {
@@ -425,7 +425,8 @@ class WaiverViewModelTest {
             vm.choosePosition(WaiverPosition.WR, WaiverFixtures.FFPC)
             assertTrue(vm.ui.value.reading, "the last rows stand, quieter, while the position is read")
             advanceUntilIdle()
-            assertEquals(listOf(null, WaiverPosition.WR), stub.asked)
+            // The screen opened on the TE Need, read quietly, before the WR card.
+            assertEquals(listOf(null, WaiverPosition.TE, WaiverPosition.WR), stub.asked)
             assertFalse(vm.ui.value.reading)
             vm.find("dotson")
             val found = vm.ui.value.table.rows
@@ -461,15 +462,16 @@ class WaiverViewModelTest {
     @Test
     fun `a position that cannot be read says so and the last read stands`() =
         runTest(main) {
-            val stub = WaiverStub(WaiverFixtures.waivers(WaiverFixtures.FFPC)).apply { failsPosition = true }
+            val page = WaiverFixtures.waivers(WaiverFixtures.FFPC)
+            val stub = WaiverStub(page).apply { failsPosition = true }
             val vm = viewModel(stub, host = LeagueHost.ffpc)
             open(vm, WaiverFixtures.FFPC)
-            val before = vm.ui.value.table.rows.size
             vm.choosePosition(WaiverPosition.QB, WaiverFixtures.FFPC)
             advanceUntilIdle()
             assertEquals("These could not be read just now. The last read stands.", vm.ui.value.problem)
             assertFalse(vm.ui.value.reading)
-            assertEquals(before, vm.ui.value.table.rows.size)
+            // The page's own quarterbacks stand.
+            assertEquals(page.rows.count { it.add.player.position == "QB" }, vm.ui.value.table.rows.size)
         }
 
     @Test
@@ -495,7 +497,12 @@ class WaiverViewModelTest {
             advanceUntilIdle()
             narrowing?.join()
             assertEquals(
-                listOf("/leagues/attached/${WaiverFixtures.FFPC}/waivers", "/leagues/attached/${WaiverFixtures.FFPC}/waivers?position=DEF"),
+                listOf(
+                    "/leagues/attached/${WaiverFixtures.FFPC}/waivers",
+                    // The screen opened on the TE Need, read quietly, before the D/ST card.
+                    "/leagues/attached/${WaiverFixtures.FFPC}/waivers?position=TE",
+                    "/leagues/attached/${WaiverFixtures.FFPC}/waivers?position=DEF",
+                ),
                 paths,
             )
             assertTrue(
@@ -578,8 +585,8 @@ private fun parityAdvice(name: String): WaiverAdvice {
  * position's own read where one is given), the plan the fixture's plan with the bid asked for, the make
  * the fixture's outcome (or no answer at all); each call kept. */
 internal class WaiverStub(
-    private val advice: WaiverAdvice,
-    private val positions: Map<WaiverPosition, WaiverAdvice> = emptyMap(),
+    var advice: WaiverAdvice,
+    var positions: Map<WaiverPosition, WaiverAdvice> = emptyMap(),
     private val plan: HostMovePlan? = null,
     private val result: HostMoveResult? = null,
 ) : WaiverReads {

@@ -8,6 +8,8 @@ import app.trycommish.core.start.FootRun
 import app.trycommish.core.start.MoveKind
 import app.trycommish.core.start.MovePanel
 import app.trycommish.core.start.MoveStep
+import app.trycommish.core.start.StartRows
+import app.trycommish.design.Words
 import java.time.Instant
 import java.time.ZoneId
 
@@ -76,9 +78,8 @@ data class WaiverUi(
     val problem: String? = null,
     val sort: WaiverSort = WaiverSort.Initial,
     val query: String = "",
-    /** The position panel's figures and its open card, by position (none open at first). */
+    /** The toggle: the cards and the list read for the rest of the season or this week. */
     val panelMode: PanelMode = PanelMode.Season,
-    val openCard: String? = null,
 ) {
     val loaded: WaiverState.Loaded? get() = state as? WaiverState.Loaded
     val model: WaiverModel? get() = loaded?.model
@@ -86,14 +87,36 @@ data class WaiverUi(
     /** The table as the sort and the search draw it, empty before an answer. */
     val table: WaiverTable get() = model?.table(sort, query) ?: WaiverTable.Empty
 
-    /** The position panel's cards in the toggle's figures, none before an answer or from one without it. */
-    val panel: List<PanelCard> get() = model?.panel(panelMode).orEmpty()
+    /** The chosen card's key: a position, or All. */
+    val navKey: String get() = position?.query ?: WaiverNav.ALL
 
-    /** The card whose list is open, if any. */
-    val openedCard: PanelCard? get() = openCard?.let { key -> panel.firstOrNull { it.key == key } }
+    /** The position cards in the toggle's figures, none before an answer. */
+    val nav: List<NavCard> get() = model?.nav(panelMode).orEmpty()
 
-    /** Whether the panel's toggle is drawn: the answer reads this week's figures. */
-    val panelHasWeek: Boolean get() = model?.panelHasWeek ?: false
+    /** Whether the toggle is drawn: the answer reads this week's figures. */
+    val navHasWeek: Boolean get() = model?.navHasWeek ?: false
+
+    /** The line over the comparison. */
+    val lead: NavLead? get() = model?.lead(navKey, panelMode)
+
+    /** The member's players at the chosen position over its free agents; null for All or a position the
+     * answer carries no card for. */
+    val compare: NavCompare?
+        get() {
+            val model = model ?: return null
+            val position = position ?: return null
+            if (model.advice.positions
+                    .orEmpty()
+                    .none { it.position.value == position.query }
+            ) {
+                return null
+            }
+            val word = StartRows.positionWord(position.query)
+            return NavCompare(WaiverNav.yours(word), WaiverNav.freeAt(word), model.yours(position.query, panelMode))
+        }
+
+    /** What the table says with no row: no free agent at the chosen position, else none found. */
+    val empty: String get() = if (compare != null && query.isEmpty()) Words.WaiverPanel.noneFree else Words.Waivers.noneFound
 
     /** The open row, if any. */
     val opened: PoolRow? get() = openRow?.let { key -> model?.rows?.firstOrNull { it.key == key } }

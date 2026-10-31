@@ -28,6 +28,7 @@ import app.trycommish.core.start.StartFixtures
 import app.trycommish.core.waivers.PanelMode
 import app.trycommish.core.waivers.WaiverFixtures
 import app.trycommish.core.waivers.WaiverKeys
+import app.trycommish.core.waivers.WaiverNav
 import app.trycommish.core.waivers.WaiverPin
 import app.trycommish.core.waivers.WaiverPosition
 import app.trycommish.core.waivers.WaiverReads
@@ -56,13 +57,12 @@ import java.io.IOException
  * The Waivers screen's mock, the same states as the iOS screen's (Lane 186 after its fix round), each the
  * view model's over the shared fixtures through a stub of the API. The table before the wire clears (the
  * FFPC stand-in at Saturday noon, its verb the platform's page): the phone's first screen with the verb
- * pinned, then the strip, the chips, the search and the rows that gain, then the rest with the basis. The
- * D/ST chip's own read; the table sorted by name; a wide receiver past the page's rows reached by the WR
- * chip's read and his name searched. An add's drop panel open on ESPN with the pair pinned. The claim on
+ * pinned, then the strip, the position cards (landing on the weakest Need, TE, the member's tight ends over
+ * the free ones), the search and the rows that gain, then the rest with the basis. The D/ST card's own
+ * read (this week's Proj on Rest of season); the table sorted by name; a wide receiver past the page's rows
+ * reached by the WR card's read and his name searched; This week on the TE card; the All card. An add's drop panel open on ESPN with the pair pinned. The claim on
  * the ESPN stand-ins: confirmed with its bid in waiver dollars (FAAB), pending with the time ESPN runs it,
  * refused in ESPN's own words, done. And a saved read with no signal, the verb disabled with its stamp.
- * The position panel (Lane 304): a card open on the rest of the season, on This week, with no free agent
- * and with no figure.
  * Both themes, a Pixel 9 and a small phone (the Nexus 5's 360 by 640 dp). The persona panel reads these.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -86,26 +86,20 @@ class WaiverSnapshotTest(
         Done("done", WaiverFixtures.DONE, listOf(Part.Pin)),
         Stale("stale", WaiverFixtures.PENDING, listOf(Part.Phone)),
 
-        /** The D/ST chip chosen: the defenses' own read under the page's strip. */
+        /** The D/ST card chosen: its card ranks this week's Proj; the defenses' own read under the strip. */
         Narrowed("narrowed", WaiverFixtures.FFPC, listOf(Part.Top)),
 
         /** The table sorted by name, A to Z, its head lit with the caret. */
         Sorted("sorted", WaiverFixtures.FFPC, listOf(Part.Top)),
 
-        /** A wide receiver past the page's rows reached: the WR chip's read, his name searched. */
+        /** A wide receiver past the page's rows reached: the WR card's read, his name searched. */
         Reach("reach", WaiverFixtures.FFPC, listOf(Part.Top, Part.Foot)),
 
-        /** The position panel's QB card open on the rest of the season: Need, his three, five free agents. */
-        Positions("positions", WaiverFixtures.FFPC, listOf(Part.Positions)),
+        /** The toggle on This week on the landing's TE card: every card on the week, the list by Proj. */
+        Week("week", WaiverFixtures.FFPC, listOf(Part.Top)),
 
-        /** The toggle on This week, the TE card open: the week's own free agents by Proj. */
-        PositionsWeek("positionsWeek", WaiverFixtures.FFPC, listOf(Part.Positions)),
-
-        /** The RB card open: no free agent we list plays there. */
-        PositionsEmpty("positionsEmpty", WaiverFixtures.FFPC, listOf(Part.Positions)),
-
-        /** The D/ST card open: no rest-of-season figure, so no rank and no median. */
-        PositionsDefense("positionsDefense", WaiverFixtures.FFPC, listOf(Part.Positions)),
+        /** The All card: every free agent, no player of the member's. */
+        All("all", WaiverFixtures.FFPC, listOf(Part.Top)),
         ;
 
         val espn: Boolean get() = league != WaiverFixtures.FFPC
@@ -122,9 +116,6 @@ class WaiverSnapshotTest(
         Panel("panel"),
         Foot("foot"),
         Pin("pin"),
-
-        /** The position panel alone, its card open on its list. */
-        Positions("positions"),
     }
 
     enum class Phone(
@@ -152,10 +143,9 @@ class WaiverSnapshotTest(
     @Test
     fun waivers() {
         val mode = if (part == Part.Phone || part == Part.Pin) RenderingMode.SHRINK else RenderingMode.V_SCROLL
-        // The long runs (every row past the gaining ones, every drop of the panel, an open position's
-        // list) are drawn at 1x, as
-        // iOS records, so each reference stays under 300 KB; the rest at 2x as the Start screen's.
-        val long = part == Part.Foot || part == Part.Panel || part == Part.Positions
+        // The long runs (every row past the gaining ones, every drop of the panel) are drawn at 1x, as iOS
+        // records, so each reference stays under 300 KB; the rest at 2x as the Start screen's.
+        val long = part == Part.Foot || part == Part.Panel
         paparazzi.unsafeUpdateConfig(deviceConfig = if (long) oneX(phone.config) else phone.config, renderingMode = mode)
         val vm = viewModelAt(scene)
         val ui = vm.ui.value
@@ -240,7 +230,11 @@ internal fun viewModelAt(scene: WaiverSnapshotTest.Scene): WaiverViewModel {
                 if (scene.espn) {
                     emptyMap()
                 } else {
-                    mapOf(WaiverPosition.DEF to WaiverFixtures.defBody(), WaiverPosition.WR to envelopeOf(receivers))
+                    mapOf(
+                        WaiverPosition.DEF to WaiverFixtures.defBody(),
+                        WaiverPosition.WR to envelopeOf(receivers),
+                        WaiverPosition.TE to envelopeOf(full.copy(rows = full.rows.filter { it.add.player.position == "TE" })),
+                    )
                 },
         )
     val host = if (scene.espn) LeagueHost.espn else LeagueHost.ffpc
@@ -263,19 +257,14 @@ internal fun viewModelAt(scene: WaiverSnapshotTest.Scene): WaiverViewModel {
             vm.press(league)
             vm.confirm(league)
         }
-        WaiverSnapshotTest.Scene.Narrowed -> vm.choosePosition(WaiverPosition.DEF, league)
+        WaiverSnapshotTest.Scene.Narrowed -> vm.chooseNav("DEF", league)
         WaiverSnapshotTest.Scene.Sorted -> vm.sortBy(WaiverSortKey.Name)
         WaiverSnapshotTest.Scene.Reach -> {
-            vm.choosePosition(WaiverPosition.WR, league)
+            vm.chooseNav("WR", league)
             vm.find("dotson")
         }
-        WaiverSnapshotTest.Scene.PositionsWeek -> {
-            vm.choosePanelMode(PanelMode.Week)
-            vm.toggleCard("TE")
-        }
-        WaiverSnapshotTest.Scene.Positions -> vm.toggleCard("QB")
-        WaiverSnapshotTest.Scene.PositionsEmpty -> vm.toggleCard("RB")
-        WaiverSnapshotTest.Scene.PositionsDefense -> vm.toggleCard("DEF")
+        WaiverSnapshotTest.Scene.Week -> vm.choosePanelMode(PanelMode.Week)
+        WaiverSnapshotTest.Scene.All -> vm.chooseNav(WaiverNav.ALL, league)
         WaiverSnapshotTest.Scene.Before, WaiverSnapshotTest.Scene.Stale -> Unit
     }
     return vm
@@ -314,7 +303,6 @@ private fun Mock(
         WaiverSnapshotTest.Part.Foot -> WaiverPage(model, ui, stamp, actions, listOf(WaiverPart.Foot), bg)
         WaiverSnapshotTest.Part.Panel -> WaiverOpenRow(model, ui, actions, bg)
         WaiverSnapshotTest.Part.Pin -> WaiverPinView(pin, WaiverPinActions(), still = true)
-        WaiverSnapshotTest.Part.Positions -> WaiverPositions(ui, actions, bg)
     }
 }
 

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,11 +41,13 @@ import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.waivers.BeatsCell
 import app.trycommish.core.waivers.DropHead
 import app.trycommish.core.waivers.DropRow
+import app.trycommish.core.waivers.NavCompare
 import app.trycommish.core.waivers.PoolRow
 import app.trycommish.core.waivers.WaiverModel
 import app.trycommish.core.waivers.WaiverSort
 import app.trycommish.core.waivers.WaiverSortKey
 import app.trycommish.core.waivers.WaiverTable
+import app.trycommish.core.waivers.YoursRow
 import app.trycommish.design.CommishTheme
 import app.trycommish.design.Faces
 import app.trycommish.design.NumWeight
@@ -91,6 +94,10 @@ class TableActions(
     val sort: WaiverSort = WaiverSort.Initial,
     val onSort: (WaiverSortKey) -> Unit = {},
     val reading: Boolean = false,
+    /** The member's players at the chosen position over its free agents, null for All (Lane 305). */
+    val compare: NavCompare? = null,
+    /** What the table says with no row: no free agent at the chosen position, else none found. */
+    val empty: String = Words.Waivers.noneFound,
 )
 
 /** Which of the table's groups a part draws. */
@@ -128,13 +135,22 @@ internal fun WaiverTableView(
         TableFrame {
             WaiverHeadRow(model.projected, actions.sort, actions.onSort)
             HeadsLine(model.heads)
+            val compare = actions.compare
+            if (TableGroup.Gaining in groups && compare != null) {
+                // The member's players there, then the free agents: each head only over rows of its own.
+                if (compare.rows.isNotEmpty()) {
+                    SectionRow(compare.yours)
+                    compare.rows.forEach { YoursRowView(it, model.projected, actions.open) }
+                }
+                if (table.rows.isNotEmpty()) SectionRow(compare.free)
+            }
             if (TableGroup.Gaining in groups) table.gaining.forEach { Entry(it, model, actions) }
             if (TableGroup.Opened in groups) table.rows.filter { it.key == actions.opened }.forEach { Entry(it, model, actions) }
             if (TableGroup.Rest in groups && table.rest.isNotEmpty()) {
                 SectionRow(Words.Waivers.noGain)
                 table.rest.forEach { Entry(it, model, actions) }
             }
-            if (TableGroup.Gaining in groups && table.gaining.isEmpty() && table.rest.isEmpty()) NoteRow(Words.Waivers.noneFound)
+            if (TableGroup.Gaining in groups && table.gaining.isEmpty() && table.rest.isEmpty()) NoteRow(actions.empty)
             if (TableGroup.Stash in groups && (table.stash.isNotEmpty() || model.stashLine.isNotEmpty())) {
                 SectionRow(Words.Stash.head)
                 if (model.stashLine.isNotEmpty()) NoteRow(model.stashLine.joinToString(" "))
@@ -221,6 +237,33 @@ private fun WaiverRowView(
         if (projected) Figure(row.cells.proj, WaiverColumn.proj)
         BeatsView(row.beats, quiet = !row.gains, Modifier.width(WaiverColumn.beats))
         Box(Modifier.width(WaiverColumn.act), contentAlignment = Alignment.CenterEnd) { RowButton(row, open, actions) }
+    }
+    Hairline()
+}
+
+/** One of the member's players at the chosen position (WaiverTable.svelte's Your rows): his cell with the
+ * evidence line and A game, Proj, and Starter or Bench where a free agent's Beats is; no verb. */
+@Composable
+private fun YoursRowView(
+    row: YoursRow,
+    projected: Boolean,
+    open: (SheetPlayer) -> Unit,
+) {
+    val c = CommishTheme.colors
+    Row(
+        Modifier.fillMaxWidth().background(c.surface2).padding(horizontal = Tokens.Space.s2.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PlayerCell(row.cells, open, Modifier.weight(1f), sheetPlayer = row.sheetPlayer, evidence = row.evidence, facts = false)
+        if (projected) Figure(row.cells.proj, WaiverColumn.proj)
+        Text(
+            row.role,
+            style = Faces.label.copy(fontWeight = if (row.starts) FontWeight.Bold else FontWeight.Normal, letterSpacing = 0.sp),
+            color = if (row.starts) c.ink else c.ink3,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(WaiverColumn.beats),
+        )
+        Spacer(Modifier.width(WaiverColumn.act))
     }
     Hairline()
 }
