@@ -30,6 +30,7 @@ import app.trycommish.design.Faces
 import app.trycommish.design.QuietButton
 import app.trycommish.design.Tokens
 import app.trycommish.design.Words
+import app.trycommish.feature.boxscore.BasisText
 import app.trycommish.feature.boxscore.Hairline
 
 /** A section's head as the iOS Account draws it: the name in the number face, uppercase, and what it
@@ -125,7 +126,8 @@ internal fun ProblemText(text: String) {
 }
 
 /** The page's foot (AccountFoot.svelte): the quiet Delete account verb, which opens the confirmation
- * dialog, then the two legal pages, each link the site's and each its own TalkBack stop. */
+ * dialog, then the two legal pages, each link the site's and each its own TalkBack stop, and the
+ * not-affiliated line beside them (Lane 310). */
 @Composable
 internal fun AccountFoot(
     deleteAccount: () -> Unit,
@@ -140,6 +142,7 @@ internal fun AccountFoot(
             color = c.ink3,
             modifier = Modifier.fillMaxWidth(),
         )
+        BasisText(Words.NotAffiliated.line)
     }
 }
 

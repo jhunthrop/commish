@@ -227,7 +227,8 @@ struct ProblemText: View {
 }
 
 /// The page's foot (AccountFoot.svelte): the quiet Delete account verb, which opens the confirmation
-/// sheet, then the two legal pages in the basis's quiet type, each link the site's.
+/// sheet, then the two legal pages in the basis's quiet type, each link the site's, and the
+/// not-affiliated line beside them (Lane 310).
 struct AccountFootView: View {
     @Environment(\.colorScheme) private var colorScheme
     let deleteAccount: () -> Void
@@ -245,6 +246,7 @@ struct AccountFootView: View {
                     openLink(url)
                     return .handled
                 })
+            BasisText(Words.NotAffiliated.line)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)

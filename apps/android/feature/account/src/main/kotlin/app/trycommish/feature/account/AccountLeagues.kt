@@ -28,7 +28,8 @@ import app.trycommish.feature.boxscore.Hairline
 
 /** The leagues followed (league/AccountLeagues.svelte) as the web's table reads on a phone: each league's
  * name and team, its record and place, its last read, and Open and Detach; a league detached a moment
- * ago keeps its row with "Detached." and Undo. With none, the web's way to follow one. */
+ * ago keeps its row with "Detached." and Undo. With none, the web's way to follow one. The follow verb
+ * is the app's connect step, so the not-affiliated line sits under it (Lane 310). */
 @Composable
 internal fun AccountLeagues(
     model: AccountModel,
@@ -43,11 +44,15 @@ internal fun AccountLeagues(
             leagues.isEmpty() -> {
                 BasisText(Words.Attached.none)
                 QuietButton(Words.LeagueSwitch.followFirst) { actions.openLink(SiteLinks.LEAGUE_START) }
+                BasisText(Words.NotAffiliated.line)
             }
             else -> {
                 Column { leagues.forEach { LeagueRowView(it, ui.busy, actions) } }
                 ui.problem?.takeIf { it.section == AccountSection.Leagues }?.let { ProblemText(it.text) }
-                if (model.followMore) QuietButton(Words.LeagueSwitch.followAnother) { actions.openLink(SiteLinks.LEAGUE_START) }
+                if (model.followMore) {
+                    QuietButton(Words.LeagueSwitch.followAnother) { actions.openLink(SiteLinks.LEAGUE_START) }
+                    BasisText(Words.NotAffiliated.line)
+                }
             }
         }
     }

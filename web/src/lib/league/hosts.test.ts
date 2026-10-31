@@ -15,6 +15,7 @@ import {
 	openLeagueHosts
 } from './hosts.ts';
 import { hostWords } from './names.ts';
+import { NOT_AFFILIATED_LINE } from './affiliation.ts';
 
 const ALL_OPEN = { ffpc: true, yahoo: true, espn: true };
 const SWITCHES = [
@@ -86,4 +87,12 @@ void test("one platforms module says which a live draft is read from and which a
 		assert.ok(openLeagueHosts(SWITCHES[3] ?? ALL_OPEN).includes(host));
 	assert.deepEqual(openLeagueHosts(ALL_OPEN), [...LEAGUE_HOSTS]);
 	assert.deepEqual(openLeagueHosts({ ffpc: false, yahoo: false, espn: false }), ['sleeper', 'mfl']);
+});
+
+void test('the not-affiliated line names every platform a league is read from, whatever the switches (Lane 310)', () => {
+	assert.equal(
+		NOT_AFFILIATED_LINE,
+		'Commish is not affiliated with or endorsed by Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN.'
+	);
+	for (const host of LEAGUE_HOSTS) assert.ok(NOT_AFFILIATED_LINE.includes(hostWords(host)), host);
 });

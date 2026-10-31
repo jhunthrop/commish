@@ -4,7 +4,8 @@ import SwiftUI
 
 /// The leagues followed (league/AccountLeagues.svelte) as the web's table reads on a phone: each
 /// league's name and team, its record and place, its last read, and Open and Detach; a league detached
-/// a moment ago keeps its row with "Detached." and Undo. With none, the web's way to follow one.
+/// a moment ago keeps its row with "Detached." and Undo. With none, the web's way to follow one. The
+/// follow verb is the app's connect step, so the not-affiliated line sits under it (Lane 310).
 struct AccountLeaguesView: View {
     @Environment(\.colorScheme) private var colorScheme
     let model: AccountModel
@@ -18,6 +19,7 @@ struct AccountLeaguesView: View {
                 if leagues.isEmpty {
                     BasisText(Words.Attached.none)
                     QuietButton(Words.LeagueSwitch.followFirst) { actions.openLink(SiteLinks.leagueStart) }
+                    BasisText(Words.NotAffiliated.line)
                 } else {
                     VStack(spacing: 0) {
                         ForEach(leagues) { league in
@@ -29,6 +31,7 @@ struct AccountLeaguesView: View {
                     }
                     if model.followMore {
                         QuietButton(Words.LeagueSwitch.followAnother) { actions.openLink(SiteLinks.leagueStart) }
+                        BasisText(Words.NotAffiliated.line)
                     }
                 }
             } else {

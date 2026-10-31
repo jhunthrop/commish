@@ -69,12 +69,17 @@ export function hostsLine(open: OpenHosts): string {
 	return `Works with ${hosts.join(', ')} and ${last}.`;
 }
 
+/** The hosts' names as one "or" list: "Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN". */
+export function hostsOrList(hosts: readonly LeagueHost[]): string {
+	const names = hosts.map(hostWords);
+	const last = names.pop() ?? '';
+	return names.length > 0 ? `${names.join(', ')} or ${last}` : last;
+}
+
 /** The hosts as the signed-out account page says it, each switched host only where open: "Sleeper,
  * MyFantasyLeague, FFPC, Yahoo or ESPN". */
 export function leagueHostsLine(open: OpenHosts): string {
-	const hosts = openLeagueHosts(open).map(hostWords);
-	const last = hosts.pop() ?? '';
-	return `${hosts.join(', ')} or ${last}`;
+	return hostsOrList(openLeagueHosts(open));
 }
 
 /** Every switched host shut: the account page's line until the hosts answer which are open. */

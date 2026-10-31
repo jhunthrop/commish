@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { links } from '#lib/site/links.ts';
 	import type { AttachedList } from '#lib/league/attached-list.svelte.ts';
+	import NotAffiliated from '#lib/league/NotAffiliated.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
@@ -245,6 +246,7 @@
 				{#each keeps as said (said)}<p>{said}</p>{/each}
 			</div>
 		{/if}
+		<div class="affiliation"><NotAffiliated /></div>
 	{/if}
 </section>
 
@@ -268,6 +270,10 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
+		margin-top: var(--s-2);
+	}
+
+	.affiliation {
 		margin-top: var(--s-2);
 	}
 

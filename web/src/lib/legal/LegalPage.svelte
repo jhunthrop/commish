@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NotAffiliated from '#lib/league/NotAffiliated.svelte';
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import type { HeadMarkup } from '#lib/site/head.ts';
 	import Shell from '#lib/ui/Shell.svelte';
@@ -38,6 +39,7 @@
 				{/each}
 			</section>
 		{/each}
+		<footer class="foot"><NotAffiliated /></footer>
 	</main>
 </Shell>
 
@@ -88,6 +90,12 @@
 
 	a {
 		color: var(--accent-text);
+	}
+
+	.foot {
+		margin-top: var(--s-4);
+		padding-top: var(--s-3);
+		border-top: 1px solid var(--shell-line);
 	}
 
 	@media (max-width: 760px) {

@@ -45,6 +45,7 @@
 		hostWords,
 		hostsLine
 	} from './model.ts';
+	import NotAffiliated from './NotAffiliated.svelte';
 	import { FLAGS } from '#lib/site/flags.ts';
 	import { FOLLOW_FOR } from './phase-words.ts';
 	import { LEAGUE_HOME, SCREEN_PARAM } from '#lib/ui/nav.ts';
@@ -350,6 +351,7 @@
 		{#if FLAGS.in_season_tools}{IN_SEASON_TOOLS_LINE}{/if}
 	</p>
 	<p class="hosts">{hostsLine({ ffpc: ffpcOn, yahoo: yahooOn, espn: espnOn })}</p>
+	<NotAffiliated />
 {/snippet}
 
 {#snippet alert()}
