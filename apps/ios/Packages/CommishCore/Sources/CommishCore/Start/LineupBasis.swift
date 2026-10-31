@@ -16,6 +16,12 @@ enum LineupBasis {
         let totals: LineupTotals
         let zone: TimeZone
         let now: Date
+        /// The platform's words: the league's own, or the store graphics' neutral one (Lane 310).
+        var words: HostWords?
+
+        var platform: String {
+            (words ?? .of(host)).name
+        }
     }
 
     static let pickPhone = "Our pick is each slot's highest \(Words.Box.proj),"
@@ -32,7 +38,7 @@ enum LineupBasis {
             gamePart(lines: facts.lines, zone: facts.zone, now: facts.now),
             drawsFacts(facts) ? nil : finalsPhone(facts),
             Words.Basis.rankOppPhone,
-            ptsPhone(advice.playerPoints, platform: ValueWords.platform(facts.host)),
+            ptsPhone(advice.playerPoints, platform: facts.platform),
             uncounted(advice, lines: facts.lines),
         ]
         return parts.compactMap(\.self).filter { !$0.isEmpty }.joined(separator: " ")
@@ -81,7 +87,7 @@ enum LineupBasis {
         guard let counted, let game = platformGame(counted) else {
             return timing
         }
-        let platform = ValueWords.platform(facts.host)
+        let platform = facts.platform
         let full = facts.lines.contains { LineRead.game($0, now: facts.now) == .kickedOff }
             ? "\(finalLands), \(Words.Box.avg) and \(Words.Box.last) then count \(platform)'s points, "
             + "our stats \(Words.Basis.statsByWednesday)"

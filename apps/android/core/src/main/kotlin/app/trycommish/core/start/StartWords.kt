@@ -2,6 +2,7 @@ package app.trycommish.core.start
 
 import app.trycommish.api.models.WeekDoneState
 import app.trycommish.core.Format
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.design.Words
 import kotlin.math.abs
 
@@ -54,18 +55,18 @@ object StartWords {
         return "$word ${if (count == 1) "change" else "changes"}"
     }
 
-    /** lineup.ts asSetWords: "as set on ESPN". */
-    private fun asSet(platform: String): String = "as set on $platform"
+    /** lineup.ts asSetWords: "as set on ESPN", the platform placed by its own words (Lane 310). */
+    private fun asSet(place: HostWords): String = "as set ${place.placed}"
 
     /** lineup.ts lineupSum: the strip's figure with the platform named. */
     fun lineupSum(
         box: LineupBox,
-        platform: String,
+        host: HostWords,
         done: String?,
     ): StripSum? {
         if (done == null) {
             val proj = box.totals.proj ?: return null
-            val words = asSet(platform)
+            val words = asSet(host)
             if (box.swaps.isEmpty()) return StripSum(number(proj), "${Words.Box.proj} $words", null, null)
             val set = box.asSet?.let { ", ${number(it)} $words" }.orEmpty()
             val gain = box.gain?.takeIf { it > 0 }?.let { "+${Format.fixed(it, 1)}" }
@@ -73,7 +74,7 @@ object StartWords {
         }
         val pts = box.totals.pts ?: return null
         val final = if (box.playing) box.totals.final?.let { "${Words.Box.projFinal} ${number(it)}" } else null
-        return StripSum(number(pts), "${Words.Box.pts} ${asSet(platform)}", null, final)
+        return StripSum(number(pts), "${Words.Box.pts} ${asSet(host)}", null, final)
     }
 
     /** lineup.ts swapWords: "QB, Mahomes in, Rodgers out". */

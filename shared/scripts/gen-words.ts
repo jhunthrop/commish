@@ -63,7 +63,7 @@ const SHEET_MODULE = "web/src/lib/sheet/words.ts";
 
 /** Every table the apps print from, the League home's first, then the box score's: its heads, the
  * scoring formats, the basis sentences' parts, the game heads, the moves' kinds, the standings'
- * tiebreak and waiver order, the platforms' names; then the Start screen's (Lane 180): the lineup's
+ * tiebreak and waiver order, the platforms' names and the not-affiliated line (Lane 310); then the Start screen's (Lane 180): the lineup's
  * strip and verb, the positions an opponent's rank is against, the move's confirmation, the in-season
  * screens' lines, a status in words and in a rank's few characters, and the figures' heads; then the
  * Matchup's (Lane 183): the words beside its box scores; then the Board's (Lane 182): its chips and heads,
@@ -167,6 +167,12 @@ export const TABLES: readonly TableSource[] = [
     module: "web/src/lib/league/names.ts",
     picks: ["HOST_WORDS"],
     json: "shared/words/league-platform.json",
+  },
+  {
+    name: "NotAffiliated",
+    module: "web/src/lib/league/affiliation.ts",
+    picks: [["line", "NOT_AFFILIATED_LINE"]],
+    json: "shared/words/not-affiliated.json",
   },
   {
     name: "Shell",

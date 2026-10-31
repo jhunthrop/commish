@@ -5,7 +5,7 @@ import app.trycommish.api.models.HostMoveInput
 import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.WaiverAdvice
 import app.trycommish.api.models.WaiverRow
-import app.trycommish.core.leaguehome.ValueWords
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.start.StartRows
 import app.trycommish.design.Words
@@ -70,11 +70,13 @@ class WaiverModel(
     private val zone: ZoneId,
     /** The page's clock, which the cards and the member's players are drawn at (WaiverScreen's pageNow). */
     private val pageNow: Instant = now,
+    /** The platform's words: the league's own, or the store graphics' neutral one (Lane 310). */
+    private val words: HostWords = HostWords.of(host),
 ) {
     /** The answer the table is drawn from: a position's own read, else the page's. */
     val shown: WaiverAdvice = shown ?: advice
-    val platform: String = ValueWords.platform(host)
-    val cards: List<PickupCard> = WaiverRows.cards(advice, platform, this.shown.moves)
+    val platform: String = words.name
+    val cards: List<PickupCard> = WaiverRows.cards(advice, words, this.shown.moves)
 
     /** "Week 6": the week the page addresses. */
     val week: String = "${Words.LeagueHome.week} ${advice.forWeek ?: advice.week}"
@@ -188,7 +190,7 @@ class WaiverModel(
 
     /** A row's verb by the Waivers rule: "Add on ESPN" where the claim is made here, else "Open ESPN
      * waivers". */
-    fun verb(source: WaiverRow): String = WaiverWords.addVerb(shown.moves, source.add.player.hostId, platform)
+    fun verb(source: WaiverRow): String = WaiverWords.addVerb(shown.moves, source.add.player.hostId, words)
 
     /** The sheet's verb on his row (WaiverScreen.svelte shelfOffer): a stash an open IR slot takes with no
      * drop, the stash verb with his week under it; else the claim in the screen's words with the pair and

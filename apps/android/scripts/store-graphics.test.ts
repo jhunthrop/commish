@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { deflateSync } from 'node:zlib';
-import { checkGraphics, EXPECTED, problemsOf, readPngHeader } from './store-graphics.ts';
+import { namedPlatforms, sceneProblemsOf } from '../../../shared/store/scene-strings.ts';
+import { checkGraphics, EXPECTED, problemsOf, readPngHeader, SHOTS } from './store-graphics.ts';
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
 	let c = n;
@@ -75,4 +76,19 @@ test('a file that is no PNG is named as such', () => {
 
 test('a missing file is a problem', () => {
 	assert.ok(checkGraphics('/nonexistent-store-graphics').every((p) => p.endsWith(': missing')));
+});
+
+test('every phone shot has its scene strings, and none names a platform (Lane 310)', () => {
+	assert.equal(SHOTS.length, 8);
+	assert.deepEqual(
+		checkGraphics().filter((p) => p.startsWith('scene-strings/')),
+		[]
+	);
+});
+
+test('a scene string naming a platform fails the check; a link with its host in lower case does not', () => {
+	assert.deepEqual(sceneProblemsOf('phone-2-waivers', ['Add in your league', 'https://fantasy.espn.com/x']), []);
+	assert.deepEqual(sceneProblemsOf('phone-2-waivers', ['Add on ESPN']), ['scene-strings/phone-2-waivers.json: "Add on ESPN" names ESPN']);
+	assert.deepEqual(namedPlatforms('Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN'), ['Sleeper', 'MyFantasyLeague', 'FFPC', 'Yahoo', 'ESPN']);
+	assert.match(sceneProblemsOf('phone-1-lineup', 'not a list')[0] ?? '', /not a list of strings/);
 });

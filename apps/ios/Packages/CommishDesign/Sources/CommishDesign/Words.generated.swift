@@ -143,6 +143,10 @@ public enum Words {
         public static let espn = "ESPN"
     }
 
+    public enum NotAffiliated {
+        public static let line = "Commish is not affiliated with or endorsed by Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN."
+    }
+
     public enum Shell {
         public static let searchPlayers = "Search players"
         public static let account = "Account"

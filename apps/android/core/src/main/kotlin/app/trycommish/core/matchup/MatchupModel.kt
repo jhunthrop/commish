@@ -8,7 +8,7 @@ import app.trycommish.api.models.MatchupBoxSide
 import app.trycommish.api.models.MatchupSide
 import app.trycommish.api.models.Scoreboard
 import app.trycommish.core.instantOrNull
-import app.trycommish.core.leaguehome.ValueWords
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.core.leaguehome.readCell
 import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.shell.initialsOf
@@ -108,11 +108,13 @@ fun matchupModel(
     clock: Instant,
     zone: ZoneId,
     board: Scoreboard? = null,
+    /** The platform's words: the league's own, or the store graphics' neutral one (Lane 310). */
+    host: HostWords = HostWords.of(sync.host),
 ): MatchupModel {
     val now = instantOrNull(sync.readAt) ?: clock
     val other = OtherGame.isOther(box)
     val matchup = (if (other) OtherGame.matchup(box, board) else sync.matchup) ?: return MatchupModel.Gap(MatchupWords.gap(sync, now))
-    return MatchupModel.Week(MatchupDraw(sync, box, matchup, other, now, zone).week(clock))
+    return MatchupModel.Week(MatchupDraw(sync, box, matchup, other, now, zone, host).week(clock))
 }
 
 /** MatchupPanel.svelte's reads over one answer. */
@@ -124,12 +126,13 @@ private class MatchupDraw(
     private val other: Boolean,
     private val now: Instant,
     private val zone: ZoneId,
+    private val host: HostWords,
 ) {
     private val starterLines = box?.sides.orEmpty().flatMap { side -> side.starters.map { it.line } }
     private val started = MatchupSides.started(starterLines, now)
     private val unlisted = MatchupSides.unlistedStates(box)
     private val headFinal = MatchupSides.final(starterLines, now, unlisted)
-    private val platform = ValueWords.platform(sync.host)
+    private val platform = host.name
 
     private fun boxSide(rosterId: Int): MatchupBoxSide? = box?.sides?.firstOrNull { it.rosterId == rosterId }
 
@@ -167,7 +170,7 @@ private class MatchupDraw(
             )
         val read =
             if (started && kickoff?.head != Words.Kickoff.final) {
-                instantOrNull(sync.readAt)?.let { readCell(platform, it, clock) }
+                instantOrNull(sync.readAt)?.let { readCell(host.stamp, it, clock) }
             } else {
                 null
             }
@@ -233,6 +236,7 @@ private class MatchupDraw(
                 unlisted = theirsUnlisted,
                 zone = zone,
                 now = now,
+                host = host,
             ),
         )
 

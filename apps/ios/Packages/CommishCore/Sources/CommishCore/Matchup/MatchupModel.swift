@@ -81,14 +81,21 @@ public enum MatchupModel: Equatable, Sendable {
     /// read's time), the read beside a live score aged by `clock`, the screen's own clock. Another
     /// team's game, by the box's own word, is drawn from the box and the scoreboard (`board`), its
     /// score unread where the scoreboard was not read.
-    public init(sync: LeagueSync, box: MatchupBox?, board: Scoreboard? = nil, clock: Date, zone: TimeZone) {
+    /// `words` is the platform's words, the league's own unless a store graphic passes the neutral one
+    /// (Lane 310).
+    public init(
+        sync: LeagueSync, box: MatchupBox?, board: Scoreboard? = nil, clock: Date, zone: TimeZone,
+        words: HostWords? = nil
+    ) {
         let now = sync.readAt
         let other = OtherGame.isOther(box)
         guard let matchup = other ? OtherGame.matchup(box, board: board) : sync.matchup?.value1 else {
             self = .gap(MatchupWords.gap(sync, now: now))
             return
         }
-        let draw = MatchupDraw(sync: sync, box: box, matchup: matchup, other: other, now: now, zone: zone)
+        let draw = MatchupDraw(
+            sync: sync, box: box, matchup: matchup, other: other, now: now, zone: zone, words: words ?? .of(sync.host)
+        )
         self = .week(draw.week(clock: clock))
     }
 }
@@ -102,6 +109,7 @@ private struct MatchupDraw {
     let other: Bool
     let now: Date
     let zone: TimeZone
+    let words: HostWords
     let started: Bool
     let unlisted: [MatchupSides.Known]
     let headFinal: Bool
@@ -109,8 +117,9 @@ private struct MatchupDraw {
 
     init(
         sync: LeagueSync, box: MatchupBox?, matchup: Components.Schemas.LeagueMatchup, other: Bool, now: Date,
-        zone: TimeZone
+        zone: TimeZone, words: HostWords
     ) {
+        self.words = words
         self.sync = sync
         self.box = box
         self.matchup = matchup
@@ -151,9 +160,9 @@ private struct MatchupDraw {
             MatchupSides.nextKickoff(starterLines, now: now, zone: zone, unlisted: unlisted),
             decided: box?.decided == true, started: started
         )
-        let platform = ValueWords.platform(sync.host)
+        let platform = words.name
         let read = started && kickoff?.head != Words.Kickoff.final
-            ? ScoreBugs.readCell(.init(platform: platform, readAt: sync.readAt), now: clock) : nil
+            ? ScoreBugs.readCell(.init(platform: words.stamp, readAt: sync.readAt), now: clock) : nil
         let week = "\(Words.LeagueHome.week) \(matchup.week)"
         let mineName = MatchupWords.teamName(sync, matchup.mine.rosterId)
         let theirName = opponentSide.map { MatchupWords.teamName(sync, $0.rosterId) }
@@ -164,7 +173,7 @@ private struct MatchupDraw {
             noFinal: MatchupSides.noFinal(mine: mine.totals, theirs: theirs?.totals, theirsUnlisted: theirsUnlisted),
             allFinal: sides.allSatisfy(\.totals.allFinal),
             finalNone: sides.contains { $0.totals.live && $0.totals.allFinal && $0.totals.pts == nil },
-            unlisted: theirsUnlisted, zone: zone, now: now
+            unlisted: theirsUnlisted, zone: zone, now: now, words: words
         ))
         let hidden = sync.host.value1 == .ffpc ? MatchupWords.yoursOnly(platform) : nil
         var boxes = [teamBox(

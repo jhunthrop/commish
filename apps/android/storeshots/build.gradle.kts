@@ -13,6 +13,9 @@ plugins {
 // the App Store shots read the same file, apps/ios/scripts/store-shots.ts).
 val storeNames = rootDir.resolve("../../shared/store/store-names.json")
 
+// The neutral platform the store shots draw in place of the league's own (Lane 310).
+val storeHost = rootDir.resolve("../../shared/store/store-host.json")
+
 @Suppress("UNCHECKED_CAST")
 val namePairs: List<List<String>> =
     (groovy.json.JsonSlurper().parse(storeNames) as Map<String, Any>)["replace"] as List<List<String>>
@@ -56,6 +59,8 @@ android {
                     .asFile.canonicalPath,
             )
             it.systemProperty("webIcon", rootDir.resolve("../../web/static/icons/icon-512.png").canonicalPath)
+            it.systemProperty("storeHost", storeHost.canonicalPath)
+            it.inputs.file(storeHost)
             it.systemProperty("storeGraphics", File(out).canonicalPath)
             it.outputs.upToDateWhen { false }
         }

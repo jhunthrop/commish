@@ -7,11 +7,13 @@
  *
  * The check reads each PNG's header: its size, and that the screenshots and the feature graphic carry no
  * alpha (24-bit RGB, no transparency chunk) while the icon does (32-bit RGBA), each under Play's file limit
- * (the reader is shared with the App Store's check: shared/store/store-png.ts).
+ * (the reader is shared with the App Store's check: shared/store/store-png.ts); and each phone shot's
+ * scene strings, which must name no platform (shared/store/scene-strings.ts, Lane 310).
  * Nothing here talks to Play: the files are uploaded in the console by hand.
  */
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { checkSceneStrings } from '../../../shared/store/scene-strings.ts';
 import { checkFolder, type Expected, KB, MB, problemsOf as storeProblems } from '../../../shared/store/store-png.ts';
 
 export { readPngHeader } from '../../../shared/store/store-png.ts';
@@ -42,9 +44,13 @@ export function problemsOf(expected: Expected, bytes: Uint8Array): string[] {
 	return storeProblems(expected, bytes, STORE);
 }
 
-/** Every problem across the folder's files, a missing file among them. */
+/** The phone shots, by the name their scene strings are written under. */
+export const SHOTS: readonly string[] = EXPECTED.filter((e) => e.file.startsWith('phone-')).map((e) => e.file.replace(/\.png$/, ''));
+
+/** Every problem across the folder's files, a missing file among them, and any platform a phone shot's
+ * scene strings name. */
 export function checkGraphics(dir: string = GRAPHICS): string[] {
-	return checkFolder(dir, EXPECTED, STORE);
+	return [...checkFolder(dir, EXPECTED, STORE), ...checkSceneStrings(dir, SHOTS)];
 }
 
 /** Draws every file again through the :storeshots tests, writing straight into the folder. */

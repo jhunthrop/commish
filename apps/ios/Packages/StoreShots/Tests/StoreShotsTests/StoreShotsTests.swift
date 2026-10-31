@@ -45,8 +45,13 @@ struct StoreShotsTests {
     func shot(_ item: Case) async throws {
         let folder = try #require(Self.folder)
         let device = item.size.device
-        let frame = try await StoreShotFrame(
-            caption: item.shot.caption, chrome: StoreFixtures.chrome(item.shot), screen: Self.screen(item.shot),
+        let chrome = StoreFixtures.chrome(item.shot)
+        let screen = try await Self.screen(item.shot)
+        if item.size == .medium {
+            try SceneStrings.write([item.shot.caption, chrome as Any] + screen.drawn, shot: item.shot, into: folder)
+        }
+        let frame = StoreShotFrame(
+            caption: item.shot.caption, chrome: chrome, screen: screen,
             size: CGSize(width: device.width, height: device.height)
         )
         let image = try #require(Snapshot.render(frame, device: device, scheme: .dark, scale: device.scale))

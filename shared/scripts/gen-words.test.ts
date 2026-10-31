@@ -160,6 +160,7 @@ void test("the tables: the League home's, the box score's, then the shell's and 
       "Tiebreak",
       "WaiverOrder",
       "Platform",
+      "NotAffiliated",
       "Shell",
       "LeagueSwitch",
       "Scoring",
@@ -284,6 +285,10 @@ void test("the web's own words land in the JSON, the Swift and the Kotlin", asyn
   assert.equal(
     json("shared/words/league-platform.json").mfl,
     "MyFantasyLeague",
+  );
+  assert.equal(
+    json("shared/words/not-affiliated.json").line,
+    "Commish is not affiliated with or endorsed by Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN.",
   );
   assert.equal(json("shared/words/league-move-kind.json").drop, "Drop");
   assert.equal(

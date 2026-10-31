@@ -5,7 +5,7 @@ import app.trycommish.api.models.PlayerLine
 import app.trycommish.api.models.TradeAdvice
 import app.trycommish.api.models.TradeRow
 import app.trycommish.api.models.TradeTeam
-import app.trycommish.core.leaguehome.ValueWords
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.design.Words
 import java.time.Instant
 import java.time.ZoneId
@@ -142,12 +142,14 @@ class TradesModel(
     host: LeagueHost,
     now: Instant,
     zone: ZoneId,
+    /** The platform's words: the league's own, or the store graphics' neutral one (Lane 310). */
+    words: HostWords = HostWords.of(host),
 ) {
     private val advice: TradeAdvice = TradeFinder.held(answer, now)
     private val presets = TradeFinder.presets(advice.teams)
 
-    val platform: String = ValueWords.platform(host)
-    val verb: String = TradesWords.verb(advice.moves, platform)
+    val platform: String = words.name
+    val verb: String = TradesWords.verb(advice.moves, words)
 
     /** The platform's trade page the verb opens; null when the API knows none, and the verb stands
      * disabled with [reason] under it. */

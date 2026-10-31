@@ -9,14 +9,17 @@
  * The committed files are CI's: ios.yml's store_shots dispatch draws them on macos-26 with the pinned
  * Xcode and uploads them as the app-store-graphics artifact. Drawing copies shared/fixtures with the
  * recorded league's names replaced (shared/store/store-names.json, the Play set's file) and runs the
- * package's tests with STORE_SHOTS naming the folder and COMMISH_FIXTURES the copy. The check reads each
- * PNG's header: its exact size and no alpha (24-bit RGB, no transparency chunk), under the store's limit.
+ * package's tests with STORE_SHOTS naming the folder, COMMISH_FIXTURES the copy and STORE_HOST the neutral
+ * platform the screens name (shared/store/store-host.json, Lane 310). The check reads each PNG's header:
+ * its exact size and no alpha (24-bit RGB, no transparency chunk), under the store's limit; and each
+ * shot's scene strings, which must name no platform (shared/store/scene-strings.ts).
  * Nothing here talks to App Store Connect: the files are uploaded by hand.
  */
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { checkSceneStrings } from '../../../shared/store/scene-strings.ts';
 import { checkFolder, type Expected, MB } from '../../../shared/store/store-png.ts';
 
 const IOS = resolve(import.meta.dirname, '..');
@@ -24,6 +27,7 @@ const ROOT = resolve(IOS, '../..');
 export const GRAPHICS = resolve(ROOT, 'docs/store/app-store-graphics');
 const FIXTURES = resolve(ROOT, 'shared/fixtures');
 const NAMES = resolve(ROOT, 'shared/store/store-names.json');
+const HOST = resolve(ROOT, 'shared/store/store-host.json');
 const PACKAGE = resolve(IOS, 'Packages/StoreShots');
 const STORE = 'the App Store';
 /** App Store Connect's limit for a screenshot file. */
@@ -39,9 +43,10 @@ export const EXPECTED: readonly Expected[] = Object.entries(SIZES).flatMap(([siz
 	STEMS.map((stem) => ({ file: `${size}-${stem}.png`, width, height, alpha: false, maxBytes: MAX_BYTES }))
 );
 
-/** Every problem across the folder's files, a missing file among them. */
+/** Every problem across the folder's files, a missing file among them, and any platform a shot's scene
+ * strings name. */
 export function checkShots(dir: string = GRAPHICS): string[] {
-	return checkFolder(dir, EXPECTED, STORE);
+	return [...checkFolder(dir, EXPECTED, STORE), ...checkSceneStrings(dir, STEMS)];
 }
 
 type NamePair = readonly [from: string, to: string];
@@ -77,7 +82,7 @@ function draw(out: string): void {
 		execFileSync('swift', ['test', '--filter', 'StoreShotsTests'], {
 			cwd: PACKAGE,
 			stdio: 'inherit',
-			env: { ...process.env, STORE_SHOTS: out, COMMISH_FIXTURES: copy }
+			env: { ...process.env, STORE_SHOTS: out, COMMISH_FIXTURES: copy, STORE_HOST: HOST }
 		});
 	} finally {
 		rmSync(copy, { recursive: true, force: true });

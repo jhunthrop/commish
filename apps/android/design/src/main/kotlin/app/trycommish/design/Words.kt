@@ -145,6 +145,10 @@ object Words {
         const val espn = "ESPN"
     }
 
+    object NotAffiliated {
+        const val line = "Commish is not affiliated with or endorsed by Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN."
+    }
+
     object Shell {
         const val searchPlayers = "Search players"
         const val account = "Account"

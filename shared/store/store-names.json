@@ -1,5 +1,5 @@
 {
-  "why": "The shared fixtures are a recorded public league: its team names and its members' handles are real people's. The store graphics draw a copy of the fixtures with each replaced by a made-up name (and the league read as the platform the app writes to), so no member's data reaches the store. Each pair is applied in order to every JSON file, as plain text.",
+  "why": "The shared fixtures are a recorded public league: its team names and its members' handles are real people's. The store graphics draw a copy of the fixtures with each replaced by a made-up name (and the league read as the platform the app writes to), so no member's data reaches the store. The API's own sentences that name a platform read as your league, so no platform is named either (Lane 310; the screens' own words take the neutral platform in store-host.json). Each pair is applied in order to every JSON file, as plain text.",
   "replace": [
     ["S.U.C.K. - Severely Underrated Carolina Keepers", "Sunday Standard"],
     ["Keeper? I Hardly Know Her", "Hail Mary Club"],
@@ -24,6 +24,8 @@
     ["\"Nowlan\"", "\"manager08\""],
     ["\"jordanp2323\"", "\"manager09\""],
     ["\"GMenJay\"", "\"manager12\""],
-    ["\"host\": \"ffpc\"", "\"host\": \"espn\""]
+    ["\"host\": \"ffpc\"", "\"host\": \"espn\""],
+    ["Sleeper does not take trade proposals from here", "Your league does not take trade proposals from here"],
+    ["Sleeper does not take claims from here", "Your league does not take claims from here"]
   ]
 }

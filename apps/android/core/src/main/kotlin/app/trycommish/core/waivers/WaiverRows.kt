@@ -5,6 +5,7 @@ import app.trycommish.api.models.WaiverAdvice
 import app.trycommish.api.models.WaiverDrop
 import app.trycommish.api.models.WaiverMoves
 import app.trycommish.api.models.WaiverRow
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.core.start.ReserveRow
 import app.trycommish.core.start.RowCells
@@ -259,7 +260,7 @@ internal object WaiverRows {
     /** waivers.ts pickupCards with the card's verb, in the API's order. */
     fun cards(
         advice: WaiverAdvice,
-        platform: String,
+        host: HostWords,
         moves: WaiverMoves,
     ): List<PickupCard> {
         val names = names(advice)
@@ -273,7 +274,7 @@ internal object WaiverRows {
                 move = WaiverWords.move(add, drop),
                 why = WaiverWords.dropWhy(dropWhy(source)),
                 gains = WaiverWords.cardGains(source.weekGain, source.gain),
-                verb = WaiverWords.addVerb(moves, source.add.player.hostId, platform),
+                verb = WaiverWords.addVerb(moves, source.add.player.hostId, host),
                 source = source,
             )
         }

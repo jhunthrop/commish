@@ -52,6 +52,8 @@ public struct WaiverModel: Equatable, Sendable {
     public let stashLine: [String]
     public let basis: String
     public let platform: String
+    /// The platform's words: the league's own, or the store graphics' neutral one (Lane 310).
+    let hostWords: HostWords
     /// The platform's waiver page, nil when the API knows none.
     public let page: URL?
     /// The API's line under the verb: why it opens the platform, or its note.
@@ -70,14 +72,16 @@ public struct WaiverModel: Equatable, Sendable {
 
     public init(
         advice: WaiverAdvice, shown: WaiverAdvice? = nil, host: Components.Schemas.LeagueHost, now: Date,
-        zone: TimeZone, pageNow: Date? = nil
+        zone: TimeZone, pageNow: Date? = nil, words: HostWords? = nil
     ) {
-        let platform = ValueWords.platform(host)
+        let hostWords = words ?? .of(host)
+        let platform = hostWords.name
         let shown = shown ?? advice
         var named = shown
         named.pickups = advice.pickups
-        let cards = WaiverRows.cards(advice, platform: platform, moves: shown.moves)
+        let cards = WaiverRows.cards(advice, host: hostWords, moves: shown.moves)
         self.platform = platform
+        self.hostWords = hostWords
         self.cards = cards
         week = "\(Words.LeagueHome.week) \(advice.forWeek ?? advice.week)"
         title = WaiverWords.pickupsTitle(cards.count)
@@ -199,7 +203,7 @@ public struct WaiverModel: Equatable, Sendable {
 
     /// A row's verb by the Waivers rule: "Add on ESPN" where the claim is made here, else "Open ESPN waivers".
     public func verb(_ source: WaiverRow) -> String {
-        WaiverWords.addVerb(shown.moves, hostID: source.add.player.hostId, platform: platform)
+        WaiverWords.addVerb(shown.moves, hostID: source.add.player.hostId, host: hostWords)
     }
 
     /// The sheet's verb on his row (WaiverScreen.svelte shelfOffer): a stash an open IR slot takes with

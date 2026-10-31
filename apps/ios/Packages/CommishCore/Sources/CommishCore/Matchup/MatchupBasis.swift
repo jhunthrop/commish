@@ -23,10 +23,12 @@ enum MatchupBasis {
         let unlisted: UnlistedDrawn
         let zone: TimeZone
         let now: Date
+        /// The platform's words: the league's own, or the store graphics' neutral one (Lane 310).
+        var words: HostWords?
     }
 
     static func phone(_ facts: Facts) -> String {
-        let platform = ValueWords.platform(facts.host)
+        let platform = (facts.words ?? .of(facts.host)).name
         // While the opponent's best-lineup words run long, the phone leaves the Proj's read time and when
         // Final lands to the desk (basis.ts unlistedLong).
         let long = facts.unlisted.long

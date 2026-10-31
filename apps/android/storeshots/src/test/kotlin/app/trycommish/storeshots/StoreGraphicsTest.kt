@@ -43,8 +43,9 @@ class StoreShotsTest(
     fun shot() {
         val screen = screenOf(shot, scheduler)
         val chrome = chromeOf(shot)
+        writeSceneStrings(shot, listOf(shot.caption, chrome) + screen.drawn)
         paparazzi.snapshot(name = shot.file) {
-            CommishTheme(dark = true) { StoreShotFrame(shot.caption, chrome) { screen() } }
+            CommishTheme(dark = true) { StoreShotFrame(shot.caption, chrome) { screen.draw() } }
         }
     }
 

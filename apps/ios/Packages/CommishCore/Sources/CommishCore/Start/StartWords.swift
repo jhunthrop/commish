@@ -55,18 +55,18 @@ public enum StartWords {
         return "\(word) \(count == 1 ? "change" : "changes")"
     }
 
-    /// lineup.ts asSetWords: "as set on ESPN".
-    static func asSet(_ platform: String) -> String {
-        "as set on \(platform)"
+    /// lineup.ts asSetWords: "as set on ESPN", the platform placed by its own words (Lane 310).
+    static func asSet(_ place: HostWords) -> String {
+        "as set \(place.placed)"
     }
 
     /// lineup.ts lineupSum: the strip's figure with the platform named.
-    static func lineupSum(_ box: LineupBox, platform: String, done: String?) -> StripSum? {
+    static func lineupSum(_ box: LineupBox, host: HostWords, done: String?) -> StripSum? {
         guard done != nil else {
             guard let proj = box.totals.proj else {
                 return nil
             }
-            let words = asSet(platform)
+            let words = asSet(host)
             if box.swaps.isEmpty {
                 return StripSum(figure: number(proj), words: "\(Words.Box.proj) \(words)", gain: nil, final: nil)
             }
@@ -78,7 +78,7 @@ public enum StartWords {
             return nil
         }
         let final = box.playing ? box.totals.final.map { "\(Words.Box.projFinal) \(number($0))" } : nil
-        return StripSum(figure: number(pts), words: "\(Words.Box.pts) \(asSet(platform))", gain: nil, final: final)
+        return StripSum(figure: number(pts), words: "\(Words.Box.pts) \(asSet(host))", gain: nil, final: final)
     }
 
     /// lineup.ts swapWords: "QB, Mahomes in, Rodgers out".

@@ -75,6 +75,11 @@ const LIVE_STATUS = /[\\/]src[\\/]lib[\\/]run[\\/]live-status\./;
  * lineup, the league pages and the user pages say lists with: a file of its own, so the record's
  * league code never loads the board's chunk for it (Lane 253). */
 const LIST_WORDS = /[\\/]src[\\/]lib[\\/]format[\\/]list\./;
+/** The not-affiliated line and its caption (Lane 310): the follow page, the legal pages and the
+ * account's Platforms draw it, and no shell part does. Kept out of the shared chunk by name, so it
+ * never rides onto every page, and the bundler splits it among the pages that draw it (a group of its
+ * own would pull the platforms' names in with it, out of the shared chunk every page loads). */
+const AFFILIATION_PARTS = /[\\/]src[\\/]lib[\\/]league[\\/](NotAffiliated|affiliation)\./;
 /** The site's one word per figure (format/figure-words.ts, the sweep's X1 and X2): the board row's
  * heads, the order's, the box score's and the player card's read it (with its table, the API's
  * words.json), and no shell part does. It rides
@@ -160,6 +165,7 @@ export default defineConfig({
 								!WEEK_PARTS.test(id) &&
 								!POOL_WORDS.test(id) &&
 								!BASIS_PARTS.test(id) &&
+								!AFFILIATION_PARTS.test(id) &&
 								!LEAGUE_PAGE_PARTS.test(id),
 							minShareCount: SHARED_BY_ROUTES,
 							priority: 1

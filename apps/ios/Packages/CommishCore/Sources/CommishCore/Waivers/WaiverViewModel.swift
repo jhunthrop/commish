@@ -56,6 +56,8 @@ public final class WaiverViewModel {
     private let clock: any Clock
     private let zone: TimeZone
     private let host: Components.Schemas.LeagueHost
+    /// The platform's words: the league's own, or the store graphics' neutral one (Lane 310).
+    private let words: HostWords
     private let copy: @MainActor (String) -> Void
     private let openPage: @MainActor (URL) -> Void
     private let onSignedOut: @MainActor () -> Void
@@ -68,12 +70,14 @@ public final class WaiverViewModel {
     public init(
         api: any WaiversAPI, cache: any AnswerCache, clock: any Clock, host: Components.Schemas.LeagueHost,
         zone: TimeZone, copy: @escaping @MainActor (String) -> Void,
-        openPage: @escaping @MainActor (URL) -> Void = { _ in }, onSignedOut: @escaping @MainActor () -> Void = {}
+        openPage: @escaping @MainActor (URL) -> Void = { _ in }, onSignedOut: @escaping @MainActor () -> Void = {},
+        words: HostWords? = nil
     ) {
         self.api = api
         self.cache = cache
         self.clock = clock
         self.host = host
+        self.words = words ?? .of(host)
         self.zone = zone
         self.copy = copy
         self.openPage = openPage
@@ -86,7 +90,7 @@ public final class WaiverViewModel {
     }
 
     public var platform: String {
-        ValueWords.platform(host)
+        words.name
     }
 
     /// "Last read Sat 12:00 pm" while the answer shown is a saved one.
@@ -374,8 +378,7 @@ public final class WaiverViewModel {
         }
         let model = WaiverModel(
             advice: answer.advice, shown: shownAnswer(answer.advice), host: host, now: narrowed?.at ?? answer.at,
-            zone: zone,
-            pageNow: answer.at
+            zone: zone, pageNow: answer.at, words: words
         )
         state = .loaded(model, stamp: stamp, stale: stale)
     }

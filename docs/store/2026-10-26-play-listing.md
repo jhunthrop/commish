@@ -12,7 +12,7 @@ Limits were read from Google's help pages on 2026-10-26 (sources at the foot). C
 | --- | --- | --- | --- |
 | App name | 30 characters | `Commish: Fantasy Football` (25) | The app's name (`apps/android/app/src/main/res/values/strings.xml` `app_name`) plus the category words a search reads |
 | Short description | 80 characters | `The lineup to start, your best waiver add and the trades that help both teams.` (78) | The site's in-season sentence, `IN_SEASON_TOOLS_LINE` in `web/src/lib/league/hosts.ts` |
-| Full description | 4000 characters | The text in §1.1 (1,550 characters) | The free page's entries (`web/src/lib/pass/words.ts`), the page descriptions (`web/src/lib/site/head-words.ts`), the platform order (`LEAGUE_HOSTS`) |
+| Full description | 4000 characters | The text in §1.1 (1,644 characters) | The free page's entries (`web/src/lib/pass/words.ts`), the page descriptions (`web/src/lib/site/head-words.ts`), the platform order (`LEAGUE_HOSTS`) |
 | App icon | 512 x 512, 32-bit PNG with alpha, at most 1024 KB | `docs/store/play-graphics/icon-512.png`: `web/static/icons/icon-512.png` re-saved as RGBA (Lane 255) | The web's icon, the same whistle as the app's launcher (`ic_launcher_foreground.xml`) |
 | Feature graphic | 1024 x 500, JPEG or 24-bit PNG, no alpha | `docs/store/play-graphics/feature-graphic.png` (Lane 255) | Required to publish |
 | Phone screenshots | 2 to 8. JPEG or 24-bit PNG, no alpha. Each side 320 to 3840 px, long side at most twice the short | 8 portrait at 1080 x 1920 (9:16), captions in §1.2: `docs/store/play-graphics/phone-1-lineup.png` to `phone-8-player-page.png` (Lane 255) | 4 or more at 1080 px or wider make the app eligible for promotion |
@@ -55,6 +55,8 @@ FREE THIS SEASON
 Every tool on Commish is free through the 2026 season, for every account. Nothing to pay and no card to give.
 
 No ads and no analytics. Commish is for people 18 and older.
+
+Commish is not affiliated with or endorsed by Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN.
 ```
 
 Notes on the copy:

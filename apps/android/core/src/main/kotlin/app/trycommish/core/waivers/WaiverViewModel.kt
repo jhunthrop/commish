@@ -14,7 +14,7 @@ import app.trycommish.core.Cache
 import app.trycommish.core.Cached
 import app.trycommish.core.Clock
 import app.trycommish.core.SessionEnd
-import app.trycommish.core.leaguehome.ValueWords
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.core.start.FootRun
 import app.trycommish.core.start.MoveKind
 import app.trycommish.core.start.MoveStep
@@ -59,6 +59,8 @@ class WaiverViewModel(
     /** Opens the platform's waiver page. */
     private val openPage: (String) -> Unit,
     private val sessionEnd: SessionEnd,
+    /** The platform's words: the league's own, or the store graphics' neutral one (Lane 310). */
+    private val host: HostWords = HostWords.of(league),
 ) : ViewModel() {
     private val mutableUi = MutableStateFlow(WaiverUi())
     private val mutableRefreshing = MutableStateFlow(false)
@@ -96,7 +98,7 @@ class WaiverViewModel(
     var shown: String? = null
         private set
 
-    val platform: String get() = ValueWords.platform(league)
+    val platform: String get() = host.name
 
     private val kind: MoveKind get() = MoveKind.Claim(zone)
 
@@ -445,7 +447,7 @@ class WaiverViewModel(
     ) {
         val page = answer ?: return
         val shownRead = narrowed
-        val model = WaiverModel(page.advice, shown(page.advice), league, shownRead?.at ?: page.at, zone, page.at)
+        val model = WaiverModel(page.advice, shown(page.advice), league, shownRead?.at ?: page.at, zone, page.at, host)
         mutableUi.update { it.copy(state = WaiverState.Loaded(model, stamp, stale)) }
     }
 

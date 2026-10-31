@@ -14,7 +14,8 @@ import SwiftUI
 /// draws: ImageRenderer cannot draw a scroll view).
 @MainActor
 enum InSeasonScenes {
-    /// Saturday noon, the lineup on a platform that takes it: the swaps and the one verb that sets them.
+    /// Saturday noon, the lineup on a platform that takes it: the swaps and the one verb that sets them, the
+    /// platform the neutral one (StoreHost).
     static func lineup() async throws -> StoreScreen {
         var advice = try StoreFixtures.answer(
             LineupAdvice.self, "lineup-\(StoreFixtures.leagueID)-\(StoreFixtures.saturday).json"
@@ -26,10 +27,10 @@ enum InSeasonScenes {
             lineup: .init(value1: .available),
             note: nil
         )
-        let viewModel = StartViewModel(
+        let viewModel = try StartViewModel(
             api: StoreLineup(advice: everySlotFilled(advice)), cache: StoreFixtures.cache("lineup"),
             clock: FixedClock(StoreFixtures.instant(StoreFixtures.saturday)), host: StoreFixtures.host,
-            zone: StoreFixtures.zone, copy: { _ in true }
+            zone: StoreFixtures.zone, copy: { _ in true }, words: StoreHost.words()
         )
         await viewModel.load(leagueID: StoreFixtures.leagueID)
         guard case let .loaded(model, _, _) = viewModel.state else {
@@ -66,15 +67,15 @@ enum InSeasonScenes {
         return filled
     }
 
-    /// Saturday noon, the wire before it clears on ESPN: the position cards opening on the weakest Need,
+    /// Saturday noon, the wire before it clears: the position cards opening on the weakest Need,
     /// the best add first, the claim pinned.
     static func waivers() async throws -> StoreScreen {
         let league = StoreFixtures.pendingClaimLeague
         let advice = try StoreFixtures.answer(WaiverAdvice.self, "waivers-\(league)-\(StoreFixtures.saturday).json")
-        let viewModel = WaiverViewModel(
+        let viewModel = try WaiverViewModel(
             api: StoreWaivers(advice: advice), cache: StoreFixtures.cache("waivers"),
             clock: FixedClock(StoreFixtures.instant(StoreFixtures.saturday)), host: StoreFixtures.host,
-            zone: StoreFixtures.zone, copy: { _ in }
+            zone: StoreFixtures.zone, copy: { _ in }, words: StoreHost.words()
         )
         await viewModel.load(leagueID: league)
         guard case let .loaded(model, _, _) = viewModel.state else {
@@ -119,7 +120,8 @@ enum InSeasonScenes {
                 check: StoreFixtures.answer(TradeCheck.self, "trade-check-\(league)-\(clock)-1.json")
             ),
             cache: StoreFixtures.cache("trades"), clock: FixedClock(StoreFixtures.instant(clock)),
-            host: StoreFixtures.host, me: StoreFixtures.me, zone: StoreFixtures.zone, copy: { _ in true }
+            host: StoreFixtures.host, me: StoreFixtures.me, zone: StoreFixtures.zone, copy: { _ in true },
+            words: StoreHost.words()
         )
         await viewModel.load(leagueID: league)
         await viewModel.load(idea: bestIdea, leagueID: league)
@@ -150,7 +152,7 @@ enum InSeasonScenes {
                 box: StoreFixtures.answer(MatchupBox.self, "matchup-\(league)-\(clock).json")
             ),
             cache: StoreFixtures.cache("matchup"), clock: FixedClock(StoreFixtures.instant(clock)),
-            zone: StoreFixtures.zone, roster: nil
+            zone: StoreFixtures.zone, roster: nil, words: StoreHost.words()
         )
         await viewModel.load(leagueID: league)
         guard case let .loaded(.week(week), _, _) = viewModel.state else {
