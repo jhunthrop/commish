@@ -94,5 +94,14 @@ void test('the not-affiliated line names every platform a league is read from, w
 		NOT_AFFILIATED_LINE,
 		'Commish is not affiliated with or endorsed by Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN.'
 	);
-	for (const host of LEAGUE_HOSTS) assert.ok(NOT_AFFILIATED_LINE.includes(hostWords(host)), host);
+	const at = LEAGUE_HOSTS.map((host) => NOT_AFFILIATED_LINE.indexOf(hostWords(host)));
+	assert.ok(
+		at.every((i) => i >= 0),
+		'every platform is named'
+	);
+	assert.deepEqual(
+		at,
+		[...at].sort((a, b) => a - b),
+		'in the naming order'
+	);
 });
