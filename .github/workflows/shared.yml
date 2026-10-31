@@ -14,6 +14,7 @@ on:
       - "apps/ios/Packages/CommishDesign/Sources/CommishDesign/*.generated.swift"
       - "apps/ios/Packages/CommishAPI/Sources/CommishAPI/openapi.yaml"
       - "apps/ios/scripts/**"
+      - "docs/store/app-store-graphics/**"
       - "api/openapi.yaml"
       - "apps/android/design/src/main/kotlin/app/trycommish/design/**"
       - "apps/android/design/src/main/res/drawable/**"
@@ -31,6 +32,7 @@ on:
       - "apps/ios/Packages/CommishDesign/Sources/CommishDesign/*.generated.swift"
       - "apps/ios/Packages/CommishAPI/Sources/CommishAPI/openapi.yaml"
       - "apps/ios/scripts/**"
+      - "docs/store/app-store-graphics/**"
       - "api/openapi.yaml"
       - "apps/android/design/src/main/kotlin/app/trycommish/design/**"
       - "apps/android/design/src/main/res/drawable/**"
@@ -66,7 +68,7 @@ jobs:
         run: node shared/scripts/check-gen.ts
       - name: The Android shell from the web (the mark, the window colours, the phone bar) matches it
         run: node apps/android/scripts/web-shell.ts --check
-      - name: The shared generators' tests, and the iOS client spec's
+      - name: The shared generators' tests, the iOS client spec's and the App Store screenshots' check
         run: node --test shared/scripts/*.test.ts apps/ios/scripts/*.test.ts
       - name: The web's own entry to the same check
         working-directory: web

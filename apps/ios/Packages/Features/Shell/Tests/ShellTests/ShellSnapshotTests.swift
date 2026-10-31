@@ -130,32 +130,8 @@ struct ShellMock: View {
                         .padding(.top, Tokens.Space.s1)
                 }
             }
-            TabStrip(tabs: tabs)
+            TabStrip(tabs: tabs, lit: tabs.first?.key)
         }
-    }
-}
-
-/// The five tabs, the first selected, as the system tab bar draws them.
-struct TabStrip: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let tabs: [RailTab]
-
-    var body: some View {
-        let theme = Theme(colorScheme)
-        HStack(spacing: 0) {
-            ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
-                VStack(spacing: 3) {
-                    Image(systemName: TabSymbols.symbol(tab.key)).font(.system(size: 20))
-                    Text(tab.label).font(.system(size: 10, weight: .medium))
-                }
-                .foregroundStyle(theme.color(index == 0 ? Tokens.Color.accentText : Tokens.Color.ink3))
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .padding(.vertical, 6)
-        .frame(height: 50)
-        .background(theme.color(Tokens.Color.shell))
-        .overlay(alignment: .top) { Rectangle().fill(theme.color(Tokens.Color.shellLine)).frame(height: 1) }
     }
 }
 
@@ -168,7 +144,7 @@ struct SignedOutMock: View {
         VStack(spacing: 0) {
             SignInView(working: false, problem: nil, signIn: {})
                 .frame(height: device.height - (device.height > 700 ? 54 + 34 : 20) - 50)
-            TabStrip(tabs: PhoneRail.withoutLeague)
+            TabStrip(tabs: PhoneRail.withoutLeague, lit: PhoneRail.withoutLeague.first?.key)
         }
     }
 }
