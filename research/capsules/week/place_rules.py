@@ -46,21 +46,20 @@ _FIRST: Final = re.compile(r"\bleads?\s+all\b|\bmore\s+than\s+any\b", re.IGNOREC
 # "we rank"; never a bare "among", "of the week" or "in the league" (the round 5 re-review's H1). A club's players
 # ("among the Rams' receivers") are his depth chart, never his peers.
 _POSITIONS: Final = r"(?:wide receivers?|receivers?|wideouts?|running backs?|backs?|tight ends?|quarterbacks?|players?)"
-# "6th among wide receivers", and Lane 300's "6th among the receivers we rank": a position's peers, never his club's
-# ("2nd among the Rams' receivers" is his depth-chart place, Lane 299's to judge: the round 5 re-review's M1).
-_ORDINAL_AMONG: Final = re.compile(
-    rf"\b(\d+)(?:st|nd|rd|th)\s+[Aa]mong\s+(?:all\s+)?(?:the\s+)?(?:[a-z-]+\s+)?{_POSITIONS}\b"
-)
-# The peer group a place is said among (Lane 307: "among wide receivers", the sheet's words, or Lane 300's "among
-# the wide receivers we rank").
-_AMONG_RANKED: Final = re.compile(
-    rf"\b[Aa]mong\s+(?:all\s+)?(?:the\s+)?((?:[a-z-]+\s+)?{_POSITIONS})(?:\s+we\s+rank)?\b"
-)
+# The words that may stand before a position and still name his peers (the round 2 re-review's MEDIUM-1): "all",
+# "every", "the", "NFL", "the league's", "starting", "other", in any order. A club's name never does ("the Rams'
+# receivers", "Colts backs" are his depth chart, Lane 299's to judge).
+_QUALIFIERS: Final = r"(?:(?:all|every|the|NFL|league|league's|league\u2019s|starting|other)\s+)*"
+# "6th among wide receivers", "6th among NFL wide receivers", and Lane 300's "6th among the receivers we rank".
+_ORDINAL_AMONG: Final = re.compile(rf"\b(\d+)(?:st|nd|rd|th)\s+[Aa]mong\s+{_QUALIFIERS}(?:[a-z-]+\s+)?{_POSITIONS}\b")
+# The peer group a place is said among (Lane 307: "among wide receivers", the sheet's words, "among NFL wide
+# receivers", or Lane 300's "among the wide receivers we rank"): the group is what follows the qualifiers.
+_AMONG_RANKED: Final = re.compile(rf"\b[Aa]mong\s+{_QUALIFIERS}((?:[a-z-]+\s+)?{_POSITIONS})(?:\s+we\s+rank)?\b")
 _PEERS: Final = re.compile(
     r"\b[Ww]e rank\b|\bon our board\b|"
-    rf"\b[Aa]mong\s+(?:all\s+)?(?:the\s+)?(?:[a-z-]+\s+)?{_POSITIONS}\b|"
-    rf"\b[Tt]han\s+any(?:\s+other)?\s+(?:[a-z-]+\s+)?{_POSITIONS}\b|"
-    rf"\b[Ll]eads?\s+all\s+(?:the\s+)?(?:[a-z-]+\s+)?{_POSITIONS}\b",
+    rf"\b[Aa]mong\s+{_QUALIFIERS}(?:[a-z-]+\s+)?{_POSITIONS}\b|"
+    rf"\b[Tt]han\s+any(?:\s+other)?\s+{_QUALIFIERS}(?:[a-z-]+\s+)?{_POSITIONS}\b|"
+    rf"\b[Ll]eads?\s+all\s+{_QUALIFIERS}(?:[a-z-]+\s+)?{_POSITIONS}\b",
 )
 # The week's clubs, for the expected score's place ("the highest expected score of the week").
 _WEEK_PEERS: Final = re.compile(r"\bexpected\b[^.]*\bof the week\b|\bof the week\b[^.]*\bexpected\b", re.IGNORECASE)

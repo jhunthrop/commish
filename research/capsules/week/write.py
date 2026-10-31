@@ -192,13 +192,22 @@ def finished(text: str) -> bool:
     return text.rstrip().endswith(_CLOSING)
 
 
-def _checked_text(content: str) -> str:
-    """The check pass's answer as a read: its quotes and any label or JSON wrapper taken off."""
+# A label before the read in a check answer (the round 2 re-review's MEDIUM-2): "READ:", "Here is the corrected
+# read:", "Corrected read:", "Fixed:", "Revised:", any short leading phrase ended by a colon and no figure or clock
+# ("6:00 pm" is no label). It is taken off, and the rest stands only if it is a read (`is_a_read`).
+_PREFACE: Final = re.compile(r"^\s*(?:\*\*)?[A-Za-z][A-Za-z' ,-]{0,60}:(?:\*\*)?\s+(?=\S)")
+
+
+def _checked_text(content: str, draft: str = "") -> str:
+    """The check pass's answer as a read: its quotes and any label or JSON wrapper taken off (a leading phrase the
+    draft itself opens on is the read's own, never a label)."""
     text = content.strip().strip("`").strip()
     found = parse_week_answer(text)
     if found.read is not None and found.read != text:
         text = found.read
-    text = text.removeprefix("READ:").strip()
+    label = _PREFACE.match(text)
+    if label is not None and not draft.startswith(label.group(0).strip()):
+        text = text[label.end() :].strip()
     if len(text) > 1 and text[0] == text[-1] and text[0] in "\"'":
         text = text[1:-1].strip()
     return text
@@ -232,7 +241,7 @@ def _check(sheet: WeekSheet, draft: str, gateway: GatewayClient) -> tuple[str, U
     """The check pass on one finished draft (`CHECK_MAX_TOKENS`): the checked read when it can stand as one
     (`is_a_read`), else the draft itself, for the validator to judge. A gateway refusal raises, for the caller."""
     answer = ask(gateway, check_messages(sheet, draft), CHECK_MAX_TOKENS)
-    checked = _checked_text(answer.content)
+    checked = _checked_text(answer.content, draft)
     return (checked if is_a_read(checked, draft, sheet.name) else draft), answer.usage
 
 

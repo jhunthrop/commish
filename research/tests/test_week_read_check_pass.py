@@ -17,7 +17,7 @@ from research.capsules.run_budget import BudgetSpentError
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.week.prompt import CHECK_RULES, answer_json, check_messages
 from research.capsules.week.rules import body_rule_violations, week_rule_violations
-from research.capsules.week.write import WEEK_WRITER_VERSION, finished, is_a_read, write_week_read
+from research.capsules.week.write import WEEK_WRITER_VERSION, _checked_text, finished, is_a_read, write_week_read
 from research.tests.test_week_read_rules import STARTER_READ
 from research.tests.week_read_fixtures import starter
 
@@ -159,3 +159,24 @@ def test_a_check_answer_that_is_no_read_keeps_the_draft(answer: str) -> None:
 
 def test_a_fixed_read_is_a_read() -> None:
     assert is_a_read(STARTER_READ, _SLIP, "Puka Nacua")
+
+
+@pytest.mark.parametrize(
+    "preface", ["Here is the corrected read:", "Corrected read:", "Fixed:", "Revised:", "READ:", "**Checked read:**"]
+)
+def test_a_label_before_the_checked_read_is_taken_off(preface: str) -> None:
+    """The round 2 re-review's MEDIUM-2: a label ended by a colon is taken off, and the read after it stands."""
+    gateway = _Checked([_draft(_SLIP)], [_check(f"{preface} {STARTER_READ}")])
+    result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
+    assert (result.source, result.text) == ("llm", STARTER_READ)
+
+
+def test_a_label_with_no_read_after_it_keeps_the_draft() -> None:
+    gateway = _Checked([_draft(STARTER_READ)], [_check("Here is the corrected read: Start him.")])
+    result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
+    assert (result.source, result.text) == ("llm", STARTER_READ)
+
+
+def test_a_colon_the_draft_opens_on_is_the_reads_own() -> None:
+    draft = f"The short version: {STARTER_READ}"
+    assert _checked_text(draft, draft) == draft

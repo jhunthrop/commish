@@ -755,6 +755,10 @@ def test_a_place_only_fact_binds_by_its_measure_words() -> None:
         ("the 3rd-highest share among receivers", True),
         ("the 2nd-highest among wide receivers", False),
         ("6th among wide receivers", False),
+        ("the 3rd-highest among NFL wide receivers", True),
+        ("the 2nd-highest among NFL wide receivers", False),
+        ("the 2nd-highest among all the league's receivers", False),
+        ("the 2nd-highest among every starting wide receiver", False),
     ],
 )
 def test_a_place_in_the_sheets_words_is_held_to_its_fact(said: str, held: bool) -> None:
@@ -769,3 +773,26 @@ def test_a_place_in_the_sheets_words_is_held_to_its_fact(said: str, held: bool) 
 def test_no_sheet_line_says_we_rank() -> None:
     sheet = replace(heaviest(), angles=(_TARGETS, _VACATED))
     assert "we rank" not in render_week_sheet(sheet)
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_a_qualified_peer_group_is_held_like_the_plain_one() -> None:
+    """The round 2 re-review's MEDIUM-1: "among NFL wide receivers" is a peer claim, accepted where the fact states
+    the place (2nd here) and refused where it does not."""
+    second = replace(
+        _TARGETS,
+        text=_TARGETS.text.replace("3rd-highest", "2nd-highest"),
+        places=(("the 2nd-highest", "among wide receivers"),),
+    )
+    read = _ACCEPTED.replace(
+        "the 3rd-highest among the wide receivers we rank", "the 2nd-highest among NFL wide receivers"
+    )
+    held = validate_week_read(read, replace(starter(), angles=(second, _VACATED)), call="start").violations
+    assert not any("places him among his peers" in v for v in held), held
+    refused = validate_week_read(read, _angled(), call="start").violations
+    assert any("places him among his peers" in v for v in refused), refused
+    # A club's players are still his depth chart, never his peers.
+    club = _ACCEPTED.replace("the 3rd-highest among the wide receivers we rank", "the 2nd-highest among Rams receivers")
+    assert not any(
+        "places him among his peers" in v for v in validate_week_read(club, _angled(), call="start").violations
+    )
