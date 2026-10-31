@@ -72,6 +72,8 @@ fun WaiverScreen(
     refreshing: Boolean,
     actions: WaiverActions,
     modifier: Modifier = Modifier,
+    /** Draws the cards and the search at rest (a store shot, which draws one frame and no scroll). */
+    still: Boolean = false,
 ) {
     Column(modifier.fillMaxSize().background(CommishTheme.colors.bg)) {
         PullToRefreshBox(isRefreshing = refreshing, onRefresh = actions.refresh, modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -87,6 +89,7 @@ fun WaiverScreen(
                         actions,
                         WaiverPart.entries,
                         Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                        still,
                     )
             }
         }

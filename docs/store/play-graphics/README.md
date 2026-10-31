@@ -20,7 +20,7 @@ The script runs `./gradlew :storeshots:testDebugUnitTest -PstoreGraphics=<this f
 | `icon-512.png` | 512 x 512 | 32-bit PNG, RGBA | App icon | `web/static/icons/icon-512.png` pixel for pixel, re-saved with an alpha channel (opaque) |
 | `feature-graphic.png` | 1024 x 500 | 24-bit PNG, no alpha | Feature graphic | The whistle (the `Mark` composable) and "Commish" in Outfit on the dark page colour |
 | `phone-1-lineup.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 1 | "The lineup to start, every week": Lineup, Saturday noon, four changes filling every slot and the verb that makes them |
-| `phone-2-waivers.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 2 | "Your best add on waivers": Waivers, the two pickups with the best first and the claim pinned |
+| `phone-2-waivers.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 2 | "Your best add on waivers": Waivers, the two pickups with the best first, the position cards opening on the weakest Need (TE), and the claim pinned |
 | `phone-3-trades.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 3 | "Trades that help both teams": Trades, two trades worth proposing with each side's gain |
 | `phone-4-matchup.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 4 | "Your game, kept up to date": Matchup, Sunday afternoon with points coming in |
 | `phone-5-rankings.png` | 1080 x 1920 | 24-bit PNG, no alpha | Phone screenshot 5 | "Our rest-of-season order": Rankings, every position with week 6's game beside each player |
