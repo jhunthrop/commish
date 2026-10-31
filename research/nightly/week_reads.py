@@ -51,7 +51,7 @@ from typing import Final
 import httpx
 from sqlalchemy import Engine
 
-from research.capsules.config import CAPSULE_CONFIG, WriterSettings, writer_settings
+from research.capsules.config import CAPSULE_CONFIG, WriterSettings, week_writer_settings
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient
 from research.capsules.gateway_ledger import ModelPrice, fetch_price
@@ -114,15 +114,23 @@ HOURLY: Final = "hourly"
 # ones about $0.15). A night whose other reasons are heavy too (the 2026-10-29 nightly's 404 rule-stale rewrites)
 # can pass it, so the writer's rewrites are last in `cadence.PRIORITY` and the budget's stop carries the rest to
 # the next nightly, named on the step line's unwritten and counted on its "stopped by the budget".
-NIGHTLY_BUDGET_USD: Final = 2.50
+# LANE 307 (the founder 2026-10-30, "splurge"): the writer is Claude Sonnet 5.5 ($2 in, $10 out a million tokens)
+# and every draft has its check pass. Measured on 15 production sheets of week 8 (lane-307-report.md): $0.032 a
+# read with its corrections, checks and the retry writer's rescues, against GLM's $0.0021. A whole-board pass:
+# 536 x $0.032 = $17.15, about $18.40 with the roll-over rounds' re-asks (7% fell), $29 with half again for
+# margin, so NIGHTLY_BUDGET_USD is $30. The hourly dollars scale by the admission price (`worst_read_usd`: GLM's
+# $0.0033, Sonnet's $0.048 with its check, 14.5 times): $0.05 a pass to $0.75, $1.50 a day to $22.50 and the
+# status share $1.00 to $15.00. What a week spends is far under the caps: about $18 on the roll-over night, $1 to
+# $2 on a mid-week night, and $9 on a game day's status rewrites (300 x $0.03), about $40 a week.
+NIGHTLY_BUDGET_USD: Final = 30.00
 # The asks of a read within a nightly pass: its first, then two more for a read that fell to its facts block or
 # was demoted for a shared sentence, a rewrite held over the written read among them (Lane 293: the 2026-10-29
 # nightly's rule-stale rewrites fell at 153 of 407 in one round, the held rows never asked again); one still not
 # landed is asked again on the next nightly. A status rewrite's falls count toward `cadence.STATUS_REWRITES_A_DAY`,
 # at most two of them within a nightly (`status_reask_allowed`); a rule-stale rewrite's never do (`cadence.kept_read`).
 ROLLOVER_ROUNDS: Final = 3
-HOURLY_BUDGET_USD: Final = 0.05
-HOURLY_DAY_USD: Final = 1.50  # 0.60 before the game-day status passes (Lane 263): headroom over $0.93 of waves
+HOURLY_BUDGET_USD: Final = 0.75
+HOURLY_DAY_USD: Final = 22.50  # 0.60 before Lane 263's game-day passes, 1.50 before Lane 307's Sonnet writer
 # THE STATUS SHARE (Lane 276 review, H1): the part of HOURLY_DAY_USD the hourly retries of fallen reads never
 # draw on, so a late game day's status rewrite always has dollars. A game day's status rewrites: Lane 263's three
 # inactives waves of about 100 board starters, GAME_DAY_STATUS_READS. Each is admitted at its worst case
@@ -133,15 +141,15 @@ HOURLY_DAY_USD: Final = 1.50  # 0.60 before the game-day status passes (Lane 263
 # a floor, and the status rewrites also draw on whatever the retries left of their $0.50. The retries stop once the day's hourly spend, status rewrites' and retries' together,
 # reaches HOURLY_DAY_USD less this share; status rewrites draw on the whole day.
 GAME_DAY_STATUS_READS: Final = 300
-HOURLY_STATUS_RESERVE_USD: Final = 1.00
+HOURLY_STATUS_RESERVE_USD: Final = 15.00  # 300 x $0.048 (Lane 307), $1.00 at GLM's admission
 # The heaviest prompt a week read's ask carries (a correction with its ledger and every line's stamp), for a
 # read's worst case against what is left of the budget. Measured on Lane 117's replay of 40 production
 # sheets of week 7 after the four-rule prompt: 8,506 prompt tokens at 17,643 characters, the fewest
 # characters a token 1.87 (the recordings of Lane 72 had peaked at 3,630).
 WORST_PROMPT_TOKENS: Final = 9_000
 # The asks the budget's check prices a read at before it starts (the coordinator's ruling, Lane 117 fix round
-# 3): two at the heaviest prompt, a draft and its one retry. A read may make more (MAX_ASKS_PER_READ); the gateway's reservation is the
-# hard stop for those in flight.
+# 3): two at the heaviest prompt, since Lane 307 a draft and its check pass. A read may make more
+# (MAX_ASKS_PER_READ, each draft with its check); the gateway's reservation is the hard stop for those in flight.
 BUDGETED_CALLS_PER_READ: Final = 2
 # The characters a prompt token takes, for counting a built prompt (the tests), measured by Lane 286 (B282)
 # against the gateway's own count: the heaviest correction (`test_week_read_writer.heaviest_correction`, 21,861
@@ -151,7 +159,7 @@ BUDGETED_CALLS_PER_READ: Final = 2
 # main's heaviest real correction over the bound when the gateway counted it at about half of it (Lane 282).
 CHARS_PER_TOKEN: Final = 3.7
 # The recordings' dearest call, for a budget in calls when the price list cannot be read.
-WORST_CALL_USD: Final = 0.00065
+WORST_CALL_USD: Final = 0.024  # Sonnet's call at WORST_PROMPT_TOKENS and MAX_TOKENS (Lane 307); 0.00065 at GLM
 Log = Callable[[str], None]
 
 
@@ -725,7 +733,7 @@ def run_week_read_step(  # noqa: PLR0913 - the pass's parts
         log(f"{STEP}: {line}")
         return StepRecord(STEP, "skipped", line)
     due = _due(night, now, hourly)
-    settings = writer_settings(os.environ)
+    settings = week_writer_settings(os.environ)
     spend = WeekReadSpend(retry_model=settings.retry_model)
     for _, reason in due:
         spend.due[reason] = spend.due.get(reason, 0) + 1
@@ -738,7 +746,10 @@ def run_week_read_step(  # noqa: PLR0913 - the pass's parts
             judge = judge_model(os.environ)
             checked = _checked_retry(http, key, settings, log)
             spend.retry_model = checked.model
-            prices = [checked_price(http, key, replace(settings, model=m)) for m in (settings.model, judge)]
+            prices = [
+                checked_price(http, key, settings, CAPSULE_CONFIG.gateway.week_model_variable),
+                checked_price(http, key, replace(settings, model=judge)),
+            ]
             price = dearest_price([*prices, *checked.prices])
             worst = worst_read_usd(price)
             budgets.append(step_budget(price, usd))
@@ -816,7 +827,7 @@ def dry_price(environ: Mapping[str, str]) -> ModelPrice:
     key = environ.get(CAPSULE_CONFIG.gateway.api_key_variable, "").strip()
     if not key:
         return ModelPrice("no list price read", None, None, "no key, so the gateway's list was not read", False)
-    settings = writer_settings(environ)
+    settings = week_writer_settings(environ)
     models = [settings.model, judge_model(environ), *([] if settings.retry_model is None else [settings.retry_model])]
     with httpx.Client() as http:
         return dearest_price([fetch_price(http, key, model) for model in models])

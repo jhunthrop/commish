@@ -20,15 +20,8 @@ from research.capsules.week.angles import (
     unusual_words,
 )
 from research.capsules.week.bites import RANK_EDGE, depth_bites, rank_bites, weather_bites
-from research.capsules.week.prompt import (
-    ANGLES_REMINDER,
-    WEEK_RULES,
-    WEEK_RULES_ANGLES,
-    week_correction,
-    week_rules,
-)
+from research.capsules.week.prompt import WEEK_RULES
 from research.capsules.week.render import ANGLES_HEAD, NO_ANGLE, render_week_sheet
-from research.capsules.week.rules import ANGLE_FIGURES, MAX_FIGURES, max_figures
 from research.capsules.week.sheet import Allowed, DepthPlace, Status, Weather, WeekSheet, week_name_ledger
 from research.capsules.week.usage_reads import UsageWeek
 from research.capsules.week.validate import validate_week_read
@@ -97,11 +90,9 @@ def test_a_receiver_far_above_his_peers_leads_on_his_target_share() -> None:
     got = board_angles([*_board(), star], {}, 8)[star.player_id]
     assert got and got[0].key in {"target_share", "air_yards_share", "snap_share"}
     lead = next(a for a in got if a.key == "target_share")
-    assert (
-        "39% of the Rams' targets in his games this season, the highest among the wide receivers we rank" in lead.text
-    )
+    assert "39% of the Rams' targets in his games this season, the highest among wide receivers" in lead.text
     assert AngleFigure(39.0, Measure.TARGETS) in lead.figures  # 14 of 36 targets
-    assert lead.places == (("the highest", "among the wide receivers we rank"),)
+    assert lead.places == (("the highest", "among wide receivers"),)
 
 
 def test_a_thin_basis_is_never_carried() -> None:
@@ -206,12 +197,12 @@ def test_the_depth_chart_bites_on_a_split_or_a_fresh_move() -> None:
 
 _TARGETS = Angle(
     "target_share",
-    "Targets: 32% of the Rams' targets in his games this season, the 3rd-highest among the wide receivers we rank.",
+    "Targets: 32% of the Rams' targets in his games this season, the 3rd-highest among wide receivers.",
     (AngleFigure(32.0, Measure.TARGETS),),
     (),
     2.2,
     Basis(5, 48, "targets"),
-    (("the 3rd-highest", "among the wide receivers we rank"),),
+    (("the 3rd-highest", "among wide receivers"),),
 )
 _VACATED = Angle(
     "vacated",
@@ -256,31 +247,12 @@ def test_an_angles_figures_and_names_are_the_reads_to_quote() -> None:
     read = (
         "Puka Nacua draws 32% of the Rams' targets, and that is before the bump. Tutu Atwell is Out this week, "
         "and his 20% of the Rams' targets has to go somewhere in week 6 of 2026. Nacua is the obvious home for it "
-        "against Arizona. Start him."
+        "against Arizona. The Rams keep running their passing game through him on the downs that matter, and "
+        "nothing on the chart behind him has moved since the season opened. Start him."
     )
     assert validate_week_read(read, sheet, call="start").ok
     made_up = read.replace("32%", "37%")
     assert not validate_week_read(made_up, sheet, call="start").ok
-
-
-def test_a_sheet_with_angles_may_state_one_figure_more() -> None:
-    assert max_figures(starter()) == MAX_FIGURES
-    assert max_figures(_angled()) == MAX_FIGURES + ANGLE_FIGURES
-
-
-@pytest.mark.usefixtures("angles_on")
-def test_the_prompt_and_the_correction_carry_the_angles() -> None:
-    assert week_rules() == WEEK_RULES_ANGLES
-    assert "Never tour the list." in WEEK_RULES_ANGLES and "Never tour the list." not in WEEK_RULES
-    assert "Pick the two or three facts" not in WEEK_RULES_ANGLES
-    correction = week_correction(_angled(), "A read.", (), ())
-    assert ANGLES_REMINDER in correction and _TARGETS.text in correction
-
-
-@pytest.mark.usefixtures("angles_off")
-def test_with_the_switch_off_the_prompt_is_mains() -> None:
-    assert week_rules() == WEEK_RULES
-    assert ANGLES_REMINDER not in week_correction(_angled(), "A read.", (), ())
 
 
 def test_a_player_who_cannot_play_gets_no_angle_line() -> None:
@@ -349,7 +321,7 @@ def test_the_heaviest_correction_with_the_full_summary_stays_inside_the_prompt_b
     playing = Status("questionable", heaviest().status.captured_at)
     sheet = replace(heaviest(), status=playing, angles=tuple(_long_angle(n) for n in range(_FULL_SUMMARY)))
     system, user = worst_correction(sheet)
-    assert system == WEEK_RULES_ANGLES and ANGLES_REMINDER in user and _long_angle(_FULL_SUMMARY - 1).text in user
+    assert system == WEEK_RULES and _long_angle(_FULL_SUMMARY - 1).text in user
     tokens = (len(system) + len(user)) / CHARS_PER_TOKEN
     assert tokens <= (1 - BOUND_MARGIN) * WORST_PROMPT_TOKENS, tokens
 
@@ -359,7 +331,8 @@ def test_the_heaviest_correction_with_the_full_summary_stays_inside_the_prompt_b
 _ACCEPTED = (
     "Puka Nacua draws 32% of the Rams' targets, the 3rd-highest among the wide receivers we rank, in week 6 of "
     "2026. Tutu Atwell is Out this week, and his 20% of the Rams' targets has to go somewhere. Nacua is the obvious "
-    "home for it against Arizona. Start him."
+    "home for it against Arizona. The Rams keep running their passing game through him on the downs that matter, "
+    "and nothing on the chart behind him has moved since the season opened. Start him."
 )
 # The review's H1: each variant quotes an angle's figure as another measure, a share as a count, or a place among
 # his peers no angle states.
@@ -496,13 +469,6 @@ def test_an_honest_paraphrase_of_an_angle_is_not_refused(honest: str) -> None:
 # --- fix round 3: the ordinary rank (the coordinator's ruling 1) -------------------------------------------------
 
 _MATCHUP = "Puka Nacua draws 32% of the Rams' targets in week 6 of 2026. {line} Start him."
-
-
-@pytest.mark.usefixtures("angles_on")
-def test_an_ordinary_rank_stated_as_a_figure_is_refused() -> None:
-    read = _MATCHUP.format(line="Arizona sits 26th of 32 against receivers.")
-    violations = validate_week_read(read, _angled(), call="start").violations
-    assert any("where it does not bite" in v and "an ordinary matchup" in v for v in violations), violations
 
 
 @pytest.mark.usefixtures("angles_on")
@@ -778,4 +744,55 @@ def test_a_place_only_fact_binds_by_its_measure_words() -> None:
         a.figures or a.key in {"return"}
         for a in board_angles([*_board(), _receiver(78, 9)], {}, 8)["00-0000078"]
         if a.places
+    )
+
+
+@pytest.mark.usefixtures("angles_on")
+@pytest.mark.parametrize(
+    ("said", "held"),
+    [
+        ("the 3rd-highest among wide receivers", True),
+        ("the 3rd-highest share among receivers", True),
+        ("the 2nd-highest among wide receivers", False),
+        ("6th among wide receivers", False),
+        ("the 3rd-highest among NFL wide receivers", True),
+        ("the 2nd-highest among NFL wide receivers", False),
+        ("the 2nd-highest among all the league's receivers", False),
+        ("the 2nd-highest among every starting wide receiver", False),
+    ],
+)
+def test_a_place_in_the_sheets_words_is_held_to_its_fact(said: str, held: bool) -> None:
+    """Lane 307: the sheet says a place "among wide receivers", never "we rank", and the place rule reads that form
+    as it read Lane 300's."""
+    read = _ACCEPTED.replace("the 3rd-highest among the wide receivers we rank", said)
+    violations = validate_week_read(read, _angled(), call="start").violations
+    assert (not any("places him among his peers" in v for v in violations)) is held, violations
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_no_sheet_line_says_we_rank() -> None:
+    sheet = replace(heaviest(), angles=(_TARGETS, _VACATED))
+    assert "we rank" not in render_week_sheet(sheet)
+
+
+@pytest.mark.usefixtures("angles_on")
+def test_a_qualified_peer_group_is_held_like_the_plain_one() -> None:
+    """The round 2 re-review's MEDIUM-1: "among NFL wide receivers" is a peer claim, accepted where the fact states
+    the place (2nd here) and refused where it does not."""
+    second = replace(
+        _TARGETS,
+        text=_TARGETS.text.replace("3rd-highest", "2nd-highest"),
+        places=(("the 2nd-highest", "among wide receivers"),),
+    )
+    read = _ACCEPTED.replace(
+        "the 3rd-highest among the wide receivers we rank", "the 2nd-highest among NFL wide receivers"
+    )
+    held = validate_week_read(read, replace(starter(), angles=(second, _VACATED)), call="start").violations
+    assert not any("places him among his peers" in v for v in held), held
+    refused = validate_week_read(read, _angled(), call="start").violations
+    assert any("places him among his peers" in v for v in refused), refused
+    # A club's players are still his depth chart, never his peers.
+    club = _ACCEPTED.replace("the 3rd-highest among the wide receivers we rank", "the 2nd-highest among Rams receivers")
+    assert not any(
+        "places him among his peers" in v for v in validate_week_read(club, _angled(), call="start").violations
     )

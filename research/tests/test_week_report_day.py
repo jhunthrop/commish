@@ -72,12 +72,12 @@ def test_the_last_check_of_the_list_counts_once_it_came_by_the_write() -> None:
 
 
 def test_the_gibbs_sheet_never_names_a_sunday_report() -> None:
-    sheet = replace(on_bye(), written_at=SUNDAY_NIGHTLY, game=GIBBS_NEXT, status=Status(None, SATURDAY_LIST))
+    sheet = replace(on_bye(), written_at=SUNDAY_NIGHTLY, game=GIBBS_NEXT, status=Status("questionable", SATURDAY_LIST))
     text = render_week_sheet(sheet)
     assert "Sunday's report" not in text
-    assert "no designation for him on the injury list as of Saturday 11:00 pm Central" in text
+    assert "Questionable on the injury list as of Saturday 11:00 pm Central" in text
     # The words name no season (review L2): a read that quotes them has named it already.
-    assert "game status report on Friday." in text
+    assert "game status report on Friday," in text
 
 
 def test_a_read_naming_a_report_the_facts_do_not_is_refused() -> None:

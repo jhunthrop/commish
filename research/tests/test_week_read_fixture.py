@@ -2,8 +2,8 @@
 2026 (a starter, a Questionable player and a player on bye), with the gateway's recorded answers. No live
 call is made here.
 
-Lane 100 (B17, B44) holds the read to one paragraph in the 40 to 95 band (WEEK_BAND, Lane 117) that quotes
-only the page's cells, at most three of them. Every recorded read is longer and retells the cells (a figure the page draws in no
+Lane 100 (B17, B44) holds the read to one paragraph in the band (WEEK_BAND, 70 to 110 words since Lane 307) that
+quotes only the page's cells and the usage facts. Every recorded read retells the cells (a figure the page draws in no
 cell among them), so each is now the guard's case: refused by name, and the writer replayed against the
 recorded answers falls to its facts block. A read the rules take is shown on each sheet by a hand-written
 read (`HAND_WRITTEN`, written for this test and never a recording), through the writer's own path.
@@ -28,18 +28,17 @@ from research.capsules.gateway import Completion
 from research.capsules.gateway_ledger import Usage
 from research.capsules.narrative import ShapeMasks
 from research.capsules.page_figures import FIGURE_OFF_PAGE
-from research.capsules.sentences import split_sentences
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.validate import word_count
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.prompt import answer_json, parse_week_answer
 from research.capsules.week.render import render_week_sheet
-from research.capsules.week.rules import CALLS, MAX_FIGURES, WEEK_NEVER_WORDS, stated_figures, week_rule_violations
+from research.capsules.week.rules import CALLS, WEEK_NEVER_WORDS, week_rule_violations
 from research.capsules.week.sheet import WeekSheet, week_name_ledger
 from research.capsules.week.validate import WEEK_BAND, sentence_shapes, validate_week_read
 from research.capsules.week.write import write_week_read
-from research.tests.week_read_fixtures import main_sheet, sheet_from_json
+from research.tests.week_read_fixtures import echoed_check, main_sheet, sheet_from_json
 
 _FIXTURE = Path(__file__).parent / "testdata" / "week_reads" / "recorded.json"
 # The player page shots' stand-in read at the cap (Lane 121, B98), checked here against the recorded sheet.
@@ -56,12 +55,14 @@ HAND_WRITTEN: Final[dict[str, tuple[str, str]]] = {
     "Puka Nacua": (
         "Puka Nacua carries no designation on the Tuesday-night list and tops the Rams' receiver depth chart for week 6 "
         "of 2026, at home against the Cardinals. Arizona ranks 28th of 32 against receivers, and the game is "
-        "indoors under a fixed roof. He comes off 37.7 points in his last game. Start him.",
+        "indoors under a fixed roof. He comes off 37.7 points in his last game. The Rams keep running their passing "
+        "game through him on the downs that matter, and nothing on the chart behind him has moved. Start him.",
         "start",
     ),
     "Jahmyr Gibbs": (
         "The Lions are off in week 6 of 2026, so Gibbs does not play and scores nothing this week. There is no "
         "designation for him on the Tuesday-night list, and he still leads the Detroit backfield ahead of Sione Vaki. "
+        "A quiet week changes nothing about his role in that backfield, so there is no reason to panic or to move him. "
         "Keep him rostered, fill his spot with a back who plays, and he is back for week 7 at home against "
         "Green Bay.",
         "sit",
@@ -69,7 +70,8 @@ HAND_WRITTEN: Final[dict[str, tuple[str, str]]] = {
     _LAMB: (
         "CeeDee Lamb is Questionable on the Tuesday-night list, so his Sunday night in Green Bay is not settled yet. "
         "He brings 22.6 PPR points a game into week 6 of 2026. Green Bay sits 15th "
-        "of 32 against receivers, and he leads the Dallas depth chart ahead of George Pickens. Wait on his status "
+        "of 32 against receivers, and he leads the Dallas depth chart ahead of George Pickens. If he plays, his role in "
+        "the Dallas passing game is the same one that has carried managers all season. Wait on his status "
         "before the 7:20 pm Central kickoff, and if he's cleared, start him.",
         "hold",
     ),
@@ -92,6 +94,8 @@ class _Replay:
     def complete(
         self, messages: list[dict[str, str]], max_tokens: int, min_words: int = 20, ask: AskWaits | None = None
     ) -> Completion:
+        if (checked := echoed_check(messages)) is not None:
+            return checked
         self.calls += 1
         answer = next(self.answers)
         usage = None if answer["usage"] is None else Usage(**answer["usage"])
@@ -127,13 +131,10 @@ def test_the_fixture_is_a_starter_a_questionable_player_and_a_player_on_bye() ->
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_under_lane_100_every_recorded_read_is_refused_by_name(name: str) -> None:
-    """Each recording states more figures than the read may (B44), and each quotes a figure the page draws
-    in no cell (B17): the opponent's points allowed, his touchdowns, a projection the card does not print.
-    Each also runs past the cap of 95 words (Lane 117 fix round 3), counted as the validator counts."""
+    """Each recording quotes a figure the page draws in no cell (B17): the opponent's points allowed, his
+    touchdowns, a projection the card does not print. (Lane 307 retired the cap on figures.)"""
     sheet, player = _sheet(name)
     violations = validate_week_read(player["read"], sheet, frozenset(player["taken"]), _call(player)).violations
-    assert any("40-95 word band" in v for v in violations), violations
-    assert any(f"state at most {MAX_FIGURES}" in v for v in violations), violations
     assert any("draws in no cell" in v for v in violations), violations
     # Lane 96 (B16): each names "Tuesday's report", where no game status report was issued by the write.
     assert any("names Tuesday's report, a report the facts do not name" in v for v in violations), violations
@@ -163,15 +164,14 @@ def test_the_recorded_read_keeps_the_guards_that_stand(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_a_hand_written_read_of_each_sheet_is_one_the_rules_take(name: str) -> None:
-    """One paragraph in the 40 to 95 band, only the cells' figures and at most three, through the writer's own
-    path in one call (and the judge's no for a player who may not be started)."""
+    """One paragraph in the 70 to 110 band, only the cells' figures, through the writer's own path in one call
+    (and the judge's no for a player who may not be started)."""
     sheet, player = _sheet(name)
     read, call = HAND_WRITTEN[name]
     taken = frozenset(player["taken"])
     result = validate_week_read(read, sheet, taken, call)
     assert result.ok, result.violations
     assert len(read.split()) <= WEEK_BAND[1] and "\n" not in read
-    assert sum(len(stated_figures(s, sheet.season)) for s in split_sentences(read)) <= MAX_FIGURES
     answers = [{"content": answer_json(read, call), "usage": None, "provider": "replay"}]
     if not sheet.may_start:
         answers.append({"content": "no", "usage": None, "provider": "replay"})
@@ -183,14 +183,15 @@ def test_a_hand_written_read_of_each_sheet_is_one_the_rules_take(name: str) -> N
 def test_the_player_page_shots_full_read_is_one_the_writer_takes() -> None:
     """Lane 121 (B98): the stand-in read the player page shots draw at the cap (web/scripts/inseason-fixture
     saturday-run.ts) passes the writer's validator on Gibbs's sheet, at the band's top, and lands through the
-    writer's own path, so the box a full read grows to is shot on a read the nightly would publish."""
+    writer's own path, so the box a full read grows to is shot on a read the nightly would publish. (The band's top
+    is 110 words since Lane 307; the stand-in stays at its 95 words, inside the band.)"""
     stand_in: dict[str, str] = json.loads(_LONG_READ.read_text())
     sheet, player = _sheet(stand_in["name"])
     read, call = stand_in["body"], stand_in["call"]
     taken = frozenset(player["taken"])
     result = validate_week_read(read, sheet, taken, call)
     assert result.ok, result.violations
-    assert word_count(read) == WEEK_BAND[1] and "\n" not in read
+    assert WEEK_BAND[0] <= word_count(read) <= WEEK_BAND[1] and "\n" not in read
     answers = [{"content": answer_json(read, call), "usage": None, "provider": "replay"}]
     if not sheet.may_start:
         answers.append({"content": "no", "usage": None, "provider": "replay"})

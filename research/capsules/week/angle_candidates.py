@@ -97,7 +97,7 @@ class Candidate:
     """One fact about his week before it is ranked: `measure` against his position's peers (None for a
     candidate scored on its own, `fixed`), the sentence, its figures and names, and its basis (None for the club's
     fact, the expected score, which has no player basis: review L5). `ends` asks the ranking pass to add his place
-    among his peers in words, from the nearer end ("the 2nd-highest among the receivers we rank")."""
+    among his peers in words, from the nearer end ("the 2nd-highest share among wide receivers")."""
 
     key: str
     family: str

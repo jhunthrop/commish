@@ -315,5 +315,5 @@ def test_the_retries_stop_names_the_budget_that_bound_them() -> None:
     """The re-review's N2: the pass's own dollars or the retries' share of the day, never the day's for the pass's."""
     by_pass = week_reads._left_line([], 0, 2, 0.05, retries_by_pass=True)
     by_day = week_reads._left_line([], 0, 2, 0.05)
-    assert by_pass == "2 unwritten reads not asked, the pass's $0.05 spent"
-    assert by_day is not None and "the retries' share of the day's hourly $1.50 spent" in by_day
+    assert by_pass == f"2 unwritten reads not asked, the pass's ${week_reads.HOURLY_BUDGET_USD:.2f} spent"
+    assert by_day is not None and f"the day's hourly ${week_reads.HOURLY_DAY_USD:.2f} spent" in by_day

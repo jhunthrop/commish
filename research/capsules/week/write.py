@@ -16,6 +16,7 @@ Every answer's read has its season said once (`season_words.said_once`, Lane 303
 and that is the read stored and the draft a correction hands back.
 """
 
+import re
 from collections.abc import Sequence, Set
 from dataclasses import dataclass
 from typing import Final
@@ -27,7 +28,7 @@ from research.capsules.generate import BUDGET_SPENT, THROTTLED, ask, gateway_fai
 from research.capsules.page_figures import fallback_violation
 from research.capsules.rule_notes import notes_of
 from research.capsules.store import WRITTEN_SOURCE
-from research.capsules.validate import ValidationResult
+from research.capsules.validate import ValidationResult, word_count
 from research.capsules.week.judge import (
     JUDGE_MAX_TOKENS,
     JUDGE_MIN_WORDS,
@@ -36,7 +37,13 @@ from research.capsules.week.judge import (
     judge_violation,
     says_start,
 )
-from research.capsules.week.prompt import parse_week_answer, week_correction, week_prompt, week_rules
+from research.capsules.week.prompt import (
+    check_messages,
+    parse_week_answer,
+    week_correction,
+    week_prompt,
+    week_rules,
+)
 from research.capsules.week.render import render_week_facts_block
 from research.capsules.week.season_words import said_once
 from research.capsules.week.sheet import WeekSheet
@@ -63,10 +70,21 @@ MAX_ASKS_PER_READ: Final = MAX_CALLS_PER_READ + OVERRUN_RETRIES + OVERRUN_JUDGE_
 RETRY_WRITER_DRAFTS: Final = 1
 RETRY_WRITER_JUDGE_ASKS: Final = 1
 MAX_ASKS_WITH_RETRY: Final = MAX_ASKS_PER_READ + RETRY_WRITER_DRAFTS + RETRY_WRITER_JUDGE_ASKS
+# Since Lane 307 every draft also carries its check call (never an ask), so a read's HTTP ceiling is about twice
+# its drafts: size a cap on calls, not asks.
+# The retry writer's one draft that stopped mid-sentence: never checked, the read falls to its facts block.
+UNFINISHED: Final = "The read stops mid-sentence."
 # The placeholder a draft carries when it passed and no ask was left for the judge: never a rule it broke.
 _NO_JUDGE_ASK: Final = "No ask was left for the judge."
-# A five-sentence read and its call run about 180 tokens; the cap leaves room and never cuts an honest read.
+# A 110-word read and its call run about 200 tokens; the cap leaves room and never cuts an honest read.
 MAX_TOKENS: Final = 600
+# THE CHECK PASS (Lane 307, the founder's harness): after every draft the model that wrote it reads it against the
+# facts and fixes only the words a fact does not support (`prompt.check_messages`), before the validator reads it.
+# The check is an HTTP call on the read's bill and the run's budget, never one of the read's asks. A draft that
+# stops mid-sentence (cut at its token limit, the gateway's refusal, or no closing punctuation) is never checked
+# or patched: it is asked again, an ask spent.
+CHECK_MAX_TOKENS: Final = 600
+_CLOSING: Final = (".", "!", "?", '"', "\u201d")
 # THE WRITER VERSION (Lane 306, the founder 2026-10-30: "why can we not update all player reads at the same
 # time?"). Every stored read records the version that wrote it (`player_week_reads.writer_version`, revision
 # 0026; a row from before it reads as 0), and the next nightly rewrites every written read of the board week
@@ -78,7 +96,8 @@ MAX_TOKENS: Final = 600
 # 0: every read stored before revision 0026 and written before the 2026-10-30T05 nightly (the checklist writer).
 # 1: Lane 299's depth-chart and card-rank facts, Lane 300's full summary of every fact on his week, Lane 303's
 #    mechanical rules (refusal side, no bump of its own); first written by the 2026-10-30T05 nightly.
-WEEK_WRITER_VERSION: Final = 1
+# 2: Lane 307: Claude Sonnet 5.5 on the analyst-playbook prompt with the check pass, the wording rules retired.
+WEEK_WRITER_VERSION: Final = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,6 +187,80 @@ class _Asks:
                 self.judge_extra += OVERRUN_JUDGE_ASKS
 
 
+def finished(text: str) -> bool:
+    """Whether a draft ends on closing punctuation: one that stops mid-sentence is asked again, never checked."""
+    return text.rstrip().endswith(_CLOSING)
+
+
+# A label before the read in a check answer (the round 2 re-review's MEDIUM-2): "READ:", "Here is the corrected
+# read:", "Corrected read:", "Fixed:", "Revised:", any short leading phrase ended by a colon and no figure or clock
+# ("6:00 pm" is no label). It is taken off, and the rest stands only if it is a read (`is_a_read`).
+_PREFACE: Final = re.compile(r"^\s*(?:\*\*)?[A-Za-z][A-Za-z' ,-]{0,60}:(?:\*\*)?\s+(?=\S)")
+
+
+def _checked_text(content: str, draft: str = "") -> str:
+    """The check pass's answer as a read: its quotes and any label or JSON wrapper taken off (a leading phrase the
+    draft itself opens on is the read's own, never a label)."""
+    text = content.strip().strip("`").strip()
+    found = parse_week_answer(text)
+    if found.read is not None and found.read != text:
+        text = found.read
+    label = _PREFACE.match(text)
+    if label is not None and not draft.startswith(label.group(0).strip()):
+        text = text[label.end() :].strip()
+    if len(text) > 1 and text[0] == text[-1] and text[0] in "\"'":
+        text = text[1:-1].strip()
+    return text
+
+
+# What a check answer says about the read instead of being one (the phase 1 review's M2): "Every claim holds.",
+# "All claims check out.", "No changes needed.", "Returned unchanged."
+_META: Final = re.compile(
+    r"\b(?:every|all|each) (?:claims?|numbers?|figures?|facts?)\b|\bclaims? (?:holds?|checks? out|fails?)\b|"
+    r"\bchecks? out\b|\bno (?:changes?|fixes?|edits?|corrections?)(?: (?:are |were )?(?:needed|required|made))?\b|"
+    r"\bunchanged\b|\bfact lines?\b|\bthe read (?:holds|is (?:accurate|correct))\b",
+    re.IGNORECASE,
+)
+
+
+def is_a_read(checked: str, draft: str, name: str) -> bool:
+    """Whether a check answer can stand as the read (the phase 1 review's M2): finished, one paragraph, inside the
+    word band, no word about the check itself, and naming him whenever the draft did (his surname)."""
+    surname = name.rsplit(maxsplit=1)[-1] if name.split() else name
+    low, high = WEEK_BAND
+    return (
+        finished(checked)
+        and "\n" not in checked.strip()
+        and low <= word_count(checked) <= high
+        and _META.search(checked) is None
+        and (surname not in draft or surname in checked)
+    )
+
+
+def _check(sheet: WeekSheet, draft: str, gateway: GatewayClient) -> tuple[str, Usage | None]:
+    """The check pass on one finished draft (`CHECK_MAX_TOKENS`): the checked read when it can stand as one
+    (`is_a_read`), else the draft itself, for the validator to judge. A gateway refusal raises, for the caller."""
+    answer = ask(gateway, check_messages(sheet, draft), CHECK_MAX_TOKENS)
+    checked = _checked_text(answer.content, draft)
+    return (checked if is_a_read(checked, draft, sheet.name) else draft), answer.usage
+
+
+def _checked_or_draft(
+    sheet: WeekSheet, draft: str, gateway: GatewayClient
+) -> tuple[str, Usage | None, GenerationError | None]:
+    """The check pass's read, or on a refused check the draft unchecked and the refusal (a budget's or a
+    throttle's stop ends the read; any other refusal lets the validator read the draft as written)."""
+    try:
+        checked, usage = _check(sheet, draft, gateway)
+    except GenerationError as error:
+        return draft, error.billed, error
+    return checked, usage, None
+
+
+def _stops_the_read(error: GenerationError | None) -> bool:
+    return error is not None and gateway_failure(error).kind in (BUDGET_SPENT, THROTTLED)
+
+
 def _judged_start(sheet: WeekSheet, text: str, judge: GatewayClient) -> tuple[bool, Usage | None]:
     """The judge's verdict on a passing read for a player who may not be started (`judge`): True for start."""
     answer = ask(judge, judge_messages(sheet, text), JUDGE_MAX_TOKENS, JUDGE_MIN_WORDS)
@@ -220,7 +313,13 @@ def _writer_read(
             continue  # an empty or cut answer is an ask spent: ask again while asks remain
         usage = add_usage(usage, completion.usage)
         answer = parse_week_answer(completion.content)
-        text = said_once(answer.read or "", sheet.season, None if sheet.bye else sheet.week)
+        if not finished(answer.read or ""):
+            continue  # a draft that stops mid-sentence is asked again, never checked or patched
+        checked, billed, refused = _checked_or_draft(sheet, answer.read or "", gateway)
+        usage = add_usage(usage, billed)
+        if refused is not None and _stops_the_read(refused):
+            return _facts(sheet, usage, made(), attempts, _gateway_why(refused))
+        text = said_once(checked, sheet.season, None if sheet.bye else sheet.week)
         result = validate_week_read(text, sheet, taken, answer.call)
         if asks.count_over(result):
             attempts.append(WeekAttempt(text, answer.call, result.violations))
@@ -298,7 +397,15 @@ def _retry_writer_read(  # noqa: PLR0913 - the read's parts
         return done(block, FACTS_SOURCE, None, fallen.fallback)
     usage = add_usage(usage, completion.usage)
     answer = parse_week_answer(completion.content)
-    text = said_once(answer.read or "", sheet.season, None if sheet.bye else sheet.week)
+    draft = answer.read or ""
+    if not finished(draft):
+        attempts.append(WeekAttempt(draft, answer.call, (UNFINISHED,)))
+        return done(block, FACTS_SOURCE, None, _validation_why(attempts))
+    checked, billed, refused = _checked_or_draft(sheet, draft, retrier)
+    usage = add_usage(usage, billed)
+    if refused is not None and _stops_the_read(refused):
+        return done(block, FACTS_SOURCE, None, fallen.fallback)
+    text = said_once(checked, sheet.season, None if sheet.bye else sheet.week)
     violations = validate_week_read(text, sheet, taken, answer.call).violations
     if not violations and not sheet.may_start:
         try:

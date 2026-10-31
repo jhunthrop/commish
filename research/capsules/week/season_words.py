@@ -1,17 +1,14 @@
 """THE READ'S SEASON, SAID ONCE: a deterministic pass over the writer's answer before the validator reads it
 (Lane 303, ruling 1).
 
-The rules stand as they are: every week a read names carries its season (`season_voice`, "a week without its
-season"), and the read names the season once (`rules._season_violation`). A writer that breaks either on the
-exact pattern the rule refuses loses nothing a reader needs, so the pass mends the pattern instead of asking
-again:
+The read names the season at most once (`rules._season_violation`). A writer that names it twice on the exact
+pattern the rule refuses loses nothing a reader needs, so the pass mends the pattern instead of asking again:
 
 - This week's own report said by its week ("week 8's game status report") is said as the sheet says it, "this
   week's game status report" (the review's L2).
-- The first week the read names, when it names no season and comes before the read's first naming of this
-  season, takes it: "week 7's 15.1 PPR points" is "week 7 of 2026's 15.1 PPR points". A range takes it after its
-  last week ("weeks 3 through 5 of 2026", the review's H3). The weeks after it are read as that season's by the
-  validator (`validate.with_season`).
+- Lane 307 retired the step that added the season to the read's first bare week, with the rule that asked for it:
+  a week read may say "week 7" or "last week" with no season (the coordinator, 2026-10-30), and the validator
+  reads every bare week as this season's (`validate.with_season`).
 - A later "week 7 of 2026" (or "in 2026", ", 2026") after the read has named this season once is said as
   "week 7", only in the forms the rule's remedy writes, before a possessive, clause punctuation or the end
   (the review's H2).
@@ -28,8 +25,6 @@ would break their rule. Never wire it into `capsules/write.py`.
 
 import re
 from typing import Final
-
-from research.capsules.season_voice import week_references
 
 _YEAR: Final = re.compile(r"\b(?:19|20)\d\d\b")
 # What places a week outside this season (the review's M1): an earlier season in words, his career, a rookie or
@@ -63,7 +58,7 @@ def _quoted(at: int, spans: list[tuple[int, int]]) -> bool:
     return any(start <= at < end for start, end in spans)
 
 
-def _sentence_around(text: str, at: int) -> str:
+def sentence_around(text: str, at: int) -> str:
     """The sentence of `text` that holds the character at `at`."""
     starts = [m.end() for m in _SENTENCE_END.finditer(text) if m.end() <= at]
     start = starts[-1] if starts else 0
@@ -71,7 +66,7 @@ def _sentence_around(text: str, at: int) -> str:
     return text[start:end]
 
 
-def _outside_this_season(sentence: str, season: int) -> bool:
+def outside_this_season(sentence: str, season: int) -> bool:
     """Whether a sentence names a season other than `season`, or places a week outside it in words."""
     return (
         any(int(year) != season for year in _YEAR.findall(sentence))
@@ -93,23 +88,6 @@ def _this_weeks_report(text: str, week: int | None) -> str:
     )
 
 
-def _add_to_first_week(text: str, season: int) -> str:
-    """`text` with this season added after its first week (the whole range), when that week names none and comes
-    before the first naming of this season, outside quotes and never in a sentence that places it elsewhere."""
-    first_season = _first_season_at(text, season)
-    first = next((r for r in week_references(text) if r.season is None), None)
-    if first is None:
-        return text
-    match = next((m for m in _WEEK.finditer(text) if m.start() == len(first.before)), None)
-    if match is None or (first_season is not None and first_season < match.start()):
-        return text
-    if _quoted(match.start(), _quoted_spans(text)) or re.match(r"\s+of\b", text[match.end() :]):
-        return text
-    if _outside_this_season(_sentence_around(text, match.start()), season):
-        return text
-    return f"{text[: match.end()]} of {season}{text[match.end() :]}"
-
-
 def _drop_repeats(text: str, season: int) -> str:
     """`text` with this season dropped from every week after its first naming of this season, except in quotes
     and in a sentence that speaks of another season (its bare week would be read as that one's)."""
@@ -123,7 +101,7 @@ def _drop_repeats(text: str, season: int) -> str:
         tail = after.match(text, match.end())
         if tail is None or tail.end() <= first_season + len(str(season)) or _quoted(match.start(), spans):
             continue
-        if _outside_this_season(_sentence_around(text, match.start()), season):
+        if outside_this_season(sentence_around(text, match.start()), season):
             continue
         kept.append(text[cursor : match.end()])
         cursor = tail.end()
@@ -131,6 +109,6 @@ def _drop_repeats(text: str, season: int) -> str:
 
 
 def said_once(text: str, season: int, week: int | None = None) -> str:
-    """The writer's `text` with this season said once, at the first week it names, and this `week`'s report said
-    as the sheet says it (the module's moves)."""
-    return _drop_repeats(_add_to_first_week(_this_weeks_report(text, week), season), season)
+    """The writer's `text` with this season said at most once and this `week`'s report said as the sheet says it.
+    Since Lane 307 the pass never adds the season: a week read may say "week 7" with no season at all."""
+    return _drop_repeats(_this_weeks_report(text, week), season)

@@ -7,7 +7,7 @@ is the oracle's and is not restated; the voice rules live in `voice_rules.py`.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final
 
 from research.errors import ConfigurationError
@@ -27,6 +27,12 @@ CAPSULE_MODEL: Final = "zai/glm-5.3-flash"
 # writing the corrections after GLM's drafts on 519 sheets of week 8 of 2026: as many reads written as GLM
 # alone, at 63% of the cost per read.
 RETRY_WRITER_MODEL: Final = "deepseek/deepseek-v4.1-flash-1017"
+# The week read's writer (Lane 307, the founder 2026-10-30: "with costs that low we could splurge for a better
+# model that give us true uniqueness and accuracy"): Claude Sonnet 5.5 wrote the most accurate and the most
+# original reads of the 2026-10-30 model ladder on the analyst-playbook prompt. The season writer stays
+# `CAPSULE_MODEL`. A setting: `WEEK_WRITER_MODEL` in the environment names another (`week_writer_settings`). The
+# non-batch id, so a whole-board rewrite finishes inside one nightly run.
+WEEK_WRITER_MODEL: Final = "anthropic/claude-sonnet-5.5"
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +75,8 @@ class Gateway:
     providers_variable: str = "CAPSULE_PROVIDERS"
     # The week read's retry writer's model (`RETRY_WRITER_MODEL`): unset is the default, empty is none.
     retry_model_variable: str = "RETRY_WRITER_MODEL"
+    # The week read's writer's model (`WEEK_WRITER_MODEL`): unset is the default.
+    week_model_variable: str = "WEEK_WRITER_MODEL"
     # The writer does not think before it writes (measured: more written, none throttled, cheaper).
     thinking: bool = False
 
@@ -333,6 +341,13 @@ def writer_settings(environ: Mapping[str, str], gateway: Gateway = CAPSULE_CONFI
         providers,
         _retry_model(environ, gateway),
     )
+
+
+def week_writer_settings(environ: Mapping[str, str], gateway: Gateway = CAPSULE_CONFIG.gateway) -> WriterSettings:
+    """The week reads' writer settings (Lane 307): the run's settings with the week writer's model, the setting
+    `WEEK_WRITER_MODEL` when set, else `WEEK_WRITER_MODEL`'s default."""
+    model = environ.get(gateway.week_model_variable, "").strip() or WEEK_WRITER_MODEL
+    return replace(writer_settings(environ, gateway), model=model)
 
 
 def _retry_model(environ: Mapping[str, str], gateway: Gateway) -> str | None:

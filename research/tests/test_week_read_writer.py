@@ -33,6 +33,7 @@ from research.capsules.week.cadence import (
     status_rewrite_capped,
 )
 from research.capsules.week.prompt import (
+    OWN_ROLE,
     WEEK_RULES,
     answer_json,
     length_move,
@@ -62,6 +63,7 @@ from research.nightly.week_reads import (
     HOURLY_BUDGET_USD,
     HOURLY_DAY_USD,
     NIGHTLY_BUDGET_USD,
+    WORST_CALL_USD,
     WORST_PROMPT_TOKENS,
     WeekReadSpend,
     dearest_price,
@@ -70,7 +72,16 @@ from research.nightly.week_reads import (
     worst_read_usd,
 )
 from research.tests.test_week_read_rules import BYE_READ, STARTER_READ
-from research.tests.week_read_fixtures import REPORT, WRITTEN_AT, heaviest, main_sheet, on_bye, questionable, starter
+from research.tests.week_read_fixtures import (
+    REPORT,
+    WRITTEN_AT,
+    echoed_check,
+    heaviest,
+    main_sheet,
+    on_bye,
+    questionable,
+    starter,
+)
 
 _USAGE = Usage(2400, 150, 2550, 0.0004)
 _A_DRAFT_AND_ONE_MORE = 2
@@ -101,6 +112,8 @@ class _StubGateway:
     def complete(
         self, messages: list[dict[str, str]], max_tokens: int, min_words: int = 20, ask: AskWaits | None = None
     ) -> Completion:
+        if (checked := echoed_check(messages)) is not None:
+            return checked
         self.calls += 1
         self.asked.append(messages)
         self.models.append(self.model)
@@ -122,21 +135,19 @@ class _StubGateway:
 def test_the_prompt_states_the_week_the_kickoff_and_that_the_number_is_published_never_ours() -> None:
     user = week_prompt(starter(), ())
     assert "week 6 of 2026" in user and "Sunday 3:05 pm Central" in user and "18.4 points" in user
-    assert "published projection" in WEEK_RULES and "never ours" in WEEK_RULES
-    assert "45 to 70 words in all, about 60" in WEEK_RULES and "never more than 95" in WEEK_RULES
-    # Lane 117 (B95): the four rules the first nightly broke most, in the writer's words.
-    assert "One figure to a sentence." in WEEK_RULES
+    # Lane 307: the harness's playbook, with the coordinator's one added sentence.
+    assert "How a good fantasy analyst thinks" in WEEK_RULES and "What makes a read worth reading" in WEEK_RULES
+    assert "Talk about him in his own role." in WEEK_RULES and OWN_ROLE in WEEK_RULES
+    assert "75 to 95 words, never more than 110" in WEEK_RULES
+    assert "No semicolons. No em dashes or en dashes." in WEEK_RULES
     # Lane 275: the read never states the published projection; the card's Wk cell prints it.
-    assert "Never state it, its figure, its change or a judgment of it" in WEEK_RULES
-    assert "Never the published projection, its figure or its change" in WEEK_RULES
-    assert "Name it once" not in WEEK_RULES and "with its figure" not in WEEK_RULES
-    # Review H1 and M1: no stock projection sentence to copy, no trading word, no report name the facts never give.
+    assert "Never state the published projection, its figure, its change or a judgment of it" in WEEK_RULES
+    assert "never ours" in WEEK_RULES
+    # The checklist's wording rules are gone with the checks that enforced them.
+    for retired in ("One figure to a sentence.", "quote at most", "The season once", "short sentences"):
+        assert retired not in WEEK_RULES, retired
     for primed in ("has him at", "the stock", "Tuesday-night"):
         assert primed not in WEEK_RULES, primed
-    assert "The season once, with the first week you name" in WEEK_RULES
-    assert "The injury list in the facts' own words for it" in WEEK_RULES
-    assert "Pick the two or three facts that decide his week" in WEEK_RULES
-    assert "quote at most 3 figures" in WEEK_RULES and "Never retell the cells" in WEEK_RULES
     assert '"in our preseason order" or "in our rest-of-season order"' in WEEK_RULES
     assert '"call"' in WEEK_RULES and '"hold" means no change' in WEEK_RULES and 'calls itself "hold"' in WEEK_RULES
     for word in ("odds", "underdog", "favoured", "line", "spread", "bet", "the books"):
@@ -167,8 +178,8 @@ def test_a_long_read_is_told_its_count_and_the_cut() -> None:
     gateway = _StubGateway([_answer(long_read), _answer(STARTER_READ)])
     assert write_week_read(starter(), gateway).source == "llm"  # type: ignore[arg-type]
     correction = gateway.asked[1][-1]["content"]
-    assert f"Your read ran {words} words, over the 95-word cap. Write it again at 60 words" in correction
-    assert length_move(95) is None
+    assert f"Your read ran {words} words, over the 110-word cap. Write it again at 90 words" in correction
+    assert length_move(110) is None
 
 
 def test_a_read_asked_shorter_still_holds_to_the_cap() -> None:
@@ -176,7 +187,7 @@ def test_a_read_asked_shorter_still_holds_to_the_cap() -> None:
     season read's 10% allowance does not carry over); Lane 117 (B95, fix round 3): the cap is 95, one read
     over it is handed back, and a second over it is the facts block, never trimmed."""
     longer = _over_the_cap()
-    assert 95 < len(longer.split()) <= 104  # noqa: PLR2004 - over the cap, inside the old 10%
+    assert 110 < len(longer.split()) <= 121  # noqa: PLR2004 - over the cap, inside the old 10%
     script = [_answer(" ".join([STARTER_READ, STARTER_READ])), _answer(longer), _answer(STARTER_READ)]
     result = write_week_read(starter(), _StubGateway(script))  # type: ignore[arg-type]
     assert (result.source, result.calls, result.fallback) == ("facts", _A_DRAFT_AND_ONE_MORE, OVER_CAP_FALL)
@@ -188,11 +199,10 @@ _BROKEN = f"{STARTER_READ.removesuffix(' Start him with confidence.')} It is a s
 
 
 def _over_the_cap() -> str:
-    """The starter read with two sentences of plain words before its call, no figure among them: 102 words."""
+    """The starter read with a sentence of plain words before its call, no figure among it: 112 words."""
     extra = (
         " Davante Adams is listed second behind him, the kind of steady pecking order that keeps the targets"
-        " flowing his way for now, and nothing in the facts says that changes in this game at home, where the Rams"
-        " keep turning to him whenever they need the ball moved."
+        " flowing his way for now, and nothing says that changes."
     )
     return STARTER_READ.replace(" Start him with confidence.", extra + " Start him with confidence.")
 
@@ -201,7 +211,7 @@ def test_a_last_draft_over_the_cap_alone_is_asked_once_more_with_its_overrun_nam
     """Lane 100: the fourth draft, the first over the cap, broke only the 40 to 95 band, so the writer asks a
     fifth time, the overrun counted for it, and that read lands."""
     long_read = _over_the_cap()
-    assert len(long_read.split()) > 95  # noqa: PLR2004 - the cap
+    assert len(long_read.split()) > 110  # noqa: PLR2004 - the cap
     script = [*[_answer(_BROKEN)] * (MAX_CALLS_PER_READ - 1), _answer(long_read), _answer(STARTER_READ)]
     gateway = _StubGateway(script)
     result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
@@ -218,7 +228,7 @@ def test_the_overrun_retry_is_one_and_only_for_the_cap() -> None:
     result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
     assert (result.source, result.calls, result.fallback) == ("facts", _A_DRAFT_AND_ONE_MORE, OVER_CAP_FALL)
     assert (
-        "Your read ran 102 words, over the 95-word cap. Write it again at 60 words" in gateway.asked[1][-1]["content"]
+        "Your read ran 112 words, over the 110-word cap. Write it again at 90 words" in gateway.asked[1][-1]["content"]
     )
     broken = f"{long_read.removesuffix(' Start him with confidence.')} It is a safe bet he scores."
     gateway = _StubGateway([_answer(_BROKEN)] * (MAX_CALLS_PER_READ - 1) + [_answer(broken)] * 3)
@@ -229,7 +239,8 @@ def test_the_overrun_retry_is_one_and_only_for_the_cap() -> None:
 OUT_READ = (
     "Puka Nacua is Out on Friday's report, so he does not play against Arizona in week 6 of 2026. "
     "His 24.1 points in his last game do not count for a player who sits this week. "
-    "Bench him this week and pick up a receiver who has a game."
+    "Arizona at home was a matchup worth chasing, but none of that matters for a receiver who is not on the field, "
+    "so the spot goes to someone who plays. Bench him this week and pick up a receiver who has a game."
 )
 # Plain words, no figure among them, that take a read over the 95-word cap.
 _PLAIN_WORDS = (
@@ -252,7 +263,7 @@ def test_a_bye_or_out_players_overrun_retry_carries_the_judges_ask(sheet_of: obj
     sheet = sheet_of()  # type: ignore[operator]
     honest = BYE_READ if sheet.bye else OUT_READ
     long_read = _bye_over_the_cap() if sheet.bye else OUT_READ.replace(" Bench him", _PLAIN_WORDS + " Bench him")
-    assert len(long_read.split()) > 95  # noqa: PLR2004 - the cap
+    assert len(long_read.split()) > 110  # noqa: PLR2004 - the cap
     judged_no = Completion("No", _USAGE, "provider", "stop")
     broken = honest.replace(" this week", " this week, a safe bet", 1)
     drafts = [*[_answer(broken, "sit")] * (MAX_CALLS_PER_READ - 1), _answer(long_read, "sit")]
@@ -338,16 +349,17 @@ def heaviest_correction() -> tuple[str, str]:
     return worst_correction(heaviest())
 
 
-# A fifth draft (the writer's asks and its one overrun retry, the Lane 286 review's M2) that breaks the four rules
-# B282 added, each with its own note: a colon set-up, a spelled count his cell prints, the member's roster, a
-# rank stated twice.
+# A fifth draft (the writer's asks and its one overrun retry, the Lane 286 review's M2) that breaks the punctuation
+# rules Lane 307 added and the week's own words, each with its own note: a semicolon, an en dash, a betting word, a
+# weekly number called ours.
 _FORM = (
-    "Bye week for him: he has played four games this season. Keep him on your roster for now. Detroit has "
-    "allowed the 9th-fewest PPR points a game to receivers, 9th of 32."
+    "He sits this week; the Lions rest \u2013 and the underdog Lions need him back. Our projection still likes him "
+    "for the weeks after."
 )
-# The heaviest real correction this ledger builds on the lane286_bakeoff copy's 519 sheets (Tyquan Thornton's),
-# the floor the synthetic one never falls under.
-_HEAVIEST_REAL_CHARS = 21_761
+# The floor the synthetic correction never falls under (the review's M2: a refactor that drops a note shrinks the
+# ask and must fail here): Lane 307's measure of it under the analyst-playbook prompt, the retired rules' notes
+# gone (Lane 286's heaviest real correction, Tyquan Thornton's, was 21,761 characters under the checklist).
+_HEAVIEST_REAL_CHARS = 18_000
 
 
 def worst_correction(sheet: WeekSheet) -> tuple[str, str]:
@@ -366,12 +378,13 @@ def test_the_worst_prompt_bound_holds_the_heaviest_correction_with_its_margin() 
     system, user = heaviest_correction()
     # The floor (the review's M2): a refactor that drops a note shrinks the ask and must fail here, not pass.
     assert len(system) + len(user) >= _HEAVIEST_REAL_CHARS
-    for reason in ("set-up clause", "spells out a figure", "addresses the member", "states the rank"):
+    for reason in ("a semicolon", "an en dash", "underdog", "calls a weekly number ours"):
         assert reason in user, reason
     tokens = (len(system) + len(user)) / CHARS_PER_TOKEN
     assert tokens <= (1 - BOUND_MARGIN) * WORST_PROMPT_TOKENS, tokens
-    assert step_budget(ModelPrice("m", None, None, "unread", None), HOURLY_BUDGET_USD).max_calls == int(0.05 / 0.00065)
-    assert pytest.approx(4.00) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
+    unread = ModelPrice("m", None, None, "unread", None)
+    assert step_budget(unread, HOURLY_BUDGET_USD).max_calls == int(HOURLY_BUDGET_USD / WORST_CALL_USD)
+    assert pytest.approx(52.50) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
 
 
 def test_the_heaviest_sheet_prints_every_section() -> None:
@@ -479,10 +492,9 @@ def test_a_written_read_the_rules_now_refuse_is_due_once_a_day_at_the_nightly() 
     "stale",
     [
         # Lane 286 (the re-review): every rule of the body alone makes a stored read due.
-        _STANDING_READ.replace("Hold him until his status settles.", "Keep him on your roster until it settles."),
-        "Bye week aside: Bijan Robinson is Questionable on Friday's report for week 6 of 2026. He leads the Atlanta "
-        "backfield. Hold him.",
-        f"{_STANDING_READ} Chicago allows the 9th-fewest PPR points a game to backs, 9th of 32.",
+        _STANDING_READ.replace("Hold him until his status settles.", "Hold him; his status is open."),
+        _STANDING_READ.replace("Hold him until his status settles.", "Hold him \u2013 his status is open."),
+        f"{_STANDING_READ} He is a big underdog this week.",
     ],
 )
 def test_a_stored_read_a_body_rule_now_refuses_is_rule_stale_at_the_nightly(stale: str) -> None:

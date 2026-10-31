@@ -82,7 +82,8 @@ _EXPECTED = Angle(
 GOOD = (
     "Josh Allen gets the Jets at home in week 6 of 2026, and the published projection has him at 26.4 points. "
     "Buffalo are expected to win 29.5 to 24, and he comes in off 22.1 PPR points at New England, after 18.5 "
-    "and 17.5 the two weeks before. He is QB1 in our rest-of-season order. Start him."
+    "and 17.5 the two weeks before. The Bills keep putting the ball in his hands on every down that matters, and "
+    "nothing about this matchup asks them to change that plan. He is QB1 in our rest-of-season order. Start him."
 )
 
 

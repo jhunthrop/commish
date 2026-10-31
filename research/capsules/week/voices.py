@@ -1,5 +1,9 @@
 """THE WEEK READ'S WRITER VOICES (Lane 266): a small desk of voices, each player's read in one of them.
 
+RETIRED FROM THE ASKS BY LANE 307: the analyst playbook in the system prompt is the voice, and no ask carries a
+brief or a reminder (`prompt`). The desk stays for the writer bake-off's arms (`explore.writer_bakeoff`), which
+read it to tag and compare reads; `VOICES_ON` is off.
+
 The founder (2026-10-28): every week read came from one prompt in one voice, so the site read like one
 writer. Each voice is a short brief (how the read opens, its sentence length and rhythm, what it leans on)
 that rides in the first ask after the facts (`prompt.week_prompt`). A correction (and the retry writer's ask,
@@ -24,8 +28,8 @@ from research.capsules.week.angles import angles_on
 from research.capsules.week.bites import rank_bites
 from research.capsules.week.sheet import WeekSheet
 
-# The switch (Lane 266's ship bar): False and every ask goes out exactly as it did before the voices.
-VOICES_ON: Final = True
+# The switch (Lane 266's ship bar): off since Lane 307, which took the voices out of the asks.
+VOICES_ON: Final = False
 
 
 @dataclass(frozen=True, slots=True)

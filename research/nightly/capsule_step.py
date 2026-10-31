@@ -638,14 +638,16 @@ class CapsuleStepError(Exception):
         self.spend = spend
 
 
-def checked_price(http: httpx.Client, key: str, settings: WriterSettings) -> ModelPrice:
+def checked_price(
+    http: httpx.Client, key: str, settings: WriterSettings, variable: str = CAPSULE_CONFIG.gateway.model_variable
+) -> ModelPrice:
     """The model's price from the gateway's list; a list that was read and does not carry the model
     fails the step before any call (a typo in CAPSULE_MODEL would demote written reads board-wide).
     A list that could not be read does not block."""
     price = fetch_price(http, key, settings.model)
     if price.listed is False:
         raise ConfigurationError(
-            f"capsules: {CAPSULE_CONFIG.gateway.model_variable} names {settings.model}, which the gateway's "
+            f"capsules: {variable} names {settings.model}, which the gateway's "
             "model list does not carry, so no call was made"
         )
     return price

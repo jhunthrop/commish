@@ -24,7 +24,6 @@ from research.capsules.week.rank_words import rank_words
 from research.capsules.week.render import render_week_facts_block, render_week_sheet
 from research.capsules.week.rules import (
     WEEK_NEVER_WORDS,
-    _opener_violation,
     names_the_projection,
     stated_figures,
     week_rule_violations,
@@ -43,7 +42,6 @@ from research.capsules.week.sheet import (
 from research.capsules.week.start_advice import start_advice_in
 from research.capsules.week.validate import sentence_shapes, validate_week_read, week_masks, with_season
 from research.tests.week_read_fixtures import (
-    BEFORE,
     BOARD,
     CAPTURED,
     FIGURES,
@@ -60,13 +58,16 @@ from research.tests.week_read_fixtures import (
 
 STARTER_READ = (
     "Puka Nacua gets Arizona at home in week 6 of 2026, and the Cardinals rank 26th of 32 against receivers. "
-    "He leads the Rams' receivers with 25.9 PPR points a game over his 3 games this season. "
-    "The Rams play indoors, so nothing about the weather gets in his way. Start him with confidence."
+    "He leads the Rams' receivers with 25.9 PPR points a game over his 3 games this season, and nothing about his "
+    "role has moved since. The Rams play indoors, so nothing about the weather gets in his way. The passing game "
+    "still runs through him on the downs that matter. Arizona has no answer for a receiver who wins this often. "
+    "Start him with confidence."
 )
 BYE_READ = (
     "Jahmyr Gibbs and the Lions are on their bye in week 6 of 2026, so he does not play this week. Keep him "
-    "rostered, because his 21.3 PPR points a game over 5 games make him a weekly starter. Fill his spot "
-    "with a back who has a game, and bring Gibbs straight back for week 7 against Green Bay."
+    "rostered, because his 21.3 PPR points a game over 5 games make him a weekly starter the moment Detroit is "
+    "back. Fill his spot with a back who has a game and steady work of his own, and do not let an empty week push "
+    "you into a panic move. Gibbs goes straight back into the lineup for week 7 against Green Bay."
 )
 
 
@@ -102,9 +103,11 @@ def test_every_line_carries_its_stamp_and_the_report_its_day() -> None:
     )
     text = render_week_sheet(sheet)
     for line in text.splitlines()[2:]:
-        if not line.startswith("Injury report"):
+        if not line.startswith("Injury report") and line != "No injury designation.":
             assert "(as of " in line, line
-    assert "on Friday's report" in text
+    # Lane 307: no designation is one short line, no stamp and no report day; a designation keeps both.
+    assert "No injury designation." in text and "Friday's report" not in text
+    assert "on Friday's report" in render_week_sheet(replace(sheet, status=Status("questionable", REPORT)))
     assert set(sheet.stamps()) >= {"schedule", "projection", "status", "expected", "allowed", "board", "stat_lines"}
     assert set(sheet.stamps()) >= {"depth_chart"}
 
@@ -207,9 +210,10 @@ def test_a_provider_or_a_rival_product_is_refused(name: str) -> None:
     assert not validate_week_read(f"{STARTER_READ} {name} agrees.", starter(), call="start").ok
 
 
-def test_a_tip_is_refused() -> None:
-    result = validate_week_read(f"{STARTER_READ} Pro tip: check the inactives.", starter(), call="start")
-    assert any("tip" in v for v in result.violations), result.violations
+def test_a_tip_word_is_no_longer_refused() -> None:
+    """Lane 307: the tip words refused a true sentence for its wording ("don't forget the bye") and are retired."""
+    result = validate_week_read(f"{STARTER_READ} Don't forget him.", starter(), call="start")
+    assert not any("tip" in v for v in result.violations), result.violations
 
 
 def test_the_projection_is_never_called_ours() -> None:
@@ -322,14 +326,6 @@ def test_a_read_must_say_he_does_not_play_when_he_cannot() -> None:
     assert any("does not play" in v for v in week_rule_violations(text, on_bye(), "hold"))
 
 
-def test_a_figure_without_its_unit_is_refused_and_week_numbers_and_clock_times_are_not_figures() -> None:
-    """The review's M1, in the recorded reads' own words."""
-    bare = "The expected score has the Rams at 32 to Arizona's 19.5 this week."
-    assert any('"32", "19.5" without its unit' in v for v in week_rule_violations(bare, starter()))
-    honest = "The Rams are expected to score 32.5 points in week 6 of 2026, kicking off at 3:05 pm Central."
-    assert not any("without its unit" in v for v in week_rule_violations(honest, starter()))
-
-
 def test_a_rank_in_our_order_says_which_order() -> None:
     plain = "We have him WR2 on our board for the weeks ahead."
     assert any("which order" in v for v in week_rule_violations(plain, starter()))
@@ -345,22 +341,10 @@ def test_the_season_is_named_once_and_weeks_after_it_go_bare() -> None:
     assert validate_week_read(BYE_READ, on_bye(), call="hold").ok
 
 
-def test_a_bare_week_before_the_season_is_named_is_refused() -> None:
-    text = STARTER_READ.replace("in week 6 of 2026", "in week 6").replace("Start him", "Start him in 2026")
-    assert not validate_week_read(text, starter(), call="start").ok
-
-
-@pytest.mark.parametrize("count", [2, 6])
-def test_a_read_runs_three_to_five_sentences(count: int) -> None:
-    sentences = [
-        "Puka Nacua faces Arizona at home in week 6 of 2026.",
-        "He leads the Rams' receivers this week.",
-        "The Cardinals allow receivers 41.3 PPR points a game.",
-        "The Rams are expected to score 32.5 points.",
-        "He has 25.9 PPR points a game.",
-        "Start him every week.",
-    ]
-    assert any("sentences" in v for v in week_rule_violations(" ".join(sentences[:count]), starter()))
+def test_a_bare_week_with_no_season_named_passes() -> None:
+    """Lane 307 retired the season on every week: "week 6" with no season is this season's."""
+    text = STARTER_READ.replace("in week 6 of 2026", "in week 6")
+    assert validate_week_read(text, starter(), call="start").ok
 
 
 def test_a_sentence_shaped_like_one_on_another_page_is_refused() -> None:
@@ -570,27 +554,26 @@ def test_the_sheet_prints_a_chance_of_rain_only_as_the_cell_names_it() -> None:
     assert "a 30% chance of rain" in render_week_sheet(questionable())
 
 
-def test_a_read_states_at_most_three_figures_and_one_paragraph() -> None:
-    """Lane 100 (B44): the cells carry his numbers; the read says what they cannot, in one paragraph."""
+def test_a_read_is_one_paragraph_with_no_cap_on_its_figures() -> None:
+    """Lane 100 (B44): one paragraph. Lane 307 retired the cap on figures with the checklist prompt."""
     four = STARTER_READ.replace(
         "Start him with confidence.",
         "He brings 25.9 PPR points a game, and the Rams are expected to score 32.5 points.",
     )
-    assert any("states 4 figures" in v for v in week_rule_violations(four, starter(), "start"))
+    assert not any("figures" in v for v in week_rule_violations(four, starter(), "start"))
     split = STARTER_READ.replace(" The Rams play", "\n\nThe Rams play")
     assert any("more than one paragraph" in v for v in week_rule_violations(split, starter(), "start"))
 
 
-def test_the_cap_is_ninety_five_words_with_no_overrun() -> None:
-    """Lane 100 (B44), the cap 95 since Lane 117 fix round 3: at most 95 words, whatever the read was asked
-    before."""
+def test_the_cap_is_one_hundred_ten_words_with_no_overrun() -> None:
+    """Lane 100 (B44), the cap 110 since Lane 307: at most 110 words, whatever the read was asked before."""
     padded = STARTER_READ.replace(
         "Start him with confidence.",
         "He has been the steadiest part of a passing game that runs through him on every down that matters, "
         "and nothing in the facts says that changes now that the Rams are at home. The rest of the room "
         "behind him has not moved in weeks, and the plays still run his way. Start him.",
     )
-    assert len(padded.split()) > 95  # noqa: PLR2004 - the cap
+    assert len(padded.split()) > 110  # noqa: PLR2004 - the cap
     result = validate_week_read(padded, starter(), call="start")
     assert result.band_failure is not None and not result.ok
 
@@ -712,67 +695,6 @@ def test_the_sheet_hands_the_writer_the_rank_in_words() -> None:
     assert "say it by its rank" in render_week_sheet(starter())
 
 
-@pytest.mark.parametrize(
-    "opener",
-    [
-        "Gibbs runs into the kind of matchup a manager hopes for: Green Bay ranks 31st of 32 against running backs.",
-        "Sunday brings a fine afternoon for Puka Nacua and the Rams.",
-    ],
-)
-def test_the_read_leads_with_the_call_or_the_fact(opener: str) -> None:
-    """Lane 139 (C25): no scene-setting opener; the first sentence carries the call, a figure or his status."""
-    text = f"{opener} {STARTER_READ}"
-    assert any("opens" in v for v in week_rule_violations(text, starter(), "start"))
-
-
-@pytest.mark.parametrize(
-    "opener",
-    [
-        "Start Puka Nacua this week.",
-        "Arizona ranks 26th of 32 against receivers, the softest matchup he has had.",
-        "Puka Nacua is Questionable on the Tuesday-night list.",
-        "The Lions are off in week 6 of 2026, so Gibbs does not play.",
-    ],
-)
-def test_a_read_that_opens_on_the_call_the_fact_or_his_status_is_taken(opener: str) -> None:
-    assert not any("opens" in v for v in week_rule_violations(opener, starter(), "start"))
-
-
-def test_a_change_under_half_a_point_is_no_cell_a_read_may_quote() -> None:
-    """Lane 139 (C21): the Proj change tile shows no move under 0.5, so neither the sheet nor a read says one;
-    since Lane 275 a change of any size is the tile's alone."""
-    sheet = replace(starter(), projection=PublishedProjection(18.4, CAPTURED, 18.3, BEFORE))
-    assert "It moved" not in render_week_sheet(sheet)
-    text = "Puka Nacua is up 0.1 points since the figure before it."
-    said = "published projection's figure"
-    assert any(said in v for v in week_rule_violations(text, sheet, "start"))
-    assert any(said in v for v in week_rule_violations(text.replace("0.1", "0.5"), starter(), "start"))
-
-
-@pytest.mark.parametrize(
-    "opener",
-    [
-        "Nacua is listed Out on Friday's report.",
-        "Puka Nacua is healthy and leads the Rams in targets again.",
-        "Puka Nacua is on injured reserve and does not play.",
-        "Keep him on your bench this week.",
-    ],
-)
-def test_a_status_first_opener_is_taken_for_every_status(opener: str) -> None:
-    """Review MEDIUM-1: the status words are the sheet's own (`STATUS_WORDS`), Out among them."""
-    assert not any("opens" in v for v in week_rule_violations(opener, starter(), "start"))
-
-
-def test_a_loose_call_word_does_not_carry_a_scene_set_opener() -> None:
-    """Review MEDIUM-1: "sits first among" is no call."""
-    text = "Gibbs sits first among Detroit running backs as the week opens."
-    assert any("opens" in v for v in week_rule_violations(text, starter(), "start"))
-    # Review LOW-11: a verb off the call list is no call, even said of a club.
-    text = "The Rams play Arizona at home this week in a game that suits him."
-    assert any("opens" in v for v in week_rule_violations(text, starter(), "start"))
-    assert not any("opens" in v for v in week_rule_violations("Trust Nacua this week.", starter(), "start"))
-
-
 def test_a_superlative_of_his_own_is_not_read_as_the_opponent_s_rank() -> None:
     """Review LOW-1: only a sentence about what an opponent allows is held to Opp rank."""
     text = "Nacua has scored the most PPR points of any Rams receiver this season."
@@ -817,20 +739,3 @@ def test_a_suffix_before_a_capital_still_ends_its_sentence() -> None:
         "Start Michael Pittman Jr.",
         "He is back this week.",
     ]
-
-
-@pytest.mark.parametrize(
-    "opener",
-    [
-        "Tee Higgins starts this week, and the deep work is why.",
-        "Demercado can't be started this week.",
-        "Fire him up against the Titans.",
-        "Chimere Dike sits this week, and it is not close.",
-    ],
-)
-def test_the_opener_knows_the_calls_forms(opener: str) -> None:
-    assert not _opener_violation(split_sentences(opener), 2026)
-
-
-def test_an_opener_with_no_call_figure_or_status_is_still_refused() -> None:
-    assert _opener_violation(["The Titans come to town on a cold afternoon."], 2026)

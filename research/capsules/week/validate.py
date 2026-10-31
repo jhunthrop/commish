@@ -25,15 +25,22 @@ from typing import Final
 
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.narrative import ShapeMasks, held_shapes, shown_shape
-from research.capsules.validate import Grounding, ValidationResult, validate_prose
+from research.capsules.validate import UNFRAMED_FLOOR_VIOLATION, Grounding, ValidationResult, validate_prose
 from research.capsules.week.render import render_week_sheet
 from research.capsules.week.rules import week_rule_violations
+from research.capsules.week.season_words import outside_this_season, sentence_around
 from research.capsules.week.sheet import WeekSheet, sheet_names, week_name_ledger
 
-# The read's words: one paragraph of three to five short sentences, never more than 95 (Lane 100, B44, set at
-# 80; Lane 117 fix round 3, the coordinator's ruling: the writer's natural read on production sheets runs about
-# 85 words, so the cap is 95 while the prompt still asks for about 60).
-WEEK_BAND: Final = (40, 95)
+# The read's words: one paragraph of 70 to 110 (Lane 307, the analyst-playbook prompt's band: the harness's
+# Sonnet reads ran 98 to 110 words; the checklist writer's 40 to 95 is retired with its prompt).
+WEEK_BAND: Final = (70, 110)
+# The days a read may name, a report's or a kickoff's (Lane 307): "If Friday's report clears him" opens on a
+# capital the name rule would otherwise read as a name no fact holds.
+WEEKDAYS: Final = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+# The season writer's rules a week read is not held to (Lane 307): "floor" beside a number must say it comes from
+# seasons shortened by injury, a season capsule's frame that refuses a true week sentence ("his floor this year is
+# 9.1 PPR points").
+SEASON_ONLY: Final = frozenset({UNFRAMED_FLOOR_VIOLATION})
 SHARED_SENTENCE: Final = "The text carries a sentence shaped like one another page carries this week"
 _BARE_WEEK: Final = re.compile(
     # A joined number is a week only when it is no figure ("week 5 and 41.4 PPR points" joins nothing); a range's
@@ -61,12 +68,15 @@ def sentence_shapes(text: str, masks: ShapeMasks) -> dict[str, str]:
 
 
 def with_season(text: str, season: int) -> str:
-    """`text` with every bare week after its first naming of the season read as that season's."""
-    first = re.search(rf"\b{season}\b", text)
-    if first is None:
-        return text
-    head, tail = text[: first.end()], text[first.end() :]
-    return head + _BARE_WEEK.sub(lambda m: f"{m.group(0)} of {season}", tail)
+    """`text` with every bare week read as this season's (Lane 307: a week read says "week 7" with no season), but
+    for a week in a sentence that speaks of another season, his career or the playoffs: the writer's time-frame
+    rules read that one as written, so a wrong season is still refused and a prior season named on purpose stands."""
+
+    def read(match: re.Match[str]) -> str:
+        sentence = sentence_around(text, match.start())
+        return match.group(0) if outside_this_season(sentence, season) else f"{match.group(0)} of {season}"
+
+    return _BARE_WEEK.sub(read, text)
 
 
 def week_grounding(sheet: WeekSheet) -> Grounding:
@@ -75,7 +85,7 @@ def week_grounding(sheet: WeekSheet) -> Grounding:
     changes = tuple(c for c in (sheet.projection_change, sheet.change_since_last_read) if c is not None)
     return Grounding(
         number_ledger=changes,
-        name_ledger=week_name_ledger(sheet),
+        name_ledger=(*week_name_ledger(sheet), *WEEKDAYS),
         prompt_text=render_week_sheet(sheet),
         tension=None,
         page_numbers=(),
@@ -110,7 +120,7 @@ def validate_week_read(
     other pages carry (`taken`). The cap is the cap (Lane 100, B44): no overrun for a read asked shorter."""
     base = validate_prose(with_season(text, sheet.season), week_grounding(sheet), WEEK_BAND)
     violations = (
-        *base.violations,
+        *(v for v in base.violations if v not in SEASON_ONLY),
         *week_rule_violations(text, sheet, call),
         *shared_sentence_violations(text, taken, week_masks((sheet,))),
     )

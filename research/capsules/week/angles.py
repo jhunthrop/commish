@@ -114,7 +114,7 @@ class Angle:
     score: float
     basis: Basis | None
     # Each place among his peers the sentence states: its words ("the 3rd-highest", "the second-highest") and
-    # the group it is among ("among the wide receivers we rank", "of the week").
+    # the group it is among ("among wide receivers", "of the week").
     places: tuple[tuple[str, str], ...] = ()
 
 
@@ -345,7 +345,7 @@ def _scored(c: Candidate, pool: Sequence[float], position: str) -> Angle | None:
         return None
     text, places = c.text, cast("tuple[tuple[str, str], ...]", ())
     if c.ends is not None and c.measure is not None:
-        words, group = place_words(c.measure, pool, c.ends), f"among the {POSITION_WORDS[position]} we rank"
+        words, group = place_words(c.measure, pool, c.ends), f"among {POSITION_WORDS[position]}"
         text, places = f"{text}, {words} {group}", ((words, group),)
     if c.key == "spread":
         # A direction only past ordinary (the final review's M1): an ordinary spread is "Week to week".

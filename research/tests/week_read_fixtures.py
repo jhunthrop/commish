@@ -8,7 +8,9 @@ from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Any, Final
 
+from research.capsules.gateway import Completion
 from research.capsules.week import angles
+from research.capsules.week.prompt import CHECK_RULES
 from research.capsules.week.sheet import (
     Allowed,
     BoardPlace,
@@ -236,3 +238,12 @@ def main_sheet() -> Iterator[None]:
         yield
     finally:
         setattr(angles, "ANGLES_ON", held)  # noqa: B010
+
+
+def echoed_check(messages: list[dict[str, str]]) -> Completion | None:
+    """The check pass's answer in a scripted gateway (Lane 307): a check ask is answered with its draft unchanged
+    and takes no scripted answer, so a script lists the writer's and the judge's answers alone; None for any
+    other ask."""
+    if not messages or messages[0]["content"] != CHECK_RULES:
+        return None
+    return Completion(messages[1]["content"].rsplit("\n\nREAD:\n", 1)[1], None, "check", "stop")

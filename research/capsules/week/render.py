@@ -88,11 +88,16 @@ def report_said(sheet: WeekSheet) -> str:
     return words
 
 
+NO_DESIGNATION: Final = "No injury designation."
+
+
 def _status_line(sheet: WeekSheet) -> str:
     status, this_week = sheet.status.status, week_of(sheet.week, sheet.season)
     report = report_said(sheet)
     if status is None:
-        return f"Injury report: no designation for him on {report}."
+        # Lane 307: an ordinary status is one short line, no stamp and no report day (the playbook leaves the
+        # ordinary out, and the stamp drew "as of Friday 1:00 am Central" into reads).
+        return NO_DESIGNATION
     returning = returning_words(sheet.status)
     if returning is not None:
         # Designated to return this week (Lane 153): available, his one sentence the fact.
@@ -296,7 +301,7 @@ def render_week_sheet(sheet: WeekSheet) -> str:
         f"front of him, and {reach}.",
         _game_line(sheet),
         _status_line(sheet),
-        report_day_line(sheet),
+        None if sheet.status.status is None else report_day_line(sheet),
         _projection_line(sheet),
         *(
             _in_full(sheet)
