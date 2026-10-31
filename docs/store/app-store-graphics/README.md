@@ -12,7 +12,8 @@ On CI, never from a local draw: dispatch ios.yml with `store_shots` on the branc
 
 ```sh
 gh workflow run ios.yml --ref <branch> -f store_shots=true
-gh run download <run id> -n app-store-graphics -D docs/store/app-store-graphics
+gh run download <run id> -n app-store-graphics -D <an empty folder>
+rsync -a <that folder>/ docs/store/app-store-graphics/
 ```
 
 The job runs `node apps/ios/scripts/store-shots.ts`, which copies `shared/fixtures` with the recorded league's names replaced (`shared/store/store-names.json`, the Play set's file), runs `swift test` in apps/ios/Packages/StoreShots with `STORE_SHOTS` naming this folder, `COMMISH_FIXTURES` the copy and `STORE_HOST` the neutral platform (`shared/store/store-host.json`), then checks the files. Each run also writes `scene-strings/<stem>.json`, every string the shot's views draw from (`StoreStrings.swift`); the check fails a shot whose strings name a platform (`shared/store/scene-strings.ts`, Lane 310). The artifact carries the folder; commit it with the PNGs. Without `STORE_SHOTS` the store tests are skipped, so the package tests on every push draw nothing. `--out <folder>` draws a preview elsewhere; `--check` checks the committed files only, and shared.yml runs that check (`apps/ios/scripts/store-shots.test.ts`). Redraw after a change to any of the eight screens or to the shell's bars.
@@ -32,7 +33,7 @@ Each shot comes in two sizes, the same image laid out at each phone's width: `me
 | `medium-7-mock-room.png`, `large-7-mock-room.png` | Screenshot 7 | "Our call at every pick": a mock draft against bots at pick 5.05, our call above the pool, full screen as the app draws the room |
 | `medium-8-player-page.png`, `large-8-player-page.png` | Screenshot 8 | "Every number with its basis": a player's page, his week's game and figures, the projection and where drafters take him |
 
-Last drawn: every file on 2026-10-31 in Lane 309, ios.yml store_shots run 41234635794 (macos-26, Xcode 26.6).
+Last drawn: every file on 2026-10-31 in Lane 310 (no platform named), ios.yml store_shots run 41249782193 (macos-26, Xcode 26.6); the run changed shots 1 to 4 at both sizes and left the other eight byte for byte.
 
 Upload the eight at each size in this order: the captions are drawn into each image, so the order is the Play listing's §1.2, which the App Store listing follows.
 
