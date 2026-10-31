@@ -54,27 +54,19 @@ struct WaiverHeadRow: View {
     }
 }
 
-/// The position chips over the table, every position first (WaiverScreen.svelte's ChipGroup, one line
-/// that scrolls on a phone), the name search under them, and why a position could not be read.
+/// The name search over the table (WaiverScreen.svelte's filters row; the position cards are the screen's
+/// navigation, Lane 305), and why a position could not be read.
 struct FiltersView: View {
     @Environment(\.colorScheme) private var colorScheme
-    let positions: [PositionChip]
-    let chosen: WaiverPosition?
-    let choose: (WaiverPosition?) -> Void
     let query: String
     let find: (String) -> Void
     let problem: String?
-    /// Draws the chips and the field at rest (a snapshot draws no scroll view or text field contents).
+    /// Draws the field at rest (a snapshot draws no text field contents).
     var still = false
 
     var body: some View {
         let theme = Theme(colorScheme)
         VStack(alignment: .leading, spacing: Tokens.Space.s2) {
-            if still {
-                chips
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) { chips }
-            }
             HStack(spacing: Tokens.Space.s2) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 14, weight: .semibold))
@@ -106,31 +98,5 @@ struct FiltersView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-    }
-
-    private var chips: some View {
-        HStack(spacing: Tokens.Space.s2) {
-            chip(Words.InSeason.all, lit: chosen == nil) { choose(nil) }
-            ForEach(positions) { position in
-                chip(position.word, lit: chosen == position.position) { choose(position.position) }
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Words.InSeason.position)
-    }
-
-    private func chip(_ words: String, lit: Bool, action: @escaping () -> Void) -> some View {
-        let theme = Theme(colorScheme)
-        return Button(action: action) {
-            Text(words)
-                .font(Faces.font(.ui, size: Tokens.TypeScale.sm, weight: .semibold))
-                .foregroundStyle(theme.color(lit ? Tokens.Color.accentInk : Tokens.Color.ink2))
-                .padding(.horizontal, Tokens.Space.s3)
-                .frame(minHeight: 30)
-                .background(Capsule().fill(theme.color(lit ? Tokens.Color.accent : Tokens.Color.surface)))
-                .overlay(Capsule().strokeBorder(theme.color(lit ? Tokens.Color.accent : Tokens.Color.lineStrong)))
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(lit ? .isSelected : [])
     }
 }

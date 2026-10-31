@@ -2,7 +2,8 @@ import CommishAPI
 import CommishDesign
 import Foundation
 
-/// A position chip over the table (WaiverScreen.svelte): the route's position and its word.
+/// A position the page's adds hold (WaiverScreen.svelte POSITIONS): the route's position and its word, a
+/// count card's where the answer carries no panel.
 public struct PositionChip: Equatable, Sendable, Identifiable {
     public let position: WaiverPosition
     public let word: String
@@ -26,9 +27,9 @@ public struct WaiverTable: Equatable, Sendable {
 }
 
 /// The Waivers screen at one clock (WaiverScreen.svelte at 390): the strip with a card for each pickup
-/// worth making, the position chips, the line under the heads, the players free to add (the rows that
+/// worth making, the position cards, the line under the heads, the players free to add (the rows that
 /// gain, then the rest under one divider, then the Stash group with its line) in any sort and search,
-/// the basis once, and what the one verb acts on. The page's answer carries the strip and the chips; the
+/// the basis once, and what the one verb acts on. The page's answer carries the strip and the cards; the
 /// answer shown (the page's, or a position's own read) carries the table, drawn at its read's instant.
 /// Every rule is the API's: the pickup rule, the order, whom an add beats, whether the claim is made from
 /// here. Nothing is computed but the words and the sort.
@@ -61,13 +62,15 @@ public struct WaiverModel: Equatable, Sendable {
     let shown: WaiverAdvice
     let zone: TimeZone
     let now: Date
+    /// The page's clock, which the cards and the member's players are drawn at (WaiverScreen's pageNow).
+    let pageNow: Date
 
     /// The positions the route narrows to, in the board's order (WaiverScreen.svelte POSITIONS).
     static let order: [WaiverPosition] = [.qb, .rb, .wr, .te, .k, .def]
 
     public init(
         advice: WaiverAdvice, shown: WaiverAdvice? = nil, host: Components.Schemas.LeagueHost, now: Date,
-        zone: TimeZone
+        zone: TimeZone, pageNow: Date? = nil
     ) {
         let platform = ValueWords.platform(host)
         let shown = shown ?? advice
@@ -98,6 +101,7 @@ public struct WaiverModel: Equatable, Sendable {
         self.shown = shown
         self.zone = zone
         self.now = now
+        self.pageNow = pageNow ?? now
     }
 
     /// The table in a sort and a search (waivers.ts sortRows, findRows, gainGroups), the Stash group the
@@ -139,27 +143,39 @@ public struct WaiverModel: Equatable, Sendable {
         WaiverRows.drops(source, roster: shown.roster, zone: zone, now: now)
     }
 
-    // MARK: the position panel (Lane 291 on the web)
+    // MARK: the position cards (Lane 305 on the web)
 
-    /// The position panel's cards in the mode, from the page's answer; none from an answer without it.
-    public func panel(_ mode: PanelMode) -> [PanelCard] {
-        WaiverPanel.cards(advice, mode: mode, zone: zone, now: now)
+    /// The cards in the mode (position-nav.ts navCards over the page's answer): the All card counts every
+    /// free agent of the page's answer, a count card a position where the answer carries no panel.
+    public func nav(_ mode: PanelMode) -> [NavCard] {
+        let all = WaiverRows.pool(advice, pickups: advice.pickups, zone: zone, now: pageNow)
+        let byPosition = positions.map { chip in
+            (
+                chip.position.rawValue,
+                WaiverNav.counts(all.filter { $0.source.add.player.position == chip.position.rawValue })
+            )
+        }
+        return WaiverNav.cards(advice, mode: mode, counts: WaiverNav.counts(all), byPosition: byPosition)
     }
 
-    /// Whether the panel's toggle is drawn: a card reads this week.
-    public var panelHasWeek: Bool {
-        WaiverPanel.hasWeek(advice)
+    /// The card the screen opens on: the weakest Need, else All.
+    public var opening: String {
+        WaiverNav.opening(advice)
     }
 
-    /// What a panel Add does, in the table's words: "Add on ESPN", or "Open ESPN waivers".
-    public func panelVerb(_ source: WaiverRow) -> String {
-        WaiverWords.addVerb(advice.moves, hostID: source.add.player.hostId, platform: platform)
+    /// Whether the toggle is drawn: a card reads this week.
+    public var navHasWeek: Bool {
+        (advice.positions ?? []).contains { $0.week != nil }
     }
 
-    /// The panel's Add (WaiverScreen.svelte addFromPanel): the add with the advice's drop, the pair the
-    /// shelf and the table's verb act on.
-    func panelPair(_ source: WaiverRow) -> WaiverRow {
-        WaiverRows.with(source, drop: drops(source).first)
+    /// The line over the comparison for the chosen card.
+    public func lead(_ key: String, mode: PanelMode) -> NavLead {
+        WaiverNav.lead(advice, key: key, mode: mode)
+    }
+
+    /// The member's players at the chosen position, starters first in the mode's lineup.
+    public func yours(_ key: String, mode: PanelMode) -> [YoursRow] {
+        WaiverNav.yours(advice, key: key, mode: mode, zone: zone, now: pageNow)
     }
 
     /// The drop panel's head and lead: "Drop one for Mason Taylor", "+4.8 Proj this week with any of them.

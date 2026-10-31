@@ -27,6 +27,10 @@ struct TableActions {
     let sort: WaiverSort
     let onSort: (WaiverSortKey) -> Void
     let reading: Bool
+    /// The member's players at the chosen position over its free agents, nil for All (Lane 305).
+    var compare: NavCompare?
+    /// What the table says with no row: no free agent at the chosen position, else none found.
+    var empty = Words.Waivers.noneFound
 }
 
 /// The players free to add (WaiverTable.svelte at 390): the heads with the line under them said once,
@@ -54,6 +58,18 @@ struct WaiverTableView: View {
         TableFrame {
             WaiverHeadRow(projected: model.projected, sort: actions.sort, onSort: actions.onSort)
             HeadsLine(text: model.heads)
+            if groups.contains(.gaining), let compare = actions.compare {
+                // The member's players there, then the free agents: each head only over rows of its own.
+                if !compare.rows.isEmpty {
+                    SectionRow(title: compare.yours)
+                    ForEach(compare.rows) { row in
+                        YoursRowView(row: row, projected: model.projected, open: actions.open)
+                    }
+                }
+                if !table.rows.isEmpty {
+                    SectionRow(title: compare.free)
+                }
+            }
             if groups.contains(.gaining) {
                 ForEach(table.gaining) { row in entry(row) }
             }
@@ -65,7 +81,7 @@ struct WaiverTableView: View {
                 ForEach(table.rest) { row in entry(row) }
             }
             if groups.contains(.gaining), table.gaining.isEmpty, table.rest.isEmpty {
-                NoteRow(text: Words.Waivers.noneFound)
+                NoteRow(text: actions.empty)
             }
             if groups.contains(.stash), !table.stash.isEmpty || !model.stashLine.isEmpty {
                 SectionRow(title: Words.Stash.head)
@@ -176,6 +192,37 @@ struct WaiverRowView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(open ? Words.Waivers.close : row.button) \(row.cells.row.name)")
         .accessibilityAddTraits(open ? .isSelected : [])
+    }
+}
+
+/// One of the member's players at the chosen position (WaiverTable.svelte's Your rows): his cell with the
+/// evidence line and A game, Proj, and Starter or Bench where a free agent's Beats is; no verb.
+struct YoursRowView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let row: YoursRow
+    let projected: Bool
+    let open: (SheetPlayer) -> Void
+
+    var body: some View {
+        let theme = Theme(colorScheme)
+        HStack(alignment: .center, spacing: 0) {
+            PlayerCell(
+                cells: row.cells, sheetPlayer: row.sheetPlayer, evidence: row.evidence, facts: false, open: open
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if projected {
+                Figure(text: row.cells.proj, width: WaiverColumn.proj, muted: row.cells.proj == Words.Box.none)
+            }
+            Text(row.role)
+                .font(Faces.font(.ui, size: Tokens.TypeScale.xs, weight: row.starts ? .bold : .regular))
+                .foregroundStyle(theme.color(row.starts ? Tokens.Color.ink : Tokens.Color.ink3))
+                .frame(width: WaiverColumn.beats, alignment: .trailing)
+            Color.clear.frame(width: WaiverColumn.act, height: 1)
+        }
+        .padding(.horizontal, Tokens.Space.s2)
+        .padding(.vertical, 6)
+        .background(theme.color(Tokens.Color.surface2))
+        .overlay(alignment: .bottom) { Hairline() }
     }
 }
 

@@ -11,9 +11,9 @@ actor WaiverStub: WaiversAPI {
         let token: String
     }
 
-    private let advice: WaiverAdvice
+    private var advice: WaiverAdvice
     /// A position's own read, by position: the page's rows at that position where none is given.
-    private let positions: [WaiverPosition: WaiverAdvice]
+    private var positions: [WaiverPosition: WaiverAdvice]
     private var failsPosition = false
     private(set) var asked: [WaiverPosition?] = []
     private let plan: HostMovePlan?
@@ -37,8 +37,17 @@ actor WaiverStub: WaiversAPI {
         failsMake = true
     }
 
-    func failPosition() {
-        failsPosition = true
+    func failPosition(_ fails: Bool = true) {
+        failsPosition = fails
+    }
+
+    /// The league as read from now on: the page's answer, and a position's own read.
+    func answer(_ advice: WaiverAdvice, at position: WaiverPosition? = nil) {
+        if let position {
+            positions[position] = advice
+        } else {
+            self.advice = advice
+        }
     }
 
     func waivers(id _: String, position: WaiverPosition?) async throws -> WaiverAdvice {
