@@ -168,9 +168,9 @@ struct WaiverNavParityTests {
         #expect(navs.contains { nav in nav.season.cards.count > 1 && nav.season.cards.allSatisfy { $0.meter == nil } })
         // No card, on either toggle, prints a bare "--" in any field.
         let every = navs.flatMap { $0.season.cards + ($0.week?.cards ?? []) }
-        #expect(every.allSatisfy { card in
-            [card.place, card.figure, card.foot, card.tag, card.waits].allSatisfy { $0 != Words.Box.none }
-        })
+        let none: String? = Words.Box.none
+        let fields = every.flatMap { card -> [String?] in [card.place, card.figure, card.foot, card.tag, card.waits] }
+        #expect(!fields.contains(none))
     }
 
     /// The words the port builds are the web's (position-nav.ts NAV's functions).
