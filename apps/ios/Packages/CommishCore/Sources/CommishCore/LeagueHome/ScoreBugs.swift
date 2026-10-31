@@ -95,6 +95,7 @@ enum ScoreBugs {
     typealias Side = Components.Schemas.ScoreboardSide
 
     struct Read {
+        /// The stamp's lead: the platform's name, or the store graphics' neutral word (HostWords.stamp).
         let platform: String
         let readAt: Date
     }

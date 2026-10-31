@@ -4,7 +4,7 @@ import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.PlayerLine
 import app.trycommish.api.models.ProjectionScoring
 import app.trycommish.core.Format
-import app.trycommish.core.leaguehome.ValueWords
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.core.start.BasisParts
 import app.trycommish.core.start.GameRead
 import app.trycommish.core.start.LineRead
@@ -44,10 +44,12 @@ internal object MatchupBasis {
         val unlisted: UnlistedDrawn,
         val zone: ZoneId,
         val now: Instant,
+        /** The platform's words: the league's own, or the store graphics' neutral one (Lane 310). */
+        val host: HostWords = HostWords.of(league),
     )
 
     fun phone(facts: Facts): String {
-        val platform = ValueWords.platform(facts.league)
+        val platform = facts.host.name
         // While the opponent's best-lineup words run long, the phone leaves the Proj's read time and when
         // Final lands to the desk (basis.ts unlistedLong).
         val long = facts.unlisted.long

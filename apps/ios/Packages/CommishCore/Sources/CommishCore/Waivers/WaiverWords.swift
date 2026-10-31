@@ -117,14 +117,14 @@ public enum WaiverWords {
 
     // MARK: the verbs
 
-    /// waivers.ts openWaiversWords: "Open ESPN waivers".
-    static func openWaivers(_ platform: String) -> String {
-        "Open \(platform) waivers"
+    /// waivers.ts openWaiversWords: "Open ESPN waivers", the platform's own page by its words (Lane 310).
+    static func openWaivers(_ place: HostWords) -> String {
+        "Open \(place.own("waivers"))"
     }
 
-    /// waivers.ts addOnWords: "Add on ESPN".
-    static func addOn(_ platform: String) -> String {
-        "\(Words.InSeason.add) on \(platform)"
+    /// waivers.ts addOnWords: "Add on ESPN", the platform placed by its own words (Lane 310).
+    static func addOn(_ place: HostWords) -> String {
+        "\(Words.InSeason.add) \(place.placed)"
     }
 
     /// The shape of a host id the claim route takes (move.ts HOST_ID).
@@ -136,8 +136,8 @@ public enum WaiverWords {
     }
 
     /// waivers.ts addVerbWords: "Add on ESPN" where the claim is made from here, else "Open ESPN waivers".
-    static func addVerb(_ moves: Components.Schemas.WaiverMoves, hostID: String, platform: String) -> String {
-        claimsAdd(moves, hostID: hostID) ? addOn(platform) : openWaivers(platform)
+    static func addVerb(_ moves: Components.Schemas.WaiverMoves, hostID: String, host: HostWords) -> String {
+        claimsAdd(moves, hostID: hostID) ? addOn(host) : openWaivers(host)
     }
 
     /// waivers.ts copiedWords: "Copied Gainwell. Add him on" and "ESPN's waiver page".

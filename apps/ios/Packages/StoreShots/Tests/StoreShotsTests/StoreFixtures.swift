@@ -5,8 +5,9 @@ import RunFixtures
 
 /// The fixture league as the store shots read it: the shared fixtures through RunFixture's folder, which
 /// the store run points at a copy with the recorded league's team names and handles replaced
-/// (shared/store/store-names.json, COMMISH_FIXTURES), the league named "Sunday Standard" and read as
-/// ESPN, the platform the lineup and the claim are made on.
+/// (shared/store/store-names.json, COMMISH_FIXTURES), the league named "Sunday Standard" on a platform
+/// the lineup and the claim are made on, which every screen names with the neutral platform's words
+/// (StoreHost, Lane 310).
 enum StoreFixtures {
     static let inseason = RunFixture.fixtures.appendingPathComponent("inseason")
     static let zone = TimeZone(identifier: "America/Chicago")!

@@ -8,15 +8,20 @@ import SwiftUI
 struct StoreScreen {
     let body: AnyView
     let pin: AnyView?
+    /// The views as the scene built them, before they are wrapped: what the scene strings are read from
+    /// (StoreStrings.swift, Lane 310).
+    let drawn: [Any]
 
     init(_ body: some View) {
         self.body = AnyView(body)
         pin = nil
+        drawn = [body]
     }
 
     init(_ body: some View, pin: some View) {
         self.body = AnyView(body)
         self.pin = AnyView(pin)
+        drawn = [body, pin]
     }
 }
 

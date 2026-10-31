@@ -4,6 +4,7 @@ import app.trycommish.api.models.PlayerLine
 import app.trycommish.api.models.TradeMoves
 import app.trycommish.api.models.TradeRow
 import app.trycommish.core.Format
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.core.start.StartRows
 import app.trycommish.design.Words
 import kotlin.math.abs
@@ -104,11 +105,11 @@ object TradesWords {
     ): String = "Trade with $team: ${list(row.give.map(::offerName))} for ${list(row.get.map(::offerName))}."
 
     /** trades.ts proposeVerb: "Propose on Sleeper" where the platform takes a proposal from here, else
-     * "Open FFPC trades", which copies the offer and opens its page. */
+     * "Open FFPC trades", which copies the offer and opens its page; the platform by its own words (Lane 310). */
     fun verb(
         moves: TradeMoves,
-        platform: String,
-    ): String = if (moves.propose == TradeMoves.Propose.available) "Propose on $platform" else "Open $platform trades"
+        place: HostWords,
+    ): String = if (moves.propose == TradeMoves.Propose.available) "Propose ${place.placed}" else "Open ${place.own("trades")}"
 
     /** TradeCopied's line: "Copied. Propose it on FFPC's trade page.", the page its link. */
     fun copied(

@@ -65,6 +65,8 @@ public final class MatchupViewModel {
     /// The game's first side, a score bug's (Lane 204's `?roster=`); nil for the member's own game.
     private let roster: Int?
     private let onSignedOut: @MainActor () -> Void
+    /// The platform's words: the league's own, or the store graphics' neutral one (Lane 310). Nil: the league's own.
+    private let words: HostWords?
     private var poll: Task<Void, Never>?
     private var signedOut = false
     /// The answer shown, so a failed read redraws it at the clock it failed at.
@@ -72,8 +74,10 @@ public final class MatchupViewModel {
 
     public init(
         api: any MatchupAPI, cache: any AnswerCache, clock: any Clock, timer: any PollTimer = SystemPollTimer(),
-        zone: TimeZone = .current, roster: Int? = nil, onSignedOut: @escaping @MainActor () -> Void = {}
+        zone: TimeZone = .current, roster: Int? = nil, onSignedOut: @escaping @MainActor () -> Void = {},
+        words: HostWords? = nil
     ) {
+        self.words = words
         self.roster = roster
         self.api = api
         self.cache = cache
@@ -185,6 +189,13 @@ public final class MatchupViewModel {
     }
 
     private func model(_ answer: MatchupAnswer) -> MatchupModel {
-        MatchupModel(sync: answer.sync, box: answer.box, board: answer.board, clock: clock.now, zone: zone)
+        MatchupModel(
+            sync: answer.sync,
+            box: answer.box,
+            board: answer.board,
+            clock: clock.now,
+            zone: zone,
+            words: words
+        )
     }
 }

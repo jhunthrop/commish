@@ -7,6 +7,7 @@ import app.trycommish.api.models.PlayerLine
 import app.trycommish.api.models.ProjectionScoring
 import app.trycommish.core.Format
 import app.trycommish.core.instantOrNull
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.core.leaguehome.ValueWords
 import app.trycommish.design.Words
 import java.time.Instant
@@ -118,6 +119,8 @@ internal object LineupBasis {
         val totals: LineupTotals,
         val zone: ZoneId,
         val now: Instant,
+        /** The platform's words: the league's own, or the store graphics' neutral one (Lane 310). */
+        val host: HostWords = HostWords.of(league),
     )
 
     private val pickPhone = "Our pick is each slot's highest ${Words.Box.proj},"
@@ -135,7 +138,7 @@ internal object LineupBasis {
                 gamePart(facts.lines, facts.zone, facts.now),
                 if (drawsFacts(facts)) null else finalsPhone(facts),
                 Words.Basis.rankOppPhone,
-                ptsPhone(advice.playerPoints, ValueWords.platform(facts.league)),
+                ptsPhone(advice.playerPoints, facts.host.name),
                 BasisParts.uncounted(advice.basisNote, advice.basisNoteList, facts.lines),
             )
         return parts.filterNotNull().filter { it.isNotEmpty() }.joinToString(" ")
@@ -181,7 +184,7 @@ internal object LineupBasis {
         val timing = kickedOffPart(facts.lines, facts.now)
         val counted = facts.lines.firstOrNull { platformGame(it) != null } ?: return timing
         val game = platformGame(counted) ?: return timing
-        val platform = ValueWords.platform(facts.league)
+        val platform = facts.host.name
         val stats = Words.Basis.statsByWednesday
         val (avg, last) = Words.Box.avg to Words.Box.last
         if (timing != null) return "$avg and $last count $platform's finals, our stats $stats"

@@ -93,9 +93,10 @@ public enum TradesWords {
     }
 
     /// trades.ts proposeVerb: "Propose on Sleeper" where the platform takes a proposal from here,
-    /// else "Open FFPC trades", which copies the offer and opens its page.
-    static func verb(_ moves: Components.Schemas.TradeMoves, platform: String) -> String {
-        moves.propose.value1 == .available ? "Propose on \(platform)" : "Open \(platform) trades"
+    /// else "Open FFPC trades", which copies the offer and opens its page; the platform by its own words
+    /// (Lane 310).
+    static func verb(_ moves: Components.Schemas.TradeMoves, host place: HostWords) -> String {
+        moves.propose.value1 == .available ? "Propose \(place.placed)" : "Open \(place.own("trades"))"
     }
 
     /// TradeCopied's line: "Copied. Propose it on FFPC's trade page.", the page its link.

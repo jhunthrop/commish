@@ -135,16 +135,22 @@ public struct StartModel: Equatable, Sendable {
     /// The lineup as the copy verb puts it on the clipboard.
     public let copyText: String
 
-    public init(advice answer: LineupAdvice, host: Components.Schemas.LeagueHost, now: Date, zone: TimeZone) {
+    /// `words` is the platform's words, the league's own unless a store graphic passes the neutral one
+    /// (Lane 310).
+    public init(
+        advice answer: LineupAdvice, host: Components.Schemas.LeagueHost, now: Date, zone: TimeZone,
+        words: HostWords? = nil
+    ) {
         let (advice, held) = LineupBoxes.held(answer, now: now)
         let box = LineupBoxes.box(advice, held: held, zone: zone, now: now)
-        let platform = ValueWords.platform(host)
+        let hostWords = words ?? .of(host)
+        let platform = hostWords.name
         let done = advice.weekDone
         self.platform = platform
         week = "\(Words.LeagueHome.week) \(advice.week)"
         title = StartWords.changesTitle(box.swaps.count, done: done, state: advice.weekDoneState?.value1)
         decision = StartModel.decision(advice)
-        sum = StartWords.lineupSum(box, platform: platform, done: done)
+        sum = StartWords.lineupSum(box, host: hostWords, done: done)
         self.done = done
         missed = advice.missed
         chips = done == nil ? box.idle.map(StripChip.idle) + box.swaps.map(StripChip.swap) : []
@@ -161,7 +167,7 @@ public struct StartModel: Equatable, Sendable {
         let lines = advice.slots.flatMap { [$0.ours] + ($0.host.map { [$0.value1] } ?? []) } + advice.bench
             + advice.reserve
         basis = LineupBasis.phone(.init(
-            advice: advice, host: host, lines: lines, totals: box.totals, zone: zone, now: now
+            advice: advice, host: host, lines: lines, totals: box.totals, zone: zone, now: now, words: hostWords
         ))
         let onHost = Self.setsOnHost(advice)
         verb = box.swaps.isEmpty ? nil : onHost ? .make : .copy

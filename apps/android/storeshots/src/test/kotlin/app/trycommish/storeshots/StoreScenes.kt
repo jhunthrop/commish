@@ -21,7 +21,6 @@ import app.trycommish.core.board.BoardState
 import app.trycommish.core.board.RunFixture
 import app.trycommish.core.board.StubRunReads
 import app.trycommish.core.leaguehome.Fixtures
-import app.trycommish.core.leaguehome.ValueWords
 import app.trycommish.core.matchup.MatchupFixtures
 import app.trycommish.core.matchup.MatchupState
 import app.trycommish.core.matchup.matchupModel
@@ -124,11 +123,18 @@ fun chromeOf(shot: StoreShot): StoreChrome? {
     return StoreChrome(face, phoneBar(storeLeague, null), shot.tab)
 }
 
+/** A shot's screen and what it draws from: the objects handed to it, whose strings the store check reads
+ * for a platform's name (StoreStrings.kt, Lane 310). */
+class StoreScreen(
+    val drawn: List<Any?>,
+    val draw: @Composable () -> Unit,
+)
+
 /** The shot's screen, its view model read through the fixtures on `scheduler` before anything is drawn. */
 fun screenOf(
     shot: StoreShot,
     scheduler: TestCoroutineScheduler,
-): @Composable () -> Unit =
+): StoreScreen =
     when (shot) {
         StoreShot.Lineup -> lineup()
         StoreShot.Waivers -> waivers(scheduler)
@@ -140,14 +146,16 @@ fun screenOf(
         StoreShot.Player -> player()
     }
 
-/** Saturday noon, the lineup on a platform that takes it: the swaps and the one verb that sets them. */
-private fun lineup(): @Composable () -> Unit {
+/** Saturday noon, the lineup on a platform that takes it: the swaps and the one verb that sets them, the
+ * platform the neutral one. */
+private fun lineup(): StoreScreen {
     val now = StartFixtures.instant(StartFixtures.WEEK)
-    val model = startModel(everySlotFilled(StartFixtures.writes(StartFixtures.WEEK)), storeLeague.host, now, Fixtures.zone)
+    val advice = everySlotFilled(StartFixtures.writes(StartFixtures.WEEK))
+    val model = startModel(advice, storeLeague.host, now, Fixtures.zone, storeHost)
     val ui = StartUi(state = StartState.Loaded(model, now, stale = false))
     val stamp = startStamp(ui, Fixtures.zone)
-    val pin = startPin(ui, ValueWords.platform(storeLeague.host), Fixtures.zone)
-    return { StartScreen(ui, stamp, pin, refreshing = false, actions = StartActions()) }
+    val pin = startPin(ui, storeHost.name, Fixtures.zone)
+    return StoreScreen(listOf(ui, stamp, pin)) { StartScreen(ui, stamp, pin, refreshing = false, actions = StartActions()) }
 }
 
 /**
@@ -167,55 +175,58 @@ internal fun everySlotFilled(advice: LineupAdvice): LineupAdvice {
 }
 
 /** Saturday noon, the wire before it clears: the best add first, the claim pinned. */
-private fun waivers(scheduler: TestCoroutineScheduler): @Composable () -> Unit {
+private fun waivers(scheduler: TestCoroutineScheduler): StoreScreen {
     val league = WaiverFixtures.PENDING
     val reads = FixtureWaivers(WaiverFixtures.waivers(league))
     val clock = FixedClock(StartFixtures.instant(WaiverFixtures.WEEK))
-    val vm = WaiverViewModel(reads, MemoryCache(), clock, Fixtures.zone, storeLeague.host, { true }, {}, {})
+    val vm = WaiverViewModel(reads, MemoryCache(), clock, Fixtures.zone, storeLeague.host, { true }, {}, {}, storeHost)
     vm.load(league)
     scheduler.advanceUntilIdle()
     val ui = vm.ui.value
     val stamp = vm.stampWords(ui)
     val pin = vm.pin(ui)
-    return { WaiverScreen(ui, stamp, pin, refreshing = false, actions = WaiverActions(), still = true) }
+    return StoreScreen(listOf(ui, stamp, pin)) {
+        WaiverScreen(ui, stamp, pin, refreshing = false, actions = WaiverActions(), still = true)
+    }
 }
 
 /** Saturday noon, the builder with our best idea loaded into its ticks. */
-private fun trades(scheduler: TestCoroutineScheduler): @Composable () -> Unit {
+private fun trades(scheduler: TestCoroutineScheduler): StoreScreen {
     val clock = FixedClock(StartFixtures.instant(TradeFixtures.WEEK))
     val reads = FixtureTrades(tradesEnvelope(TradeFixtures.trades()), TradeFixtures.check(TradeFixtures.WEEK, 1))
-    val vm = TradesViewModel(reads, MemoryCache(), clock, Fixtures.zone, storeLeague.host, ME, { true }, {}, {})
+    val vm = TradesViewModel(reads, MemoryCache(), clock, Fixtures.zone, storeLeague.host, ME, { true }, {}, {}, storeHost)
     vm.load(TradeFixtures.LEAGUE)
     scheduler.advanceUntilIdle()
     vm.loadIdea(TradeFixtures.BEST, TradeFixtures.LEAGUE)
     scheduler.advanceUntilIdle()
     val ui = vm.ui.value
     val stamp = vm.stampWords(ui)
-    return { TradesScreen(ui, stamp, refreshing = false, actions = TradeActions()) }
+    return StoreScreen(listOf(ui, stamp)) { TradesScreen(ui, stamp, refreshing = false, actions = TradeActions()) }
 }
 
 /** Sunday afternoon, the member's game with its points coming in. */
-private fun matchup(): @Composable () -> Unit {
+private fun matchup(): StoreScreen {
     val now = StartFixtures.instant(MatchupFixtures.SUNDAY)
-    val model = matchupModel(MatchupFixtures.sync(MatchupFixtures.SUNDAY), MatchupFixtures.box(MatchupFixtures.SUNDAY), now, Fixtures.zone)
+    val sync = MatchupFixtures.sync(MatchupFixtures.SUNDAY)
+    val model = matchupModel(sync, MatchupFixtures.box(MatchupFixtures.SUNDAY), now, Fixtures.zone, host = storeHost)
     val state = MatchupState.Loaded(model, now, stale = false)
     val stamp = matchupStamp(state, Fixtures.zone)
-    return { MatchupScreen(state, stamp, refreshing = false, actions = MatchupActions()) }
+    return StoreScreen(listOf(state, stamp)) { MatchupScreen(state, stamp, refreshing = false, actions = MatchupActions()) }
 }
 
 /** Saturday noon, our rest-of-season order with no league, every position. */
-private fun rankings(scheduler: TestCoroutineScheduler): @Composable () -> Unit {
+private fun rankings(scheduler: TestCoroutineScheduler): StoreScreen {
     val clock = FixedClock(StartFixtures.instant(StartFixtures.WEEK))
     val vm = RankingsViewModel(StubRankings(), MemoryCache(), clock, Fixtures.zone, inSeason = true, query = "", sessionEnd = {})
     vm.load()
     scheduler.advanceUntilIdle()
     val ui = vm.ui.value
     val head = RankingsHead(vm.name, vm.lead(ui), vm.stampWords(ui))
-    return { RankingsScreen(ui, head, refreshing = false, actions = RankingsActions()) }
+    return StoreScreen(listOf(ui, head)) { RankingsScreen(ui, head, refreshing = false, actions = RankingsActions()) }
 }
 
 /** Before the draft, the PPR board from its top: the tiers and the drop to the next one. */
-private fun board(): @Composable () -> Unit {
+private fun board(): StoreScreen {
     val model =
         BoardModel.of(
             RunFixture.StandIn.read(),
@@ -226,21 +237,23 @@ private fun board(): @Composable () -> Unit {
             zone = RunFixture.zone,
         )
     val state = BoardState.Loaded(model, RunFixture.preDraft, stale = null)
-    return { BoardScreen(state, null, model.formats, refreshing = false, actions = BoardActions()) }
+    return StoreScreen(
+        listOf(state, model.formats),
+    ) { BoardScreen(state, null, model.formats, refreshing = false, actions = BoardActions()) }
 }
 
 /** A mock draft against bots at round 5, the member on the clock: our call above the pool. */
-private fun mockRoom(scheduler: TestCoroutineScheduler): @Composable () -> Unit {
+private fun mockRoom(scheduler: TestCoroutineScheduler): StoreScreen {
     val stub = StubMock(MockFixtures.Answer.Round5)
     val vm = MockRoomViewModel(MockFixtures.ID, stub, MemoryCache(), FixedClock(MockFixtures.readAt), MockFixtures.zone, SessionEnd {})
     vm.load()
     scheduler.advanceUntilIdle()
-    return { MockRoomView(vm, MockRoomExits({}, {}, {})) }
+    return StoreScreen(listOf(vm.state.value)) { MockRoomView(vm, MockRoomExits({}, {}, {})) }
 }
 
 /** A player's page from its top in the fixture league at Saturday noon: his week's game and figures,
  * the board's projection and where drafters take him. */
-private fun player(): @Composable () -> Unit {
+private fun player(): StoreScreen {
     val graph =
         playerGraph(
             StubRunReads(RunFixture.StandIn),
@@ -253,7 +266,7 @@ private fun player(): @Composable () -> Unit {
     runBlocking { vm.read() }
     val state = vm.state.value
     val stamp = vm.stampWords(state)
-    return { PlayerPageView(state, stamp, refreshing = false, refresh = {}) { _, _ -> {} } }
+    return StoreScreen(listOf(state, stamp)) { PlayerPageView(state, stamp, refreshing = false, refresh = {}) { _, _ -> {} } }
 }
 
 /** The stand-in run's player with a week read in the fixture league (the player tests' page hero). */

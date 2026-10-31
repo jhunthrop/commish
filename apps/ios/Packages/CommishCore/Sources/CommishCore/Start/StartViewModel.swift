@@ -43,6 +43,8 @@ public final class StartViewModel {
     private let clock: any Clock
     private let zone: TimeZone
     private let host: Components.Schemas.LeagueHost
+    /// The platform's words: the league's own, or the store graphics' neutral one (Lane 310).
+    private let words: HostWords
     private let copy: @MainActor (String) -> Bool
     private let onSignedOut: @MainActor () -> Void
     /// The answer shown, so a press reads it again at the clock it is pressed at.
@@ -55,12 +57,13 @@ public final class StartViewModel {
     public init(
         api: any LineupAPI, cache: any AnswerCache, clock: any Clock, host: Components.Schemas.LeagueHost,
         zone: TimeZone = .current, copy: @escaping @MainActor (String) -> Bool,
-        onSignedOut: @escaping @MainActor () -> Void = {}
+        onSignedOut: @escaping @MainActor () -> Void = {}, words: HostWords? = nil
     ) {
         self.api = api
         self.cache = cache
         self.clock = clock
         self.host = host
+        self.words = words ?? .of(host)
         self.zone = zone
         self.copy = copy
         self.onSignedOut = onSignedOut
@@ -72,7 +75,7 @@ public final class StartViewModel {
     }
 
     public var platform: String {
-        ValueWords.platform(host)
+        words.name
     }
 
     /// "Last read Sat 12:00 pm" while the lineup shown is a saved one.
@@ -130,7 +133,7 @@ public final class StartViewModel {
         guard case let .loaded(_, stamp, false) = state, let answer, step == .closed else {
             return
         }
-        let model = StartModel(advice: answer, host: host, now: clock.now, zone: zone)
+        let model = StartModel(advice: answer, host: host, now: clock.now, zone: zone, words: words)
         state = .loaded(model, stamp: stamp, stale: false)
         switch model.verb {
         case .make?:
@@ -193,6 +196,8 @@ public final class StartViewModel {
 
     private func show(_ advice: LineupAdvice, stamp: Date, stale: Bool) {
         answer = advice
-        state = .loaded(StartModel(advice: advice, host: host, now: clock.now, zone: zone), stamp: stamp, stale: stale)
+        state = .loaded(
+            StartModel(advice: advice, host: host, now: clock.now, zone: zone, words: words), stamp: stamp, stale: stale
+        )
     }
 }

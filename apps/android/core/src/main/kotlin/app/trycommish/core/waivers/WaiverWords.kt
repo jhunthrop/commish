@@ -6,6 +6,7 @@ import app.trycommish.api.models.WaiverAdvice
 import app.trycommish.api.models.WaiverMoves
 import app.trycommish.core.Format
 import app.trycommish.core.instantOrNull
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.core.start.StartRows
 import app.trycommish.design.Words
 import java.time.LocalDate
@@ -137,11 +138,11 @@ object WaiverWords {
 
     // The verbs.
 
-    /** waivers.ts openWaiversWords: "Open ESPN waivers". */
-    fun openWaivers(platform: String): String = "Open $platform waivers"
+    /** waivers.ts openWaiversWords: "Open ESPN waivers", the platform's own page by its words (Lane 310). */
+    fun openWaivers(place: HostWords): String = "Open ${place.own("waivers")}"
 
-    /** waivers.ts addOnWords: "Add on ESPN". */
-    fun addOn(platform: String): String = "${Words.InSeason.add} on $platform"
+    /** waivers.ts addOnWords: "Add on ESPN", the platform placed by its own words (Lane 310). */
+    fun addOn(place: HostWords): String = "${Words.InSeason.add} ${place.placed}"
 
     /** move.ts claimsAdd: the API opens claims for the league and names him by an id the route takes. */
     fun claimsAdd(
@@ -153,8 +154,8 @@ object WaiverWords {
     fun addVerb(
         moves: WaiverMoves,
         hostId: String,
-        platform: String,
-    ): String = if (claimsAdd(moves, hostId)) addOn(platform) else openWaivers(platform)
+        host: HostWords,
+    ): String = if (claimsAdd(moves, hostId)) addOn(host) else openWaivers(host)
 
     /** waivers.ts copiedWords: "Copied Gainwell. Add him on" and "ESPN's waiver page". */
     fun copied(

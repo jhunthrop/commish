@@ -38,6 +38,8 @@ public final class TradesViewModel {
     private let clock: any Clock
     private let zone: TimeZone
     private let host: Components.Schemas.LeagueHost
+    /// The platform's words: the league's own, or the store graphics' neutral one (Lane 310).
+    private let words: HostWords
     private let me: TradeMe
     private let copy: @MainActor (String) -> Bool
     private let onSignedOut: @MainActor () -> Void
@@ -56,12 +58,13 @@ public final class TradesViewModel {
     public init(
         api: any TradesAPI, cache: any AnswerCache, clock: any Clock, host: Components.Schemas.LeagueHost,
         me: TradeMe, zone: TimeZone = .current, copy: @escaping @MainActor (String) -> Bool,
-        onSignedOut: @escaping @MainActor () -> Void = {}
+        onSignedOut: @escaping @MainActor () -> Void = {}, words: HostWords? = nil
     ) {
         self.api = api
         self.cache = cache
         self.clock = clock
         self.host = host
+        self.words = words ?? .of(host)
         self.me = me
         self.zone = zone
         self.copy = copy
@@ -167,7 +170,7 @@ public final class TradesViewModel {
             return
         }
         let offer = TradesWords.offer(team: team.name, row: check.trade.value1)
-        builderCopied = TradesWords.copied(copy(offer), platform: ValueWords.platform(host))
+        builderCopied = TradesWords.copied(copy(offer), platform: words.name)
     }
 
     /// Share: the built trade as text in our words, and the line beside it.
@@ -256,7 +259,7 @@ public final class TradesViewModel {
 
     private func show(_ advice: TradeAdvice, stamp: Date, stale: Bool) {
         answer = advice
-        let model = TradesModel(advice: advice, host: host, now: clock.now, zone: zone)
+        let model = TradesModel(advice: advice, host: host, now: clock.now, zone: zone, words: words)
         if building == nil {
             building = model.opening
         }

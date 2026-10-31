@@ -15,7 +15,7 @@ import app.trycommish.core.Cache
 import app.trycommish.core.Cached
 import app.trycommish.core.Clock
 import app.trycommish.core.SessionEnd
-import app.trycommish.core.leaguehome.ValueWords
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.design.Words
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -47,6 +47,8 @@ class TradesViewModel(
     /** Opens the platform's trade page. */
     private val openPage: (String) -> Unit,
     private val sessionEnd: SessionEnd,
+    /** The platform's words: the league's own, or the store graphics' neutral one (Lane 310). */
+    private val words: HostWords = HostWords.of(host),
 ) : ViewModel() {
     private val mutableUi = MutableStateFlow(TradesUi())
     private val mutableRefreshing = MutableStateFlow(false)
@@ -74,7 +76,7 @@ class TradesViewModel(
     var shown: String? = null
         private set
 
-    private val platform: String get() = ValueWords.platform(host)
+    private val platform: String get() = words.name
 
     /** "Last read Sat 12:00 pm" while the trades shown are a saved read. */
     fun stampWords(ui: TradesUi = this.ui.value): String? = tradesStamp(ui, zone)
@@ -260,7 +262,7 @@ class TradesViewModel(
         stale: Boolean,
     ) {
         answer = advice
-        val model = TradesModel(advice, host, clock.now(), zone)
+        val model = TradesModel(advice, host, clock.now(), zone, words)
         if (picks == null) picks = model.opening
         mutableUi.update { it.copy(state = TradesState.Loaded(model, stamp, stale)) }
         redraw()

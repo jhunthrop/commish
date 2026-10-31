@@ -6,7 +6,7 @@ import app.trycommish.api.models.LeagueHost
 import app.trycommish.api.models.LineupAdvice
 import app.trycommish.api.models.LineupMoves
 import app.trycommish.core.Format
-import app.trycommish.core.leaguehome.ValueWords
+import app.trycommish.core.leaguehome.HostWords
 import app.trycommish.core.shell.SheetPlayer
 import app.trycommish.design.Words
 import java.time.Instant
@@ -190,16 +190,18 @@ data class StartModel(
 }
 
 /** The Start screen from the API's answer at the screen's clock, the times in the member's zone. Pure:
- * the same answer at the same clock draws the same screen. */
+ * the same answer at the same clock draws the same screen. `host` is the platform's words, the league's
+ * own unless a store graphic passes the neutral one (Lane 310). */
 fun startModel(
     answer: LineupAdvice,
     league: LeagueHost,
     now: Instant,
     zone: ZoneId,
+    host: HostWords = HostWords.of(league),
 ): StartModel {
     val (advice, held) = LineupBoxes.held(answer, now)
     val box = LineupBoxes.box(advice, held, zone, now)
-    val platform = ValueWords.platform(league)
+    val platform = host.name
     val done = advice.weekDone
     val small = StartWords.teamSmall(box.totals)
     val lines = advice.slots.flatMap { listOfNotNull(it.ours, it.host) } + advice.bench + advice.reserve
@@ -209,7 +211,7 @@ fun startModel(
         week = "${Words.LeagueHome.week} ${advice.week}",
         title = StartWords.changesTitle(box.swaps.size, done, advice.weekDoneState),
         decision = StartMoves.decision(advice),
-        sum = StartWords.lineupSum(box, platform, done),
+        sum = StartWords.lineupSum(box, host, done),
         done = done,
         missed = advice.missed,
         chips = if (done == null) box.idle.map(StripChip::Idle) + box.swaps.map(StripChip::SwapChip) else emptyList(),
@@ -225,7 +227,7 @@ fun startModel(
             ),
         bench = box.bench.map { RowCells.of(it, it.row, if (it.row.reserve) ReserveRow.Bench else null) },
         reserve = box.reserve.map { RowCells.of(null, it, ReserveRow.Slot) },
-        basis = LineupBasis.phone(LineupBasis.Facts(advice, league, lines, box.totals, zone, now)),
+        basis = LineupBasis.phone(LineupBasis.Facts(advice, league, lines, box.totals, zone, now, host)),
         platform = platform,
         verb =
             if (box.swaps.isEmpty()) {

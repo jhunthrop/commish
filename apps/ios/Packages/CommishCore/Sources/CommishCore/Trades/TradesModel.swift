@@ -140,12 +140,18 @@ public struct TradesModel: Equatable, Sendable {
     public let basis: String
 
     /// The answer drawn at `now`.
-    public init(advice answer: TradeAdvice, host: Components.Schemas.LeagueHost, now: Date, zone: TimeZone) {
+    /// `words` is the platform's words, the league's own unless a store graphic passes the neutral one
+    /// (Lane 310).
+    public init(
+        advice answer: TradeAdvice, host: Components.Schemas.LeagueHost, now: Date, zone: TimeZone,
+        words: HostWords? = nil
+    ) {
         let advice = TradeFinder.held(answer, now: now)
-        let platform = ValueWords.platform(host)
+        let hostWords = words ?? .of(host)
+        let platform = hostWords.name
         let presets = TradeFinder.presets(advice.teams)
         self.platform = platform
-        verb = TradesWords.verb(advice.moves, platform: platform)
+        verb = TradesWords.verb(advice.moves, host: hostWords)
         page = advice.hostTradesUrl.isEmpty ? nil : URL(string: advice.hostTradesUrl)
         reason = advice.hostTradesUrl.isEmpty ? advice.hostNote : nil
         let offers = TradeOffers.presets(advice, platform: platform, now: now, zone: zone)

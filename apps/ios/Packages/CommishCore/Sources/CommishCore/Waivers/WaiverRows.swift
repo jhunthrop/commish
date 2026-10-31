@@ -225,7 +225,7 @@ enum WaiverRows {
     }
 
     /// waivers.ts pickupCards with the card's verb, in the API's order.
-    static func cards(_ advice: WaiverAdvice, platform: String, moves: Components.Schemas.WaiverMoves) -> [PickupCard] {
+    static func cards(_ advice: WaiverAdvice, host: HostWords, moves: Components.Schemas.WaiverMoves) -> [PickupCard] {
         let names = names(advice)
         return advice.pickups.enumerated().map { index, source in
             let add = WaiverWords.cardName(source.add.player.name, onScreen: names)
@@ -235,7 +235,7 @@ enum WaiverRows {
                 mark: index == 0 && advice.pickups.count > 1 ? Words.Strip.best : nil,
                 move: WaiverWords.move(add: add, drop: drop), why: WaiverWords.dropWhy(dropWhy(source)),
                 gains: WaiverWords.cardGains(week: source.weekGain, gain: source.gain),
-                verb: WaiverWords.addVerb(moves, hostID: source.add.player.hostId, platform: platform),
+                verb: WaiverWords.addVerb(moves, hostID: source.add.player.hostId, host: host),
                 source: source
             )
         }
